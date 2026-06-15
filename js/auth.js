@@ -123,10 +123,9 @@ function _atualizarTickLabel() {
   const disponivel = Math.max(0, 100 - usado);
 
   if (disponivel <= 20) {
-    el.textContent = '▶ Pronto para avançar';
-    el.style.color = '#B8922A';
+    el.innerHTML = `<span style="cursor:pointer;text-decoration:underline;color:var(--ouro2)" onclick="window.avancarMes()">▶ Avançar mês</span>`;
   } else {
-    el.textContent = `⚡ ${disponivel} energia`;
+    el.innerHTML = `<span>⚡ ${disponivel} energia</span>`;
     el.style.color = '';
   }
 }

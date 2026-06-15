@@ -101,13 +101,26 @@ function _atualizarSidebarEsquerda(j) {
 // SIDEBAR DIREITA
 // ════════════════════════════════════════════════════════
 function _atualizarSidebarDireita(j) {
-  const energia     = j.energia || 100;
-  const energiaUsada = j.energia_usada_mes || 0;
-  const disponivel  = Math.max(0, energia - energiaUsada);
-  const pct         = Math.round((disponivel / 100) * 100);
-
-  _set('sr-energia-val', `${disponivel}/100`);
-  _style('sr-energia-bar', 'width', `${pct}%`);
+  // Bloco de energia + botão avançar mês
+  if (window.renderBlocoEnergia) {
+    window.renderBlocoEnergia(j);
+  } else {
+    // Fallback simples enquanto o módulo carrega
+    const el = document.getElementById('bloco-energia');
+    if (el) {
+      const usado = j.energia_usada_mes || 0;
+      const disp  = Math.max(0, 100 - usado);
+      const cor   = disp > 50 ? '#5A9A3A' : disp > 20 ? '#B8922A' : '#A83A3A';
+      el.innerHTML = `
+        <div class="bloco-titulo">⚡ Energia <span style="color:${cor};font-weight:700">${disp}/100</span></div>
+        <div class="energia-bar-wrap" style="margin-bottom:.6rem">
+          <div class="energia-bar-fill" style="width:${disp}%;background:${cor}"></div>
+        </div>
+        ${disp <= 20
+          ? `<button class="btn btn-prim btn-block" style="animation:pulseGold .8s ease infinite alternate" onclick="window.avancarMes()">▶ Avançar mês →</button>`
+          : `<button class="btn btn-ghost btn-block" onclick="window.avancarMes(true)" style="font-size:.72rem;opacity:.7">Avançar agora (${disp} ⚡ restantes)</button>`}`;
+    }
+  }
 
   const wA  = j.wins_ano   || 0;
   const lA  = j.losses_ano || 0;
@@ -160,9 +173,18 @@ function _atualizarTopbar(j) {
 // RELÓGIO GLOBAL
 // ════════════════════════════════════════════════════════
 function _atualizarRelógio(server) {
-  const texto = `${server.mes_nome || 'Janeiro'}, Ano ${server.ano_jogo || 1}`;
-  _set('server-data',   texto);
-  _set('sr-data-jogo',  texto);
+  // Usa calendário pessoal do jogador se disponível, senão o do servidor
+  const j = window.JOGADOR;
+  let texto;
+  if (j && j.mes_pessoal !== undefined) {
+    const MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                      'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    texto = `${MESES_PT[j.mes_pessoal]}, Ano ${j.ano_pessoal || 1}`;
+  } else {
+    texto = `${server.mes_nome || 'Janeiro'}, Ano ${server.ano_jogo || 1}`;
+  }
+  _set('server-data',  texto);
+  _set('sr-data-jogo', texto);
 }
 
 // ════════════════════════════════════════════════════════
@@ -304,3 +326,6 @@ function fmt(n) {
 // Expor para uso externo
 window.MESES      = MESES;
 window.CARGO_LABEL = CARGO_LABEL;
+
+// renderBlocoEnergia é definido em avancar_mes.js e exposto via window
+// chamado em _atualizarSidebarDireita
