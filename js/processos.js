@@ -162,21 +162,37 @@ window.abrirProcesso = async function(processoId) {
 };
 
 function _renderModalProcesso(id, p) {
-  const j       = window.JOGADOR;
-  const cs      = p.chance_sucesso || 50;
-  const prog    = p.progresso || 0;
-  const csColor = cs>=70?'var(--verde3)':cs>=40?'#ffa726':'var(--verm3)';
-  const inst    = ['','1ª Instância','2ª Instância','STJ','STF'][p.instancia||1]||'1ª Inst.';
-  const isSolo  = j.escritorio_id === 'solo';
-  const cargoId = j.cargo_id;
+  const j          = window.JOGADOR;
+  const cs         = p.chance_sucesso || 50;
+  const prog       = p.progresso || 0;
+  const csColor    = cs>=70?'var(--verde3)':cs>=40?'#ffa726':'var(--verm3)';
+  const inst       = ['','1ª Instância','2ª Instância','STJ','STF'][p.instancia||1]||'1ª Inst.';
+  const isSolo     = j.escritorio_id === 'solo';
+  const cargoId    = j.cargo_id;
 
-  // Verificar se pode ir a audiência (Júnior+)
-  const podeAud = ['jnr','pln','snr','asc','soc','snm',
+  // Verificar energia disponível
+  const energiaUsada = j.energia_usada_mes || 0;
+  const energiaDisp  = Math.max(0, 100 - energiaUsada);
+  const semEnergia   = energiaDisp === 0;
+  const podeAud20    = energiaDisp >= 20 && ['jnr','pln','snr','asc','soc','snm',
     'jsub','jtit','dsb','mstj','padj','prom','pjus','pgj','dadj','def','dch','dge'].includes(cargoId);
+  const podePesq10   = energiaDisp >= 10;
+  const podeAcordo   = energiaDisp >= 5;
 
   const honInfo = isSolo
     ? `Solo: 30% causa + ${[,'10%','10%','5%','5%'][p.instancia||1]} sucumbência`
     : `Escritório: 10% da sucumbência desta instância`;
+
+  // Aviso de energia zero
+  const avisoEnergia = semEnergia
+    ? `<div style="background:rgba(122,32,32,.15);border:1px solid rgba(200,80,80,.35);border-radius:2px;padding:.6rem;margin-bottom:.7rem;font-size:.75rem;color:var(--verm3);text-align:center">
+        ⚡ Energia esgotada — avance o mês para continuar
+       </div>`
+    : energiaDisp <= 20
+    ? `<div style="background:rgba(184,146,42,.08);border:var(--borda);border-radius:2px;padding:.5rem;margin-bottom:.7rem;font-size:.72rem;color:var(--ouro2);text-align:center">
+        ⚡ ${energiaDisp} energia restante — mês pronto para avançar
+       </div>`
+    : `<div style="font-size:.68rem;color:var(--ardosia2);text-align:right;margin-bottom:.5rem">⚡ ${energiaDisp} energia disponível</div>`;
 
   abrirModal(
     `⚖️ ${p.tipo||'—'}`,
@@ -203,17 +219,28 @@ function _renderModalProcesso(id, p) {
       </div>
     </div>
 
+    ${avisoEnergia}
+
     <div style="display:flex;flex-direction:column;gap:.4rem">
       <button class="btn btn-sec btn-block" onclick="window.iniciarQuiz('${id}','audiencia')"
-        ${!podeAud?'disabled title="Requer Advogado Júnior+"':''}>
-        🏛️ Realizar audiência <span style="font-size:.68rem;opacity:.7;margin-left:.4rem">(-20 energia)</span>
-        ${!podeAud?'<span style="font-size:.65rem;color:var(--verm3);margin-left:.5rem">🔒 Júnior+</span>':''}
+        ${!podeAud20?'disabled':''} style="${!podeAud20?'opacity:.35;cursor:not-allowed':''}">
+        🏛️ Realizar audiência
+        <span style="font-size:.68rem;opacity:.7;margin-left:.4rem">(-20 ⚡)</span>
+        ${!['jnr','pln','snr','asc','soc','snm','jsub','jtit','dsb','mstj','padj','prom','pjus','pgj','dadj','def','dch','dge'].includes(cargoId)
+          ? '<span style="font-size:.65rem;color:var(--verm3);margin-left:.5rem">🔒 Júnior+</span>'
+          : !podeAud20 ? '<span style="font-size:.65rem;color:var(--verm3);margin-left:.5rem">🔒 Sem energia</span>' : ''}
       </button>
-      <button class="btn btn-sec btn-block" onclick="window.iniciarQuiz('${id}','pesquisa')">
-        🔬 Pesquisa jurídica <span style="font-size:.68rem;opacity:.7;margin-left:.4rem">(-10 energia)</span>
+      <button class="btn btn-sec btn-block" onclick="window.iniciarQuiz('${id}','pesquisa')"
+        ${!podePesq10?'disabled':''} style="${!podePesq10?'opacity:.35;cursor:not-allowed':''}">
+        🔬 Pesquisa jurídica
+        <span style="font-size:.68rem;opacity:.7;margin-left:.4rem">(-10 ⚡)</span>
+        ${!podePesq10?'<span style="font-size:.65rem;color:var(--verm3);margin-left:.5rem">🔒 Sem energia</span>':''}
       </button>
-      <button class="btn btn-ghost btn-block" onclick="window.tentarAcordo('${id}')">
-        🤝 Propor acordo <span style="font-size:.68rem;opacity:.7;margin-left:.4rem">(honorários parciais)</span>
+      <button class="btn btn-ghost btn-block" onclick="window.tentarAcordo('${id}')"
+        ${!podeAcordo?'disabled':''} style="${!podeAcordo?'opacity:.35;cursor:not-allowed':''}">
+        🤝 Propor acordo
+        <span style="font-size:.68rem;opacity:.7;margin-left:.4rem">(-5 ⚡)</span>
+        ${!podeAcordo?'<span style="font-size:.65rem;color:var(--verm3);margin-left:.5rem">🔒 Sem energia</span>':''}
       </button>
       ${p.recurso_pendente ? `
       <button class="btn btn-sec btn-block" style="border-color:${cs>=70?'#ffa726':'rgba(255,255,255,.15)'}"
@@ -230,7 +257,10 @@ function _renderModalProcesso(id, p) {
 // ════════════════════════════════════════════════════════
 // QUIZ
 // ════════════════════════════════════════════════════════
-window.iniciarQuiz = function(procId, acao) {
+window.iniciarQuiz = async function(procId, acao) {
+  const custo = acao === 'audiencia' ? 20 : 10;
+  const ok = await window.gastarEnergia(custo, acao === 'audiencia' ? 'Audiência' : 'Pesquisa');
+  if (!ok) return;
   const j   = window.JOGADOR;
   const esp = j?.especialidade || 'civil';
   const banco = QUIZ[esp]?.[acao] || QUIZ.civil?.[acao] || QUIZ.civil.pesquisa;
@@ -447,6 +477,8 @@ window.decidirRecurso = async function(procId, interpor) {
 // ACORDO
 // ════════════════════════════════════════════════════════
 window.tentarAcordo = async function(procId) {
+  const ok = await window.gastarEnergia(5, 'Tentativa de acordo');
+  if (!ok) return;
   const j    = window.JOGADOR;
   const snap = await getDoc(doc(db, 'processos', procId));
   if (!snap.exists()) return;
