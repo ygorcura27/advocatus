@@ -168,21 +168,11 @@
       </div>
     </div>
 
-    <!-- Energia -->
-    <div class="energia-bloco">
-      <div class="bloco-titulo">
-        ⚡ Energia Mensal
-        <span id="sr-energia-val">100/100</span>
-      </div>
+    <!-- Energia + Botão Avançar Mês (injetado por avancar_mes.js) -->
+    <div class="energia-bloco" id="bloco-energia">
+      <div class="bloco-titulo">⚡ Energia Mensal <span>100/100</span></div>
       <div class="energia-bar-wrap">
-        <div class="energia-bar-fill" id="sr-energia-bar" style="width:100%"></div>
-      </div>
-      <div class="energia-costs">
-        <div class="ec-row"><span>Caso simples</span>   <span class="cost-val">-10</span></div>
-        <div class="ec-row"><span>Caso médio</span>     <span class="cost-val">-20</span></div>
-        <div class="ec-row"><span>Caso complexo</span>  <span class="cost-val">-35</span></div>
-        <div class="ec-row"><span>Networking</span>     <span class="cost-val">-5</span></div>
-        <div class="ec-row"><span>Curso</span>          <span class="cost-val">-10</span></div>
+        <div class="energia-bar-fill" style="width:100%"></div>
       </div>
     </div>
 
@@ -245,6 +235,7 @@
 <!-- ════════ SCRIPTS ════════ -->
 <script type="module">
   import './js/firebase-init.js';
+  import './js/avancar_mes.js';
   import './js/auth.js';
   import './js/gamestate.js';
   import './js/ui-main.js';
