@@ -10,13 +10,13 @@ import { getFirestore }     from 'https://www.gstatic.com/firebasejs/10.12.2/fir
 import { getFunctions }     from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
 
 const FB_CONFIG = {
-  apiKey:            "AIzaSyCiGvGA2OUYSGp2BHM-K05tM39hPk40trY",
-  authDomain:        "advocatus-simultor.firebaseapp.com",
-  projectId:         "advocatus-simultor",
-  storageBucket:     "advocatus-simultor.firebasestorage.app",
-  messagingSenderId: "527755299061",
-  appId:             "1:527755299061:web:cc75b6f9912d13a44a5dbc",
-  measurementId:     "G-MTKD441F1V",
+  apiKey:            "AIzaSyAjKvYGvb8kFasxaYzze4A5mnsdSjEFOXQ",
+  authDomain:        "advocatus-57f24.firebaseapp.com",
+  projectId:         "advocatus-57f24",
+  storageBucket:     "advocatus-57f24.firebasestorage.app",
+  messagingSenderId: "799917424990",
+  appId:             "1:799917424990:web:064c2d7ce678b901ff8fcf",
+  measurementId:     "G-4N9220630M",
 };
 
 const app       = initializeApp(FB_CONFIG);
