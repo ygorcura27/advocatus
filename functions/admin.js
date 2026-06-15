@@ -17,7 +17,7 @@ const { logger }             = require('firebase-functions');
 // ── UIDs autorizados como administradores ──
 // Adicione o seu UID do Firebase Auth (encontre em Authentication > Users)
 const ADMIN_UIDS = [
-  'COLE_SEU_UID_AQUI',   // Ygor — admin principal
+  'pdt67JLLnxdzFu86jIZ3oqbzpA82',   // Ygor — admin principal
 ];
 
 function assertAdmin(auth) {
