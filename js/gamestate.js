@@ -111,14 +111,26 @@ function _atualizarSidebarDireita(j) {
       const usado = j.energia_usada_mes || 0;
       const disp  = Math.max(0, 100 - usado);
       const cor   = disp > 50 ? '#5A9A3A' : disp > 20 ? '#B8922A' : '#A83A3A';
+      const pronto = disp <= 20;
       el.innerHTML = `
-        <div class="bloco-titulo">⚡ Energia <span style="color:${cor};font-weight:700">${disp}/100</span></div>
+        <div class="bloco-titulo">⚡ Energia Mensal <span style="font-weight:700;color:${cor}">${disp}/100</span></div>
         <div class="energia-bar-wrap" style="margin-bottom:.6rem">
           <div class="energia-bar-fill" style="width:${disp}%;background:${cor}"></div>
         </div>
-        ${disp <= 20
-          ? `<button class="btn btn-prim btn-block" style="animation:pulseGold .8s ease infinite alternate" onclick="window.avancarMes()">▶ Avançar mês →</button>`
-          : `<button class="btn btn-ghost btn-block" onclick="window.avancarMes(true)" style="font-size:.72rem;opacity:.7">Avançar agora (${disp} ⚡ restantes)</button>`}`;
+        <div style="font-size:.63rem;color:var(--txt4);line-height:1.85;margin-bottom:.7rem">
+          <div style="display:flex;justify-content:space-between"><span>Pesquisa jurídica</span><span>-10 ⚡</span></div>
+          <div style="display:flex;justify-content:space-between"><span>Audiência</span><span>-20 ⚡</span></div>
+          <div style="display:flex;justify-content:space-between"><span>Acordo</span><span>-5 ⚡</span></div>
+        </div>
+        <button class="btn-avancar-mes ${pronto ? 'pronto' : ''}"
+          onclick="window.avancarMes(${pronto ? 'false' : 'true'})"
+          ${!pronto ? 'style="background:linear-gradient(135deg,#6B7FA0,#9BAAC4);border-color:#D1D8EE;color:#fff;opacity:.75"' : ''}>
+          <span class="bam-icon">${pronto ? '▶' : '⚡'}</span>
+          <div>
+            ${pronto ? 'Avançar mês' : 'Forçar avanço'}
+            <span class="bam-hint">${pronto ? 'Energia esgotada — pronto!' : disp + ' ⚡ restantes'}</span>
+          </div>
+        </button>`;
     }
   }
 
