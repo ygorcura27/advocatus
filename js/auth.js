@@ -109,35 +109,30 @@ function _atualizarRelogio(server) {
   if (el) {
     el.textContent = `${server.mes_nome || 'Janeiro'}, Ano ${server.ano_jogo || 1}`;
   }
-
-  // Countdown para o próximo tick (aproximado — 1 dia = próximo tick)
-  _iniciarCountdown();
+  // O tick é manual (por clique) — mostrar energia restante
+  _atualizarTickLabel();
 }
 
-let _countdownInterval = null;
-function _iniciarCountdown() {
-  if (_countdownInterval) clearInterval(_countdownInterval);
+function _atualizarTickLabel() {
+  const el = document.getElementById('server-tick');
+  if (!el) return;
+  const j = window.JOGADOR;
+  if (!j) { el.textContent = ''; return; }
 
-  // Próximo tick: meia-noite de amanhã (São Paulo)
-  function calcProximoTick() {
-    const agora   = new Date();
-    const amanha  = new Date(agora);
-    amanha.setDate(amanha.getDate() + 1);
-    amanha.setHours(0, 0, 0, 0);
-    return amanha - agora;
+  const usado      = j.energia_usada_mes || 0;
+  const disponivel = Math.max(0, 100 - usado);
+
+  if (disponivel <= 20) {
+    el.textContent = '▶ Pronto para avançar';
+    el.style.color = '#B8922A';
+  } else {
+    el.textContent = `⚡ ${disponivel} energia`;
+    el.style.color = '';
   }
-
-  function atualizar() {
-    const ms     = calcProximoTick();
-    const h      = Math.floor(ms / 3600000);
-    const m      = Math.floor((ms % 3600000) / 60000);
-    const el     = document.getElementById('server-tick');
-    if (el) el.textContent = `Próximo mês em ${h}h ${m}min`;
-  }
-
-  atualizar();
-  _countdownInterval = setInterval(atualizar, 60000); // atualiza a cada minuto
 }
+
+// Atualizar label quando jogador mudar
+window.addEventListener('jogador:update', () => _atualizarTickLabel());
 
 // ════════════════════════════════════════════════════════
 // LOGOUT
@@ -146,7 +141,6 @@ window.fazerLogout = async () => {
   if (!confirm('Sair do jogo? Seu progresso está salvo automaticamente.')) return;
   if (_unsubJogador) _unsubJogador();
   if (_unsubServer)  _unsubServer();
-  if (_countdownInterval) clearInterval(_countdownInterval);
   await signOut(auth);
   window.location.href = '/index.html';
 };
