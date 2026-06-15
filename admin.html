@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Advocatus Online</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700&family=Inter:wght@300;400;500;600&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<style>
+body { background: var(--couro); overflow-x: hidden; }
+
+.admin-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  min-height: 100vh;
+  margin-top: var(--topbar-h);
+}
+
+/* Sidebar admin */
+.admin-sidebar {
+  background: rgba(0,0,0,.25);
+  border-right: var(--borda);
+  padding: 1rem .7rem;
+  position: sticky;
+  top: var(--topbar-h);
+  height: calc(100vh - var(--topbar-h));
+  overflow-y: auto;
+}
+.admin-nav-titulo {
+  font-size: .58rem;
+  color: var(--ardosia);
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  padding: .5rem .5rem .3rem;
+  margin-top: .5rem;
+}
+.admin-nav-item {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .42rem .65rem;
+  border-radius: var(--r);
+  cursor: pointer;
+  font-size: .78rem;
+  color: var(--ardosia2);
+  transition: all .15s;
+}
+.admin-nav-item:hover { background: rgba(255,255,255,.05); color: var(--perg); }
+.admin-nav-item.ativo { background: rgba(184,146,42,.12); color: var(--ouro2); border: var(--borda); }
+
+/* Área central admin */
+.admin-main {
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+.admin-header {
+  display: flex;
+  align-items: center;
+  gap: .8rem;
+  margin-bottom: 1.2rem;
+  padding-bottom: .7rem;
+  border-bottom: var(--borda);
+}
+.admin-titulo {
+  font-family: var(--font-serif);
+  font-size: 1.1rem;
+  color: var(--perg);
+  font-weight: 600;
+}
+.admin-badge {
+  font-size: .62rem;
+  padding: .12rem .5rem;
+  background: rgba(122,32,32,.3);
+  border: 1px solid rgba(200,80,80,.35);
+  color: var(--verm3);
+  border-radius: var(--r);
+}
+
+/* Grid de controles */
+.ctrl-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .7rem;
+  margin-bottom: 1.2rem;
+}
+.ctrl-card {
+  background: rgba(255,255,255,.03);
+  border: var(--borda);
+  border-radius: var(--r);
+  padding: .9rem;
+}
+.ctrl-card-titulo {
+  font-size: .72rem;
+  color: var(--ardosia2);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: .6rem;
+}
+
+/* Inputs compactos */
+.ctrl-campo { margin-bottom: .6rem; }
+.ctrl-campo label {
+  display: block;
+  font-size: .62rem;
+  color: var(--ardosia);
+  margin-bottom: .2rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.ctrl-campo input, .ctrl-campo select {
+  width: 100%;
+  background: rgba(255,255,255,.06);
+  border: var(--borda);
+  color: var(--perg);
+  padding: .45rem .7rem;
+  border-radius: var(--r);
+  font-family: var(--font-mono);
+  font-size: .8rem;
+  outline: none;
+}
+.ctrl-campo input:focus { border-color: var(--ouro2); }
+
+/* Log de resultados */
+#admin-log {
+  background: rgba(0,0,0,.3);
+  border: var(--borda);
+  border-radius: var(--r);
+  padding: .8rem;
+  font-family: var(--font-mono);
+  font-size: .72rem;
+  color: var(--perg2);
+  max-height: 280px;
+  overflow-y: auto;
+  line-height: 1.7;
+}
+.log-ok     { color: var(--verde3); }
+.log-ko     { color: var(--verm3); }
+.log-info   { color: var(--ardosia2); }
+.log-gold   { color: var(--ouro2); }
+
+/* Tabela de jogadores */
+#tabela-jogadores {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .75rem;
+}
+#tabela-jogadores th {
+  text-align: left;
+  font-size: .62rem;
+  color: var(--ardosia);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  padding: .4rem .6rem;
+  border-bottom: var(--borda);
+}
+#tabela-jogadores td {
+  padding: .45rem .6rem;
+  color: var(--perg2);
+  border-bottom: var(--borda-sub);
+  vertical-align: middle;
+}
+#tabela-jogadores tr:hover td { background: rgba(255,255,255,.03); }
+.uid-cell { font-family: var(--font-mono); font-size: .62rem; color: var(--ardosia); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Info card servidor */
+.server-info-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: .5rem;
+  margin-bottom: 1rem;
+}
+.server-info-card {
+  background: rgba(255,255,255,.04);
+  border: var(--borda);
+  border-radius: var(--r);
+  padding: .65rem;
+  text-align: center;
+}
+.server-info-val  { font-family: var(--font-serif); font-size: 1.1rem; color: var(--ouro2); font-weight: 700; }
+.server-info-label{ font-size: .6rem; color: var(--ardosia); text-transform: uppercase; letter-spacing: .08em; margin-top: .15rem; }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<header class="topbar">
+  <div class="logo">Advocatus<em>Online</em> <span style="font-size:.65rem;color:var(--verm3);margin-left:.5rem">⚙️ ADMIN</span></div>
+  <div style="margin-left:auto;display:flex;gap:.8rem;align-items:center">
+    <a href="/jogo.html" class="btn btn-sm btn-ghost">← Voltar ao jogo</a>
+    <span id="admin-uid" style="font-size:.65rem;color:var(--ardosia);font-family:var(--font-mono)">—</span>
+    <button class="btn-logout" onclick="fazerLogout()">Sair</button>
+  </div>
+</header>
+
+<div class="admin-layout">
+
+  <!-- SIDEBAR -->
+  <nav class="admin-sidebar">
+    <div class="admin-nav-titulo">Servidor</div>
+    <div class="admin-nav-item ativo" onclick="painelAdmin('servidor',this)">⏰ Calendário</div>
+    <div class="admin-nav-item" onclick="painelAdmin('eventos',this)">⚡ Eventos</div>
+
+    <div class="admin-nav-titulo">Jogadores</div>
+    <div class="admin-nav-item" onclick="painelAdmin('jogadores',this)">👥 Listar</div>
+    <div class="admin-nav-item" onclick="painelAdmin('editar_jogador',this)">✏️ Editar jogador</div>
+    <div class="admin-nav-item" onclick="painelAdmin('financeiro',this)">💰 Financeiro</div>
+    <div class="admin-nav-item" onclick="painelAdmin('skills',this)">⚡ Skills</div>
+    <div class="admin-nav-item" onclick="painelAdmin('cargo',this)">📈 Cargo / OAB</div>
+    <div class="admin-nav-item" onclick="painelAdmin('saude',this)">🧠 Burnout / Saúde</div>
+    <div class="admin-nav-item" onclick="painelAdmin('reset_jogador',this)">🔄 Reset completo</div>
+
+    <div class="admin-nav-titulo">Processos</div>
+    <div class="admin-nav-item" onclick="painelAdmin('processos',this)">⚖️ Processos</div>
+
+    <div class="admin-nav-titulo">Escritórios</div>
+    <div class="admin-nav-item" onclick="painelAdmin('escritorios',this)">🏢 Escritórios</div>
+
+    <div class="admin-nav-titulo">Comunicação</div>
+    <div class="admin-nav-item" onclick="painelAdmin('mensagens',this)">📬 Mensagens</div>
+
+    <div class="admin-nav-titulo">Beta</div>
+    <div class="admin-nav-item" onclick="painelAdmin('beta',this)">🚀 Ferramentas Beta</div>
+    <div class="admin-nav-item" onclick="painelAdmin('log',this)">📋 Log de ações</div>
+  </nav>
+
+  <!-- ÁREA CENTRAL -->
+  <main class="admin-main" id="admin-main">
+    <div style="text-align:center;padding:3rem;color:var(--ardosia)">
+      <div style="font-size:2rem;margin-bottom:.5rem">⚙️</div>
+      <div>Carregando painel admin...</div>
+    </div>
+  </main>
+</div>
+
+<!-- Toast -->
+<div id="toast-container"></div>
+
+<script type="module">
+import { initializeApp }    from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getAuth, onAuthStateChanged, signOut }
+  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { getFunctions, httpsCallable }
+  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
+import { getFirestore }
+  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+const FB = {
+  apiKey:"AIzaSyCiGvGA2OUYSGp2BHM-K05tM39hPk40trY",
+  authDomain:"advocatus-simultor.firebaseapp.com",
+  projectId:"advocatus-simultor",
+  storageBucket:"advocatus-simultor.firebasestorage.app",
+  messagingSenderId:"527755299061",
+  appId:"1:527755299061:web:cc75b6f9912d13a44a5dbc",
+};
+const app       = initializeApp(FB);
+const auth      = getAuth(app);
+const db        = getFirestore(app);
+const functions = getFunctions(app, 'southamerica-east1');
+const adminFn   = httpsCallable(functions, 'adminAction');
+
+window._auth      = auth;
+window._db        = db;
+window._adminFn   = adminFn;
+window._adminUID  = null;
+
+// ── Auth check ──
+onAuthStateChanged(auth, async user => {
+  if (!user) { window.location.href = '/index.html'; return; }
+  document.getElementById('admin-uid').textContent = user.uid;
+  window._adminUID = user.uid;
+  // Verificar se é admin chamando uma ação simples
+  try {
+    const r = await adminFn({ acao:'server_get', payload:{} });
+    if (!r.data.ok) throw new Error('Não autorizado');
+    window._serverData = r.data.data;
+    // Carregar painel inicial
+    window.painelAdmin('servidor', document.querySelector('.admin-nav-item.ativo'));
+  } catch (err) {
+    document.getElementById('admin-main').innerHTML = `
+      <div style="text-align:center;padding:3rem">
+        <div style="font-size:2rem;margin-bottom:.5rem">🔒</div>
+        <div style="color:var(--verm3);font-size:1rem">Acesso negado</div>
+        <div style="color:var(--ardosia2);font-size:.78rem;margin-top:.5rem">
+          Seu UID não está na lista de administradores.<br>
+          UID atual: <code style="color:var(--ouro2)">${user.uid}</code><br><br>
+          Adicione este UID ao array <code>ADMIN_UIDS</code> em <code>functions/admin.js</code>
+        </div>
+      </div>`;
+  }
+});
+
+window.fazerLogout = async () => { await signOut(auth); window.location.href='/index.html'; };
+
+// ── Dispatcher de painéis ──
+window.painelAdmin = function(painel, el) {
+  document.querySelectorAll('.admin-nav-item').forEach(e => e.classList.remove('ativo'));
+  if (el) el.classList.add('ativo');
+  const main = document.getElementById('admin-main');
+
+  switch (painel) {
+    case 'servidor':      renderServidor(main); break;
+    case 'jogadores':     renderJogadores(main); break;
+    case 'editar_jogador':renderEditarJogador(main); break;
+    case 'financeiro':    renderFinanceiro(main); break;
+    case 'skills':        renderSkills(main); break;
+    case 'cargo':         renderCargo(main); break;
+    case 'saude':         renderSaude(main); break;
+    case 'reset_jogador': renderReset(main); break;
+    case 'processos':     renderProcessos(main); break;
+    case 'escritorios':   renderEscritorios(main); break;
+    case 'mensagens':     renderMensagens(main); break;
+    case 'beta':          renderBeta(main); break;
+    case 'eventos':       renderEventos(main); break;
+    case 'log':           renderLog(main); break;
+    default: main.innerHTML = '<div class="card">Em breve.</div>';
+  }
+};
+
+// ════════════════════════════════════════════════════════
+// SERVIDOR
+// ════════════════════════════════════════════════════════
+function renderServidor(main) {
+  const s = window._serverData || {};
+  main.innerHTML = `
+    <div class="admin-header">
+      <div class="admin-titulo">⏰ Calendário do Servidor</div>
+      <span class="admin-badge">ADMIN</span>
+    </div>
+    <div class="server-info-grid">
+      <div class="server-info-card"><div class="server-info-val">${s.mes_nome||'—'}</div><div class="server-info-label">Mês</div></div>
+      <div class="server-info-card"><div class="server-info-val">Ano ${s.ano_jogo||'—'}</div><div class="server-info-label">Ano de Jogo</div></div>
+      <div class="server-info-card"><div class="server-info-val">${s.mes_global||'—'}</div><div class="server-info-label">Mês Global</div></div>
+      <div class="server-info-card"><div class="server-info-val">${s.total_jogadores||0}</div><div class="server-info-label">Jogadores</div></div>
+    </div>
+    <div class="ctrl-grid">
+      <div class="ctrl-card">
+        <div class="ctrl-card-titulo">🔄 Resetar Calendário</div>
+        <p style="font-size:.72rem;color:var(--ardosia2);margin-bottom:.7rem">Volta para Ano 1, Janeiro. <b style="color:var(--verm3)">Irreversível.</b></p>
+        <button class="btn btn-danger btn-block" onclick="acaoAdmin('server_reset_calendario',{},'Confirma reset do calendário?')">
+          Resetar para Ano 1, Janeiro
+        </button>
+      </div>
+      <div class="ctrl-card">
+        <div class="ctrl-card-titulo">📅 Definir Mês/Ano</div>
+        <div class="ctrl-campo"><label>Mês (0=Jan…11=Dez)</label><input type="number" id="set-mes" min="0" max="11" value="${s.mes_jogo||0}"></div>
+        <div class="ctrl-campo"><label>Ano de jogo</label><input type="number" id="set-ano" min="1" value="${s.ano_jogo||1}"></div>
+        <div class="ctrl-campo"><label>Mês global (absoluto)</label><input type="number" id="set-mesg" min="1" value="${s.mes_global||1}"></div>
+        <button class="btn btn-sec btn-block" onclick="acaoAdmin('server_set_mes',{mes_jogo:+id('set-mes').value,ano_jogo:+id('set-ano').value,mes_global:+id('set-mesg').value})">
+          Aplicar
+        </button>
+      </div>
+      <div class="ctrl-card">
+        <div class="ctrl-card-titulo">⚡ Forçar Tick</div>
+        <p style="font-size:.72rem;color:var(--ardosia2);margin-bottom:.7rem">Avança o servidor manualmente (equivale a 1 dia).</p>
+        <button class="btn btn-sec btn-block" onclick="acaoAdmin('server_forcar_tick',{})">
+          Forçar tick agora
+        </button>
+      </div>
+      <div class="ctrl-card">
+        <div class="ctrl-card-titulo">🏆 Atualizar Rankings</div>
+        <p style="font-size:.72rem;color:var(--ardosia2);margin-bottom:.7rem">Força a recalculação dos rankings imediatamente.</p>
+        <button class="btn btn-sec btn-block" onclick="acaoAdmin('rankings_atualizar',{})">
+          Atualizar rankings
+        </button>
+      </div>
+    </div>
+    <div class="ctrl-card">
+      <div class="ctrl-card-titulo">📋 Log de resultado</div>
+      <div id="admin-log" style="min-height:80px"><span class="log-info">Aguardando ações...</span></div>
+    </div>`;
+}
+
+// ════════════════════════════════════════════════════════
+// LISTAR JOGADORES
+// ════════════════════════════════════════════════════════
+async function renderJogadores(main) {
+  main.innerHTML = `
+    <div class="admin-header"><div class="admin-titulo">👥 Jogadores</div></div>
+    <div style="font-size:.78rem;color:var(--ardosia);margin-bottom:.8rem">Carregando...</div>`;
+  try {
+    const r = await window._adminFn({ acao:'jogador_listar', payload:{limit:200} });
+    const lista = r.data.data || [];
+    const CARGO_L = {est:'Est.',ass:'Ass.',jnr:'Júnior',pln:'Pleno',snr:'Sênior',asc:'Assoc.',soc:'Sócio',snm:'Sócio Nom.'};
+    main.innerHTML = `
+      <div class="admin-header"><div class="admin-titulo">👥 Jogadores (${lista.length})</div></div>
+      <table id="tabela-jogadores">
+        <thead><tr>
+          <th>UID</th><th>Nome</th><th>Cargo</th><th>Rep</th>
+          <th>Saldo</th><th>OAB</th><th>Serasa</th><th>Ações</th>
+        </tr></thead>
+        <tbody>
+          ${lista.map(j=>`<tr>
+            <td class="uid-cell" title="${j.uid}">${j.uid.slice(0,12)}…</td>
+            <td style="font-weight:600">${j.nome||'—'}</td>
+            <td>${CARGO_L[j.cargo_id]||j.cargo_id}</td>
+            <td style="color:var(--ouro2)">${j.reputacao}</td>
+            <td style="color:var(--verde3)">${fmt(j.dinheiro)}</td>
+            <td>${j.oab?'✅':'—'}</td>
+            <td>${j.no_serasa?'<span style="color:var(--verm3)">🚨</span>':'—'}</td>
+            <td>
+              <button class="btn btn-sm btn-ghost" onclick="abrirEditarUID('${j.uid}','${j.nome}')">Editar</button>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch (err) {
+    main.innerHTML = `<div class="card" style="color:var(--verm3)">Erro: ${err.message}</div>`;
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// EDITAR JOGADOR (formulário de busca por UID)
+// ════════════════════════════════════════════════════════
+function renderEditarJogador(main) {
+  main.innerHTML = `
+    <div class="admin-header"><div class="admin-titulo">✏️ Editar Jogador</div></div>
+    <div class="ctrl-card" style="margin-bottom:1rem">
+      <div class="ctrl-card-titulo">Buscar por UID</div>
+      <div style="display:flex;gap:.5rem">
+        <input type="text" id="busca-uid" placeholder="Cole o UID aqui..." style="flex:1;background:rgba(255,255,255,.06);border:var(--borda);color:var(--perg);padding:.45rem .7rem;border-radius:var(--r);font-family:var(--font-mono);font-size:.8rem;outline:none">
+        <button class="btn btn-sec" onclick="buscarJogador()">Buscar</button>
+      </div>
+    </div>
+    <div id="resultado-busca"></div>
+    <div class="ctrl-card" style="margin-top:1rem">
+      <div class="ctrl-card-titulo">📋 Log</div>
+      <div id="admin-log" style="min-height:60px"><span class="log-info">Aguardando...</span></div>
+    </div>`;
+}
+
+window.buscarJogador = async function() {
+  const uid = id('busca-uid').value.trim();
+  if (!uid) { toast('Digite um UID.','ko'); return; }
+  try {
+    const r = await window._adminFn({ acao:'jogador_get', payload:{uid} });
+    const j = r.data.data;
+    document.getElementById('resultado-busca').innerHTML = `
+      <div class="ctrl-card">
+        <div style="font-weight:600;color:var(--perg);margin-bottom:.5rem">${j.nome_personagem||'—'} <span style="font-size:.65rem;font-family:var(--font-mono);color:var(--ardosia)">${j.uid}</span></div>
+        <pre style="font-size:.68rem;color:var(--ardosia2);max-height:200px;overflow:auto;font-family:var(--font-mono)">${JSON.stringify({
+          cargo_id:j.cargo_id, reputacao:j.reputacao, dinheiro:j.dinheiro,
+          oab:j.oab, no_serasa:j.no_serasa, saude_mental:j.saude_mental,
+          disposicao:j.disposicao, energia:j.energia, skills:j.skills,
+          wins:j.wins, losses:j.losses, carreira:j.carreira, especialidade:j.especialidade,
+        }, null, 2)}</pre>
+      </div>`;
+    abrirEditarUID(uid, j.nome_personagem);
+  } catch (err) {
+    log(`❌ ${err.message}`, 'ko');
+  }
+};
+
+window.abrirEditarUID = function(uid, nome) {
+  // Navega para o painel de edição com o UID pré-preenchido
+  window._uid_editando = uid;
+  document.querySelectorAll('.admin-nav-item').forEach(e=>e.classList.remove('ativo'));
+  const el = document.querySelector('.admin-nav-item[onclick*="editar_jogador"]');
+  if (el) el.classList.add('ativo');
+  const main = document.getElementById('admin-main');
+  renderEditarJogador(main);
+  setTimeout(() => {
+    const inp = document.getElementById('busca-uid');
+    if (inp) inp.value = uid;
+    toast(`UID ${nome||uid} carregado.`,'ok');
+  }, 100);
+};
+
+// ════════════════════════════════════════════════════════
+// FINANCEIRO
+// ════════════════════════════════════════════════════════
+function renderFinanceiro(main) {
+  main.innerHTML = `
+    <div class="admin-header"><div class="admin-titulo">💰 Editar Financeiro</div></div>
+    <div class="ctrl-grid">
+      <div class="ctrl-card">
+        <div class="ctrl-card-titulo">Definir saldo</div>
+        <div class="ctrl-campo"><label>UID</label><input type="text" id="fin-uid" placeholder="UID do jogador"></div>
+        <div class="ctrl-campo"><label>Valor (R$)</label><input type="number" id="fin-val" value="100000"></div>
+        <button class="btn btn-sec btn-block" onclick="acaoAdmin('jogador_set_dinheiro',{uid:id('fin-uid').value.trim(),valor:+id('fin-val').value})">Definir saldo</button>
+      </div>
+      <div class="ctrl-card">
+        <div class="ctrl-card-titulo">Adicionar dinheiro</div>
+        <div class="ctrl-campo"><label>UID</label><input type="text" id="fadd-uid" placeholder="UID do jogador"></div>
+        <div class="ctrl-campo"><label>Valor a adicionar (R$)</label><input type="number" id="fadd-val" value="50000"></div>
+        <button class="btn btn-sec btn-block" onclick="acaoAdmin('jogador_add_dinheiro',{uid:id('fadd-uid').value.trim(),valor:+id('fadd-val').value})">Adicionar</button>
+      </div>
+      <div class="ctrl-card">
+        <div class="ctrl-card-titulo">Limpar Serasa</div>
+        <div class="ctrl-campo"><label>UID</label><input type="text" id="ser-uid" placeholder="UID do jogador"></div>
+        <button class="btn btn-danger btn-block" onclick="acaoAdmin('jogador_reset_financeiro',{uid:id('ser-uid').value.trim()})">Limpar Serasa e histórico negativo</button>
+      </div>
+      <div class="ctrl-card">
+        <div class="ctrl-card-titulo">Definir reputação</div>
+        <div class="ctrl-campo"><label>UID</label><input type="text" id="rep-uid" placeholder="UID do jogador"></div>
+        <div class="ctrl-campo"><label>Valor (0–100)</label><input type="number" id="rep-val" min="0" max="100" value="50"></div>
+        <button class="btn btn-sec btn-block" onclick="acaoAdmin('jogador_set_reputacao',{uid:id('rep-uid').value.trim(),valor:+id('rep-val').value})">Definir reputação</button>
+      </div>
+    </div>
+    <div class="ctrl-card">
+      <div class="ctrl-card-titulo">Definir atributo específico</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem">
+        <div class="ctrl-campo"><label>UID</label><input type="text" id="atr-uid" placeholder="UID"></div>
+        <div class="ctrl-campo"><label>Atributo</label>
+          <select id="atr-nome">
+            <option value="reputacao">Reputação</option>
+            <option value="networking">Networking</option>
+            <option value="saude_mental">Saúde Mental</option>
+            <option value="disposicao">Disposição</option>
+            <option value="prestigio_academico">Prestígio Acadêmico</option>
+            <option value="energia">Energia</option>
+          </select>
+        </div>
+        <div class="ctrl-campo"><label>Valor (0–100)</label><input type="number" id="atr-val" min="0" max="100" value="80"></div>
+      </div>
+      <button class="btn btn-sec" onclick="acaoAdmin('jogador_set_atributo',{uid:id('atr-uid').value.trim(),atributo:id('atr-nome').value,valor:+id('atr-val').value})">Aplicar</button>
+    </div>
+    <div class="ctrl-card" style="margin-top:.7rem">
+      <div class="ctrl-card-titulo">📋 Log</div>
+      <div id="admin-log" style="min-height:80px"><span class="log-info">Aguardando...</span></div>
+    </div>`;
+}
+
+// ════════════════════════════════════════════════════════
+// SKILLS
+// ════════════════════════════════════════════════════════
+function renderSkills(main) {
+  const SKILLS = ['oratoria','argumentacao','escrita','pesquisa','negociacao','persuasao','gestao','networking'];
+  main.innerHTML = `
+    <div class="admin-header"><div class="admin-titulo">⚡ Editar Skills</div></div>
+    <div class="ctrl-grid">
+      <div class="ctrl-card">
+        <div class="ctrl-card-titulo">Definir skill individual</div>
+        <div class="ctrl-campo"><label>UID</label><input type="text" id="sk-uid" placeholder="UID"></div>
+        <div class="ctrl-campo"><label>Skill</label>
+          <select id="sk-nome">${SKILLS.map(s=>`<option value="${s}">${s}</option>`).join('')}</select>
+        </div>
+        <div class="ctrl-campo"><label>Valor (0–100)</label><input type="number" id="sk-val" min="0" max="100" value="50"></div>
+        <button class="btn btn-sec btn-block" onclick="acaoAdmin('jogador_set_skill',{uid:id('sk-uid').value.trim(),skill:id('sk-nome').value,valor:+id('sk-val').value})">Aplicar</button>
+      </div>
+      <div class="ctrl-card">
+        <div class="ctrl-card-titulo">Resetar todas as skills</div>
+        <div class="ctrl-campo"><label>UID</label><input type="text" id="skr-uid" placeholder="UID"></div>
+        <button class="btn btn-danger btn-block" onclick="acaoAdmin('jogador_reset_skills',{uid:id('skr-uid').value.trim()},'Confirma reset de skills?')">Reset skills para valores iniciais</button>
+        <div style="margin-top:.5rem"></div>
+        <button class="btn btn-sec btn-block" onclick="acaoAdmin('jogador_max_skills',{uid:id('skr-uid').value})">Maxar skills no cap do cargo</button>
+      </div>
+    </div>
+    <div class="ctrl-card"><div class="ctrl-card-titulo">📋 Log</div>
+      <div id="admin-log" style="min-height:80px"><span class="log-info">Aguardando...</span></div>
+    </div>`;
+}
+
+// ════════════════════════════════════════════════════════
+// CARGO / OAB
+// ════════════════════════════════════════════════════════
+function renderCargo(main) {
+  const CARGOS = ['est','ass','jnr','pln','snr','asc','soc','snm','jsub','jtit','dsb','mstj','padj','prom','pjus','pgj','dadj','def','dch','dge'];
+  main.innerHTML = `
+    <div class="admin-header"><div class="admin-titulo">📈 Cargo & OAB</div></div>
+    <div class="ctrl-grid">
+      <div class="ctrl-card">
+        <div class="ctrl-card-titulo">Definir cargo</div>
+        <div class="ctrl-campo"><label>UID</label><input type="text" id="cg-uid" placeholder="UID"></div>
+        <div class="ctrl-campo"><label>Cargo</label>
+          <select id="cg-cargo">${CARGOS.map(c=>`<option value="${c}">${c}</option>`).join('')}</select>
+        </div>
+        <div style="font-size:.68rem;color:var(--ardosia2);margin-bottom:.5rem">OAB concedida automaticamente para Júnior+.</div>
+        <button class="btn btn-sec btn-block" onclick="acaoAdmin('jogador_set_cargo',{uid:id('cg-uid').value.trim(),cargo_id:id('cg-cargo').value})">Definir cargo</button>
+      </div>
+      <div class="ctrl-card">
+        <div class="ctrl-card-titulo">OAB / Concurso</div>
+        <div class="ctrl-campo"><label>UID</label><input type="text" id="oab-uid" placeholder="UID"></div>
+        <div style="display:flex;gap:.5rem;margin-bottom:.5rem">
+          <button class="btn btn-sec" style="flex:1" onclick="acaoAdmin('jogador_set_oab',{uid:id('oab-uid').value.trim(),aprovado:true})">Conceder OAB ✅</button>
+          <button class="btn btn-danger" style="flex:1" onclick="acaoAdmin('jogador_set_oab',{uid:id('oab-uid').value.trim(),aprovado:false})">Revogar OAB</button>
+        </div>
+        <button class="btn btn-sec btn-block" onclick="acaoAdmin('jogador_set_concurso',{uid:id('oab-uid').value.trim(),aprovado:true})">Aprovar no concurso público</button>
+      </div>
+      <div class="ctrl-card">
+        <div class="ctrl-card-titulo">Definir XP</div>
+        <div class="ctrl-campo"><label>UID</label><input type="text" id="xp-uid" placeholder="UID"></div>
+        <div class="ctrl-campo"><label>XP</label><input type="number" id="xp-val" value="1000"></div>
+        <button class="btn btn-sec btn-block" onclick="acaoAdmin('jogador_set_xp',{uid:id('xp-uid').value.trim(),xp:+id('xp-val').value})">Definir XP</button>
+      </div>
+    </div>
+    <div class="ctrl-card"><div class="ctrl-card-titulo">📋 Log</div>
+      <div id="admin-log" style="min-height:80px"><span class="log-info">Aguardando...</span></div>
+    </div>`;
+}
+
+// ════════════════════════════════════════════════════════
+// SAÚDE / BURNOUT
+// ════════════════════════════════════════════════════════
+function renderSaude(main) {
+  main.innerHTML = `
+    <div class="admin-header"><div class="admin-titulo">🧠 Burnout & Saúde Mental</div></div>
+    <div class="ctrl-card" style="max-width:400px">
+      <div class="ctrl-card-titulo">Curar burnout e restaurar saúde</div>
+      <div class="ctrl-campo"><label>UID do jogador</label><input type="text" id="burn-uid" placeholder="UID"></div>
+      <button class="btn btn-sec btn-block" onclick="acaoAdmin('jogador_curar_burnout',{uid:id('burn-uid').value.trim()})">
+        Curar burnout (saúde+disposição → 80)
+      </button>
+    </div>
+    <div class="ctrl-card" style="max-width:400px;margin-top:.7rem">
+      <div class="ctrl-card-titulo">📋 Log</div>
+      <div id="admin-log" style="min-height:80px"><span class="log-info">Aguardando...</span></div>
+    </div>`;
+}
+
+// ════════════════════════════════════════════════════════
+// RESET COMPLETO
+// ════════════════════════════════════════════════════════
+function renderReset(main) {
+  main.innerHTML = `
+    <div class="admin-header"><div class="admin-titulo">🔄 Reset Completo de Jogador</div></div>
+    <div class="ctrl-card" style="max-width:450px;border-color:rgba(200,80,80,.35)">
+      <div class="ctrl-card-titulo" style="color:var(--verm3)">⚠️ Ação irreversível</div>
+      <p style="font-size:.75rem;color:var(--ardosia2);margin-bottom:.8rem">
+        Zera todo o progresso do jogador: cargo, dinheiro, rep, skills, patrimônio.<br>
+        Mantém: nome, especialidade, geração.
+      </p>
+      <div class="ctrl-campo"><label>UID do jogador</label><input type="text" id="rst-uid" placeholder="UID"></div>
+      <button class="btn btn-danger btn-block" onclick="acaoAdmin('jogador_reset_completo',{uid:id('rst-uid').value.trim()},'ATENÇÃO: Reset completo é irreversível. Confirmar?')">
+        🔄 Resetar jogador completamente
+      </button>
+    </div>
+    <div class="ctrl-card" style="max-width:450px;margin-top:.7rem">
+      <div class="ctrl-card-titulo">📋 Log</div>
+      <div id="admin-log" style="min-height:80px"><span class="log-info">Aguardando...</span></div>
+    </div>`;
+}
+
+// ════════════════════════════════════════════════════════
+// PROCESSOS
+// ════════════════════════════════════════════════════════
+function renderProcessos(main) {
+  main.innerHTML = `
+    <div class="admin-header"><div class="admin-titulo">⚖️ Gerenciar Processos</div></div>
+    <div class="ctrl-grid">
+      <div class="ctrl-card">
+        <div class="ctrl-card-titulo">Listar processos de um jogador</div>
+        <div class="ctrl-campo"><label>UID</label><input type="text" id="proc-uid" placeholder="UID"></div>
+        <button class="btn btn-sec btn-block" onclick="listarProcessos()">Listar</button>
+        <div id="proc-lista" style="margin-top:.6rem;font-size:.72rem"></div>
+      </div>
+      <div class="ctrl-card">
+        <div class="ctrl-card-titulo">Encerrar / Deletar processo</div>
+        <div class="ctrl-campo"><label>ID do processo</label><input type="text" id="proc-id" placeholder="ID do processo"></div>
+        <div class="ctrl-campo"><label>Resultado</label>
+          <select id="proc-res"><option value="ganho">Ganho</option><option value="perdido">Perdido</option></select>
+        </div>
+        <div style="display:flex;gap:.5rem">
+          <button class="btn btn-sec" style="flex:1" onclick="acaoAdmin('processo_encerrar',{processo_id:id('proc-id').value.trim(),resultado:id('proc-res').value})">Encerrar</button>
+          <button class="btn btn-danger" style="flex:1" onclick="acaoAdmin('processo_deletar',{processo_id:id('proc-id').value.trim()},'Deletar processo?')">Deletar</button>
+        </div>
+      </div>
+    </div>
+    <div class="ctrl-card"><div class="ctrl-card-titulo">📋 Log</div>
+      <div id="admin-log" style="min-height:80px"><span class="log-info">Aguardando...</span></div>
+    </div>`;
+}
+
+window.listarProcessos = async function() {
+  const uid = id('proc-uid').value.trim();
+  if (!uid) return;
+  try {
+    const r = await window._adminFn({ acao:'processos_listar_jogador', payload:{uid} });
+    const lista = r.data.data || [];
+    document.getElementById('proc-lista').innerHTML = lista.length === 0
+      ? '<div style="color:var(--ardosia)">Nenhum processo.</div>'
+      : lista.map(p=>`<div style="display:flex;justify-content:space-between;padding:.3rem 0;border-bottom:var(--borda-sub)">
+          <span style="color:var(--ardosia);font-family:var(--font-mono)">${p.id.slice(0,10)}</span>
+          <span>${p.tipo||'—'}</span>
+          <span style="color:${p.status==='andamento'?'var(--ouro2)':p.status==='ganho'?'var(--verde3)':'var(--verm3)'}">${p.status}</span>
+          <button class="btn btn-sm btn-ghost" onclick="id('proc-id').value='${p.id}'">Sel.</button>
+        </div>`).join('');
+  } catch (err) { log(`❌ ${err.message}`,'ko'); }
+};
+
+// ════════════════════════════════════════════════════════
+// ESCRITÓRIOS
+// ════════════════════════════════════════════════════════
+function renderEscritorios(main) {
+  main.innerHTML = `
+    <div class="admin-header"><div class="admin-titulo">🏢 Escritórios</div></div>
+    <div class="ctrl-grid">
+      <div class="ctrl-card">
+        <div class="ctrl-card-titulo">Buscar escritório</div>
+        <div class="ctrl-campo"><label>ID do escritório</label><input type="text" id="esc-id" placeholder="ID do Firestore"></div>
+        <button class="btn btn-sec btn-block" onclick="buscarEscritorio()">Buscar</button>
+        <div id="esc-info" style="margin-top:.6rem;font-size:.72rem"></div>
+      </div>
+      <div class="ctrl-card">
+        <div class="ctrl-card-titulo">Editar escritório</div>
+        <div class="ctrl-campo"><label>ID</label><input type="text" id="esc-edit-id" placeholder="ID"></div>
+        <div class="ctrl-campo"><label>Prestígio (0–100)</label><input type="number" id="esc-pres" min="0" max="100" value="50"></div>
+        <div class="ctrl-campo"><label>Nível (1–7)</label><input type="number" id="esc-nivel" min="1" max="7" value="1"></div>
+        <div style="display:flex;gap:.5rem">
+          <button class="btn btn-sec" style="flex:1" onclick="acaoAdmin('escritorio_set_prestigio',{escritorio_id:id('esc-edit-id').value.trim(),prestigio:+id('esc-pres').value})">Prestígio</button>
+          <button class="btn btn-sec" style="flex:1" onclick="acaoAdmin('escritorio_set_nivel',{escritorio_id:id('esc-edit-id').value.trim(),nivel:+id('esc-nivel').value})">Nível</button>
+        </div>
+      </div>
+    </div>
+    <div class="ctrl-card"><div class="ctrl-card-titulo">📋 Log</div>
+      <div id="admin-log" style="min-height:80px"><span class="log-info">Aguardando...</span></div>
+    </div>`;
+}
+
+window.buscarEscritorio = async function() {
+  const escId = id('esc-id').value.trim();
+  if (!escId) return;
+  try {
+    const r = await window._adminFn({ acao:'escritorio_get', payload:{escritorio_id:escId} });
+    const e = r.data.data;
+    const NIVEL_L = ['','Autônomo','Individual','Boutique','Regional','Nacional','Full Service','Big Law'];
+    document.getElementById('esc-info').innerHTML = `
+      <div><b>${e.nome}</b> · Nível ${NIVEL_L[e.nivel]||e.nivel} · Prestígio ${e.prestigio}</div>
+      <div style="color:var(--ardosia2)">${(e.socios_uids||[]).length} sócio(s) · ${e.total_casos||0} casos</div>`;
+    id('esc-edit-id').value = escId;
+  } catch(err){log(`❌ ${err.message}`,'ko');}
+};
+
+// ════════════════════════════════════════════════════════
+// MENSAGENS
+// ════════════════════════════════════════════════════════
+function renderMensagens(main) {
+  main.innerHTML = `
+    <div class="admin-header"><div class="admin-titulo">📬 Mensagens</div></div>
+    <div class="ctrl-grid">
+      <div class="ctrl-card">
+        <div class="ctrl-card-titulo">Enviar para jogador específico</div>
+        <div class="ctrl-campo"><label>UID</label><input type="text" id="msg-uid" placeholder="UID do jogador"></div>
+        <div class="ctrl-campo"><label>Assunto</label><input type="text" id="msg-assunto" placeholder="Assunto"></div>
+        <div class="ctrl-campo"><label>Corpo</label><textarea id="msg-corpo" rows="3" placeholder="Mensagem..." style="width:100%;background:rgba(255,255,255,.05);border:var(--borda);color:var(--perg);padding:.45rem .7rem;border-radius:var(--r);font-family:var(--font-sans);font-size:.8rem;outline:none;resize:vertical"></textarea></div>
+        <button class="btn btn-sec btn-block" onclick="acaoAdmin('enviar_mensagem_sistema',{uid:id('msg-uid').value.trim(),assunto:id('msg-assunto').value,corpo:id('msg-corpo').value,tipo:'sistema'})">Enviar</button>
+      </div>
+      <div class="ctrl-card">
+        <div class="ctrl-card-titulo">Mensagem para TODOS os jogadores</div>
+        <div class="ctrl-campo"><label>Assunto</label><input type="text" id="all-assunto" placeholder="Aviso global"></div>
+        <div class="ctrl-campo"><label>Corpo</label><textarea id="all-corpo" rows="3" placeholder="Mensagem para todos..." style="width:100%;background:rgba(255,255,255,.05);border:var(--borda);color:var(--perg);padding:.45rem .7rem;border-radius:var(--r);font-family:var(--font-sans);font-size:.8rem;outline:none;resize:vertical"></textarea></div>
+        <button class="btn btn-danger btn-block" onclick="acaoAdmin('enviar_mensagem_todos',{assunto:id('all-assunto').value,corpo:id('all-corpo').value},'Enviar para todos os jogadores?')">📢 Enviar para todos</button>
+      </div>
+      <div class="ctrl-card">
+        <div class="ctrl-card-titulo">Limpar inbox</div>
+        <div class="ctrl-campo"><label>UID</label><input type="text" id="clr-uid" placeholder="UID do jogador"></div>
+        <button class="btn btn-danger btn-block" onclick="acaoAdmin('limpar_inbox',{uid:id('clr-uid').value.trim()},'Limpar todas as mensagens?')">Limpar inbox</button>
+      </div>
+    </div>
+    <div class="ctrl-card"><div class="ctrl-card-titulo">📋 Log</div>
+      <div id="admin-log" style="min-height:80px"><span class="log-info">Aguardando...</span></div>
+    </div>`;
+}
+
+// ════════════════════════════════════════════════════════
+// BETA
+// ════════════════════════════════════════════════════════
+function renderBeta(main) {
+  main.innerHTML = `
+    <div class="admin-header"><div class="admin-titulo">🚀 Ferramentas Beta</div></div>
+    <div class="ctrl-grid">
+      <div class="ctrl-card">
+        <div class="ctrl-card-titulo">Starter Pack Beta</div>
+        <p style="font-size:.72rem;color:var(--ardosia2);margin-bottom:.6rem">
+          Dá R$100k, rep 40, skills 45, OAB, cargo Júnior. Para testers.
+        </p>
+        <div class="ctrl-campo"><label>UID</label><input type="text" id="beta-uid" placeholder="UID do jogador"></div>
+        <button class="btn btn-sec btn-block" onclick="acaoAdmin('beta_dar_starter_pack',{uid:id('beta-uid').value.trim()})">Conceder Starter Pack</button>
+      </div>
+      <div class="ctrl-card">
+        <div class="ctrl-card-titulo">Simular próximo tick</div>
+        <p style="font-size:.72rem;color:var(--ardosia2);margin-bottom:.6rem">
+          Simula o que aconteceria no próximo tick para um jogador (sem salvar).
+        </p>
+        <div class="ctrl-campo"><label>UID</label><input type="text" id="sim-uid" placeholder="UID do jogador"></div>
+        <button class="btn btn-sec btn-block" onclick="simularTick()">Simular</button>
+        <div id="sim-resultado" style="margin-top:.6rem;font-size:.72rem"></div>
+      </div>
+    </div>
+    <div class="ctrl-card"><div class="ctrl-card-titulo">📋 Log</div>
+      <div id="admin-log" style="min-height:80px"><span class="log-info">Aguardando...</span></div>
+    </div>`;
+}
+
+window.simularTick = async function() {
+  const uid = id('sim-uid').value.trim();
+  if (!uid) return;
+  try {
+    const r = await window._adminFn({ acao:'beta_testar_tick', payload:{uid} });
+    const s = r.data.simulacao;
+    document.getElementById('sim-resultado').innerHTML = `
+      <div style="background:rgba(255,255,255,.04);border:var(--borda);border-radius:var(--r);padding:.6rem;font-family:var(--font-mono)">
+        <div><b>${s.jogador}</b> · ${s.cargo} · ${s.mes_atual}</div>
+        <div>Renda: <span style="color:var(--verde3)">${fmt(s.renda)}</span></div>
+        <div>Custo de vida: <span style="color:var(--verm3)">${fmt(s.custo_vida)}</span></div>
+        <div>Saldo estimado: <span style="color:${s.saldo_estimado>=0?'var(--verde3)':'var(--verm3)'}">${fmt(s.saldo_estimado)}</span></div>
+        <div>Próxima idade: ${s.idade_proxima} anos</div>
+      </div>`;
+  } catch(err){log(`❌ ${err.message}`,'ko');}
+};
+
+// ════════════════════════════════════════════════════════
+// EVENTOS
+// ════════════════════════════════════════════════════════
+function renderEventos(main) {
+  main.innerHTML = `
+    <div class="admin-header"><div class="admin-titulo">⚡ Eventos Globais</div></div>
+    <div class="card" style="color:var(--ardosia2);font-size:.8rem;text-align:center;padding:1.5rem">
+      Os eventos globais são gerados automaticamente pelo tick mensal.<br>
+      Esta seção exibirá o histórico de eventos em breve.
+    </div>`;
+}
+
+// ════════════════════════════════════════════════════════
+// LOG DE AÇÕES
+// ════════════════════════════════════════════════════════
+let _logHistorico = [];
+
+function renderLog(main) {
+  main.innerHTML = `
+    <div class="admin-header"><div class="admin-titulo">📋 Log de Ações</div></div>
+    <div id="admin-log" style="min-height:300px">
+      ${_logHistorico.length === 0
+        ? '<span class="log-info">Nenhuma ação realizada ainda.</span>'
+        : _logHistorico.map(l=>`<div class="${l.tipo}">${l.msg}</div>`).join('')}
+    </div>
+    <button class="btn btn-ghost btn-sm" style="margin-top:.5rem" onclick="_logHistorico=[];renderLog(document.getElementById('admin-main'))">Limpar log</button>`;
+}
+
+// ════════════════════════════════════════════════════════
+// AÇÃO GENÉRICA (chama Cloud Function)
+// ════════════════════════════════════════════════════════
+window.acaoAdmin = async function(acao, payload, confirmar) {
+  if (confirmar && !confirm(confirmar)) return;
+  try {
+    log(`⏳ ${acao}...`, 'info');
+    const r = await window._adminFn({ acao, payload });
+    const msg = r.data.msg || 'OK';
+    log(`✅ ${msg}`, 'ok');
+    _logHistorico.push({ tipo:'log-ok', msg:`[${new Date().toLocaleTimeString('pt-BR')}] ${acao}: ${msg}` });
+    toast(msg.slice(0,80), 'ok');
+    // Se for um reset do servidor, recarregar dados
+    if (acao.startsWith('server_')) {
+      const srv = await window._adminFn({ acao:'server_get', payload:{} });
+      window._serverData = srv.data.data;
+    }
+  } catch (err) {
+    log(`❌ ${err.message}`, 'ko');
+    _logHistorico.push({ tipo:'log-ko', msg:`[${new Date().toLocaleTimeString('pt-BR')}] ERRO ${acao}: ${err.message}` });
+    toast(`Erro: ${err.message.slice(0,60)}`, 'ko');
+  }
+};
+
+// ════════════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════════════
+function id(i) { return document.getElementById(i) || {value:''}; }
+
+function log(msg, tipo='info') {
+  const logEl = document.getElementById('admin-log');
+  if (!logEl) return;
+  const line = document.createElement('div');
+  line.className = `log-${tipo}`;
+  line.textContent = `[${new Date().toLocaleTimeString('pt-BR')}] ${msg}`;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function fmt(n) {
+  if (!n && n!==0) return '—';
+  if (n>=1000000) return `R$ ${(n/1000000).toFixed(1)}M`;
+  if (n>=1000)    return `R$ ${Math.round(n/1000)}k`;
+  return `R$ ${Number(n).toLocaleString('pt-BR')}`;
+}
+
+window.toast = function(msg, tipo='neutro') {
+  const c = document.getElementById('toast-container');
+  if (!c) return;
+  const el = document.createElement('div');
+  el.className = `toast ${tipo}`;
+  el.textContent = msg;
+  c.appendChild(el);
+  setTimeout(()=>{el.style.animation='fadeOut .3s ease forwards';setTimeout(()=>el.remove(),300);},3500);
+};
+</script>
+
+</body>
+</html>

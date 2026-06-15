@@ -1,0 +1,30 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "processos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "advogado_uid", "order": "ASCENDING" },
+        { "fieldPath": "status",       "order": "ASCENDING" },
+        { "fieldPath": "criado_mes",   "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "processos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "escritorio_id", "order": "ASCENDING" },
+        { "fieldPath": "status",        "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "jogadores",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "reputacao",  "order": "DESCENDING" },
+        { "fieldPath": "cargo_id",   "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

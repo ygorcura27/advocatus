@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Advocatus Online</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,900;1,400;1,600&family=Inter:wght@300;400;500;600&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<style>
+/* ── Estilos específicos da tela de entrada ── */
+body { background: var(--couro); overflow: hidden; }
+
+.entrada-wrap {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 440px;
+}
+
+/* Painel esquerdo — visual */
+.entrada-visual {
+  position: relative;
+  background: var(--couro2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  padding: 3rem;
+  overflow: hidden;
+}
+.entrada-visual::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 30% 40%, rgba(184,146,42,.08) 0%, transparent 60%),
+    radial-gradient(ellipse at 70% 70%, rgba(184,146,42,.05) 0%, transparent 50%);
+}
+.entrada-visual-logo {
+  position: relative;
+  text-align: center;
+}
+.entrada-visual-logo .marca {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(2.5rem, 5vw, 4.5rem);
+  font-weight: 900;
+  color: var(--perg);
+  letter-spacing: -.01em;
+  line-height: 1;
+}
+.entrada-visual-logo .marca em {
+  font-style: italic;
+  color: var(--ouro2);
+}
+.entrada-visual-logo .subtitulo {
+  font-size: .8rem;
+  color: var(--ardosia2);
+  letter-spacing: .25em;
+  text-transform: uppercase;
+  margin-top: .6rem;
+}
+.entrada-sep {
+  width: 60px; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--ouro3), transparent);
+  margin: 0 auto;
+}
+.entrada-taglines {
+  position: relative;
+  text-align: center;
+  max-width: 420px;
+}
+.tagline-item {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 1.05rem;
+  color: var(--perg2);
+  line-height: 1.7;
+  opacity: 0;
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  transition: opacity .8s ease;
+}
+.tagline-item.ativo { opacity: 1; position: relative; }
+.entrada-stats {
+  position: relative;
+  display: flex;
+  gap: 2.5rem;
+}
+.est-stat { text-align: center; }
+.est-stat .val {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--ouro2);
+}
+.est-stat .lbl {
+  font-size: .65rem;
+  color: var(--ardosia2);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  margin-top: .15rem;
+}
+
+/* Painel direito — formulários */
+.entrada-painel {
+  background: var(--couro);
+  border-left: 1px solid rgba(184,146,42,.15);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+/* Tela de login */
+#tela-login {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 2.5rem;
+  gap: 1.8rem;
+}
+#tela-login h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.35rem;
+  color: var(--perg);
+  font-weight: 600;
+}
+#tela-login p {
+  font-size: .82rem;
+  color: var(--ardosia2);
+  text-align: center;
+  line-height: 1.7;
+  max-width: 300px;
+}
+.btn-google {
+  display: flex; align-items: center; gap: .75rem;
+  width: 100%;
+  background: #fff;
+  color: #3c4043;
+  border: none;
+  padding: .82rem 1.2rem;
+  border-radius: 2px;
+  font-size: .9rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  transition: all .2s;
+  max-width: 320px;
+}
+.btn-google:hover { background: #f0f0f0; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,0,0,.3); }
+.btn-google:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+.btn-google svg { width: 20px; height: 20px; flex-shrink: 0; }
+.login-divider {
+  width: 100%; max-width: 320px;
+  display: flex; align-items: center; gap: .8rem;
+}
+.login-divider span { font-size: .7rem; color: var(--ardosia); }
+.login-divider::before, .login-divider::after {
+  content: '';
+  flex: 1; height: 1px;
+  background: rgba(184,146,42,.15);
+}
+.login-disclaimer {
+  font-size: .68rem;
+  color: var(--ardosia);
+  text-align: center;
+  line-height: 1.6;
+  max-width: 300px;
+}
+
+/* Tela de criação de personagem */
+#tela-criacao {
+  display: none;
+  flex: 1;
+  padding: 2rem 2.5rem;
+  overflow-y: auto;
+}
+#tela-criacao h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.2rem;
+  color: var(--perg);
+  margin-bottom: .3rem;
+}
+#tela-criacao .sub {
+  font-size: .75rem;
+  color: var(--ardosia2);
+  margin-bottom: 1.5rem;
+}
+
+/* Formulário */
+.campo { margin-bottom: 1.1rem; }
+.campo label {
+  display: block;
+  font-size: .65rem;
+  color: var(--ardosia2);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  margin-bottom: .35rem;
+}
+.campo input, .campo select {
+  width: 100%;
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(184,146,42,.2);
+  color: var(--perg);
+  padding: .65rem .85rem;
+  border-radius: 2px;
+  font-family: 'Inter', sans-serif;
+  font-size: .88rem;
+  outline: none;
+  transition: border-color .2s;
+  -webkit-appearance: none;
+}
+.campo input:focus, .campo select:focus {
+  border-color: var(--ouro2);
+  background: rgba(255,255,255,.07);
+}
+.campo select option { background: var(--couro2); color: var(--perg); }
+.campo-hint { font-size: .68rem; color: var(--ardosia); margin-top: .3rem; line-height: 1.5; }
+
+/* Grade de carreira */
+.carreira-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .5rem;
+  margin-bottom: 1.1rem;
+}
+.carreira-card {
+  border: 1px solid rgba(184,146,42,.2);
+  border-radius: 2px;
+  padding: .8rem .7rem;
+  cursor: pointer;
+  transition: all .2s;
+  text-align: center;
+  background: rgba(255,255,255,.03);
+}
+.carreira-card:hover {
+  border-color: rgba(184,146,42,.5);
+  background: rgba(184,146,42,.06);
+}
+.carreira-card.selecionado {
+  border-color: var(--ouro2);
+  background: rgba(184,146,42,.12);
+}
+.carreira-card .ic { font-size: 1.4rem; display: block; margin-bottom: .3rem; }
+.carreira-card .nm { font-size: .76rem; font-weight: 600; color: var(--perg); }
+.carreira-card .ds { font-size: .63rem; color: var(--ardosia2); margin-top: .2rem; line-height: 1.4; }
+
+/* Info de carreira */
+#carreira-info {
+  display: none;
+  background: rgba(184,146,42,.06);
+  border: 1px solid rgba(184,146,42,.2);
+  border-radius: 2px;
+  padding: .75rem;
+  margin-bottom: 1.1rem;
+  font-size: .75rem;
+  color: var(--ardosia2);
+  line-height: 1.6;
+}
+
+/* Botão primário */
+.btn-prim {
+  width: 100%;
+  background: var(--ouro2);
+  color: var(--couro);
+  border: none;
+  padding: .82rem;
+  border-radius: 2px;
+  font-family: 'Inter', sans-serif;
+  font-size: .88rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all .2s;
+  margin-top: .5rem;
+}
+.btn-prim:hover { background: var(--ouro); }
+.btn-prim:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Loading overlay */
+#loading {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: var(--couro);
+  z-index: 999;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 1rem;
+}
+#loading.vis { display: flex; }
+.loading-logo {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.5rem;
+  color: var(--ouro2);
+}
+.loading-spin {
+  width: 24px; height: 24px;
+  border: 2px solid rgba(184,146,42,.2);
+  border-top-color: var(--ouro2);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-msg { font-size: .78rem; color: var(--ardosia2); }
+
+/* Mensagem de erro */
+#msg-erro {
+  font-size: .75rem;
+  color: #C88A8A;
+  text-align: center;
+  min-height: 1.2rem;
+}
+
+@media (max-width: 768px) {
+  .entrada-wrap { grid-template-columns: 1fr; }
+  .entrada-visual { display: none; }
+  .entrada-painel { border-left: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- Loading overlay -->
+<div id="loading">
+  <div class="loading-logo">Advocatus<em style="font-style:italic;color:var(--ardosia2)">Online</em></div>
+  <div class="loading-spin"></div>
+  <div class="loading-msg" id="loading-msg">Carregando...</div>
+</div>
+
+<div class="entrada-wrap">
+
+  <!-- ══ PAINEL VISUAL ══ -->
+  <div class="entrada-visual">
+    <div class="entrada-visual-logo">
+      <div class="marca">Advocatus<em>Online</em></div>
+      <div class="subtitulo">Simulador Jurídico Multiplayer</div>
+    </div>
+
+    <div class="entrada-sep"></div>
+
+    <div class="entrada-taglines">
+      <div class="tagline-item ativo" id="tl-0">
+        "A lei é a razão sem paixão."<br>
+        <small style="font-size:.7rem;color:var(--ardosia);font-style:normal">— Aristóteles</small>
+      </div>
+      <div class="tagline-item" id="tl-1">
+        "O advogado que defende a si mesmo tem um tolo por cliente."<br>
+        <small style="font-size:.7rem;color:var(--ardosia);font-style:normal">— Abraham Lincoln</small>
+      </div>
+      <div class="tagline-item" id="tl-2">
+        "Injustiça em qualquer lugar é uma ameaça à justiça em todo lugar."<br>
+        <small style="font-size:.7rem;color:var(--ardosia);font-style:normal">— Martin Luther King Jr.</small>
+      </div>
+      <div class="tagline-item" id="tl-3">
+        "A toga não faz o magistrado. O caráter, sim."<br>
+        <small style="font-size:.7rem;color:var(--ardosia);font-style:normal">— Anônimo</small>
+      </div>
+    </div>
+
+    <div class="entrada-stats">
+      <div class="est-stat">
+        <div class="val" id="stat-jogadores">—</div>
+        <div class="lbl">Jogadores</div>
+      </div>
+      <div class="est-stat">
+        <div class="val" id="stat-mes">Ano 1</div>
+        <div class="lbl">Data do jogo</div>
+      </div>
+      <div class="est-stat">
+        <div class="val" id="stat-casos">—</div>
+        <div class="lbl">Casos ativos</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ PAINEL DE ENTRADA ══ -->
+  <div class="entrada-painel">
+
+    <!-- Tela de login -->
+    <div id="tela-login">
+      <div style="text-align:center">
+        <div style="font-size:2rem;margin-bottom:.4rem">⚖️</div>
+        <h2>Bem-vindo(a)</h2>
+      </div>
+      <p>Entre com sua conta Google para iniciar ou continuar sua carreira jurídica.</p>
+
+      <button class="btn-google" id="btn-google" onclick="fazerLogin()">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+        </svg>
+        Entrar com Google
+      </button>
+
+      <div id="msg-erro"></div>
+
+      <div class="login-disclaimer">
+        Ao entrar, você concorda com os termos de uso.<br>
+        Seu progresso é salvo automaticamente na nuvem.
+      </div>
+    </div>
+
+    <!-- Tela de criação de personagem -->
+    <div id="tela-criacao">
+      <h2>Criar Personagem</h2>
+      <p class="sub">Você só faz isso uma vez. Escolha com cuidado.</p>
+
+      <div class="campo">
+        <label>Nome do personagem</label>
+        <input type="text" id="inp-nome" placeholder="Dr(a). Seu Nome" maxlength="50" oninput="validarCriacao()"/>
+        <div class="campo-hint">Este nome será visível para outros jogadores.</div>
+      </div>
+
+      <div class="campo">
+        <label>Especialização jurídica</label>
+        <select id="inp-esp" onchange="validarCriacao()">
+          <option value="">Escolha sua área...</option>
+          <option value="tributario">Direito Tributário</option>
+          <option value="trabalhista">Direito Trabalhista</option>
+          <option value="civil">Direito Civil</option>
+          <option value="criminal">Direito Criminal / Penal</option>
+          <option value="empresarial">Direito Empresarial</option>
+          <option value="constitucional">Direito Constitucional</option>
+          <option value="ambiental">Direito Ambiental</option>
+          <option value="previdenciario">Direito Previdenciário</option>
+        </select>
+      </div>
+
+      <div class="campo">
+        <label>Trilha de carreira</label>
+        <div class="carreira-grid">
+          <div class="carreira-card" data-carreira="adv_privado" onclick="selecionarCarreira(this)">
+            <span class="ic">⚖️</span>
+            <div class="nm">Advogado Privado</div>
+            <div class="ds">Escritório autônomo. Honorários de sucesso.</div>
+          </div>
+          <div class="carreira-card" data-carreira="inhouse" onclick="selecionarCarreira(this)">
+            <span class="ic">🏢</span>
+            <div class="nm">In-House</div>
+            <div class="ds">Jurídico corporativo. Salário fixo.</div>
+          </div>
+          <div class="carreira-card" data-carreira="juiz" onclick="selecionarCarreira(this)">
+            <span class="ic">🔨</span>
+            <div class="nm">Magistratura</div>
+            <div class="ds">Carreira pública. Exige concurso após 3 anos.</div>
+          </div>
+          <div class="carreira-card" data-carreira="promotor" onclick="selecionarCarreira(this)">
+            <span class="ic">🛡️</span>
+            <div class="nm">Ministério Público</div>
+            <div class="ds">MP. Concurso público exigente.</div>
+          </div>
+          <div class="carreira-card" data-carreira="defensor" onclick="selecionarCarreira(this)">
+            <span class="ic">🤝</span>
+            <div class="nm">Defensoria Pública</div>
+            <div class="ds">DPE/DPU. Foco em direitos fundamentais.</div>
+          </div>
+        </div>
+        <div id="carreira-info"></div>
+      </div>
+
+      <div id="msg-erro-criacao" style="font-size:.75rem;color:#C88A8A;min-height:1.2rem;margin-bottom:.5rem"></div>
+
+      <button class="btn-prim" id="btn-criar" disabled onclick="criarPersonagem()">
+        Iniciar Carreira →
+      </button>
+
+      <p style="font-size:.68rem;color:var(--ardosia);text-align:center;margin-top:.8rem;line-height:1.6">
+        Sua carreira começa em <strong style="color:var(--ouro2)">Janeiro, Ano 1</strong> com 22 anos.<br>
+        1 dia real = 1 mês de jogo. O tempo passa automaticamente.
+      </p>
+    </div>
+
+  </div>
+</div>
+
+<!-- Scripts Firebase -->
+<script type="module">
+import { initializeApp }                                from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getAuth, signInWithPopup, GoogleAuthProvider,
+         onAuthStateChanged }                           from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { getFirestore, doc, getDoc, setDoc, collection,
+         query, orderBy, limit, getDocs }               from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+// ── Config Firebase ──
+const FB = {
+  apiKey:            "AIzaSyCiGvGA2OUYSGp2BHM-K05tM39hPk40trY",
+  authDomain:        "advocatus-simultor.firebaseapp.com",
+  projectId:         "advocatus-simultor",
+  storageBucket:     "advocatus-simultor.firebasestorage.app",
+  messagingSenderId: "527755299061",
+  appId:             "1:527755299061:web:cc75b6f9912d13a44a5dbc",
+};
+const app  = initializeApp(FB);
+const auth = getAuth(app);
+const db   = getFirestore(app);
+const gp   = new GoogleAuthProvider();
+
+// ── Estado global ──
+window._auth = auth;
+window._db   = db;
+
+// ── Infos do servidor ──
+async function carregarInfoServidor() {
+  try {
+    const snap = await getDoc(doc(db, 'config', 'server'));
+    if (snap.exists()) {
+      const s = snap.data();
+      const el = document.getElementById('stat-mes');
+      if (el) el.textContent = `${s.mes_nome || 'Janeiro'}, Ano ${s.ano_jogo || 1}`;
+      const tj = document.getElementById('stat-jogadores');
+      if (tj) tj.textContent = (s.total_jogadores || 0).toLocaleString('pt-BR');
+    }
+    // Contar casos ativos
+    const casosSnap = await getDocs(
+      query(collection(db, 'processos'), orderBy('criado_mes', 'desc'), limit(1))
+    );
+    const elC = document.getElementById('stat-casos');
+    if (elC) elC.textContent = '—'; // placeholder, ranking atualiza
+  } catch (e) {
+    // Silencioso — servidor pode não ter inicializado ainda
+  }
+}
+carregarInfoServidor();
+
+// ── Rotação de taglines ──
+let tlIdx = 0;
+const tls = document.querySelectorAll('.tagline-item');
+setInterval(() => {
+  tls[tlIdx].classList.remove('ativo');
+  tlIdx = (tlIdx + 1) % tls.length;
+  tls[tlIdx].classList.add('ativo');
+}, 5000);
+
+// ── Auth listener ──
+onAuthStateChanged(auth, async (user) => {
+  const loading = document.getElementById('loading');
+  const msgL    = document.getElementById('loading-msg');
+
+  if (user) {
+    loading.classList.add('vis');
+    msgL.textContent = 'Verificando seu perfil...';
+
+    try {
+      const jogadorSnap = await getDoc(doc(db, 'jogadores', user.uid));
+
+      if (jogadorSnap.exists()) {
+        // Jogador existente → ir para o jogo
+        msgL.textContent = `Bem-vindo(a) de volta, ${jogadorSnap.data().nome_personagem}!`;
+        setTimeout(() => { window.location.href = '/jogo.html'; }, 800);
+      } else {
+        // Novo jogador → tela de criação
+        loading.classList.remove('vis');
+        document.getElementById('tela-login').style.display   = 'none';
+        document.getElementById('tela-criacao').style.display = 'flex';
+        document.getElementById('tela-criacao').style.flexDirection = 'column';
+      }
+    } catch (err) {
+      loading.classList.remove('vis');
+      document.getElementById('msg-erro').textContent = 'Erro ao verificar perfil. Tente novamente.';
+      console.error(err);
+    }
+  } else {
+    loading.classList.remove('vis');
+  }
+});
+
+// ── Login Google ──
+window.fazerLogin = async () => {
+  const btn = document.getElementById('btn-google');
+  const err = document.getElementById('msg-erro');
+  btn.disabled    = true;
+  btn.textContent = 'Conectando...';
+  err.textContent = '';
+  try {
+    await signInWithPopup(auth, gp);
+    // onAuthStateChanged cuida do redirect
+  } catch (e) {
+    btn.disabled    = false;
+    btn.textContent = 'Entrar com Google';
+    if (e.code !== 'auth/popup-closed-by-user') {
+      err.textContent = 'Erro ao conectar. Tente novamente.';
+    }
+  }
+};
+
+// ── Seleção de carreira ──
+const CARREIRA_INFO = {
+  adv_privado: 'Começa como Estagiário e passa pela OAB antes de advogar. Sem salário fixo — seus ganhos vêm de honorários de sucesso (30% + sucumbência). Total autonomia.',
+  inhouse:     'Contratado em empresa. Salário fixo desde o início (pós-OAB). Progressão interna mais rápida, porém menos autonomia na escolha de casos.',
+  juiz:        'Carreira pública: Estagiário → OAB → Advogado Sênior → 3 anos de experiência → Concurso da Magistratura (muito difícil). Salário alto, estabilidade máxima.',
+  promotor:    'Carreira pública: mesmo percurso até o concurso do MP. Exige processo penal e constitucional aprofundados. Prestígio enorme.',
+  defensor:    'Carreira pública: concurso da DPE/DPU. Foco em direitos fundamentais e assistência a populações vulneráveis. Muito respeitado.',
+};
+
+window.selecionarCarreira = (el) => {
+  document.querySelectorAll('.carreira-card').forEach(c => c.classList.remove('selecionado'));
+  el.classList.add('selecionado');
+  const info = document.getElementById('carreira-info');
+  info.textContent = CARREIRA_INFO[el.dataset.carreira] || '';
+  info.style.display = 'block';
+  validarCriacao();
+};
+
+window.validarCriacao = () => {
+  const nome = document.getElementById('inp-nome').value.trim();
+  const esp  = document.getElementById('inp-esp').value;
+  const carr = document.querySelector('.carreira-card.selecionado');
+  document.getElementById('btn-criar').disabled = !(nome.length >= 3 && esp && carr);
+};
+
+// ── Criar personagem ──
+window.criarPersonagem = async () => {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const nome     = document.getElementById('inp-nome').value.trim();
+  const esp      = document.getElementById('inp-esp').value;
+  const carreira = document.querySelector('.carreira-card.selecionado')?.dataset.carreira;
+  const errEl    = document.getElementById('msg-erro-criacao');
+
+  if (!nome || !esp || !carreira) {
+    errEl.textContent = 'Preencha todos os campos.';
+    return;
+  }
+  if (nome.length < 3 || nome.length > 50) {
+    errEl.textContent = 'Nome deve ter entre 3 e 50 caracteres.';
+    return;
+  }
+
+  const btn = document.getElementById('btn-criar');
+  btn.disabled    = true;
+  btn.textContent = 'Criando personagem...';
+  errEl.textContent = '';
+
+  try {
+    // Buscar mês global do servidor
+    const serverSnap = await getDoc(doc(db, 'config', 'server'));
+    const mesGlobal  = serverSnap.exists() ? (serverSnap.data().mes_global || 1) : 1;
+
+    // Boost de skill por especialização
+    const SK_BOOST = {
+      tributario:     'pesquisa',    trabalhista: 'oratoria',
+      civil:          'escrita',     criminal:    'argumentacao',
+      empresarial:    'negociacao',  constitucional:'argumentacao',
+      ambiental:      'pesquisa',    previdenciario:'escrita',
+    };
+    const skBoostKey = SK_BOOST[esp];
+    const skills = {
+      oratoria:15, argumentacao:15, escrita:15,
+      pesquisa:18, negociacao:12, persuasao:12,
+      gestao:8,   networking:10,
+    };
+    if (skBoostKey) skills[skBoostKey] = (skills[skBoostKey] || 0) + 12;
+
+    const personagem = {
+      uid:              user.uid,
+      nome:             user.displayName || nome,
+      email:            user.email || '',
+      nome_personagem:  nome,
+      especialidade:    esp,
+      carreira,
+      criado_em:        new Date().toISOString(),
+      ultimo_login:     new Date().toISOString(),
+
+      // Cargo inicial
+      cargo_id:         'est',
+      cargo_publico_id: null,
+      oab:              false,
+      concurso_aprovado:false,
+      anos_carreira:    0,
+      mes_global_inicio:mesGlobal,
+      idade:            22,
+
+      // Atributos
+      reputacao:             30,
+      networking:            10,
+      saude_mental:          80,
+      disposicao:            80,
+      prestigio_academico:   0,
+      energia:              100,
+      energia_usada_mes:     0,
+
+      skills,
+
+      // Financeiro
+      dinheiro:              carreira === 'adv_privado' ? 12000 : 15000,
+      meses_negativo:        0,
+      meses_positivo_streak: 0,
+      no_serasa:             false,
+      renda_calculada:       0,
+      despesas_calculadas:   0,
+
+      // Moradia
+      pat: { moradia:'pais', transporte:'onibus', escritorio:'cw' },
+      moradias_compradas:    {},
+      prazo_sair_pais:       0,
+      mora_com_pais:         true,
+
+      // Transporte
+      financiamentos:        {},
+
+      // Escritório
+      escritorio_id:          'solo',
+      escritorio_empregado_id:null,
+      escritorio_proprio_id:  null,
+      escritorio_nome:        null,
+      vaga_tipo:             'contencioso',
+      sal_mult:               1.0,
+
+      // Gamificação
+      xp:           0,
+      xp_next:     120,
+      wins:          0,
+      losses:        0,
+      wins_ano:      0,
+      losses_ano:    0,
+      derrotas_consecutivas: 0,
+
+      // Vida pessoal
+      estado_civil: 'solteiro',
+      conjuge_uid:  null,
+      filhos:        0,
+      geracao:       1,
+
+      // Filas
+      study_queue:   [],
+      cursos_feitos: [],
+      compras:       [],
+      estagiarios:   [],
+
+      // Flags
+      em_burnout:          false,
+      burnout_ate_mes:     0,
+      recesso_pendente:    false,
+      aposentado:          false,
+      ultimo_mes_processado: 0,
+      bonus_pendente:        0,
+
+      // Sessão
+      notificacoes_nao_lidas: 0,
+    };
+
+    await setDoc(doc(db, 'jogadores', user.uid), personagem);
+
+    // Atualizar total de jogadores no servidor
+    // (incrementado na próxima leitura do tick)
+
+    document.getElementById('loading').classList.add('vis');
+    document.getElementById('loading-msg').textContent = 'Personagem criado! Iniciando jogo...';
+    setTimeout(() => { window.location.href = '/jogo.html'; }, 1000);
+
+  } catch (err) {
+    btn.disabled    = false;
+    btn.textContent = 'Iniciar Carreira →';
+    errEl.textContent = `Erro ao criar personagem: ${err.message}`;
+    console.error(err);
+  }
+};
+</script>
+
+</body>
+</html>

@@ -1,0 +1,191 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ══════════════════════════════════════════════════════
+    // FUNÇÕES AUXILIARES
+    // ══════════════════════════════════════════════════════
+
+    // Verifica se o usuário está autenticado
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // Verifica se o uid do request bate com o documento
+    function isOwner(uid) {
+      return isAuth() && request.auth.uid == uid;
+    }
+
+    // Verifica se o usuário é sócio do escritório
+    function isSocio(escritorioData) {
+      return isAuth() &&
+        request.auth.uid in escritorioData.socios_uids;
+    }
+
+    // Verifica se o campo não está sendo alterado
+    function notChanging(field) {
+      return !(field in request.resource.data) ||
+        request.resource.data[field] == resource.data[field];
+    }
+
+    // ══════════════════════════════════════════════════════
+    // CONFIG DO SERVIDOR (somente leitura para jogadores)
+    // ══════════════════════════════════════════════════════
+    match /config/{doc} {
+      allow read: if isAuth();
+      allow write: if false; // somente Cloud Functions escrevem aqui
+    }
+
+    // ══════════════════════════════════════════════════════
+    // JOGADORES
+    // ══════════════════════════════════════════════════════
+    match /jogadores/{uid} {
+      // Qualquer autenticado pode LER dados públicos de outro jogador
+      // (para rankings, escritórios, convites)
+      allow read: if isAuth();
+
+      // Criação: apenas o próprio usuário cria seu documento
+      allow create: if isOwner(uid)
+        && request.resource.data.uid == uid
+        && request.resource.data.reputacao <= 30
+        && request.resource.data.dinheiro <= 15000;
+
+      // Update: apenas o próprio usuário, com restrições
+      allow update: if isOwner(uid)
+        // Campos que NUNCA podem ser alterados pelo cliente diretamente
+        && notChanging('uid')
+        && notChanging('criado_em')
+        && notChanging('geracao')
+        // Reputação só pode subir até o cap do cargo (verificado no cliente,
+        // validação real está nas Cloud Functions)
+        && request.resource.data.reputacao >= 0
+        && request.resource.data.reputacao <= 100
+        // Dinheiro não pode ser inflado do nada
+        && request.resource.data.dinheiro >= 0;
+
+      // Deleção não permitida pelo cliente
+      allow delete: if false;
+
+      // ── Subcoleção: mensagens/inbox ──
+      match /inbox/{msgId} {
+        allow read: if isOwner(uid);
+        // Criação de mensagem: qualquer autenticado pode enviar para outro
+        allow create: if isAuth()
+          && request.resource.data.de == request.auth.uid
+          && request.resource.data.lida == false;
+        // Update: apenas o destinatário (marcar como lida)
+        allow update: if isOwner(uid)
+          && request.resource.data.keys().hasOnly(['lida', 'lida_em']);
+        allow delete: if isOwner(uid);
+      }
+    }
+
+    // ══════════════════════════════════════════════════════
+    // PROCESSOS
+    // ══════════════════════════════════════════════════════
+    match /processos/{processoId} {
+      // Leitura: advogado do caso ou sócio do escritório
+      allow read: if isAuth() && (
+        resource.data.advogado_uid == request.auth.uid ||
+        (resource.data.escritorio_id != null &&
+         exists(/databases/$(database)/documents/escritorios/$(resource.data.escritorio_id)) &&
+         request.auth.uid in get(/databases/$(database)/documents/escritorios/$(resource.data.escritorio_id)).data.socios_uids)
+      );
+
+      // Criação: apenas o advogado cria seu próprio processo
+      allow create: if isAuth()
+        && request.resource.data.advogado_uid == request.auth.uid
+        && request.resource.data.status == 'andamento'
+        && request.resource.data.progresso == 0;
+
+      // Update: apenas o advogado do caso pode atualizar
+      allow update: if isAuth()
+        && resource.data.advogado_uid == request.auth.uid
+        // Não pode mudar o advogado do caso
+        && notChanging('advogado_uid')
+        // Não pode inflar o valor da causa
+        && notChanging('valor')
+        // Não pode retroagir instância
+        && request.resource.data.instancia >= resource.data.instancia;
+
+      // Deleção não permitida
+      allow delete: if false;
+    }
+
+    // ══════════════════════════════════════════════════════
+    // ESCRITÓRIOS
+    // ══════════════════════════════════════════════════════
+    match /escritorios/{escritorioId} {
+      // Leitura pública (para rankings e busca)
+      allow read: if isAuth();
+
+      // Criação: qualquer advogado autenticado pode criar
+      allow create: if isAuth()
+        && request.resource.data.fundador_uid == request.auth.uid
+        && request.resource.data.nivel == 1
+        && request.resource.data.caixa == 0;
+
+      // Update: apenas sócios
+      allow update: if isAuth()
+        && request.auth.uid in resource.data.socios_uids
+        // Fundador não pode ser removido
+        && resource.data.fundador_uid in request.resource.data.socios_uids
+        // Nível só pode crescer
+        && request.resource.data.nivel >= resource.data.nivel;
+
+      allow delete: if false;
+    }
+
+    // ══════════════════════════════════════════════════════
+    // RANKINGS (somente leitura para jogadores)
+    // ══════════════════════════════════════════════════════
+    match /rankings/{tipo} {
+      allow read: if isAuth();
+      allow write: if false; // apenas Cloud Functions
+    }
+
+    // ══════════════════════════════════════════════════════
+    // EVENTOS GLOBAIS (somente leitura)
+    // ══════════════════════════════════════════════════════
+    match /eventos/{eventoId} {
+      allow read: if isAuth();
+      allow write: if false;
+    }
+
+    // ══════════════════════════════════════════════════════
+    // CONVITES DE ESCRITÓRIO
+    // ══════════════════════════════════════════════════════
+    match /convites/{conviteId} {
+      // Destinatário e remetente podem ler
+      allow read: if isAuth() && (
+        resource.data.para_uid == request.auth.uid ||
+        resource.data.de_uid == request.auth.uid
+      );
+      // Sócio do escritório pode criar convite
+      allow create: if isAuth()
+        && request.resource.data.de_uid == request.auth.uid
+        && request.resource.data.status == 'pendente';
+      // Destinatário aceita ou recusa
+      allow update: if isAuth()
+        && resource.data.para_uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['status', 'respondido_em'])
+        && request.resource.data.status in ['aceito', 'recusado'];
+      allow delete: if false;
+    }
+
+    // ══════════════════════════════════════════════════════
+    // SESSÕES DE QUIZ/PROVA (temporárias)
+    // ══════════════════════════════════════════════════════
+    match /sessoes_prova/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // ══════════════════════════════════════════════════════
+    // BLOQUEAR TUDO QUE NÃO FOI EXPLICITAMENTE PERMITIDO
+    // ══════════════════════════════════════════════════════
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
