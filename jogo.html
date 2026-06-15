@@ -168,21 +168,11 @@
       </div>
     </div>
 
-    <!-- Energia -->
-    <div class="energia-bloco">
-      <div class="bloco-titulo">
-        ⚡ Energia Mensal
-        <span id="sr-energia-val">100/100</span>
-      </div>
+    <!-- Energia + Botão Avançar Mês (injetado por avancar_mes.js) -->
+    <div class="energia-bloco" id="bloco-energia">
+      <div class="bloco-titulo">⚡ Energia Mensal <span>100/100</span></div>
       <div class="energia-bar-wrap">
-        <div class="energia-bar-fill" id="sr-energia-bar" style="width:100%"></div>
-      </div>
-      <div class="energia-costs">
-        <div class="ec-row"><span>Caso simples</span>   <span class="cost-val">-10</span></div>
-        <div class="ec-row"><span>Caso médio</span>     <span class="cost-val">-20</span></div>
-        <div class="ec-row"><span>Caso complexo</span>  <span class="cost-val">-35</span></div>
-        <div class="ec-row"><span>Networking</span>     <span class="cost-val">-5</span></div>
-        <div class="ec-row"><span>Curso</span>          <span class="cost-val">-10</span></div>
+        <div class="energia-bar-fill" style="width:100%"></div>
       </div>
     </div>
 
@@ -245,6 +235,7 @@
 <!-- ════════ SCRIPTS ════════ -->
 <script type="module">
   import './js/firebase-init.js';
+  import './js/avancar_mes.js';
   import './js/auth.js';
   import './js/gamestate.js';
   import './js/ui-main.js';
@@ -255,6 +246,46 @@
 </script>
 
 <script>
+// ── Avançar Mês (definido aqui para garantir disponibilidade antes dos módulos) ──
+window.avancarMes = async function(forcar) {
+  // Aguardar o módulo carregar se ainda não carregou
+  if (window._avancarMesImpl) {
+    return window._avancarMesImpl(forcar);
+  }
+  // Fallback direto se o módulo ainda não carregou
+  const j = window.JOGADOR;
+  if (!j) { alert('Carregando... tente novamente em instantes.'); return; }
+  const usado     = j.energia_usada_mes || 0;
+  const disponivel = Math.max(0, 100 - usado);
+  if (!forcar && disponivel > 20) {
+    if (!confirm('Você ainda tem ' + disponivel + ' ⚡ de energia. Avançar mesmo assim?')) return;
+  }
+  // Chamar a Cloud Function diretamente
+  try {
+    const { getFunctions, httpsCallable } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js');
+    const fn = httpsCallable(window.FB_FUNCTIONS, 'avancarMes');
+    const btn = document.getElementById('server-tick');
+    if (btn) btn.innerHTML = '⏳ Avançando...';
+    const result = await fn({});
+    const r = result.data;
+    if (r.ok) {
+      window.toast && window.toast('✅ ' + r.mes + ' iniciado!', 'ok', 4000);
+      if (btn) btn.innerHTML = '<span style="color:var(--ouro2)">⚡ 100 energia</span>';
+    }
+  } catch(err) {
+    const msg = err.message || 'Erro desconhecido';
+    if (msg.includes('energia') || msg.includes('Voce')) {
+      window.toast ? window.toast('⚡ ' + msg, 'ko', 5000) : alert(msg);
+    } else if (msg.includes('Ferias') || msg.includes('ferias')) {
+      window.toast ? window.toast('🏖️ ' + msg, 'ko', 6000) : alert(msg);
+    } else {
+      window.toast ? window.toast('Erro: ' + msg, 'ko') : alert(msg);
+    }
+    const btn = document.getElementById('server-tick');
+    if (btn) btn.innerHTML = '<span style="cursor:pointer;text-decoration:underline;color:var(--ouro2)" onclick="window.avancarMes()">▶ Avançar mês</span>';
+  }
+};
+
 // ── Navegação entre painéis ──
 window.navTo = function(painel, el) {
   // Atualizar nav top
