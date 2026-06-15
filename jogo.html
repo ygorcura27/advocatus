@@ -257,37 +257,44 @@ window.avancarMes = async function(forcar) {
     if (!confirm('Você ainda tem ' + disponivel + ' ⚡ de energia. Avançar mesmo assim?')) return;
   }
 
-  // Aguardar FB_FUNCTIONS estar disponível (inicializado pelo módulo firebase-init.js)
-  let tentativas = 0;
-  while (!window.FB_FUNCTIONS && tentativas < 20) {
-    await new Promise(r => setTimeout(r, 200));
-    tentativas++;
-  }
-  if (!window.FB_FUNCTIONS) {
-    window.toast && window.toast('Firebase não inicializado. Recarregue a página.', 'ko');
-    return;
-  }
-
   const tickEl = document.getElementById('server-tick');
   if (tickEl) tickEl.innerHTML = '⏳ Avançando...';
 
+  // Aguardar FB_FUNCTIONS (inicializado pelo módulo firebase-init.js)
+  let tentativas = 0;
+  while (!window.FB_FUNCTIONS && tentativas < 30) {
+    await new Promise(r => setTimeout(r, 300));
+    tentativas++;
+  }
+
   try {
+    // Usar o SDK do Firebase para chamada autenticada (onCall)
+    const fbFuncs = window.FB_FUNCTIONS;
+    if (!fbFuncs) throw new Error('Firebase Functions não inicializado. Recarregue a página.');
+
     const { httpsCallable } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js');
-    const fn     = httpsCallable(window.FB_FUNCTIONS, 'avancarMes');
+    const fn     = httpsCallable(fbFuncs, 'avancarMes');
     const result = await fn({});
     const r      = result.data;
     if (r.ok) {
-      window.toast && window.toast('✅ ' + r.mes + ' — novo mês iniciado!', 'ok', 4000);
+      window.toast && window.toast('✅ ' + r.mes + ' iniciado!', 'ok', 4000);
+      if (tickEl) tickEl.innerHTML = '<span style="color:var(--ouro)">⚡ 100 energia</span>';
     }
   } catch(err) {
-    const msg = (err.message || '').replace('Firebase: ','');
-    if (msg.includes('energia') || msg.includes('Voce ainda')) {
+    const code = err.code || '';
+    const msg  = (err.message || err.details || '').replace('Firebase: ','').replace(/\s*\(.*\)\s*$/,'');
+    console.error('[AVANÇAR MÊS] code:', code, 'msg:', msg, err);
+
+    if (tickEl) tickEl.innerHTML = '<span style="cursor:pointer;color:var(--ouro)" onclick="window.avancarMes()">▶ Avançar mês</span>';
+
+    if (code === 'functions/failed-precondition' || msg.includes('energia') || msg.includes('Voce')) {
       window.toast ? window.toast('⚡ ' + msg, 'ko', 5000) : alert(msg);
-    } else if (msg.includes('erias')) {
+    } else if (code === 'functions/resource-exhausted' || msg.includes('erias') || msg.includes('Descanse')) {
       window.toast ? window.toast('🏖️ ' + msg, 'ko', 8000) : alert(msg);
+    } else if (code === 'functions/unauthenticated') {
+      window.toast ? window.toast('🔒 Sessão expirada. Recarregue a página.', 'ko') : alert('Sessão expirada.');
     } else {
-      console.error('[AVANÇAR MÊS]', err);
-      window.toast ? window.toast('Erro: ' + msg.slice(0,80), 'ko') : alert(msg);
+      window.toast ? window.toast('Erro: ' + msg.slice(0,100), 'ko') : alert(msg);
     }
   }
 };
