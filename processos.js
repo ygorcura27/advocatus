@@ -230,7 +230,10 @@ function _renderModalProcesso(id, p) {
 // ════════════════════════════════════════════════════════
 // QUIZ
 // ════════════════════════════════════════════════════════
-window.iniciarQuiz = function(procId, acao) {
+window.iniciarQuiz = async function(procId, acao) {
+  const custo = acao === 'audiencia' ? 20 : 10;
+  const ok = await window.gastarEnergia(custo, acao === 'audiencia' ? 'Audiência' : 'Pesquisa');
+  if (!ok) return;
   const j   = window.JOGADOR;
   const esp = j?.especialidade || 'civil';
   const banco = QUIZ[esp]?.[acao] || QUIZ.civil?.[acao] || QUIZ.civil.pesquisa;
@@ -447,6 +450,8 @@ window.decidirRecurso = async function(procId, interpor) {
 // ACORDO
 // ════════════════════════════════════════════════════════
 window.tentarAcordo = async function(procId) {
+  const ok = await window.gastarEnergia(5, 'Tentativa de acordo');
+  if (!ok) return;
   const j    = window.JOGADOR;
   const snap = await getDoc(doc(db, 'processos', procId));
   if (!snap.exists()) return;
