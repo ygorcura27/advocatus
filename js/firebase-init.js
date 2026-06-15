@@ -16,7 +16,6 @@ const FB_CONFIG = {
   storageBucket:     "advocatus-simultor.firebasestorage.app",
   messagingSenderId: "527755299061",
   appId:             "1:527755299061:web:cc75b6f9912d13a44a5dbc",
-  measurementId:     "G-MTKD441F1V",
 };
 
 const app       = initializeApp(FB_CONFIG);
