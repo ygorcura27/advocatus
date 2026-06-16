@@ -159,6 +159,94 @@ a:hover { color: var(--navy); }
 .topbar-rep  { font-size: .75rem; font-weight: 700; color: var(--ouro); }
 .topbar-saldo{ font-size: .75rem; color: #6EE7A0; font-weight: 600; }
 .topbar-serasa{ display:none; font-size:.62rem; padding:.1rem .4rem; background:rgba(231,76,60,.25); border:1px solid rgba(231,76,60,.5); border-radius:var(--r); color:#FF8A80; }
+/* ── Topbar: bloco de prestígio ── */
+.tb-pres-bloco {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 90px;
+}
+.tb-pres-header {
+  display: flex;
+  align-items: baseline;
+  gap: 1px;
+}
+.tb-rep-val {
+  font-family: var(--font-serif);
+  font-size: .9rem;
+  font-weight: 700;
+  color: var(--ouro);
+  line-height: 1;
+}
+.tb-rep-cap {
+  font-size: .62rem;
+  color: rgba(255,255,255,.4);
+}
+.tb-pres-bar-wrap {
+  height: 4px;
+  background: rgba(255,255,255,.12);
+  border-radius: 2px;
+  overflow: hidden;
+  width: 100%;
+}
+.tb-pres-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width .5s ease, background .5s ease;
+}
+.tb-pres-label {
+  font-size: .55rem;
+  color: rgba(255,255,255,.5);
+  letter-spacing: .06em;
+}
+
+/* ── Topbar: saldo ── */
+.tb-saldo-bloco {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 80px;
+}
+.tb-saldo-label {
+  font-size: .55rem;
+  color: rgba(255,255,255,.4);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.tb-saldo-val {
+  font-size: .78rem;
+  font-weight: 700;
+  color: #6EE7A0;
+  white-space: nowrap;
+}
+
+/* ── Topbar: badge energia ── */
+.tb-energia-badge {
+  font-size: .72rem;
+  color: rgba(255,255,255,.6);
+  white-space: nowrap;
+}
+
+/* ── Topbar: botão avançar mês ── */
+.tb-btn-avancar {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  padding: .3rem .7rem;
+  background: linear-gradient(135deg, var(--navy2), var(--navy3));
+  border: 1px solid var(--ouro2);
+  border-radius: var(--r);
+  color: var(--ouro);
+  font-family: var(--font-serif);
+  font-size: .78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all .2s;
+}
+.tb-btn-avancar:hover { border-color: var(--ouro); transform: translateY(-1px); }
+.tb-btn-avancar.pronto { animation: pulseGold 1.5s ease infinite; }
+
 .btn-logout {
   background: rgba(255,255,255,.08);
   border: 1px solid rgba(255,255,255,.2);
