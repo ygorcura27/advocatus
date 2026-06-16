@@ -323,29 +323,72 @@ window.renderPatrimonio = function(j, el) {
       }).join('')}
     </div>
     <!-- ESCRITÓRIO PESSOAL -->
-    <div class="secao-header"><div class="secao-titulo">💼 Espaço de Trabalho</div></div>
+    <!-- ESCRITÓRIO PESSOAL -->
+    <div class="secao-header">
+      <div class="secao-titulo">💼 Espaço de Trabalho</div>
+    </div>
+
     ${j.escritorio_empregado_id && j.escritorio_id !== 'solo'
       ? `<div class="card" style="background:var(--verde-bg);border:1px solid var(--verde3)">
-           <div style="font-size:.8rem;color:var(--verde);font-weight:600">✅ Você trabalha em ${j.escritorio_nome||'escritório'}</div>
-           <div style="font-size:.72rem;color:var(--txt3);margin-top:.2rem">Sem custo de espaço — o escritório cobre sua estrutura.</div>
+           <div style="font-size:.8rem;color:var(--verde);font-weight:600">
+             ✅ Você trabalha em ${j.escritorio_nome || 'escritório'}
+           </div>
+           <div style="font-size:.72rem;color:var(--txt3);margin-top:.2rem">
+             Sem custo de espaço — o escritório cobre sua estrutura.
+           </div>
          </div>`
       : `<div class="grid-cards">
-           ${ESC_PAT.filter(e => e.id !== 'cw' || j.escritorio_id === 'solo' || !j.escritorio_empregado_id).map(e=>{
-             const isAt = e.id === escId;
-             const repTxt = e.rep > 0 ? \`+\${e.rep} rep/mês\` : e.rep < 0 ? \`\${e.rep} rep/mês\` : 'Neutro';
-             const repCor = e.rep > 0 ? 'var(--verde2)' : e.rep < 0 ? 'var(--verm2)' : 'var(--txt4)';
-             return \`<div class="pat-card \${isAt?'ativo':''}">
-               <div class="pc-icon">\${e.i}</div>
-               <div class="pc-nome">\${e.l}</div>
-               <div class="pc-det" style="color:var(--amber)">\${e.cm > 0 ? fmt(e.cm)+'/mês' : 'Gratuito'}</div>
-               <div class="pc-rep" style="color:\${repCor}">\${repTxt}</div>
-               <div class="pc-det" style="font-size:.6rem">\${e.desc||''}</div>
-               \${isAt ? \`<div class="pc-ativo">✓ Atual</div>\` :
-               \`<button class="btn btn-sm btn-ghost" style="width:100%;margin-top:.3rem" onclick="window.escolherEscritorioPat('\${e.id}')">Escolher</button>\`}
-             </div>\`;
-           }).join('')}
-         </div>`}`;
-};
+           ${ESC_PAT
+             .filter(e => e.id !== 'cw' || j.escritorio_id === 'solo' || !j.escritorio_empregado_id)
+             .map(e => {
+               const isAt = e.id === escId;
+
+               const repTxt =
+                 e.rep > 0
+                   ? '+' + e.rep + ' rep/mês'
+                   : e.rep < 0
+                     ? e.rep + ' rep/mês'
+                     : 'Neutro';
+
+               const repCor =
+                 e.rep > 0
+                   ? 'var(--verde2)'
+                   : e.rep < 0
+                     ? 'var(--verm2)'
+                     : 'var(--txt4)';
+
+               return `
+                 <div class="pat-card ${isAt ? 'ativo' : ''}">
+                   <div class="pc-icon">${e.i}</div>
+                   <div class="pc-nome">${e.l}</div>
+
+                   <div class="pc-det" style="color:var(--amber)">
+                     ${e.cm > 0 ? fmt(e.cm) + '/mês' : 'Gratuito'}
+                   </div>
+
+                   <div class="pc-rep" style="color:${repCor}">
+                     ${repTxt}
+                   </div>
+
+                   <div class="pc-det" style="font-size:.6rem">
+                     ${e.desc || ''}
+                   </div>
+
+                   ${isAt
+                     ? `<div class="pc-ativo">✓ Atual</div>`
+                     : `<button
+                          class="btn btn-sm btn-ghost"
+                          style="width:100%;margin-top:.3rem"
+                          onclick="window.escolherEscritorioPat('${e.id}')">
+                          Escolher
+                        </button>`
+                   }
+                 </div>
+               `;
+             })
+             .join('')}
+         </div>`
+    }
 
 // ════════════════════════════════════════════════════════
 // AÇÕES
