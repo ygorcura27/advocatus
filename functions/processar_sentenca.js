@@ -51,8 +51,6 @@ function calcHonorarios(processo, instancia, isSolo, jogador) {
     return contingencia + sucumbencia;
   }
 
-  return Math.floor(sucumbencia * 0.10);
-}
   // Escritório: advogado recebe 10% da sucumbência do escritório
   return Math.floor(sucumbencia * 0.10);
 }
