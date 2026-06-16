@@ -1,290 +1,324 @@
 /**
  * PROCESSOS — Advocatus Online
- * Engine de processos: quiz, sentenças, recursos.
- * Chama Cloud Functions para resultados validados pelo servidor.
+ * Fluxo: Abrir processo → Peça processual → Ação → Quiz técnico → Resultado
  */
 
 import { collection, addDoc, doc, updateDoc, getDoc }
-// getBonusEscritorioParaCaso importado via window.getBonusEsc (carregado por vagas.js)
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { httpsCallable }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
 import { db } from './firebase-init.js';
+import { getPecasParaCaso } from './banco_pecas.js';
+import { getQuestoes } from './banco_questoes.js';
 
 // ════════════════════════════════════════════════════════
-// BANCO DE QUESTÕES (espelho do GDD)
+// CONSTANTES
 // ════════════════════════════════════════════════════════
-const QUIZ = {
-  tributario: {
-    pesquisa: [
-      {q:'Qual é o prazo para oposição de Embargos à Execução Fiscal (LEF art. 16)?',
-       opts:['30 dias após a garantia do juízo','15 dias da citação','5 dias da penhora','60 dias'],c:0,
-       dica:'LEF art. 16 §1º: 30 dias contados da intimação da penhora ou do depósito.'},
-      {q:'A Exceção de Pré-Executividade dispensa qual requisito?',
-       opts:['Garantia do juízo','Advogado constituído','Citação','Tempestividade'],c:0,
-       dica:'STJ Súmula 393: EPE não exige garantia — cabível para vícios cognoscíveis de ofício.'},
-      {q:'O prazo para homologação tácita no lançamento por homologação (CTN art. 150) é:',
-       opts:['5 anos do fato gerador','10 anos do pagamento','3 anos da declaração','2 anos'],c:0,
-       dica:'CTN art. 150 §4º: 5 anos contados da ocorrência do fato gerador.'},
-    ],
-    audiencia: [
-      {q:'Em audiência de Execução Fiscal, o devedor pode apresentar defesa por meio de:',
-       opts:['Embargos à EF com garantia do juízo','Contestação oral','Reconvenção','Exceção dilatória'],c:0,
-       dica:'LEF art. 16: apenas por Embargos, que exigem garantia do juízo.'},
-      {q:'A penhora online (BACEN-JUD) em EF pode ser determinada:',
-       opts:['Sem esgotamento prévio de outras diligências (STJ Tema 1.026)','Só após 3 tentativas frustradas','Com autorização do CGJ','Apenas para débitos >500 SM'],c:0,
-       dica:'STJ Tema 1.026: penhora eletrônica não exige tentativas anteriores.'},
-    ],
-  },
-  trabalhista: {
-    pesquisa: [
-      {q:'O prazo prescricional para reclamação trabalhista após extinção do contrato é:',
-       opts:['2 anos, créditos dos últimos 5 anos','5 anos sempre','1 ano do ato lesivo','30 dias'],c:0,
-       dica:'CF art. 7º XXIX: 2 anos após a extinção, créditos dos últimos 5 anos.'},
-      {q:'Para equiparação salarial (CLT art. 461), a diferença de tempo na função não pode superar:',
-       opts:['4 anos','2 anos','1 ano','Sem limite'],c:0,
-       dica:'CLT art. 461 §4º (Reforma 2017): diferença de tempo na função ≤ 4 anos.'},
-      {q:'Os elementos do vínculo de emprego são:',
-       opts:['Pessoalidade, não-eventualidade, onerosidade e subordinação','Exclusividade e jornada fixa','Contrato escrito e CTPS','Registro e subordinação'],c:0,
-       dica:'CLT art. 3º: 4 elementos cumulativos — pessoalidade, não-eventualidade, onerosidade e subordinação jurídica.'},
-    ],
-    audiencia: [
-      {q:'Na JT, a audiência trabalhista é:',
-       opts:['Una — conciliação, instrução e julgamento em sessão única','Apenas conciliação','Instrução e sentença separadas','Somente depoimentos'],c:0,
-       dica:'CLT art. 849: audiência trabalhista é una (ou com continuações).'},
-    ],
-  },
-  civil: {
-    pesquisa: [
-      {q:'O prazo para contestação no rito ordinário (CPC art. 335) é:',
-       opts:['15 dias úteis','10 dias corridos','30 dias úteis','5 dias úteis'],c:0,
-       dica:'CPC art. 335: prazo de 15 dias úteis para contestação.'},
-      {q:'A prescrição da pretensão de reparação civil extracontratual (CC art. 206 §3º V) é de:',
-       opts:['3 anos','10 anos','5 anos','1 ano'],c:0,
-       dica:'CC art. 206 §3º V: prescreve em 3 anos a pretensão de reparação civil.'},
-      {q:'A tutela de urgência antecipada (CPC art. 300) exige:',
-       opts:['Probabilidade do direito e perigo de dano','Certeza do direito','Prova inequívoca','Caução obrigatória'],c:0,
-       dica:'CPC art. 300: basta probabilidade (não certeza) + perigo de dano ou risco ao resultado útil.'},
-    ],
-    audiencia: [
-      {q:'A audiência de conciliação e mediação (CPC art. 334) deve ocorrer:',
-       opts:['Antes da contestação, no prazo de 20-30 dias da citação','Após a contestação','No início da instrução','Só se as partes concordarem'],c:0,
-       dica:'CPC art. 334: designada antes da contestação, 20-30 dias após a citação.'},
-    ],
-  },
-  criminal: {
-    pesquisa: [
-      {q:'Os vetores do princípio da insignificância (STF HC 84.412) são:',
-       opts:['Mínima ofensividade, ausência de periculosidade, reduzido grau de reprovabilidade e inexpressividade da lesão','Valor inferior a 1 SM','Primariedade','Qualquer desses isoladamente'],c:0,
-       dica:'STF HC 84.412: 4 vetores cumulativos.'},
-      {q:'O flagrante preparado (provocado) gera:',
-       opts:['Crime impossível — atipicidade (Súmula 145 STF)','Atenuante da pena','Nulidade relativa','Causa de diminuição'],c:0,
-       dica:'Súmula 145 STF: flagrante preparado → crime impossível (CP art. 17).'},
-    ],
-    audiencia: [
-      {q:'A Resposta à Acusação (CPP art. 396-A) deve ser apresentada em:',
-       opts:['10 dias após notificação do recebimento da denúncia','5 dias da citação','15 dias úteis','30 dias'],c:0,
-       dica:'CPP art. 396-A: prazo de 10 dias da notificação do acusado.'},
-    ],
-  },
-  empresarial: {
-    pesquisa: [
-      {q:'O prazo para apresentação do plano de recuperação judicial (Lei 11.101/05 art. 53) é:',
-       opts:['60 dias do deferimento do processamento','30 dias','90 dias','180 dias'],c:0,
-       dica:'Lei 11.101/05 art. 53: prazo improrrogável de 60 dias.'},
-      {q:'Para desconsideração da personalidade jurídica (CC art. 50 — teoria maior) é necessário:',
-       opts:['Desvio de finalidade OU confusão patrimonial','Apenas insolvência','Encerramento irregular','Qualquer ato ilícito'],c:0,
-       dica:'CC art. 50: teoria maior exige desvio de finalidade OU confusão patrimonial.'},
-    ],
-    audiencia: [
-      {q:'A Assembleia Geral de Credores (AGC) na RJ é presidida por:',
-       opts:['Administrador judicial','Juiz da recuperação','Maior credor','Devedor'],c:0,
-       dica:'Lei 11.101/05 art. 37: a AGC é presidida pelo administrador judicial.'},
-    ],
-  },
-  constitucional: {
-    pesquisa: [
-      {q:'A reserva de plenário (CF art. 97) exige que a declaração de inconstitucionalidade ocorra por:',
-       opts:['Maioria absoluta do pleno ou órgão especial','Maioria simples','Unanimidade','Apenas o relator'],c:0,
-       dica:'CF art. 97 + SV 10 STF: maioria absoluta do tribunal pleno ou órgão especial.'},
-    ],
-    audiencia: [
-      {q:'Na sustentação oral no STF, o advogado tem:',
-       opts:['15 minutos por parte (prorrogável pelo Presidente)','30 minutos','1 hora','5 minutos'],c:0,
-       dica:'RISTF art. 131: 15 minutos por parte.'},
-    ],
-  },
-  ambiental: {
-    pesquisa: [
-      {q:'A responsabilidade civil por dano ambiental (Lei 6.938/81 art. 14 §1º) é:',
-       opts:['Objetiva — basta o nexo causal','Subjetiva com culpa grave','Solidária apenas entre PJs','Limitada ao seguro'],c:0,
-       dica:'Lei 6.938/81 art. 14 §1º: responsabilidade objetiva — independe de culpa.'},
-    ],
-    audiencia: [
-      {q:'Na Ação Civil Pública ambiental, o MP pode atuar como:',
-       opts:['Autor principal ou fiscal da lei (custos legis)','Apenas interveniente','Réu em omissão','Amicus curiae'],c:0,
-       dica:'Lei 7.347/85 art. 5º: MP tem legitimidade ativa; quando não autor, é fiscal obrigatório.'},
-    ],
-  },
-  previdenciario: {
-    pesquisa: [
-      {q:'A carência para auxílio por incapacidade temporária é de:',
-       opts:['12 contribuições (salvo acidente e doenças especiais — carência zero)','24 contribuições','6 meses','Sem carência'],c:0,
-       dica:'Lei 8.213/91 arts. 25 e 26: regra 12 meses; exceção carência zero para acidente.'},
-      {q:'O JEF (Lei 10.259/01) tem competência para causas até:',
-       opts:['60 salários mínimos','40 SM','100 SM','Qualquer valor'],c:0,
-       dica:'Lei 10.259/01 art. 3º: competência até 60 SM contra entidades federais.'},
-    ],
-    audiencia: [
-      {q:'O INSS tem prazo para analisar requerimento administrativo de:',
-       opts:['45 dias (Lei 8.213/91 art. 41-A)','30 dias','90 dias','Indeterminado'],c:0,
-       dica:'Lei 8.213/91 art. 41-A: prazo de 45 dias para análise dos benefícios.'},
-    ],
-  },
+const ACOES = {
+  pesquisa:       { l:'🔬 Pesquisa Jurídica',    energia:5,  progresso:8,  skills:['pesquisa','argumentacao'],   desc:'Análise de legislação e jurisprudência.' },
+  peticionamento: { l:'📝 Peticionamento',        energia:10, progresso:15, skills:['escrita','argumentacao'],    desc:'Elaboração de peça processual.' },
+  diligencia:     { l:'🔍 Diligência',            energia:15, progresso:22, skills:['pesquisa','negociacao'],     desc:'Coleta de provas e informações.' },
+  audiencia:      { l:'🏛️ Audiência',            energia:20, progresso:30, skills:['oratoria','persuasao'],      desc:'Sustentação oral e audiência.' },
+};
+
+const CARGO_IDX = {
+  est:0, ass:1, jnr:2, pln:3, snr:4, asc:5, soc:6, snm:7,
+  jsub:2, jtit:4, dsb:5, mstj:7, padj:2, prom:4, pjus:5, pgj:7,
+  dadj:2, def:4, dch:5, dge:7,
 };
 
 // ════════════════════════════════════════════════════════
-// ESTADO DO QUIZ
+// ESTADO DO FLUXO ATUAL
 // ════════════════════════════════════════════════════════
-let _quizState = null;
-let _procAtivo = null;
+let _estado = null; // { procId, proc, fase, acaoId, questoes, qi, acertos }
 
 // ════════════════════════════════════════════════════════
-// ABRIR PROCESSO (modal de ações)
+// ABRIR PROCESSO (modal principal)
 // ════════════════════════════════════════════════════════
 window.abrirProcesso = async function(processoId) {
   try {
     const snap = await getDoc(doc(db, 'processos', processoId));
-    if (!snap.exists()) { toast('Processo não encontrado.','ko'); return; }
+    if (!snap.exists()) { toast('Processo não encontrado.', 'ko'); return; }
     const p = snap.data();
-    _procAtivo = { id: processoId, ...p };
+    _estado = { procId: processoId, proc: p, fase: 'modal' };
     _renderModalProcesso(processoId, p);
-  } catch (err) { toast('Erro ao abrir processo.','ko'); }
+  } catch (err) { toast('Erro ao abrir processo.', 'ko'); console.error(err); }
 };
 
 function _renderModalProcesso(id, p) {
-  const j          = window.JOGADOR;
-  const cs         = p.chance_sucesso || 50;
-  const prog       = p.progresso || 0;
-  const csColor    = cs>=70?'var(--verde3)':cs>=40?'#ffa726':'var(--verm3)';
-  const inst       = ['','1ª Instância','2ª Instância','STJ','STF'][p.instancia||1]||'1ª Inst.';
-  const isSolo     = j.escritorio_id === 'solo';
-  const cargoId    = j.cargo_id;
-
-  // Verificar energia disponível
-  const energiaUsada = j.energia_usada_mes || 0;
-  const energiaDisp  = Math.max(0, 100 - energiaUsada);
-  const semEnergia   = energiaDisp === 0;
-  const podeAud20    = energiaDisp >= 20 && ['jnr','pln','snr','asc','soc','snm',
-    'jsub','jtit','dsb','mstj','padj','prom','pjus','pgj','dadj','def','dch','dge'].includes(cargoId);
-  const podePesq10   = energiaDisp >= 10;
-  const podeAcordo   = energiaDisp >= 5;
-
-  const honInfo = isSolo
+  const j        = window.JOGADOR;
+  const cs       = p.chance_sucesso || 50;
+  const prog     = p.progresso || 0;
+  const csColor  = cs >= 70 ? 'var(--verde2)' : cs >= 40 ? 'var(--amber)' : 'var(--verm2)';
+  const inst     = ['','1ª Instância','2ª Instância','STJ','STF'][p.instancia||1] || '1ª Inst.';
+  const isSolo   = !j.escritorio_empregado_id || j.escritorio_id === 'solo';
+  const energiaDisp = Math.max(0, 100 - (j.energia_usada_mes || 0));
+  const honInfo  = isSolo
     ? `Solo: 30% causa + ${[,'10%','10%','5%','5%'][p.instancia||1]} sucumbência`
-    : `Escritório: 10% da sucumbência desta instância`;
+    : `Escritório: 10% da sucumbência`;
 
-  // Aviso de energia zero
-  const avisoEnergia = semEnergia
-    ? `<div style="background:rgba(122,32,32,.15);border:1px solid rgba(200,80,80,.35);border-radius:2px;padding:.6rem;margin-bottom:.7rem;font-size:.75rem;color:var(--verm3);text-align:center">
+  const avisoEnergia = energiaDisp === 0
+    ? `<div style="background:var(--verm-bg);border:1px solid var(--verm3);border-radius:var(--r);padding:.55rem .75rem;margin-bottom:.7rem;font-size:.75rem;color:var(--verm2);text-align:center">
         ⚡ Energia esgotada — avance o mês para continuar
        </div>`
     : energiaDisp <= 20
-    ? `<div style="background:rgba(184,146,42,.08);border:var(--borda);border-radius:2px;padding:.5rem;margin-bottom:.7rem;font-size:.72rem;color:var(--ouro2);text-align:center">
-        ⚡ ${energiaDisp} energia restante — mês pronto para avançar
+    ? `<div style="background:var(--amber-bg);border:1px solid var(--amber);border-radius:var(--r);padding:.45rem .75rem;margin-bottom:.6rem;font-size:.72rem;color:var(--amber);text-align:center">
+        ⚡ ${energiaDisp} energia restante
        </div>`
-    : `<div style="font-size:.68rem;color:var(--ardosia2);text-align:right;margin-bottom:.5rem">⚡ ${energiaDisp} energia disponível</div>`;
+    : '';
 
-  abrirModal(
-    `⚖️ ${p.tipo||'—'}`,
-    `<div style="background:rgba(255,255,255,.04);border:var(--borda);border-radius:2px;padding:.75rem;margin-bottom:.8rem">
-      <div style="font-family:var(--font-mono);font-size:.62rem;color:var(--ardosia);margin-bottom:.3rem">${p.numero||'—'}</div>
-      <div style="font-weight:600;font-size:.88rem;margin-bottom:.15rem">${p.autor||'—'} vs ${p.reu||'—'}</div>
-      <div style="font-size:.72rem;color:var(--ouro2)">${p.tribunal||'—'} · ${inst}</div>
-      <div style="font-size:.7rem;color:var(--verde3);margin-top:.3rem">Valor: ${fmt(p.valor)} · ${honInfo}</div>
+  abrirModal(`⚖️ ${p.tipo || '—'}`,
+    `<div style="background:var(--surface2);border:var(--borda);border-radius:var(--r);padding:.75rem;margin-bottom:.85rem">
+      <div style="font-family:var(--font-mono);font-size:.6rem;color:var(--txt4);margin-bottom:.25rem">${p.numero || '—'}</div>
+      <div style="font-weight:700;font-size:.9rem;color:var(--navy);margin-bottom:.15rem">${p.autor || '—'} <span style="opacity:.4">vs</span> ${p.reu || '—'}</div>
+      <div style="font-size:.7rem;color:var(--ouro2)">${p.tribunal || '—'} · ${inst}</div>
+      <div style="font-size:.7rem;color:var(--verde2);margin-top:.25rem">${fmt(p.valor)} · ${honInfo}</div>
     </div>
-
-    <div style="margin-bottom:.8rem">
-      <div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--ardosia2);margin-bottom:.25rem">
-        <span>Progresso do caso</span><span style="color:var(--ouro2)">${prog}%</span>
+    <div style="margin-bottom:.85rem">
+      <div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--txt3);margin-bottom:.2rem">
+        <span>Progresso</span><span style="color:var(--navy);font-weight:700">${prog}%</span>
       </div>
-      <div style="height:6px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden;margin-bottom:.4rem">
-        <div style="height:100%;width:${prog}%;background:linear-gradient(90deg,var(--ouro3),var(--ouro))"></div>
+      <div style="height:7px;background:var(--bg2);border-radius:3px;overflow:hidden;margin-bottom:.4rem">
+        <div style="height:100%;width:${prog}%;background:linear-gradient(90deg,var(--navy3),var(--ouro2));transition:width .4s"></div>
       </div>
-      <div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--ardosia2)">
-        <span>⚖️ Chance de vitória</span>
+      <div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--txt3)">
+        <span>Chance de vitória</span>
         <span style="font-weight:700;color:${csColor}">${cs}%</span>
       </div>
-      <div style="height:5px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden;margin-top:.2rem">
-        <div style="height:100%;width:${cs}%;background:${csColor}"></div>
+      <div style="height:5px;background:var(--bg2);border-radius:3px;overflow:hidden;margin-top:.18rem">
+        <div style="height:100%;width:${cs}%;background:${csColor};transition:width .4s"></div>
       </div>
     </div>
-
     ${avisoEnergia}
+    ${prog >= 100
+      ? `<button class="btn btn-prim btn-block" onclick="window.processarSentenca('${id}')">⚖️ Processar sentença →</button>`
+      : p.recurso_pendente
+      ? `<div style="display:flex;flex-direction:column;gap:.4rem">
+           <button class="btn btn-prim btn-block" onclick="window.decidirRecurso('${id}',true)">⚠️ Interpor recurso (${cs}% chance)</button>
+           <button class="btn btn-ghost btn-block" onclick="window.decidirRecurso('${id}',false)">✋ Não recorrer</button>
+         </div>`
+      : `<button class="btn btn-prim btn-block" ${energiaDisp === 0 ? 'disabled' : ''} onclick="window.iniciarFluxo('${id}')">
+           ▶ Iniciar ação processual →
+         </button>`}
+    <button class="btn btn-ghost btn-sm btn-block" style="margin-top:.4rem" onclick="window.tentarAcordo('${id}')">
+      🤝 Propor acordo (-5 ⚡)
+    </button>`
+  );
+}
 
+// ════════════════════════════════════════════════════════
+// ETAPA 1 — ESCOLHA DA PEÇA PROCESSUAL
+// ════════════════════════════════════════════════════════
+window.iniciarFluxo = async function(procId) {
+  const snap = await getDoc(doc(db, 'processos', procId));
+  if (!snap.exists()) return;
+  const p = snap.data();
+  _estado = { procId, proc: p, fase: 'peca' };
+
+  const pecas = getPecasParaCaso(p.tipo, p.area || 'civil', p.instancia || 1);
+  if (!pecas) { _iniciarEscolhaAcao(procId, p); return; }
+
+  _estado.pecas = pecas;
+
+  abrirModal('📋 Qual é a peça processual correta?',
+    `<div style="background:var(--surface2);border:var(--borda);border-radius:var(--r);padding:.7rem;margin-bottom:.85rem">
+      <div style="font-size:.68rem;color:var(--txt4);margin-bottom:.15rem">${p.tipo} · ${p.area} · ${['','1ª','2ª','3ª','4ª'][p.instancia||1]} instância</div>
+      <div style="font-size:.8rem;color:var(--navy);font-weight:600">${pecas.pergunta.split('\n\n')[1] || pecas.caso}</div>
+    </div>
+    <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.75rem">
+      ✅ Peça correta → +10% chance vitória → escolhe a ação<br>
+      ⚠️ Parcialmente correta → -5% chance vitória → escolhe a ação<br>
+      ❌ Errada → perde a ação + -rep + contabiliza para demissão
+    </div>
     <div style="display:flex;flex-direction:column;gap:.4rem">
-      <button class="btn btn-sec btn-block" onclick="window.iniciarQuiz('${id}','audiencia')"
-        ${!podeAud20?'disabled':''} style="${!podeAud20?'opacity:.35;cursor:not-allowed':''}">
-        🏛️ Realizar audiência
-        <span style="font-size:.68rem;opacity:.7;margin-left:.4rem">(-20 ⚡)</span>
-        ${!['jnr','pln','snr','asc','soc','snm','jsub','jtit','dsb','mstj','padj','prom','pjus','pgj','dadj','def','dch','dge'].includes(cargoId)
-          ? '<span style="font-size:.65rem;color:var(--verm3);margin-left:.5rem">🔒 Júnior+</span>'
-          : !podeAud20 ? '<span style="font-size:.65rem;color:var(--verm3);margin-left:.5rem">🔒 Sem energia</span>' : ''}
-      </button>
-      <button class="btn btn-sec btn-block" onclick="window.iniciarQuiz('${id}','pesquisa')"
-        ${!podePesq10?'disabled':''} style="${!podePesq10?'opacity:.35;cursor:not-allowed':''}">
-        🔬 Pesquisa jurídica
-        <span style="font-size:.68rem;opacity:.7;margin-left:.4rem">(-10 ⚡)</span>
-        ${!podePesq10?'<span style="font-size:.65rem;color:var(--verm3);margin-left:.5rem">🔒 Sem energia</span>':''}
-      </button>
-      <button class="btn btn-ghost btn-block" onclick="window.tentarAcordo('${id}')"
-        ${!podeAcordo?'disabled':''} style="${!podeAcordo?'opacity:.35;cursor:not-allowed':''}">
-        🤝 Propor acordo
-        <span style="font-size:.68rem;opacity:.7;margin-left:.4rem">(-5 ⚡)</span>
-        ${!podeAcordo?'<span style="font-size:.65rem;color:var(--verm3);margin-left:.5rem">🔒 Sem energia</span>':''}
-      </button>
-      ${p.recurso_pendente ? `
-      <button class="btn btn-sec btn-block" style="border-color:${cs>=70?'#ffa726':'rgba(255,255,255,.15)'}"
-        onclick="window.decidirRecurso('${id}',true)">
-        ⚠️ Interpor recurso <span style="font-size:.68rem;opacity:.7">${cs}% de chance</span>
-      </button>
-      <button class="btn btn-ghost btn-block" onclick="window.decidirRecurso('${id}',false)">
-        ✋ Não recorrer — encerrar caso
-      </button>` : ''}
+      ${pecas.opcoes.map((op, i) =>
+        `<button class="btn btn-ghost btn-block" style="text-align:left;font-size:.8rem;padding:.65rem .85rem"
+          onclick="window.responderPeca(${i})">
+          ${String.fromCharCode(65+i)}) ${op.texto}
+        </button>`
+      ).join('')}
+    </div>`
+  );
+};
+
+window.responderPeca = async function(idx) {
+  const { procId, proc, pecas } = _estado;
+  const j   = window.JOGADOR;
+  const uid = j?.uid || window.JOGADOR_UID;
+  const op  = pecas.opcoes[idx];
+  const cs  = proc.chance_sucesso || 50;
+
+  // Desabilitar botões
+  document.querySelectorAll('.modal-body .btn-ghost').forEach((b,i) => {
+    b.disabled = true;
+    if (i === idx) b.style.background = 'var(--navy-light)';
+  });
+
+  if (op.tipo === 'correta') {
+    // ✅ Acertou — +10% chance, prossegue
+    await updateDoc(doc(db, 'processos', procId), { chance_sucesso: Math.min(95, cs + 10) });
+    _estado.proc = { ...proc, chance_sucesso: Math.min(95, cs + 10) };
+
+    const feedback = document.createElement('div');
+    feedback.innerHTML = `
+      <div style="background:var(--verde-bg);border:1px solid var(--verde3);border-radius:var(--r);padding:.6rem;margin-top:.7rem">
+        <div style="color:var(--verde);font-weight:700;font-size:.8rem">✅ Correto! +10% chance de vitória</div>
+        <div style="font-size:.7rem;color:var(--txt3);margin-top:.25rem">${op.justificativa}</div>
+      </div>`;
+    document.querySelector('.modal-body').appendChild(feedback);
+
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-prim btn-block';
+    btn.style.marginTop = '.75rem';
+    btn.textContent = 'Escolher ação →';
+    btn.onclick = () => _iniciarEscolhaAcao(procId, _estado.proc);
+    document.querySelector('.modal-body').appendChild(btn);
+
+  } else if (op.tipo === 'parcial') {
+    // ⚠️ Parcial — -5% chance, prossegue
+    await updateDoc(doc(db, 'processos', procId), { chance_sucesso: Math.max(5, cs - 5) });
+    _estado.proc = { ...proc, chance_sucesso: Math.max(5, cs - 5) };
+
+    const feedback = document.createElement('div');
+    feedback.innerHTML = `
+      <div style="background:var(--amber-bg);border:1px solid var(--amber);border-radius:var(--r);padding:.6rem;margin-top:.7rem">
+        <div style="color:var(--amber);font-weight:700;font-size:.8rem">⚠️ Parcialmente correto — -5% chance de vitória</div>
+        <div style="font-size:.7rem;color:var(--txt3);margin-top:.25rem">${op.justificativa}</div>
+      </div>`;
+    document.querySelector('.modal-body').appendChild(feedback);
+
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-sec btn-block';
+    btn.style.marginTop = '.75rem';
+    btn.textContent = 'Continuar com a ação →';
+    btn.onclick = () => _iniciarEscolhaAcao(procId, _estado.proc);
+    document.querySelector('.modal-body').appendChild(btn);
+
+  } else {
+    // ❌ Errada — perde a ação, -rep, conta para demissão
+    const cap    = (window.REP_CAP || {})[j.cargo_id] || 55;
+    const rep    = j.reputacao || 30;
+    const perda  = Math.max(1, Math.floor(rep * 0.04));
+    const dc     = (j.derrotas_consecutivas || 0) + 1;
+    const demitido = dc >= 5 && j.escritorio_empregado_id && j.escritorio_empregado_id !== 'solo';
+
+    const updates = {
+      reputacao: Math.max(0, rep - perda),
+      derrotas_consecutivas: dc,
+    };
+    if (demitido) {
+      updates.escritorio_id           = 'solo';
+      updates.escritorio_empregado_id = null;
+      updates.escritorio_nome         = null;
+      updates.derrotas_consecutivas   = 0;
+    }
+    await updateDoc(doc(db, 'jogadores', uid), updates);
+
+    const feedback = document.createElement('div');
+    feedback.innerHTML = `
+      <div style="background:var(--verm-bg);border:1px solid var(--verm3);border-radius:var(--r);padding:.6rem;margin-top:.7rem">
+        <div style="color:var(--verm2);font-weight:700;font-size:.8rem">❌ Peça incorreta — ação perdida</div>
+        <div style="font-size:.7rem;color:var(--txt3);margin-top:.2rem">${op.justificativa}</div>
+        <div style="font-size:.72rem;color:var(--verm2);margin-top:.3rem">-${perda} reputação · Derrotas consecutivas: ${dc}/5</div>
+        ${demitido ? `<div style="font-size:.75rem;font-weight:700;color:var(--verm2);margin-top:.3rem">⚠️ Demitido(a) por 5 derrotas consecutivas!</div>` : ''}
+      </div>`;
+    document.querySelector('.modal-body').appendChild(feedback);
+
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-ghost btn-block';
+    btn.style.marginTop = '.75rem';
+    btn.textContent = 'Fechar';
+    btn.onclick = () => fecharModal();
+    document.querySelector('.modal-body').appendChild(btn);
+  }
+};
+
+// ════════════════════════════════════════════════════════
+// ETAPA 2 — ESCOLHA DA AÇÃO
+// ════════════════════════════════════════════════════════
+function _iniciarEscolhaAcao(procId, p) {
+  const j           = window.JOGADOR;
+  const energiaDisp = Math.max(0, 100 - (j.energia_usada_mes || 0));
+  const cargoIdx    = CARGO_IDX[j.cargo_id] || 0;
+  const podeAudiencia = cargoIdx >= 2; // Júnior+
+
+  abrirModal('⚡ Escolha sua ação',
+    `<div style="font-size:.72rem;color:var(--txt3);margin-bottom:.75rem;padding:.5rem;background:var(--surface2);border-radius:var(--r)">
+      Maior gasto de energia = maior progresso no caso.<br>
+      Você tem <b style="color:var(--navy)">⚡ ${energiaDisp}</b> de energia disponível.
+    </div>
+    <div style="display:flex;flex-direction:column;gap:.4rem">
+      ${Object.entries(ACOES).map(([id, a]) => {
+        const podeUsar = energiaDisp >= a.energia && (id !== 'audiencia' || podeAudiencia);
+        const motivo   = !podeAudiencia && id === 'audiencia' ? '🔒 Requer Júnior+' :
+                         energiaDisp < a.energia ? `🔒 Requer ${a.energia} ⚡` : '';
+        return `
+          <button class="btn btn-block" ${!podeUsar ? 'disabled' : ''}
+            style="text-align:left;padding:.7rem .9rem;border:var(--borda);border-radius:var(--r);background:${podeUsar?'var(--surface)':'var(--bg2)'};cursor:${podeUsar?'pointer':'not-allowed'};opacity:${podeUsar?1:.5}"
+            onclick="window.iniciarQuiz('${procId}','${id}')">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div style="font-weight:700;font-size:.85rem;color:var(--navy)">${a.l}</div>
+                <div style="font-size:.68rem;color:var(--txt3);margin-top:.1rem">${a.desc} · Skills: ${a.skills.join(' + ')}</div>
+              </div>
+              <div style="text-align:right;flex-shrink:0;margin-left:.8rem">
+                <div style="font-size:.75rem;font-weight:700;color:var(--navy3)">+${a.progresso}%</div>
+                <div style="font-size:.65rem;color:var(--txt4)">-${a.energia} ⚡</div>
+                ${motivo ? `<div style="font-size:.62rem;color:var(--verm2)">${motivo}</div>` : ''}
+              </div>
+            </div>
+          </button>`;
+      }).join('')}
     </div>`
   );
 }
 
 // ════════════════════════════════════════════════════════
-// QUIZ
+// ETAPA 3 — QUIZ TÉCNICO
 // ════════════════════════════════════════════════════════
-window.iniciarQuiz = async function(procId, acao) {
-  const custo = acao === 'audiencia' ? 20 : 10;
-  const ok = await window.gastarEnergia(custo, acao === 'audiencia' ? 'Audiência' : 'Pesquisa');
-  if (!ok) return;
+window.iniciarQuiz = async function(procId, acaoId) {
   const j   = window.JOGADOR;
-  const esp = j?.especialidade || 'civil';
-  const banco = QUIZ[esp]?.[acao] || QUIZ.civil?.[acao] || QUIZ.civil.pesquisa;
-  const pergs = [...banco].sort(() => Math.random() - .5).slice(0, 3);
+  const uid = j?.uid || window.JOGADOR_UID;
+  const a   = ACOES[acaoId];
+  if (!a) return;
 
-  _quizState = { procId, acao, pergs, qi: 0, acertos: 0 };
+  // Verificar e gastar energia
+  const usado = j.energia_usada_mes || 0;
+  const disp  = Math.max(0, 100 - usado);
+  if (disp < a.energia) { toast(`⚡ Energia insuficiente (requer ${a.energia}).`, 'ko'); return; }
+
+  // Debitar energia imediatamente
+  await updateDoc(doc(db, 'jogadores', uid), {
+    energia_usada_mes: usado + a.energia,
+  });
+
+  // Buscar processo atualizado
+  const snap = await getDoc(doc(db, 'processos', procId));
+  const p    = snap.exists() ? snap.data() : _estado?.proc || {};
+
+  const area    = p.area || j?.especialidade || 'civil';
+  const questoes = getQuestoes(area, 3);
+
+  _estado = { procId, proc: p, acaoId, fase: 'quiz', questoes, qi: 0, acertos: 0 };
   _renderQuizQ();
 };
 
 function _renderQuizQ() {
-  const { pergs, qi, acao } = _quizState;
-  const q     = pergs[qi];
-  const label = acao === 'audiencia' ? '🏛️ Audiência' : '🔬 Pesquisa';
+  const { questoes, qi, acaoId } = _estado;
+  const q  = questoes[qi];
+  const a  = ACOES[acaoId];
 
   abrirModal(
-    `${label} — Questão ${qi+1} de ${pergs.length}`,
+    `${a.l} — Questão ${qi + 1}/3`,
     `<div class="quiz-wrap">
-      <div class="quiz-header">${label} · ${qi+1}/${pergs.length}</div>
-      <div class="quiz-prog-bar"><div class="quiz-prog-fill" style="width:${qi/pergs.length*100}%"></div></div>
+      <div class="quiz-header">${a.l} · ${qi + 1}/3 · ${a.skills.join(' + ')}</div>
+      <div class="quiz-prog-bar">
+        <div class="quiz-prog-fill" style="width:${qi / 3 * 100}%"></div>
+      </div>
       <div class="quiz-questao">${q.q}</div>
       <div class="quiz-opts">
-        ${q.opts.map((o,i) =>
-          `<button class="quiz-opt" onclick="window.responderQuiz(${i})">${o}</button>`
+        ${q.opts.map((op, i) =>
+          `<button class="quiz-opt" onclick="window.responderQuiz(${i})">${op}</button>`
         ).join('')}
       </div>
     </div>`
@@ -292,14 +326,13 @@ function _renderQuizQ() {
 }
 
 window.responderQuiz = function(idx) {
-  const { pergs, qi, acao } = _quizState;
-  const q     = pergs[qi];
+  const { questoes, qi } = _estado;
+  const q     = questoes[qi];
   const certo = idx === q.c;
-  if (certo) _quizState.acertos++;
+  if (certo) _estado.acertos++;
 
   // Feedback visual
-  const opts = document.querySelectorAll('.quiz-opt');
-  opts.forEach((b, i) => {
+  document.querySelectorAll('.quiz-opt').forEach((b, i) => {
     b.disabled = true;
     if (i === q.c)           b.classList.add('certo');
     if (i === idx && !certo) b.classList.add('errado');
@@ -307,87 +340,76 @@ window.responderQuiz = function(idx) {
 
   const dica = document.createElement('div');
   dica.className = 'quiz-dica';
-  dica.innerHTML = `${certo ? '✅ Correto!' : '❌ Incorreto.'} <b>📖 ${q.dica}</b>`;
+  dica.innerHTML = `${certo ? '✅ Correto!' : '❌ Incorreto.'} <b>📖 ${q.e}</b>`;
   document.querySelector('.quiz-wrap').appendChild(dica);
 
   const btn = document.createElement('button');
-  btn.className = 'btn btn-sec btn-block';
-  btn.style.marginTop = '.6rem';
-  const last = qi === pergs.length - 1;
+  btn.className = 'btn btn-prim btn-block';
+  btn.style.marginTop = '.65rem';
+  const last = qi === 2;
   btn.textContent = last ? 'Ver resultado →' : 'Próxima →';
-  btn.onclick = last
-    ? () => _finalizarQuiz()
-    : () => { _quizState.qi++; _renderQuizQ(); };
+  btn.onclick = last ? () => _finalizarQuiz() : () => { _estado.qi++; _renderQuizQ(); };
   document.querySelector('.quiz-wrap').appendChild(btn);
 };
 
+// ════════════════════════════════════════════════════════
+// ETAPA 4 — RESULTADO DO QUIZ E PROGRESSO
+// ════════════════════════════════════════════════════════
 async function _finalizarQuiz() {
-  const { procId, acao, acertos, pergs } = _quizState;
-  const j = window.JOGADOR;
-  if (!j) return;
+  const { procId, proc, acaoId, acertos } = _estado;
+  const j   = window.JOGADOR;
+  const uid = j?.uid || window.JOGADOR_UID;
+  const a   = ACOES[acaoId];
 
-  const total   = pergs.length;
-  const impactoProgresso = acao==='audiencia'
-    ? [5,12,22,28][acertos]
-    : [3, 8,15,20][acertos];
-  const impactoChance = acao==='audiencia'
-    ? [-5,-1,4,8][acertos]
-    : [-3, 0,3,6][acertos];
-  const impactoSk = acao==='audiencia' ? 'oratoria' : 'pesquisa';
-  const energiaCusto = acao==='audiencia' ? 20 : 10;
+  // Progresso proporcional aos acertos
+  const fator = [0, 1/3, 2/3, 1][acertos];
+  const prog  = Math.round(a.progresso * fator);
+  const novoP = Math.min(100, (proc.progresso || 0) + prog);
 
-  // Buscar processo atual
-  const snap = await getDoc(doc(db, 'processos', procId));
-  if (!snap.exists()) { toast('Processo não encontrado.','ko'); fecharModal(); return; }
-  const p = snap.data();
+  // Bônus de chance baseado nas skills
+  const skills   = j.skills || {};
+  const skMedia  = a.skills.reduce((s, k) => s + (skills[k] || 10), 0) / a.skills.length;
+  const bonusCs  = acertos >= 2 ? Math.floor(skMedia * 0.05) : 0;
+  const novoCs   = Math.min(95, (proc.chance_sucesso || 50) + bonusCs);
 
-  const novoProgresso = Math.min(100, (p.progresso||0) + impactoProgresso);
-  const novaChance    = Math.max(5, Math.min(95, (p.chance_sucesso||50) + impactoChance));
-  const novaEnergia   = Math.max(0, (j.energia||100) - energiaCusto);
-
-  // Skill boost
-  const cap      = window.REP_CAP[j.cargo_id] || 55;
-  const skAtual  = (j.skills||{})[impactoSk] || 0;
-  const novaSk   = Math.min(cap, skAtual + (acertos >= 2 ? 2 : 1));
-
-  // Atualizar processo
   await updateDoc(doc(db, 'processos', procId), {
-    progresso:     novoProgresso,
-    chance_sucesso:novaChance,
+    progresso:      novoP,
+    chance_sucesso: novoCs,
   });
 
-  // Atualizar jogador
-  await updateDoc(doc(db, 'jogadores', j.uid), {
-    energia:              novaEnergia,
-    energia_usada_mes:    (j.energia_usada_mes||0) + energiaCusto,
-    [`skills.${impactoSk}`]: novaSk,
-  });
+  const corAcertos = acertos === 3 ? 'var(--verde2)' : acertos === 2 ? 'var(--amber)' : acertos === 1 ? 'var(--navy3)' : 'var(--verm2)';
+  const emoji      = acertos === 3 ? '🏆' : acertos === 2 ? '👍' : acertos === 1 ? '😐' : '😔';
+  const msg        = acertos === 3 ? 'Excelente domínio jurídico!' : acertos === 2 ? 'Bom desempenho.' : acertos === 1 ? 'Desempenho mediano.' : 'Estude mais esta matéria.';
 
-  const cor  = acertos===3?'var(--verde3)':acertos===2?'var(--ouro2)':acertos===1?'#ffa726':'var(--verm3)';
-  const msg  = acertos===3?'Desempenho excelente!':acertos===2?'Bom desempenho.':acertos===1?'Desempenho mediano.':'Desempenho fraco.';
-
-  abrirModal('Resultado do Quiz', `
-    <div style="text-align:center;padding:1rem">
-      <div style="font-size:2rem">${acertos===3?'🏆':acertos===2?'👍':acertos===1?'😐':'😔'}</div>
-      <div style="font-size:1.5rem;font-weight:700;color:${cor};margin:.3rem 0">${acertos}/${total} corretas</div>
-      <div style="font-size:.8rem;color:var(--ardosia2);margin-bottom:.8rem">${msg}</div>
-      <div style="font-size:.75rem;color:var(--perg2);line-height:2">
-        Progresso: <b style="color:var(--ouro2)">${novoProgresso}%</b><br>
-        Chance de vitória: <b style="color:${cor}">${novaChance}%</b><br>
-        Energia gasta: <b>-${energiaCusto}</b> (restam ${novaEnergia})
-      </div>
-    </div>
-    ${novoProgresso >= 100
-      ? `<div style="background:rgba(184,146,42,.1);border:var(--borda);border-radius:2px;padding:.75rem;text-align:center;margin-top:.5rem">
-          ⚖️ <b>Progresso completo!</b> Clique abaixo para processar a sentença.
+  abrirModal('Resultado da Ação',
+    `<div style="text-align:center;padding:.75rem 0">
+      <div style="font-size:2rem;margin-bottom:.3rem">${emoji}</div>
+      <div style="font-size:1.4rem;font-weight:700;color:${corAcertos};margin-bottom:.2rem">${acertos}/3 corretas</div>
+      <div style="font-size:.78rem;color:var(--txt3);margin-bottom:.9rem">${msg}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-bottom:1rem">
+        <div style="background:var(--surface2);border:var(--borda-sub);border-radius:var(--r);padding:.55rem;text-align:center">
+          <div style="font-size:.6rem;color:var(--txt4);text-transform:uppercase">Progresso</div>
+          <div style="font-size:1rem;font-weight:700;color:var(--ouro2)">+${prog}%</div>
+          <div style="font-size:.65rem;color:var(--txt3)">Total: ${novoP}%</div>
         </div>
-        <button class="btn btn-prim btn-block" style="margin-top:.8rem" onclick="window.processarSentenca('${procId}')">
-          Processar sentença →
-        </button>`
-      : `<button class="btn btn-sec btn-block" style="margin-top:.8rem" onclick="window.abrirProcesso('${procId}')">
-          Continuar caso
-        </button>`}
-  `);
+        <div style="background:var(--surface2);border:var(--borda-sub);border-radius:var(--r);padding:.55rem;text-align:center">
+          <div style="font-size:.6rem;color:var(--txt4);text-transform:uppercase">Chance vitória</div>
+          <div style="font-size:1rem;font-weight:700;color:${corAcertos}">${novoCs}%</div>
+          ${bonusCs > 0 ? `<div style="font-size:.65rem;color:var(--verde2)">+${bonusCs}% bônus skill</div>` : '<div style="font-size:.65rem;color:var(--txt4)">Sem bônus de skill</div>'}
+        </div>
+      </div>
+      ${novoP >= 100
+        ? `<div style="background:var(--verde-bg);border:1px solid var(--verde3);border-radius:var(--r);padding:.6rem;margin-bottom:.75rem;font-size:.78rem;color:var(--verde)">
+            ⚖️ Progresso completo! Pronto para sentença.
+           </div>
+           <button class="btn btn-prim btn-block" onclick="window.processarSentenca('${procId}')">
+             Processar sentença →
+           </button>`
+        : `<button class="btn btn-prim btn-block" onclick="window.abrirProcesso('${procId}')">
+             Continuar caso (${novoP}% concluído)
+           </button>`}
+    </div>`
+  );
 }
 
 // ════════════════════════════════════════════════════════
@@ -397,129 +419,100 @@ window.processarSentenca = async function(procId) {
   toast('⏳ Processando sentença...', 'neutro', 2000);
   fecharModal();
 
-  // Tentar Cloud Function primeiro
   if (window.FB_FUNCTIONS) {
     try {
       const fn     = httpsCallable(window.FB_FUNCTIONS, 'processarSentenca');
       const result = await fn({ processo_id: procId });
-      const r      = result.data;
-      _mostrarResultadoSentenca(r, procId);
+      _mostrarResultadoSentenca(result.data, procId);
       return;
     } catch (err) {
-      console.warn('[SENTENÇA] Cloud Function falhou, usando frontend:', err.message);
-      // Cai no fallback abaixo
+      console.warn('[SENTENÇA] CF falhou, usando frontend:', err.code, err.message);
     }
   }
-
-  // Fallback: processar no frontend
   await _processarSentencaFrontend(procId);
 };
 
 async function _processarSentencaFrontend(procId) {
-  const j = window.JOGADOR;
-  if (!j) return;
-
+  const j    = window.JOGADOR;
+  const uid  = j?.uid || window.JOGADOR_UID;
   const snap = await getDoc(doc(db, 'processos', procId));
   if (!snap.exists()) { toast('Processo não encontrado.', 'ko'); return; }
-  const p = snap.data();
+  const p    = snap.data();
 
-  const cs       = p.chance_sucesso || 50;
+  const cs        = p.chance_sucesso || 50;
   const instancia = p.instancia || 1;
-  const isSolo   = !j.escritorio_empregado_id || j.escritorio_id === 'solo';
-  const isAdmin  = p.tipo_processo === 'administrativo';
-  const reuEstado= p.reu_eh_estado === true;
-  const cap      = (window.REP_CAP || {})[j.cargo_id] || 55;
-  const rep      = j.reputacao || 30;
-  const mesAtual = j.mes_global_pessoal || 1;
+  const isSolo    = !j.escritorio_empregado_id || j.escritorio_id === 'solo';
+  const cap       = (window.REP_CAP || {})[j.cargo_id] || 55;
+  const rep       = j.reputacao || 30;
+  const mesAtual  = j.mes_global_pessoal || 1;
 
-  const roll   = Math.random() * 100;
-  const ganhou = roll < cs;
-
-  // Calcular honorários
-  const pct = {1:0.10,2:0.10,3:0.05,4:0.05}[instancia]||0.10;
-  const suc  = Math.floor(p.valor * pct);
-  const hon  = ganhou ? (isSolo ? Math.floor((instancia===1?p.valor*0.30:0) + suc) : Math.floor(suc*0.10)) : 0;
-
-  // Ganho/perda de rep proporcional
-  const ganhoRep = Math.max(1, Math.floor((cap - rep) * 0.08));
-  const perdaRep = Math.max(1, Math.floor(rep * 0.04));
-
-  // XP
-  const xpGanho = ganhou ? 25 : 10;
-  const novoXP  = (j.xp || 0) + xpGanho;
+  const ganhou     = Math.random() * 100 < cs;
+  const pct        = {1:0.10,2:0.10,3:0.05,4:0.05}[instancia] || 0.10;
+  const suc        = Math.floor(p.valor * pct);
+  const hon        = ganhou ? (isSolo ? Math.floor((instancia===1?p.valor*0.30:0)+suc) : Math.floor(suc*0.10)) : 0;
+  const ganhoRep   = Math.max(1, Math.floor((cap - rep) * 0.08));
+  const perdaRep   = Math.max(1, Math.floor(rep * 0.04));
+  const xpGanho    = ganhou ? 25 : 10;
 
   if (ganhou) {
-    const estadoNaoPodeRecorrer = isAdmin && reuEstado;
-    const parteRecorre = !estadoNaoPodeRecorrer && cs < 70 && Math.random() < 0.55 && instancia < 4;
-
-    // Atualizar jogador
-    await updateDoc(doc(db, 'jogadores', j.uid), {
-      dinheiro:   (j.dinheiro||0) + hon,
-      wins:       (j.wins||0) + 1,
-      wins_ano:   (j.wins_ano||0) + 1,
-      reputacao:  Math.min(cap, rep + ganhoRep),
-      xp:         novoXP,
+    const parteRecorre = cs < 70 && Math.random() < 0.55 && instancia < 4;
+    await updateDoc(doc(db, 'jogadores', uid), {
+      dinheiro:              (j.dinheiro||0) + hon,
+      wins:                  (j.wins||0) + 1,
+      wins_ano:              (j.wins_ano||0) + 1,
+      reputacao:             Math.min(cap, rep + ganhoRep),
+      xp:                    (j.xp||0) + xpGanho,
       derrotas_consecutivas: 0,
     });
-
-    if (parteRecorre && !estadoNaoPodeRecorrer) {
+    if (parteRecorre) {
       await updateDoc(doc(db, 'processos', procId), {
-        instancia: instancia + 1, progresso: 0,
+        instancia: instancia + 1, progresso: 0, status: 'andamento',
         hon_total_acumulado: (p.hon_total_acumulado||0) + hon,
-        status: 'andamento',
       });
-      _mostrarResultadoSentenca({ resultado:'ganho_continua', hon, honTotal:(p.hon_total_acumulado||0)+hon,
-        msg:`✅ Vitória! +${fmt(hon)} honorários. +${ganhoRep} rep. +${xpGanho} XP. Parte contrária recorreu.` }, procId);
+      _mostrarResultadoSentenca({ resultado:'ganho_continua', hon, msg:`✅ Vitória! +${fmt(hon)} honorários. +${ganhoRep} rep. +${xpGanho} XP.\nParte contrária recorreu — caso sobe de instância.` }, procId);
     } else {
       await updateDoc(doc(db, 'processos', procId), {
-        status: 'ganho', encerrado_mes: mesAtual,
-        hon_total_acumulado: (p.hon_total_acumulado||0) + hon,
+        status:'ganho', encerrado_mes:mesAtual, hon_total_acumulado:(p.hon_total_acumulado||0)+hon,
       });
-      _mostrarResultadoSentenca({ resultado:'ganho_definitivo', hon, honTotal:(p.hon_total_acumulado||0)+hon,
-        msg:`🏆 Vitória! +${fmt(hon)} honorários. +${ganhoRep} rep. +${xpGanho} XP.` }, procId);
+      _mostrarResultadoSentenca({ resultado:'ganho_definitivo', hon, msg:`🏆 Vitória definitiva! +${fmt(hon)} honorários. +${ganhoRep} rep. +${xpGanho} XP.` }, procId);
     }
   } else {
     const dc = (j.derrotas_consecutivas||0) + 1;
-    await updateDoc(doc(db, 'jogadores', j.uid), {
-      losses:    (j.losses||0) + 1,
-      losses_ano:(j.losses_ano||0) + 1,
-      reputacao: Math.max(0, rep - perdaRep),
-      xp:        novoXP,
-      derrotas_consecutivas: dc,
-    });
-
-    if (isAdmin && instancia === 1) {
-      await updateDoc(doc(db, 'processos', procId), { instancia:2, progresso:0, tipo_processo:'judicial', status:'andamento' });
-      _mostrarResultadoSentenca({ resultado:'derrota_admin_recurso_judicial', hon:0,
-        msg:`❌ Decisão administrativa desfavorável. -${perdaRep} rep. +${xpGanho} XP. Pode recorrer judicialmente.` }, procId);
-    } else if (cs >= 70 && instancia < 4) {
-      await updateDoc(doc(db, 'processos', procId), { recurso_pendente:true, progresso:0, status:'andamento' });
-      _mostrarResultadoSentenca({ resultado:'derrota_pode_recorrer', hon:0, cs,
-        msg:`❌ Derrota. -${perdaRep} rep. +${xpGanho} XP. Chance ${cs}% — pode recorrer.` }, procId);
+    const demitido = dc >= 5 && j.escritorio_empregado_id && j.escritorio_empregado_id !== 'solo';
+    const upds = {
+      losses:    (j.losses||0)+1, losses_ano:(j.losses_ano||0)+1,
+      reputacao: Math.max(0, rep-perdaRep),
+      xp:        (j.xp||0)+xpGanho, derrotas_consecutivas:dc,
+    };
+    if (demitido) { upds.escritorio_id='solo'; upds.escritorio_empregado_id=null; upds.escritorio_nome=null; upds.derrotas_consecutivas=0; }
+    await updateDoc(doc(db,'jogadores',uid), upds);
+    if (p.tipo_processo==='administrativo' && instancia===1) {
+      await updateDoc(doc(db,'processos',procId),{instancia:2,progresso:0,tipo_processo:'judicial',status:'andamento'});
+      _mostrarResultadoSentenca({resultado:'derrota_admin_recurso_judicial',hon:0,demitido,msg:`❌ Decisão administrativa desfavorável. -${perdaRep} rep. Pode recorrer judicialmente.`},procId);
+    } else if (cs>=70 && instancia<4) {
+      await updateDoc(doc(db,'processos',procId),{recurso_pendente:true,progresso:0,status:'andamento'});
+      _mostrarResultadoSentenca({resultado:'derrota_pode_recorrer',hon:0,cs,demitido,msg:`❌ Derrota. -${perdaRep} rep. +${xpGanho} XP. Chance ${cs}% → pode recorrer.`},procId);
     } else {
-      await updateDoc(doc(db, 'processos', procId), { status:'perdido', encerrado_mes: mesAtual });
-      _mostrarResultadoSentenca({ resultado:'derrota_definitiva', hon:0,
-        msg:`❌ Derrota. -${perdaRep} rep. +${xpGanho} XP. Caso encerrado.` }, procId);
+      await updateDoc(doc(db,'processos',procId),{status:'perdido',encerrado_mes:mesAtual});
+      _mostrarResultadoSentenca({resultado:'derrota_definitiva',hon:0,demitido,msg:`❌ Derrota definitiva. -${perdaRep} rep. +${xpGanho} XP.`},procId);
     }
   }
 }
 
 function _mostrarResultadoSentenca(r, procId) {
-  const iconMap = {
-    ganho_definitivo:'🏆', ganho_continua:'✅', ganho_encerrado_cargo:'⚠️',
-    derrota_admin_recurso_judicial:'📋', derrota_pode_recorrer:'❌', derrota_definitiva:'❌',
-  };
-  abrirModal(
-    `${iconMap[r.resultado]||'⚖️'} Sentença`,
-    `<div style="font-size:.85rem;line-height:1.7;margin-bottom:1rem;color:var(--txt2)">${r.msg}</div>
-    ${r.hon > 0 ? `<div style="font-size:.95rem;color:var(--verde2);font-weight:700;margin-bottom:.5rem">💰 +${fmt(r.hon)} honorários</div>` : ''}
-    ${r.resultado === 'ganho_continua' ? `<button class="btn btn-prim btn-block" style="margin-top:.8rem" onclick="window.abrirProcesso('${procId}');fecharModal()">Ver processo →</button>` : ''}
-    ${r.resultado === 'derrota_pode_recorrer' ? `
-      <div style="display:flex;gap:.5rem;margin-top:.8rem">
+  const icons = { ganho_definitivo:'🏆', ganho_continua:'✅', ganho_encerrado_cargo:'⚠️',
+    derrota_admin_recurso_judicial:'📋', derrota_pode_recorrer:'❌', derrota_definitiva:'❌' };
+  abrirModal(`${icons[r.resultado]||'⚖️'} Sentença`,
+    `<div style="font-size:.85rem;line-height:1.75;margin-bottom:.9rem;color:var(--txt2);white-space:pre-line">${r.msg}</div>
+    ${r.hon > 0 ? `<div style="font-size:.95rem;color:var(--verde2);font-weight:700;margin-bottom:.65rem">💰 +${fmt(r.hon)} honorários</div>` : ''}
+    ${r.demitido ? `<div style="font-size:.8rem;color:var(--verm2);margin-bottom:.65rem;font-weight:600">⚠️ Demitido(a) — 5 derrotas consecutivas.</div>` : ''}
+    ${r.resultado==='ganho_continua' ? `<button class="btn btn-prim btn-block" onclick="window.abrirProcesso('${procId}');fecharModal()">Ver processo →</button>` : ''}
+    ${r.resultado==='derrota_pode_recorrer' ? `
+      <div style="display:flex;gap:.5rem">
         <button class="btn btn-prim" style="flex:1" onclick="window.decidirRecurso('${procId}',true)">Interpor recurso</button>
         <button class="btn btn-ghost" style="flex:1" onclick="window.decidirRecurso('${procId}',false)">Não recorrer</button>
       </div>` : ''}
-    ${r.resultado === 'derrota_admin_recurso_judicial' ? `<button class="btn btn-prim btn-block" style="margin-top:.8rem" onclick="window.abrirProcesso('${procId}');fecharModal()">Ver processo judicial →</button>` : ''}`
+    ${r.resultado==='derrota_admin_recurso_judicial' ? `<button class="btn btn-prim btn-block" onclick="window.abrirProcesso('${procId}');fecharModal()">Iniciar recurso judicial →</button>` : ''}`
   );
 }
 
@@ -528,84 +521,44 @@ function _mostrarResultadoSentenca(r, procId) {
 // ════════════════════════════════════════════════════════
 window.decidirRecurso = async function(procId, interpor) {
   if (!interpor) {
-    if (!confirm('Confirma: encerrar o caso sem interpor recurso?')) return;
-    await updateDoc(doc(db, 'processos', procId), {
-      status:       'perdido',
-      encerrado_mes: window.SERVER?.mes_global || 0,
-    });
-    fecharModal();
-    toast('Caso encerrado sem recurso.', 'neutro');
-    return;
+    if (!confirm('Confirma: encerrar o caso sem recorrer?')) return;
+    await updateDoc(doc(db,'processos',procId),{ status:'perdido', encerrado_mes:window.JOGADOR?.mes_global_pessoal||1 });
+    fecharModal(); toast('Caso encerrado sem recurso.','neutro'); return;
   }
-
-  // Interpor recurso: avançar instância
-  const snap = await getDoc(doc(db, 'processos', procId));
+  const snap = await getDoc(doc(db,'processos',procId));
   if (!snap.exists()) return;
   const p = snap.data();
-
-  const novaInst = (p.instancia||1) + 1;
-  const RECURSO  = {
-    tributario:    {2:'Apelação/Remessa',3:'REsp (STJ)',4:'RE (STF)'},
-    trabalhista:   {2:'Recurso Ordinário',3:'Recurso de Revista',4:'RE (STF)'},
-    civil:         {2:'Apelação (TJRJ)',3:'REsp (STJ)',4:'RE (STF)'},
-    criminal:      {2:'Apelação Criminal',3:'REsp (STJ)',4:'RE (STF)'},
-    empresarial:   {2:'Apelação (TJRJ)',3:'REsp (STJ)',4:'RE (STF)'},
-    constitucional:{2:'ROC',3:'Emb. Divergência',4:'RE (STF)'},
-    ambiental:     {2:'Apelação',3:'REsp (STJ)',4:'RE (STF)'},
-    previdenciario:{2:'Rec. Inominado (TNU)',3:'REsp (STJ)',4:'RE (STF)'},
-  };
-  const esp      = window.JOGADOR?.especialidade || 'civil';
-  const recLabel = RECURSO[esp]?.[novaInst] || `${novaInst}ª Instância`;
-
-  await updateDoc(doc(db, 'processos', procId), {
-    instancia:       novaInst,
-    progresso:       0,
-    recurso_pendente:false,
-    status:          'andamento',
+  const novaInst = (p.instancia||1)+1;
+  await updateDoc(doc(db,'processos',procId),{
+    instancia:novaInst, progresso:0, recurso_pendente:false, status:'andamento',
   });
-
   fecharModal();
-  toast(`📋 ${recLabel} interposto!`, 'ok');
+  toast(`📋 Recurso interposto — ${['','1ª','2ª','3ª','4ª'][novaInst]} instância`, 'ok');
 };
 
 // ════════════════════════════════════════════════════════
 // ACORDO
 // ════════════════════════════════════════════════════════
 window.tentarAcordo = async function(procId) {
-  const ok = await window.gastarEnergia(5, 'Tentativa de acordo');
+  const ok = await _gastarEnergia(5, 'Tentativa de acordo');
   if (!ok) return;
   const j    = window.JOGADOR;
-  const snap = await getDoc(doc(db, 'processos', procId));
+  const uid  = j?.uid || window.JOGADOR_UID;
+  const snap = await getDoc(doc(db,'processos',procId));
   if (!snap.exists()) return;
   const p = snap.data();
-
-  const cs       = p.chance_sucesso || 50;
-  const aceito   = Math.random() < (cs/120 + 0.25);
-  const isSolo   = j.escritorio_id === 'solo';
-
+  const cs = p.chance_sucesso||50;
+  const aceito = Math.random() < (cs/120+0.25);
+  const isSolo = !j.escritorio_empregado_id||j.escritorio_id==='solo';
   if (aceito) {
-    // Honorários de acordo: 50% do que seria numa vitória
-    const pct  = {1:0.10,2:0.10,3:0.05,4:0.05}[p.instancia||1]||0.10;
-    const suc  = Math.floor(p.valor * pct);
-    const hon  = isSolo
-      ? Math.floor((p.instancia===1 ? p.valor*0.30 : 0) + suc) / 2
-      : Math.floor(suc * 0.10 / 2);
-
-    await updateDoc(doc(db, 'processos', procId), {
-      status:       'ganho',
-      encerrado_mes: window.SERVER?.mes_global || 0,
-      hon_total_acumulado: hon,
-    });
-    await updateDoc(doc(db, 'jogadores', j.uid), {
-      dinheiro:   (j.dinheiro||0) + hon,
-      wins:       (j.wins||0) + 1,
-      wins_ano:   (j.wins_ano||0) + 1,
-      derrotas_consecutivas: 0,
-    });
-    fecharModal();
-    toast(`🤝 Acordo fechado! +${fmt(hon)} honorários`, 'ok');
+    const pct = {1:0.10,2:0.10,3:0.05,4:0.05}[p.instancia||1]||0.10;
+    const suc = Math.floor(p.valor*pct);
+    const hon = isSolo ? Math.floor(((p.instancia===1?p.valor*0.30:0)+suc)/2) : Math.floor(suc*0.10/2);
+    await updateDoc(doc(db,'processos',procId),{status:'ganho',encerrado_mes:j.mes_global_pessoal||1,hon_total_acumulado:hon});
+    await updateDoc(doc(db,'jogadores',uid),{dinheiro:(j.dinheiro||0)+hon,wins:(j.wins||0)+1,wins_ano:(j.wins_ano||0)+1,derrotas_consecutivas:0});
+    fecharModal(); toast(`🤝 Acordo! +${fmt(hon)} honorários`,'ok');
   } else {
-    toast('❌ Proposta de acordo rejeitada. Continue litigando.', 'ko');
+    toast('❌ Proposta de acordo rejeitada.','ko');
   }
 };
 
@@ -613,114 +566,84 @@ window.tentarAcordo = async function(procId) {
 // NOVO PROCESSO
 // ════════════════════════════════════════════════════════
 window.novoProcesso = async function() {
-  const j = window.JOGADOR;
-  if (!j) return;
-
-  // Verificar energia
-  const energia = Math.max(0, (j.energia||100) - (j.energia_usada_mes||0));
-  if (energia < 10) {
-    toast('Energia insuficiente para novos casos este mês.', 'ko');
-    return;
-  }
-  // Verificar burnout
-  if (j.em_burnout) {
-    toast('🔴 Você está em burnout. Descanse antes de assumir novos casos.', 'ko');
-    return;
-  }
-
+  const j   = window.JOGADOR;
+  if (!j)   return;
+  const uid = j.uid||window.JOGADOR_UID;
+  const energiaDisp = Math.max(0,100-(j.energia_usada_mes||0));
+  if (energiaDisp < 5) { toast('⚡ Energia insuficiente para novos casos.','ko'); return; }
+  if (j.em_burnout)    { toast('🔴 Em burnout. Descanse antes de novos casos.','ko'); return; }
   const proc = _gerarProcesso(j);
   try {
-    await addDoc(collection(db, 'processos'), proc);
-    toast(`📁 Novo caso: ${proc.tipo}`, 'ok');
-  } catch (err) {
-    toast('Erro ao criar processo.', 'ko');
-    console.error(err);
-  }
+    await addDoc(collection(db,'processos'),proc);
+    toast(`📁 Novo caso: ${proc.tipo}`,'ok');
+  } catch(err) { toast('Erro ao criar processo.','ko'); }
 };
 
 function _gerarProcesso(j) {
-  const esp    = j.especialidade || 'civil';
-  const s      = window.SERVER || {};
-  const mesG   = s.mes_global || 1;
-  const cargoId = j.cargo_id;
-
-  // Valor por cargo
+  const esp    = j.especialidade||'civil';
+  const mesG   = j.mes_global_pessoal||1;
   const RANGES = {
-    est:{min:0,max:0,dniv:0}, ass:{min:0,max:0,dniv:0},
-    jnr:{min:1000,max:20000,dniv:1},
-    pln:{min:20000,max:200000,dniv:11},
-    snr:{min:200000,max:10000000,dniv:21},
-    asc:{min:200000,max:10000000,dniv:21},
-    soc:{min:200000,max:10000000,dniv:21},
-    snm:{min:200000,max:10000000,dniv:21},
+    est:{min:500,max:5000,dniv:0}, ass:{min:1000,max:10000,dniv:0},
+    jnr:{min:1000,max:20000,dniv:1}, pln:{min:20000,max:200000,dniv:11},
+    snr:{min:150000,max:500000,dniv:21}, asc:{min:200000,max:10000000,dniv:21},
+    soc:{min:250000,max:10000000,dniv:21}, snm:{min:500000,max:100000000,dniv:21},
   };
-  const range = RANGES[cargoId] || RANGES.jnr;
-  const valor = range.min + Math.floor(Math.random() * (range.max - range.min));
-  const nivel = range.dniv + Math.floor(Math.random() * 10);
-
-  // Chance de sucesso base
-  const sk     = j.skills || {};
+  const range  = RANGES[j.cargo_id]||RANGES.jnr;
+  const valor  = range.min+Math.floor(Math.random()*(range.max-range.min));
+  const nivel  = range.dniv+Math.floor(Math.random()*10);
+  const sk     = j.skills||{};
   const skMed  = ((sk.argumentacao||15)+(sk.oratoria||15)+(sk.pesquisa||18))/3;
-  const bonusEsc = window.getBonusEsc ? window.getBonusEsc(j, esp) : 0;
-  const cs     = Math.max(10, Math.min(95, Math.round(50 + (skMed-40)*0.4 - nivel*0.5 + bonusEsc)));
-
-  // Tipos de caso por especialidade
-  const TIPOS = {
-    tributario:   ['Execução Fiscal','Repetição de Indébito','Mandado de Segurança Tributário','Embargos à Execução'],
-    trabalhista:  ['Reclamação Trabalhista','Ação de Indenização por Acidente de Trabalho','Ação de Equiparação Salarial'],
-    civil:        ['Ação de Indenização','Ação Revisional','Ação de Cobrança','Ação de Despejo'],
-    criminal:     ['Defesa Criminal','Habeas Corpus','Recurso em Sentido Estrito','Apelação Criminal'],
-    empresarial:  ['Recuperação Judicial','Ação de Dissolução','Due Diligence Judicial','Arbitragem'],
-    constitucional:['Mandado de Segurança','Ação Popular','ADPF Estadual','Recurso Constitucional'],
-    ambiental:    ['Defesa Autuação IBAMA','Ação Civil Pública Ambiental','Licenciamento Judicial','ACP'],
-    previdenciario:['Concessão de Benefício','Revisão de Aposentadoria','Recurso ao CRPS','Ação contra INSS'],
+  const bonusEsc = window.getBonusEsc ? window.getBonusEsc(j,esp) : 0;
+  const cs     = Math.max(10,Math.min(90,Math.round(50+(skMed-40)*0.4-nivel*0.5+bonusEsc)));
+  const TIPOS  = {
+    tributario:['Execução Fiscal','Repetição de Indébito','Mandado de Segurança Tributário','Impugnação de Auto de Infração','Recurso ao CARF','Compensação Tributária'],
+    trabalhista:['Reclamação Trabalhista','Ação de Indenização por Acidente de Trabalho','Ação de Equiparação Salarial','Rescisão Indireta'],
+    civil:['Ação de Indenização','Ação Revisional de Contrato','Ação de Despejo','Ação de Cobrança','Ação de Usucapião'],
+    criminal:['Defesa Criminal','Habeas Corpus','Recurso em Sentido Estrito','Apelação Criminal'],
+    empresarial:['Recuperação Judicial','Ação de Dissolução de Sociedade','Due Diligence Judicial','Arbitragem Empresarial'],
+    constitucional:['Mandado de Segurança','Ação Popular','Impugnação de Licitação'],
+    ambiental:['Defesa Autuação IBAMA','Ação Civil Pública Ambiental'],
+    previdenciario:['Concessão de Benefício Previdenciário','Revisão de Aposentadoria','Recurso ao CRPS'],
   };
-  const AUTORES = ['João Silva ME','Empresa Beta Ltda','Maria Oliveira','Carlos Santos','Família Andrade','Cooperativa Verde'];
-  const REUS    = ['Receita Federal','INSS','Estado do RJ','Município do Rio','Empresa Alfa S/A','Construtora Delta'];
-  const TRIBUNAIS = {
-    tributario:['TRF-2','CARF','TJRJ','Câmara do 1º CCE'],
-    trabalhista:['TRT-1','Vara do Trabalho','JT Rio'],
-    civil:['TJRJ','JEF','Vara Cível','Câmara Cível'],
-    criminal:['Vara Criminal','TJRJ','STJ'],
-    empresarial:['TJRJ','Câmara Empresarial','Vara Empresarial'],
-    constitucional:['TJRJ','STJ','STF'],
-    ambiental:['TRF-2','TJRJ','JF'],
-    previdenciario:['JEF','TRF-2','TNU','TJRJ'],
-  };
-
-  const tipos  = TIPOS[esp]    || TIPOS.civil;
-  const tribs  = TRIBUNAIS[esp] || TRIBUNAIS.civil;
-  const num    = `${String(Math.floor(Math.random()*9999999)).padStart(7,'0')}-${String(Math.floor(Math.random()*99)).padStart(2,'0')}.${s.ano_jogo||1}.8.19.0001`;
-
+  const AUTORES = ['João Silva ME','Empresa Beta Ltda','Maria Oliveira','Carlos Santos','Família Andrade'];
+  const REUS    = ['Receita Federal','INSS','Estado do RJ','Município do Rio','Empresa Alfa S/A'];
+  const TRIBS   = {tributario:['TRF-2','CARF','TJRJ'],trabalhista:['TRT-1','Vara do Trabalho'],civil:['TJRJ','JEF','Vara Cível'],criminal:['Vara Criminal','TJRJ'],empresarial:['TJRJ','Câmara Empresarial'],constitucional:['TJRJ','STJ'],ambiental:['TRF-2','TJRJ'],previdenciario:['JEF','TRF-2']};
+  const tipos   = TIPOS[esp]||TIPOS.civil;
+  const tribs   = TRIBS[esp]||['TJRJ'];
+  const num     = `${String(Math.floor(Math.random()*9999999)).padStart(7,'0')}-${String(Math.floor(Math.random()*99)).padStart(2,'0')}.${Math.max(1,j.ano_pessoal||1)}.8.19.0001`;
   return {
-    numero:        num,
-    tipo:          tipos[Math.floor(Math.random()*tipos.length)],
-    area:          esp,
-    tipo_processo: Math.random()<0.25 ? 'administrativo' : 'judicial',
-    reu_eh_estado: Math.random()<0.5,
-    autor:         AUTORES[Math.floor(Math.random()*AUTORES.length)],
-    reu:           REUS[Math.floor(Math.random()*REUS.length)],
-    tribunal:      tribs[Math.floor(Math.random()*tribs.length)],
-    advogado_uid:  j.uid,
-    escritorio_id: j.escritorio_id || null,
-    status:        'andamento',
-    instancia:     1,
-    fase:          '1ª Instância',
-    progresso:     0,
-    chance_sucesso:cs,
-    valor,
-    nivel,
-    hon_total_acumulado: 0,
-    urgente:       Math.random() < 0.2,
-    recurso_pendente: false,
-    criado_mes:    mesG,
-    encerrado_mes: null,
+    numero:num, tipo:tipos[Math.floor(Math.random()*tipos.length)],
+    area:esp, tipo_processo:Math.random()<0.25?'administrativo':'judicial',
+    reu_eh_estado:Math.random()<0.5,
+    autor:AUTORES[Math.floor(Math.random()*AUTORES.length)],
+    reu:REUS[Math.floor(Math.random()*REUS.length)],
+    tribunal:tribs[Math.floor(Math.random()*tribs.length)],
+    advogado_uid:j.uid, escritorio_id:j.escritorio_id||null,
+    status:'andamento', instancia:1, progresso:0, chance_sucesso:cs,
+    valor, nivel, hon_total_acumulado:0,
+    urgente:Math.random()<0.2, recurso_pendente:false,
+    criado_mes:mesG, encerrado_mes:null,
   };
 }
 
+// ════════════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════════════
+async function _gastarEnergia(custo, desc) {
+  const j   = window.JOGADOR;
+  const uid = j?.uid||window.JOGADOR_UID;
+  const usado = j?.energia_usada_mes||0;
+  const disp  = Math.max(0,100-usado);
+  if (disp < custo) { toast(`⚡ Energia insuficiente (${disp} restantes, requer ${custo}).`,'ko'); return false; }
+  try {
+    await updateDoc(doc(db,'jogadores',uid),{energia_usada_mes:usado+custo});
+    return true;
+  } catch(err) { toast('Erro ao gastar energia.','ko'); return false; }
+}
+
 function fmt(n) {
-  if (!n && n !== 0) return '—';
-  if (n >= 1000000) return `R$ ${(n/1000000).toFixed(1)}M`;
-  if (n >= 1000)    return `R$ ${Math.round(n/1000)}k`;
+  if (!n&&n!==0) return '—';
+  if (n>=1000000) return `R$ ${(n/1000000).toFixed(1)}M`;
+  if (n>=1000)    return `R$ ${Math.round(n/1000)}k`;
   return `R$ ${Number(n).toLocaleString('pt-BR')}`;
 }
