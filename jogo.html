@@ -324,9 +324,8 @@ window.avancarMes = async function(forcar) {
 
   const usado      = j.energia_usada_mes || 0;
   const disponivel = Math.max(0, 100 - usado);
-  if (!forcar && disponivel > 5) {
-    if (!confirm('Você ainda tem ' + disponivel + ' ⚡ de energia. Avançar mesmo assim?')) return;
-  }
+  // Sem bloqueio — o jogador pode avançar quando quiser
+  // O botão fica em destaque quando disponivel <= 5 (energia quase esgotada)
 
   const tickEl = document.getElementById('server-tick');
   if (tickEl) tickEl.innerHTML = '⏳ Avançando...';
