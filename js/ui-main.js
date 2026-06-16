@@ -50,6 +50,10 @@ function _renderizar() {
     case 'ranking':
       if (window.renderRanking) window.renderRanking(j, main);
       break;
+    case 'vagas':
+      if (window.renderVagas) window.renderVagas(j, main);
+      else main.innerHTML = '<div class="card" style="color:var(--txt3)">Carregando vagas...</div>';
+      break;
     case 'inbox':        renderInbox(j, main);         break;
     default:             renderPerfil(j, main);
   }

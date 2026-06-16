@@ -5,6 +5,7 @@
  */
 
 import { collection, addDoc, doc, updateDoc, getDoc }
+// getBonusEscritorioParaCaso importado via window.getBonusEsc (carregado por vagas.js)
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { httpsCallable }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
@@ -390,43 +391,137 @@ async function _finalizarQuiz() {
 }
 
 // ════════════════════════════════════════════════════════
-// SENTENÇA (Cloud Function)
+// SENTENÇA — tenta Cloud Function, fallback no frontend
 // ════════════════════════════════════════════════════════
 window.processarSentenca = async function(procId) {
-  try {
-    toast('⏳ Processando sentença...', 'neutro', 2000);
-    fecharModal();
+  toast('⏳ Processando sentença...', 'neutro', 2000);
+  fecharModal();
 
-    const fn       = httpsCallable(window.FB_FUNCTIONS, 'processarSentenca');
-    const result   = await fn({ processo_id: procId });
-    const r        = result.data;
-
-    const iconMap  = {
-      ganho_definitivo:        '🏆',
-      ganho_continua:          '✅',
-      ganho_encerrado_cargo:   '⚠️',
-      derrota_admin_recurso_judicial: '📋',
-      derrota_pode_recorrer:   '❌',
-      derrota_definitiva:      '❌',
-    };
-
-    abrirModal(
-      `${iconMap[r.resultado]||'⚖️'} Sentença`,
-      `<div style="font-size:.85rem;color:var(--perg2);line-height:1.7;margin-bottom:1rem">${r.msg}</div>
-      ${r.hon > 0 ? `<div style="font-size:.9rem;color:var(--verde3);font-weight:600">💰 Honorários recebidos: ${fmt(r.hon)}</div>` : ''}
-      ${r.demitido ? `<div style="font-size:.8rem;color:var(--verm3);margin-top:.5rem">⚠️ Você foi desligado do escritório por 5 derrotas consecutivas.</div>` : ''}
-      ${r.resultado === 'ganho_continua' ? `<button class="btn btn-sec btn-block" style="margin-top:.8rem" onclick="window.abrirProcesso('${procId}')">Ver processo →</button>` : ''}
-      ${r.resultado === 'derrota_pode_recorrer' ? `
-        <div style="display:flex;gap:.5rem;margin-top:.8rem">
-          <button class="btn btn-sec" style="flex:1" onclick="window.decidirRecurso('${procId}',true)">Interpor recurso</button>
-          <button class="btn btn-ghost" style="flex:1" onclick="window.decidirRecurso('${procId}',false)">Não recorrer</button>
-        </div>` : ''}`
-    );
-  } catch (err) {
-    toast(`Erro na sentença: ${err.message}`, 'ko');
-    console.error('[PROCESSOS] Sentença:', err);
+  // Tentar Cloud Function primeiro
+  if (window.FB_FUNCTIONS) {
+    try {
+      const fn     = httpsCallable(window.FB_FUNCTIONS, 'processarSentenca');
+      const result = await fn({ processo_id: procId });
+      const r      = result.data;
+      _mostrarResultadoSentenca(r, procId);
+      return;
+    } catch (err) {
+      console.warn('[SENTENÇA] Cloud Function falhou, usando frontend:', err.message);
+      // Cai no fallback abaixo
+    }
   }
+
+  // Fallback: processar no frontend
+  await _processarSentencaFrontend(procId);
 };
+
+async function _processarSentencaFrontend(procId) {
+  const j = window.JOGADOR;
+  if (!j) return;
+
+  const snap = await getDoc(doc(db, 'processos', procId));
+  if (!snap.exists()) { toast('Processo não encontrado.', 'ko'); return; }
+  const p = snap.data();
+
+  const cs       = p.chance_sucesso || 50;
+  const instancia = p.instancia || 1;
+  const isSolo   = !j.escritorio_empregado_id || j.escritorio_id === 'solo';
+  const isAdmin  = p.tipo_processo === 'administrativo';
+  const reuEstado= p.reu_eh_estado === true;
+  const cap      = (window.REP_CAP || {})[j.cargo_id] || 55;
+  const rep      = j.reputacao || 30;
+  const mesAtual = j.mes_global_pessoal || 1;
+
+  const roll   = Math.random() * 100;
+  const ganhou = roll < cs;
+
+  // Calcular honorários
+  const pct = {1:0.10,2:0.10,3:0.05,4:0.05}[instancia]||0.10;
+  const suc  = Math.floor(p.valor * pct);
+  const hon  = ganhou ? (isSolo ? Math.floor((instancia===1?p.valor*0.30:0) + suc) : Math.floor(suc*0.10)) : 0;
+
+  // Ganho/perda de rep proporcional
+  const ganhoRep = Math.max(1, Math.floor((cap - rep) * 0.08));
+  const perdaRep = Math.max(1, Math.floor(rep * 0.04));
+
+  // XP
+  const xpGanho = ganhou ? 25 : 10;
+  const novoXP  = (j.xp || 0) + xpGanho;
+
+  if (ganhou) {
+    const estadoNaoPodeRecorrer = isAdmin && reuEstado;
+    const parteRecorre = !estadoNaoPodeRecorrer && cs < 70 && Math.random() < 0.55 && instancia < 4;
+
+    // Atualizar jogador
+    await updateDoc(doc(db, 'jogadores', j.uid), {
+      dinheiro:   (j.dinheiro||0) + hon,
+      wins:       (j.wins||0) + 1,
+      wins_ano:   (j.wins_ano||0) + 1,
+      reputacao:  Math.min(cap, rep + ganhoRep),
+      xp:         novoXP,
+      derrotas_consecutivas: 0,
+    });
+
+    if (parteRecorre && !estadoNaoPodeRecorrer) {
+      await updateDoc(doc(db, 'processos', procId), {
+        instancia: instancia + 1, progresso: 0,
+        hon_total_acumulado: (p.hon_total_acumulado||0) + hon,
+        status: 'andamento',
+      });
+      _mostrarResultadoSentenca({ resultado:'ganho_continua', hon, honTotal:(p.hon_total_acumulado||0)+hon,
+        msg:`✅ Vitória! +${fmt(hon)} honorários. +${ganhoRep} rep. +${xpGanho} XP. Parte contrária recorreu.` }, procId);
+    } else {
+      await updateDoc(doc(db, 'processos', procId), {
+        status: 'ganho', encerrado_mes: mesAtual,
+        hon_total_acumulado: (p.hon_total_acumulado||0) + hon,
+      });
+      _mostrarResultadoSentenca({ resultado:'ganho_definitivo', hon, honTotal:(p.hon_total_acumulado||0)+hon,
+        msg:`🏆 Vitória! +${fmt(hon)} honorários. +${ganhoRep} rep. +${xpGanho} XP.` }, procId);
+    }
+  } else {
+    const dc = (j.derrotas_consecutivas||0) + 1;
+    await updateDoc(doc(db, 'jogadores', j.uid), {
+      losses:    (j.losses||0) + 1,
+      losses_ano:(j.losses_ano||0) + 1,
+      reputacao: Math.max(0, rep - perdaRep),
+      xp:        novoXP,
+      derrotas_consecutivas: dc,
+    });
+
+    if (isAdmin && instancia === 1) {
+      await updateDoc(doc(db, 'processos', procId), { instancia:2, progresso:0, tipo_processo:'judicial', status:'andamento' });
+      _mostrarResultadoSentenca({ resultado:'derrota_admin_recurso_judicial', hon:0,
+        msg:`❌ Decisão administrativa desfavorável. -${perdaRep} rep. +${xpGanho} XP. Pode recorrer judicialmente.` }, procId);
+    } else if (cs >= 70 && instancia < 4) {
+      await updateDoc(doc(db, 'processos', procId), { recurso_pendente:true, progresso:0, status:'andamento' });
+      _mostrarResultadoSentenca({ resultado:'derrota_pode_recorrer', hon:0, cs,
+        msg:`❌ Derrota. -${perdaRep} rep. +${xpGanho} XP. Chance ${cs}% — pode recorrer.` }, procId);
+    } else {
+      await updateDoc(doc(db, 'processos', procId), { status:'perdido', encerrado_mes: mesAtual });
+      _mostrarResultadoSentenca({ resultado:'derrota_definitiva', hon:0,
+        msg:`❌ Derrota. -${perdaRep} rep. +${xpGanho} XP. Caso encerrado.` }, procId);
+    }
+  }
+}
+
+function _mostrarResultadoSentenca(r, procId) {
+  const iconMap = {
+    ganho_definitivo:'🏆', ganho_continua:'✅', ganho_encerrado_cargo:'⚠️',
+    derrota_admin_recurso_judicial:'📋', derrota_pode_recorrer:'❌', derrota_definitiva:'❌',
+  };
+  abrirModal(
+    `${iconMap[r.resultado]||'⚖️'} Sentença`,
+    `<div style="font-size:.85rem;line-height:1.7;margin-bottom:1rem;color:var(--txt2)">${r.msg}</div>
+    ${r.hon > 0 ? `<div style="font-size:.95rem;color:var(--verde2);font-weight:700;margin-bottom:.5rem">💰 +${fmt(r.hon)} honorários</div>` : ''}
+    ${r.resultado === 'ganho_continua' ? `<button class="btn btn-prim btn-block" style="margin-top:.8rem" onclick="window.abrirProcesso('${procId}');fecharModal()">Ver processo →</button>` : ''}
+    ${r.resultado === 'derrota_pode_recorrer' ? `
+      <div style="display:flex;gap:.5rem;margin-top:.8rem">
+        <button class="btn btn-prim" style="flex:1" onclick="window.decidirRecurso('${procId}',true)">Interpor recurso</button>
+        <button class="btn btn-ghost" style="flex:1" onclick="window.decidirRecurso('${procId}',false)">Não recorrer</button>
+      </div>` : ''}
+    ${r.resultado === 'derrota_admin_recurso_judicial' ? `<button class="btn btn-prim btn-block" style="margin-top:.8rem" onclick="window.abrirProcesso('${procId}');fecharModal()">Ver processo judicial →</button>` : ''}`
+  );
+}
 
 // ════════════════════════════════════════════════════════
 // RECURSO
@@ -551,13 +646,13 @@ function _gerarProcesso(j) {
 
   // Valor por cargo
   const RANGES = {
-    est:{min:1000,max:10000,dniv:1}, ass:{min:1000,max:10000,dniv:1},
-    jnr:{min:2500,max:20000,dniv:1},
-    pln:{min:20000,max:150000,dniv:11},
-    snr:{min:150000,max:500000,dniv:21},
+    est:{min:0,max:0,dniv:0}, ass:{min:0,max:0,dniv:0},
+    jnr:{min:1000,max:20000,dniv:1},
+    pln:{min:20000,max:200000,dniv:11},
+    snr:{min:200000,max:10000000,dniv:21},
     asc:{min:200000,max:10000000,dniv:21},
-    soc:{min:250000,max:10000000,dniv:21},
-    snm:{min:500000,max:100000000,dniv:21},
+    soc:{min:200000,max:10000000,dniv:21},
+    snm:{min:200000,max:10000000,dniv:21},
   };
   const range = RANGES[cargoId] || RANGES.jnr;
   const valor = range.min + Math.floor(Math.random() * (range.max - range.min));
@@ -566,7 +661,8 @@ function _gerarProcesso(j) {
   // Chance de sucesso base
   const sk     = j.skills || {};
   const skMed  = ((sk.argumentacao||15)+(sk.oratoria||15)+(sk.pesquisa||18))/3;
-  const cs     = Math.max(10, Math.min(90, Math.round(50 + (skMed-40)*0.4 - nivel*0.5)));
+  const bonusEsc = window.getBonusEsc ? window.getBonusEsc(j, esp) : 0;
+  const cs     = Math.max(10, Math.min(95, Math.round(50 + (skMed-40)*0.4 - nivel*0.5 + bonusEsc)));
 
   // Tipos de caso por especialidade
   const TIPOS = {
