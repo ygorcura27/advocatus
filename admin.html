@@ -475,40 +475,111 @@ window.id = function(el) {
 // ════════════════════════════════════════════════════════
 // FINANCEIRO
 // ════════════════════════════════════════════════════════
-
-  function renderFinanceiro(main) {
+function renderFinanceiro(main) {
   main.innerHTML = `
-    <div class="admin-header"><div class="admin-titulo">💰 Editar Financeiro</div></div>
+    <div class="admin-header">
+      <div class="admin-titulo">💰 Editar Financeiro</div>
+    </div>
+
     <div class="ctrl-grid">
+
       <div class="ctrl-card">
         <div class="ctrl-card-titulo">Definir saldo</div>
-        <div class="ctrl-campo"><label>UID</label><input type="text" id="fin-uid" placeholder="UID do jogador"></div>
-        <div class="ctrl-campo"><label>Valor (R$)</label><input type="number" id="fin-val" value="100000"></div>
-        <button class="btn btn-sec btn-block" onclick="acaoAdmin('jogador_set_dinheiro',{uid:id('fin-uid').value.trim(),valor:+id('fin-val').value})"> Definir saldo </button>
+
+        <div class="ctrl-campo">
+          <label>UID</label>
+          <input type="text" id="fin-uid" placeholder="UID do jogador">
+        </div>
+
+        <div class="ctrl-campo">
+          <label>Valor (R$)</label>
+          <input type="number" id="fin-val" value="100000">
+        </div>
+
+        <button class="btn btn-sec btn-block"
+          onclick="acaoAdmin('jogador_set_dinheiro',{
+            uid:document.getElementById('fin-uid').value.trim(),
+            valor:+document.getElementById('fin-val').value
+          })">
+          Definir saldo
+        </button>
       </div>
+
       <div class="ctrl-card">
         <div class="ctrl-card-titulo">Adicionar dinheiro</div>
-        <div class="ctrl-campo"><label>UID</label><input type="text" id="fadd-uid" placeholder="UID do jogador"></div>
-        <div class="ctrl-campo"><label>Valor a adicionar (R$)</label><input type="number" id="fadd-val" value="50000"></div>
-        <button class="btn btn-sec btn-block" onclick="acaoAdmin('jogador_add_dinheiro',{uid:id('fadd-uid').value.trim(),valor:+id('fadd-val').value})">Adicionar</button>
+
+        <div class="ctrl-campo">
+          <label>UID</label>
+          <input type="text" id="fadd-uid" placeholder="UID do jogador">
+        </div>
+
+        <div class="ctrl-campo">
+          <label>Valor a adicionar (R$)</label>
+          <input type="number" id="fadd-val" value="50000">
+        </div>
+
+        <button class="btn btn-sec btn-block"
+          onclick="acaoAdmin('jogador_add_dinheiro',{
+            uid:document.getElementById('fadd-uid').value.trim(),
+            valor:+document.getElementById('fadd-val').value
+          })">
+          Adicionar
+        </button>
       </div>
+
       <div class="ctrl-card">
         <div class="ctrl-card-titulo">Limpar Serasa</div>
-        <div class="ctrl-campo"><label>UID</label><input type="text" id="ser-uid" placeholder="UID do jogador"></div>
-        <button class="btn btn-danger btn-block" onclick="acaoAdmin('jogador_reset_financeiro',{uid:id('ser-uid').value.trim()})">Limpar Serasa e histórico negativo</button>
+
+        <div class="ctrl-campo">
+          <label>UID</label>
+          <input type="text" id="ser-uid" placeholder="UID do jogador">
+        </div>
+
+        <button class="btn btn-danger btn-block"
+          onclick="acaoAdmin('jogador_reset_financeiro',{
+            uid:document.getElementById('ser-uid').value.trim()
+          })">
+          Limpar Serasa e histórico negativo
+        </button>
       </div>
+
       <div class="ctrl-card">
         <div class="ctrl-card-titulo">Definir reputação</div>
-        <div class="ctrl-campo"><label>UID</label><input type="text" id="rep-uid" placeholder="UID do jogador"></div>
-        <div class="ctrl-campo"><label>Valor (0–100)</label><input type="number" id="rep-val" min="0" max="100" value="50"></div>
-        <button class="btn btn-sec btn-block" onclick="acaoAdmin('jogador_set_reputacao',{uid:id('rep-uid').value.trim(),valor:+id('rep-val').value})">Definir reputação</button>
+
+        <div class="ctrl-campo">
+          <label>UID</label>
+          <input type="text" id="rep-uid" placeholder="UID do jogador">
+        </div>
+
+        <div class="ctrl-campo">
+          <label>Valor (0–100)</label>
+          <input type="number" id="rep-val" min="0" max="100" value="50">
+        </div>
+
+        <button class="btn btn-sec btn-block"
+          onclick="acaoAdmin('jogador_set_reputacao',{
+            uid:document.getElementById('rep-uid').value.trim(),
+            valor:+document.getElementById('rep-val').value
+          })">
+          Definir reputação
+        </button>
       </div>
+
     </div>
+
     <div class="ctrl-card">
       <div class="ctrl-card-titulo">Definir atributo específico</div>
+
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem">
-        <div class="ctrl-campo"><label>UID</label><input type="text" id="atr-uid" placeholder="UID"></div>
-        <div class="ctrl-campo"><label>Atributo</label>
+
+        <div class="ctrl-campo">
+          <label>UID</label>
+          <input type="text" id="atr-uid" placeholder="UID">
+        </div>
+
+        <div class="ctrl-campo">
+          <label>Atributo</label>
+
           <select id="atr-nome">
             <option value="reputacao">Reputação</option>
             <option value="networking">Networking</option>
@@ -518,16 +589,32 @@ window.id = function(el) {
             <option value="energia">Energia</option>
           </select>
         </div>
-        <div class="ctrl-campo"><label>Valor (0–100)</label><input type="number" id="atr-val" min="0" max="100" value="80"></div>
+
+        <div class="ctrl-campo">
+          <label>Valor (0–100)</label>
+          <input type="number" id="atr-val" min="0" max="100" value="80">
+        </div>
+
       </div>
-      <button class="btn btn-sec" onclick="acaoAdmin('jogador_set_atributo',{uid:id('atr-uid').value.trim(),atributo:id('atr-nome').value,valor:+id('atr-val').value})">Aplicar</button>
+
+      <button class="btn btn-sec"
+        onclick="acaoAdmin('jogador_set_atributo',{
+          uid:document.getElementById('atr-uid').value.trim(),
+          atributo:document.getElementById('atr-nome').value,
+          valor:+document.getElementById('atr-val').value
+        })">
+        Aplicar
+      </button>
     </div>
+
     <div class="ctrl-card" style="margin-top:.7rem">
       <div class="ctrl-card-titulo">📋 Log</div>
-      <div id="admin-log" style="min-height:80px"><span class="log-info">Aguardando...</span></div>
-    </div>`;
+      <div id="admin-log" style="min-height:80px">
+        <span class="log-info">Aguardando...</span>
+      </div>
+    </div>
+  `;
 }
-
 // ════════════════════════════════════════════════════════
 // SKILLS
 // ════════════════════════════════════════════════════════
