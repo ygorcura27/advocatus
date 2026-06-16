@@ -126,10 +126,10 @@ window.renderCarreiraProgressao = function(j, el) {
     <div class="card" style="border-color:rgba(184,146,42,.4)">
       <div class="card-titulo">📋 Prova da OAB</div>
       <div class="card-sub" style="margin-bottom:.75rem">
-        Requer: Argumentação ≥ 45 (${(j.skills||{}).argumentacao||0}) e Pesquisa ≥ 40 (${(j.skills||{}).pesquisa||0})
+        Requer: Argumentação ≥ 28 (${(j.skills||{}).argumentacao||0}) e Pesquisa ≥ 25 (${(j.skills||{}).pesquisa||0})
       </div>
       <button class="btn btn-sec" onclick="window.iniciarOAB()"
-        ${((j.skills||{}).argumentacao||0)<45||((j.skills||{}).pesquisa||0)<40?'disabled':''}>
+        ${((j.skills||{}).argumentacao||0)<28||((j.skills||{}).pesquisa||0)<25?'disabled':''}>
         Realizar Prova da OAB
       </button>
     </div>` : ''}

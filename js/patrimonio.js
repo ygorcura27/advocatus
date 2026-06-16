@@ -381,14 +381,14 @@ window.comprarItem = async function(id) {
 window.estudarSkill = async function(sk, skLabel) {
   const j   = window.JOGADOR;
   const uid = j.uid || window.JOGADOR_UID;
-  if ((j.dinheiro||0) < 500) { toast('Saldo insuficiente. Estudar custa R$500.','ko'); return; }
+  if ((j.dinheiro||0) < 400) { toast('Saldo insuficiente. Estudar custa R$400.','ko'); return; }
   if ((j.study_queue||[]).some(s=>s.skill===sk)) { toast('Já há um estudo desta skill em andamento.','ko'); return; }
 
   const mesAtual = window.SERVER?.mes_global || 1;
   const novaFila = [...(j.study_queue||[]), {
     skill:         sk,
     skill_label:   skLabel,
-    ganho:         2,
+    ganho:         3,
     mes_conclusao: mesAtual + 1,
   }];
   await _salvar(uid, { dinheiro:(j.dinheiro||0)-500, study_queue:novaFila });

@@ -524,7 +524,7 @@ function renderHabilidades(j, el) {
             ? `<div class="skill-pendente">⏳ Estudo em andamento — resultado no próximo mês</div>`
             : `<button class="btn btn-sm btn-ghost" style="margin-top:.4rem;width:100%;font-size:.65rem"
                 onclick="window.estudarSkill && window.estudarSkill('${sk.k}','${sk.l}')">
-                📖 Estudar +2 · R$500 · 1 mês
+                📖 Estudar +3 · R$400 · 1 mês
               </button>`}
         </div>`;
       }).join('')}
