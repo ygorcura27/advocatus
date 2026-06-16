@@ -90,10 +90,11 @@ const CARROS = [
 ];
 
 const ESC_PAT = [
-  {id:'cw',  l:'Coworking jurídico',  i:'💼', cm:600,   rep:0},
-  {id:'sal', l:'Sala própria',        i:'🏛️', cm:3000,  rep:3},
-  {id:'esm', l:'Escritório médio',    i:'🏢', cm:7500,  rep:6},
-  {id:'esp', l:'Escritório premium',  i:'⚖️', cm:18000, rep:12},
+  {id:'home', l:'Home Office',         i:'🏠', cm:0,     rep:-2, desc:'Gratuito. -2 rep/mês (imagem menos profissional).'},
+  {id:'cw',   l:'Coworking jurídico',  i:'💼', cm:600,   rep:0,  desc:'Para advogados solo. Endereço profissional.'},
+  {id:'sal',  l:'Sala própria',        i:'🏛️', cm:3000,  rep:3,  desc:'Escritório individual. +3 rep/mês.'},
+  {id:'esm',  l:'Escritório médio',    i:'🏢', cm:7500,  rep:6,  desc:'Espaço para equipe. +6 rep/mês.'},
+  {id:'esp',  l:'Escritório premium',  i:'⚖️', cm:18000, rep:12, desc:'Big Law. +12 rep/mês.'},
 ];
 
 const SHOP = [
@@ -136,15 +137,23 @@ function calcDeslocamento(morId, escZona) {
 window.renderPatrimonio = function(j, el) {
   const morId   = j.pat?.moradia   || 'pais';
   const carId   = j.pat?.transporte|| 'onibus';
-  const escId   = j.pat?.escritorio|| 'cw';
+  const escId   = j.pat?.escritorio|| 'home';
   const mor     = MORADIAS.find(m=>m.id===morId) || MORADIAS[0];
   const car     = CARROS.find(c=>c.id===carId);
   const esc     = ESC_PAT.find(e=>e.id===escId);
   const comprada = j.moradias_compradas?.[morId];
   const fins    = j.financiamentos || {};
   const deslocamento = calcDeslocamento(morId, 'centro'); // usa centro como referência
-  const custoVida = 800 + Math.max(0,(j.reputacao||30)-20)*25;
-  const despEsc  = esc?.cm || 0;
+  const CUSTO_BASE_PAT = {
+    est:600, ass:700, jnr:900, pln:1400, snr:2200,
+    asc:3000, soc:4500, snm:6000,
+    jsub:2200, jtit:3000, dsb:4000, mstj:5500,
+    padj:2000, prom:2800, pjus:3800, pgj:5000,
+    dadj:1800, def:2400, dch:3200, dge:4500,
+  };
+  const custoVida = CUSTO_BASE_PAT[j.cargo_id] || 700;
+  // Coworking só cobra se for solo
+  const despEsc  = (!j.escritorio_empregado_id || j.escritorio_id === 'solo') ? (esc?.cm || 0) : 0;
   const despCar  = car?.cm || 0;
   const despAlug = comprada ? 0 : calcAluguel(mor.v||0);
   const despFin  = Object.values(fins).reduce((s,f)=>s+(f.parcelas_restantes>0?f.parcela_mensal:0),0);
@@ -212,7 +221,8 @@ window.renderPatrimonio = function(j, el) {
           ${cr.v>0?`<div class="pc-det">${fmt(cr.v)}</div>`:''}
           <div class="pc-det" style="color:#ffa726">${fmt(cr.cm)}/mês</div>
           <div class="pc-rep">Rep: ${cr.rep>=0?'+':''}${cr.rep}</div>
-          ${isAt ? `<div class="pc-ativo">✓ Seu veículo${fin&&fin.parcelas_restantes>0?`<br><span style="font-size:.6rem;color:#ffa726">${fin.parcelas_restantes}× restantes</span>`:''}</div>` :
+          ${isAt ? `<div class="pc-ativo">✓ Seu veículo${fin&&fin.parcelas_restantes>0?`<br><span style="font-size:.6rem;color:var(--amber)">${fin.parcelas_restantes}× restantes</span>`:''}</div>`
+          ${fin&&fin.parcelas_restantes>0?`<button style="font-size:.58rem;margin-top:.3rem;background:var(--verm-bg);border:1px solid var(--verm3);color:var(--verm2);padding:.25rem .5rem;border-radius:3px;cursor:pointer;width:100%" onclick="window.devolverCarro('${cr.id}')">↩ Devolver carro (50% de volta)</button>`:''} :
           cr.id === 'onibus' ? `<button class="btn btn-sm btn-ghost" style="width:100%;margin-top:.3rem" onclick="window.escolherCarro('onibus','vista')">Usar</button>` :
           `<div style="display:flex;flex-direction:column;gap:.2rem;margin-top:.3rem">
             ${(j.dinheiro||0)>=cr.v?`<button class="btn btn-sm btn-sec" style="width:100%;font-size:.6rem" onclick="window.escolherCarro('${cr.id}','vista')">À vista ${fmt(cr.v)}</button>`:''}
@@ -224,20 +234,28 @@ window.renderPatrimonio = function(j, el) {
     </div>
 
     <!-- ESCRITÓRIO PESSOAL -->
-    <div class="secao-header"><div class="secao-titulo">💼 Escritório / Coworking</div></div>
-    <div class="grid-cards">
-      ${ESC_PAT.map(e=>{
-        const isAt = e.id === escId;
-        return `<div class="pat-card ${isAt?'ativo':''}">
-          <div class="pc-icon">${e.i}</div>
-          <div class="pc-nome">${e.l}</div>
-          <div class="pc-det" style="color:#ffa726">${fmt(e.cm)}/mês</div>
-          <div class="pc-rep">Rep: +${e.rep}</div>
-          ${isAt ? `<div class="pc-ativo">✓ Atual</div>` :
-          `<button class="btn btn-sm btn-ghost" style="width:100%;margin-top:.3rem" onclick="window.escolherEscritorioPat('${e.id}')">Mudar</button>`}
-        </div>`;
-      }).join('')}
-    </div>`;
+    <div class="secao-header"><div class="secao-titulo">💼 Espaço de Trabalho</div></div>
+    ${j.escritorio_empregado_id && j.escritorio_id !== 'solo'
+      ? `<div class="card" style="background:var(--verde-bg);border:1px solid var(--verde3)">
+           <div style="font-size:.8rem;color:var(--verde);font-weight:600">✅ Você trabalha em ${j.escritorio_nome||'escritório'}</div>
+           <div style="font-size:.72rem;color:var(--txt3);margin-top:.2rem">Sem custo de espaço — o escritório cobre sua estrutura.</div>
+         </div>`
+      : `<div class="grid-cards">
+           ${ESC_PAT.filter(e => e.id !== 'cw' || j.escritorio_id === 'solo' || !j.escritorio_empregado_id).map(e=>{
+             const isAt = e.id === escId;
+             const repTxt = e.rep > 0 ? \`+\${e.rep} rep/mês\` : e.rep < 0 ? \`\${e.rep} rep/mês\` : 'Neutro';
+             const repCor = e.rep > 0 ? 'var(--verde2)' : e.rep < 0 ? 'var(--verm2)' : 'var(--txt4)';
+             return \`<div class="pat-card \${isAt?'ativo':''}">
+               <div class="pc-icon">\${e.i}</div>
+               <div class="pc-nome">\${e.l}</div>
+               <div class="pc-det" style="color:var(--amber)">\${e.cm > 0 ? fmt(e.cm)+'/mês' : 'Gratuito'}</div>
+               <div class="pc-rep" style="color:\${repCor}">\${repTxt}</div>
+               <div class="pc-det" style="font-size:.6rem">\${e.desc||''}</div>
+               \${isAt ? \`<div class="pc-ativo">✓ Atual</div>\` :
+               \`<button class="btn btn-sm btn-ghost" style="width:100%;margin-top:.3rem" onclick="window.escolherEscritorioPat('\${e.id}')">Escolher</button>\`}
+             </div>\`;
+           }).join('')}
+         </div>`}`;
 };
 
 // ════════════════════════════════════════════════════════
@@ -398,6 +416,42 @@ window.estudarSkill = async function(sk, skLabel) {
 // ════════════════════════════════════════════════════════
 // HELPERS
 // ════════════════════════════════════════════════════════
+window.devolverCarro = async function(carroId) {
+  const j   = window.JOGADOR;
+  const uid = j.uid || window.JOGADOR_UID;
+  const fin = (j.financiamentos || {})[carroId];
+  if (!fin || fin.parcelas_restantes <= 0) {
+    toast('Nenhum financiamento ativo para este veículo.', 'ko');
+    return;
+  }
+
+  // Calcular valor pago até agora
+  const totalContrato  = fin.valor_total || 0;
+  const totalParcelas  = Math.round(totalContrato / fin.parcela_mensal) || 1;
+  const pagas          = totalParcelas - fin.parcelas_restantes;
+  const valorPago      = pagas * fin.parcela_mensal;
+  const reembolso      = Math.floor(valorPago * 0.5);
+
+  if (!confirm(
+    `Devolver ${fin.nome}?\n\n` +
+    `Parcelas pagas: ${pagas}/${totalParcelas}\n` +
+    `Valor pago até agora: R$ ${valorPago.toLocaleString('pt-BR')}\n` +
+    `Reembolso (50%): R$ ${reembolso.toLocaleString('pt-BR')}\n\n` +
+    `Você voltará para o ônibus.`
+  )) return;
+
+  const novosFins = { ...(j.financiamentos || {}) };
+  delete novosFins[carroId];
+
+  await _salvar(uid, {
+    financiamentos:  novosFins,
+    'pat.transporte': 'onibus',
+    dinheiro:        (j.dinheiro || 0) + reembolso,
+  });
+
+  toast(`🚗 Carro devolvido. +R$ ${reembolso.toLocaleString('pt-BR')} de reembolso.`, 'ok', 5000);
+};
+
 async function _salvar(uid, updates) {
   try {
     await updateDoc(doc(db, 'jogadores', uid), updates);
@@ -410,7 +464,7 @@ async function _salvar(uid, updates) {
 function _calcRepPat(j) {
   const morId  = j.pat?.moradia||'pais';
   const carId  = j.pat?.transporte||'onibus';
-  const escId  = j.pat?.escritorio||'cw';
+  const escId  = j.pat?.escritorio||'home';
   const mor    = MORADIAS.find(m=>m.id===morId);
   const car    = CARROS.find(c=>c.id===carId);
   const esc    = ESC_PAT.find(e=>e.id===escId);
@@ -418,7 +472,9 @@ function _calcRepPat(j) {
   let rep = 0;
   if (mor) rep += propria ? mor.rep_cp : Math.max(0, mor.rep_al);
   if (car) rep += car.rep;
-  if (esc) rep += esc.rep;
+  // Escritório: só aplica se for solo (NPC não tem custo/bônus pat)
+  const isSoloPat = !j.escritorio_empregado_id || j.escritorio_id === 'solo';
+  if (esc && isSoloPat) rep += esc.rep;
   (j.compras||[]).forEach(c=>{ if (c.rep>0) rep+=c.rep; });
   return Math.min(30, rep);
 }
