@@ -39,9 +39,23 @@
 
   <!-- Usuário -->
   <div class="topbar-user">
-    <span id="tb-rep" style="font-size:.7rem;color:var(--ouro2);font-weight:700">—</span>
-    <span id="tb-saldo" style="font-size:.7rem;color:var(--verde3);font-weight:600">—</span>
-    <div id="tb-serasa" class="topbar-serasa">🚨 Serasa</div>
+    <!-- Bloco de prestígio -->
+    <div class="tb-pres-bloco">
+      <div class="tb-pres-header">
+        <span id="tb-rep" class="tb-rep-val">—</span>
+        <span id="tb-rep-cap" class="tb-rep-cap">/35</span>
+      </div>
+      <div class="tb-pres-bar-wrap">
+        <div class="tb-pres-bar-fill" id="tb-pres-fill" style="width:0%"></div>
+      </div>
+      <div id="tb-pres-label" class="tb-pres-label">Prestígio</div>
+    </div>
+    <!-- Saldo -->
+    <div class="tb-saldo-bloco">
+      <div class="tb-saldo-label">Saldo</div>
+      <span id="tb-saldo" class="tb-saldo-val">—</span>
+    </div>
+    <div id="tb-serasa" class="topbar-serasa">🚨</div>
     <img id="tb-avatar" class="topbar-avatar" src="" alt="" style="display:none">
     <span id="tb-nome" class="topbar-nome">—</span>
     <button class="btn-logout" onclick="fazerLogout()">Sair</button>
@@ -310,7 +324,7 @@ window.avancarMes = async function(forcar) {
 
   const usado      = j.energia_usada_mes || 0;
   const disponivel = Math.max(0, 100 - usado);
-  if (!forcar && disponivel > 20) {
+  if (!forcar && disponivel > 5) {
     if (!confirm('Você ainda tem ' + disponivel + ' ⚡ de energia. Avançar mesmo assim?')) return;
   }
 
@@ -447,26 +461,57 @@ window.navTo = function(painel, el) {
   closeSidebar();
 };
 
-// ── Atualizar barra de energia mobile ──
+// ── Atualizar topbar + barra mobile ──
 window.addEventListener('jogador:update', (e) => {
   const j    = e.detail;
   if (!j) return;
   const usado = j.energia_usada_mes || 0;
   const disp  = Math.max(0, 100 - usado);
-  const pct   = disp;
   const cor   = disp > 50 ? '#4AAB77' : disp > 20 ? '#B7791F' : '#C0392B';
-  const fill  = document.getElementById('bem-fill');
-  const val   = document.getElementById('bem-val');
-  const btn   = document.getElementById('btn-avancar-mobile');
-  if (fill) { fill.style.width = pct + '%'; fill.style.background = cor; }
+
+  // ── Barra de energia mobile ──
+  const fill = document.getElementById('bem-fill');
+  const val  = document.getElementById('bem-val');
+  const btn  = document.getElementById('btn-avancar-mobile');
+  if (fill) { fill.style.width = disp + '%'; fill.style.background = cor; }
   if (val)  val.textContent = disp + '/100';
   if (btn) {
-    if (disp <= 20) {
-      btn.textContent = '▶ Avançar';
-      btn.classList.add('pronto');
+    if (disp <= 5) { btn.textContent = '▶ Avançar'; btn.classList.add('pronto'); }
+    else           { btn.textContent = '⚡ ' + disp; btn.classList.remove('pronto'); }
+  }
+
+  // ── Topbar: prestígio ──
+  const cap      = (window.REP_CAP || {})[j.cargo_id] || 35;
+  const rep      = j.reputacao || 0;
+  const pct      = Math.min(100, Math.round(rep / cap * 100));
+  const corPres  = pct >= 80 ? '#4AAB77' : pct >= 50 ? '#C9A227' : pct >= 25 ? '#3A5080' : '#9BAAC4';
+  const tierLabel= pct >= 90 ? '👑 Elite' : pct >= 70 ? '⭐ Destaque' : pct >= 40 ? '📈 Crescendo' : '🌱 Iniciante';
+
+  const presEl   = document.getElementById('tb-pres-fill');
+  const repEl    = document.getElementById('tb-rep');
+  const capEl    = document.getElementById('tb-rep-cap');
+  const labelEl  = document.getElementById('tb-pres-label');
+  if (presEl)  { presEl.style.width = pct + '%'; presEl.style.background = corPres; }
+  if (repEl)   repEl.textContent = rep;
+  if (capEl)   capEl.textContent = '/' + cap;
+  if (labelEl) labelEl.textContent = tierLabel;
+
+  // ── Topbar: saldo ──
+  const saldoEl = document.getElementById('tb-saldo');
+  if (saldoEl && j.dinheiro !== undefined) {
+    const d = j.dinheiro || 0;
+    saldoEl.textContent = d >= 1000000
+      ? 'R$ ' + (d/1000000).toFixed(2) + 'M'
+      : 'R$ ' + Number(d).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+
+  // ── Topbar: botão avançar mês ──
+  const tickEl = document.getElementById('server-tick');
+  if (tickEl) {
+    if (disp <= 5) {
+      tickEl.innerHTML = '<button onclick="window.avancarMes()" class="tb-btn-avancar pronto">▶ Avançar mês</button>';
     } else {
-      btn.textContent = '⚡ ' + disp;
-      btn.classList.remove('pronto');
+      tickEl.innerHTML = '<span class="tb-energia-badge">⚡ ' + disp + '</span>';
     }
   }
 });
