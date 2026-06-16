@@ -500,7 +500,15 @@ const app  = initializeApp(FB_CONFIG);
 const auth = getAuth(app);
 const db   = getFirestore(app);
 const gp   = new GoogleAuthProvider();
-
+window.fazerLogin = async function() {
+  try {
+    await signInWithPopup(auth, gp);
+  } catch (err) {
+    console.error(err);
+    const el = document.getElementById('msg-erro');
+    if (el) el.textContent = err.message;
+  }
+};
 // ── Estado global ──
 window._auth = auth;
 window._db   = db;
