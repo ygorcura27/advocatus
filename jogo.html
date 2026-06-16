@@ -11,6 +11,10 @@
 
 <!-- ════════ TOPBAR ════════ -->
 <header class="topbar">
+  <!-- Hamburger — só aparece no mobile -->
+  <button class="hamburger" id="hamburger" onclick="toggleSidebar()" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
   <div class="logo">Advocatus<em>Online</em></div>
 
   <nav class="nav-top">
@@ -221,6 +225,51 @@
   </aside>
 </div>
 
+<!-- ════════ SIDEBAR OVERLAY (mobile) ════════ -->
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+<!-- ════════ BOTTOM NAV (mobile) ════════ -->
+<nav class="bottom-nav" id="bottom-nav">
+  <div class="bnav-item ativo" id="bn-perfil" onclick="navTo('perfil',this);closeSidebar()">
+    <span class="bnav-icon">⚖️</span>
+    <span class="bnav-label">Perfil</span>
+  </div>
+  <div class="bnav-item" id="bn-processos" onclick="navTo('processos',this);closeSidebar()">
+    <span class="bnav-icon">📋</span>
+    <span class="bnav-label">Casos</span>
+  </div>
+  <div class="bnav-item" id="bn-escritorio" onclick="navTo('escritorio',this);closeSidebar()">
+    <span class="bnav-icon">🏢</span>
+    <span class="bnav-label">Escrit.</span>
+  </div>
+  <div class="bnav-item" id="bn-vagas" onclick="navTo('vagas',this);closeSidebar()">
+    <span class="bnav-icon">💼</span>
+    <span class="bnav-label">Vagas</span>
+  </div>
+  <div class="bnav-item" id="bn-habilidades" onclick="navTo('habilidades',this);closeSidebar()">
+    <span class="bnav-icon">⚡</span>
+    <span class="bnav-label">Skills</span>
+  </div>
+  <div class="bnav-item" id="bn-mais" onclick="toggleSidebar()">
+    <span class="bnav-icon">☰</span>
+    <span class="bnav-label">Mais</span>
+  </div>
+</nav>
+
+<!-- ════════ BARRA DE ENERGIA MOBILE ════════ -->
+<div class="bloco-energia-mobile" id="barra-energia-mobile">
+  <div class="bem-mobile-energia">
+    <div class="bem-mobile-label">Energia ⚡</div>
+    <div class="bem-mobile-bar">
+      <div class="bem-mobile-bar-fill" id="bem-fill" style="width:100%;background:#4AAB77"></div>
+    </div>
+  </div>
+  <span class="bem-mobile-val" id="bem-val">100/100</span>
+  <button class="btn-avancar-mobile" id="btn-avancar-mobile" onclick="window.avancarMes()">
+    ▶ Avançar
+  </button>
+</div>
+
 <!-- ════════ MODAL GENÉRICO ════════ -->
 <div class="modal-overlay" id="modal" onclick="fecharModal(event)">
   <div class="modal" id="modal-box">
@@ -359,6 +408,69 @@ window.toast = function(msg, tipo = 'neutro', duracao = 3500) {
 };
 
 // ── Formato de moeda ──
+// ── Mobile sidebar ──
+window.toggleSidebar = function() {
+  const sb  = document.querySelector('.sidebar-left');
+  const ov  = document.getElementById('sidebar-overlay');
+  const hb  = document.getElementById('hamburger');
+  const isOpen = sb.classList.contains('aberta');
+  if (isOpen) {
+    sb.classList.remove('aberta');
+    ov.classList.remove('vis');
+    hb.classList.remove('aberto');
+    document.body.style.overflow = '';
+  } else {
+    sb.classList.add('aberta');
+    ov.classList.add('vis');
+    hb.classList.add('aberto');
+    document.body.style.overflow = 'hidden';
+  }
+};
+window.closeSidebar = function() {
+  const sb = document.querySelector('.sidebar-left');
+  const ov = document.getElementById('sidebar-overlay');
+  const hb = document.getElementById('hamburger');
+  sb.classList.remove('aberta');
+  ov.classList.remove('vis');
+  hb.classList.remove('aberto');
+  document.body.style.overflow = '';
+};
+
+// ── Atualizar bottom nav ativo ──
+const _navToOrig = window.navTo;
+window.navTo = function(painel, el) {
+  _navToOrig(painel, el);
+  // Atualizar bottom nav
+  document.querySelectorAll('.bnav-item').forEach(b => b.classList.remove('ativo'));
+  const bnMap = { perfil:'bn-perfil', processos:'bn-processos', escritorio:'bn-escritorio', vagas:'bn-vagas', habilidades:'bn-habilidades' };
+  if (bnMap[painel]) document.getElementById(bnMap[painel])?.classList.add('ativo');
+  closeSidebar();
+};
+
+// ── Atualizar barra de energia mobile ──
+window.addEventListener('jogador:update', (e) => {
+  const j    = e.detail;
+  if (!j) return;
+  const usado = j.energia_usada_mes || 0;
+  const disp  = Math.max(0, 100 - usado);
+  const pct   = disp;
+  const cor   = disp > 50 ? '#4AAB77' : disp > 20 ? '#B7791F' : '#C0392B';
+  const fill  = document.getElementById('bem-fill');
+  const val   = document.getElementById('bem-val');
+  const btn   = document.getElementById('btn-avancar-mobile');
+  if (fill) { fill.style.width = pct + '%'; fill.style.background = cor; }
+  if (val)  val.textContent = disp + '/100';
+  if (btn) {
+    if (disp <= 20) {
+      btn.textContent = '▶ Avançar';
+      btn.classList.add('pronto');
+    } else {
+      btn.textContent = '⚡ ' + disp;
+      btn.classList.remove('pronto');
+    }
+  }
+});
+
 window.fmt = function(n) {
   if (!n && n !== 0) return '—';
   if (n >= 1000000) return `R$ ${(n/1000000).toFixed(1)}M`;
