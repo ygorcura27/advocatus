@@ -123,6 +123,8 @@ exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (requ
     jogadorUpdates.wins_ano    = (j.wins_ano || 0) + 1;
     jogadorUpdates.reputacao   = Math.min(100, (j.reputacao || 30) + 5);
     jogadorUpdates.derrotas_consecutivas = 0;
+    const xpGanho = 25 * instancia;
+    jogadorUpdates.xp = (j.xp || 0) + xpGanho;
 
     // Estado perde processo administrativo → trânsito imediato (não pode recorrer)
     const estadoNaoPodeRecorrer = isAdmin && reuEhEstado;
