@@ -19,6 +19,7 @@
     <a href="#" onclick="navTo('escritorio',this)">Escritório</a>
     <a href="#" onclick="navTo('patrimonio',this)">Patrimônio</a>
     <a href="#" onclick="navTo('habilidades',this)">Habilidades</a>
+    <a href="#" onclick="navTo('vagas',this)">Vagas</a>
     <a href="#" onclick="navTo('ranking',this)">Rankings</a>
     <a href="#" onclick="navTo('inbox',this)">
       Mensagens
@@ -112,6 +113,9 @@
 
       <div class="nav-grupo">
         <div class="nav-grupo-titulo">Social</div>
+        <div class="nav-item" onclick="navTo('vagas',this)">
+          <span class="ni-icon">📋</span> Vagas
+        </div>
         <div class="nav-item" onclick="navTo('ranking',this)">
           <span class="ni-icon">🏆</span> Rankings
         </div>
@@ -236,6 +240,8 @@
 <script type="module">
   import './js/firebase-init.js';
   import './js/avancar_mes.js';
+  import './js/escritorios_npc.js';
+  import './js/vagas.js';
   import './js/auth.js';
   import './js/gamestate.js';
   import './js/ui-main.js';
