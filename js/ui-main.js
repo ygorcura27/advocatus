@@ -286,6 +286,12 @@ function renderEscritorio(j, el) {
   const isSolo  = !j.escritorio_proprio_id && j.escritorio_id === 'solo';
   const escNome = j.escritorio_nome || 'Advocacia Solo';
 
+  // Se está num escritório NPC, mostrar detalhes completos
+  if (!isSolo && j.escritorio_id && j.escritorio_id !== 'solo') {
+    _renderEscritorioNPC(j, el);
+    return;
+  }
+
   el.innerHTML = `
     <div class="secao-header">
       <div class="secao-titulo">🏢 Escritório</div>
@@ -338,6 +344,98 @@ async function _carregarEscritorio(escId) {
         ${_miniStatCard('💰','Faturamento',fmt(e.faturamento_total||0),'money')}
       </div>`;
   } catch (err) { console.error('[UI] Escritório:', err); }
+}
+
+// ════════════════════════════════════════════════════════
+// ESCRITÓRIO NPC DETALHADO
+// ════════════════════════════════════════════════════════
+function _renderEscritorioNPC(j, el) {
+  // Tentar carregar dados do escritório NPC
+  const escId  = j.escritorio_id;
+  const escNPC = window.ESCRITORIOS_NPC_DATA ? window.ESCRITORIOS_NPC_DATA.find(e => e.id === escId) : null;
+  const TIER_BONUS_DATA = window.TIER_BONUS_DATA || {
+    1:{rep_passivo:0,networking_passivo:0,bonus_chance_esp:3,caso_min:1000,caso_max:50000},
+    2:{rep_passivo:1,networking_passivo:1,bonus_chance_esp:5,caso_min:20000,caso_max:200000},
+    3:{rep_passivo:1,networking_passivo:1,bonus_chance_esp:7,caso_min:80000,caso_max:800000},
+    4:{rep_passivo:2,networking_passivo:2,bonus_chance_esp:10,caso_min:300000,caso_max:5000000},
+    5:{rep_passivo:3,networking_passivo:3,bonus_chance_esp:12,caso_min:1000000,caso_max:100000000},
+  };
+
+  const tier   = j.escritorio_tier || 1;
+  const bonus  = TIER_BONUS_DATA[tier] || {};
+  const vagaTipo = j.vaga_tipo || 'contencioso';
+  const VAGA_LABEL = {
+    estagiario_pesquisa:'Estagiário de Pesquisa',
+    advogado_peticionante:'Advogado Peticionante',
+    advogado_audiencista:'Advogado Audiencista',
+    advogado_contencioso:'Advogado Contencioso',
+    advogado_consultor:'Advogado Consultor',
+    advogado_parecerista:'Advogado Parecerista',
+    advogado_palestrante:'Advogado Palestrante',
+    socio_associado:'Sócio-Associado',
+  };
+  const TIER_COR = {1:'#9BAAC4',2:'#4AAB77',3:'#B7791F',4:'#3A5080',5:'#8B1A1A'};
+  const fmtV = n => n>=1000000?`R$${(n/1000000).toFixed(0)}M`:n>=1000?`R$${(n/1000).toFixed(0)}k`:`R$${n}`;
+
+  el.innerHTML = `
+    <div class="secao-header">
+      <div class="secao-titulo">🏢 Meu Escritório</div>
+      <span class="secao-badge" style="background:${TIER_COR[tier]}20;color:${TIER_COR[tier]}">Tier ${tier}</span>
+    </div>
+
+    <div class="card" style="border-left:4px solid ${TIER_COR[tier]};margin-bottom:1rem">
+      <div style="display:flex;align-items:center;gap:.8rem;margin-bottom:.8rem">
+        <div style="font-size:2rem">🏛️</div>
+        <div>
+          <div style="font-family:var(--font-serif);font-size:1.1rem;font-weight:700;color:var(--navy)">${j.escritorio_nome || '—'}</div>
+          <div style="font-size:.72rem;color:var(--txt3)">📍 ${j.escritorio_bairro||'—'} · ${_espLabel2(j.escritorio_esp)} · Tier ${tier}</div>
+        </div>
+      </div>
+      <div style="background:var(--surface2);border:var(--borda-sub);border-radius:var(--r);padding:.7rem;margin-bottom:.7rem">
+        <div style="font-size:.62rem;color:var(--txt4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">Sua vaga</div>
+        <div style="font-weight:700;color:var(--navy);font-size:.9rem">${VAGA_LABEL[vagaTipo]||vagaTipo}</div>
+        <div style="font-size:.75rem;color:var(--verde2);font-weight:600;margin-top:.15rem">R$ ${(j.sal_base_escritorio||0).toLocaleString('pt-BR')}/mês</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem;margin-bottom:.7rem">
+        <div style="text-align:center;padding:.5rem;background:var(--verde-bg);border-radius:var(--r)">
+          <div style="font-size:.6rem;color:var(--txt4);text-transform:uppercase">Bônus chance</div>
+          <div style="font-weight:700;color:var(--verde2);font-size:.9rem">+${bonus.bonus_chance_esp||0}%</div>
+          <div style="font-size:.58rem;color:var(--txt4)">vitória ${_espLabel2(j.escritorio_esp)}</div>
+        </div>
+        <div style="text-align:center;padding:.5rem;background:var(--navy-light);border-radius:var(--r)">
+          <div style="font-size:.6rem;color:var(--txt4);text-transform:uppercase">Bônus passivo</div>
+          <div style="font-weight:700;color:var(--navy3);font-size:.9rem">+${bonus.rep_passivo||0} rep</div>
+          <div style="font-size:.58rem;color:var(--txt4)">+${bonus.networking_passivo||0} net/mês</div>
+        </div>
+        <div style="text-align:center;padding:.5rem;background:var(--amber-bg);border-radius:var(--r)">
+          <div style="font-size:.6rem;color:var(--txt4);text-transform:uppercase">Faixa de causas</div>
+          <div style="font-weight:700;color:var(--amber);font-size:.82rem">${fmtV(bonus.caso_min||0)}</div>
+          <div style="font-size:.58rem;color:var(--txt4)">até ${fmtV(bonus.caso_max||0)}</div>
+        </div>
+      </div>
+
+      <button class="btn btn-ghost btn-sm btn-block" onclick="window.sairEscritorio && window.sairEscritorio()">
+        Sair do escritório
+      </button>
+    </div>
+
+    <div class="secao-header">
+      <div class="secao-titulo">📋 Ver outras oportunidades</div>
+    </div>
+    <div class="card" style="text-align:center;padding:1.2rem;color:var(--txt3)">
+      <div style="font-size:.85rem;margin-bottom:.5rem">Quer explorar outras vagas?</div>
+      <button class="btn btn-prim" onclick="window.navTo('vagas',null)">Ver Vagas Disponíveis →</button>
+    </div>`;
+}
+
+function _espLabel2(esp) {
+  const MAP = {
+    tributario:'Tributário',trabalhista:'Trabalhista',civil:'Civil',
+    criminal:'Criminal',empresarial:'Empresarial',constitucional:'Constitucional',
+    ambiental:'Ambiental',previdenciario:'Previdenciário',
+  };
+  return MAP[esp]||esp||'—';
 }
 
 // ════════════════════════════════════════════════════════
