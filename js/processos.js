@@ -456,8 +456,11 @@ async function _processarSentencaFrontend(procId) {
   const pct        = {1:0.10,2:0.10,3:0.05,4:0.05}[instancia] || 0.10;
   const suc        = Math.floor(p.valor * pct);
   const hon        = ganhou ? (isSolo ? Math.floor((instancia===1?p.valor*0.30:0)+suc) : Math.floor(suc*0.10)) : 0;
-  const ganhoRep   = Math.max(1, Math.floor((cap - rep) * 0.08));
-  const perdaRep   = Math.max(1, Math.floor(rep * 0.04));
+  const _pctRep  = rep / (cap || 35);
+  const _fGanho  = _pctRep > 0.8 ? 0.04 : _pctRep > 0.6 ? 0.06 : 0.08;
+  const _fPerda  = _pctRep > 0.8 ? 0.07 : _pctRep > 0.5 ? 0.05 : 0.03;
+  const ganhoRep = Math.max(1, Math.floor((cap - rep) * _fGanho));
+  const perdaRep = Math.max(1, Math.floor(rep * _fPerda));
   const xpGanho    = ganhou ? 25 : 10;
 
   if (ganhou) {

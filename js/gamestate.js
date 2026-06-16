@@ -46,6 +46,8 @@ window.addEventListener('jogador:update', (e) => {
   _atualizarSidebarEsquerda(j);
   _atualizarSidebarDireita(j);
   _atualizarTopbar(j);
+  // Atualizar calendário com dados pessoais do jogador (mais precisos que o server)
+  _atualizarRelógio(window.SERVER || {}, j);
   // Notificar ui-main.js para re-renderizar o painel ativo
   window.dispatchEvent(new CustomEvent('gamestate:ready', { detail: j }));
 });
@@ -56,7 +58,7 @@ window.addEventListener('jogador:update', (e) => {
 window.addEventListener('server:update', (e) => {
   const s = e.detail;
   if (!s) return;
-  _atualizarRelógio(s);
+  _atualizarRelógio(s, window.JOGADOR);
   _carregarEventoGlobal(s.mes_global);
 });
 
@@ -111,7 +113,7 @@ function _atualizarSidebarDireita(j) {
       const usado = j.energia_usada_mes || 0;
       const disp  = Math.max(0, 100 - usado);
       const cor   = disp > 50 ? '#5A9A3A' : disp > 20 ? '#B8922A' : '#A83A3A';
-      const pronto = disp <= 20;
+      const pronto = disp <= 5;
       el.innerHTML = `
         <div class="bloco-titulo">⚡ Energia Mensal <span style="font-weight:700;color:${cor}">${disp}/100</span></div>
         <div class="energia-bar-wrap" style="margin-bottom:.6rem">
@@ -184,14 +186,14 @@ function _atualizarTopbar(j) {
 // ════════════════════════════════════════════════════════
 // RELÓGIO GLOBAL
 // ════════════════════════════════════════════════════════
-function _atualizarRelógio(server) {
-  // Usa calendário pessoal do jogador se disponível, senão o do servidor
-  const j = window.JOGADOR;
+function _atualizarRelógio(server, jogador) {
+  // Prioridade: calendário pessoal do jogador > servidor global
+  const j = jogador || window.JOGADOR;
   let texto;
-  if (j && j.mes_pessoal !== undefined) {
+  if (j && j.mes_pessoal !== undefined && j.ano_pessoal !== undefined) {
     const MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                       'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-    texto = `${MESES_PT[j.mes_pessoal]}, Ano ${j.ano_pessoal || 1}`;
+    texto = `${MESES_PT[j.mes_pessoal]}, Ano ${j.ano_pessoal}`;
   } else {
     texto = `${server.mes_nome || 'Janeiro'}, Ano ${server.ano_jogo || 1}`;
   }
