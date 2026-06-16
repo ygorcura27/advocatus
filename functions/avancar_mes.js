@@ -213,10 +213,15 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
   // ── 6. Calcular renda ──
   let renda = 0;
   if (j.escritorio_id !== 'solo' && j.escritorio_empregado_id) {
-    const salMin = CARGO_SAL_MIN[j.cargo_id] || 1700;
-    const salMax = CARGO_SAL_MAX[j.cargo_id] || 1700;
-    const repF   = Math.min(1, (j.reputacao || 30) / 100);
-    renda = Math.floor(salMin + (salMax - salMin) * repF * (j.sal_mult || 1.0));
+    if (j.sal_base_escritorio && j.sal_base_escritorio > 0) {
+      // Salario negociado ao entrar no escritorio NPC
+      renda = j.sal_base_escritorio;
+    } else {
+      const salMin = CARGO_SAL_MIN[j.cargo_id] || 1700;
+      const salMax = CARGO_SAL_MAX[j.cargo_id] || 1700;
+      const repF   = Math.min(1, (j.reputacao || 30) / 100);
+      renda = Math.floor(salMin + (salMax - salMin) * repF * (j.sal_mult || 1.0));
+    }
   }
 
   // ── 7. Calcular despesas ──
