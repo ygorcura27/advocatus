@@ -112,7 +112,7 @@ exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (requ
   logger.info(`[SENTENÇA] ${processo_id} | cs:${cs}% | roll:${roll.toFixed(1)} | ganhou:${ganhou}`);
 
   // ── Calcular honorários ──
-  const hon     = calcHonorarios(p, instancia, isSolo);
+  const hon = calcHonorarios(p, instancia, isSolo, j);
   const honTotal = (p.hon_total_acumulado || 0) + hon;
 
   // ── Preparar updates ──
