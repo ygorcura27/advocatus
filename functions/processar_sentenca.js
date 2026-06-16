@@ -33,14 +33,26 @@ function podeFazerInstancia(cargoId, instancia) {
   return permitidos.includes(cargoId);
 }
 
-function calcHonorarios(processo, instancia, isSolo) {
+function calcHonorarios(processo, instancia, isSolo, jogador) {
+
+  // Estagiário e Assistente não recebem honorários
+  if (['est', 'ass'].includes(jogador.cargo_id)) {
+    return 0;
+  }
+
   const pct         = SUCES_PCT[instancia] || 0.10;
   const sucumbencia = Math.floor(processo.valor * pct);
+
   if (isSolo) {
-    // Solo: 30% do valor (só na 1ª instância) + sucumbência
-    const contingencia = instancia === 1 ? Math.floor(processo.valor * 0.30) : 0;
+    const contingencia = instancia === 1
+      ? Math.floor(processo.valor * 0.30)
+      : 0;
+
     return contingencia + sucumbencia;
   }
+
+  return Math.floor(sucumbencia * 0.10);
+}
   // Escritório: advogado recebe 10% da sucumbência do escritório
   return Math.floor(sucumbencia * 0.10);
 }
