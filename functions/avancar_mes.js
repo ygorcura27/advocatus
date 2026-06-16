@@ -231,7 +231,13 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
   const comprada = j.moradias_compradas?.[morId];
 
   let despesas = 0;
-  despesas += ESCRITORIO_CM[escId] || 600;
+  // Espaço de trabalho: home=gratuito, NPC=gratuito, solo=cobra coworking/sala
+  const ESCRITORIO_CM_LOCAL = { home:0, cw:600, sal:3000, esm:7500, esp:18000 };
+  const isSoloWork = !j.escritorio_empregado_id || j.escritorio_id === 'solo';
+  if (isSoloWork) {
+    despesas += ESCRITORIO_CM_LOCAL[escId] || 0;
+  }
+  // Debuff de rep do home office (aplicado no bloco de patrimônio mais abaixo)
   if (morId !== 'pais' && !comprada) {
     const v = IMOVEL_VALOR[morId] || 0;
     despesas += v < 500000 ? Math.floor(v*0.0055) : v < 1000000 ? Math.floor(v*0.004) : Math.floor(v*0.003);
@@ -241,7 +247,15 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
     if (fin.parcelas_restantes > 0) despesas += fin.parcela_mensal || 0;
   }
   despesas += (j.estagiarios || []).length * 1700;
-  const custoVida = 800 + Math.max(0, (j.reputacao || 30) - 20) * 25;
+  // Custo de vida por cargo — escalonado de forma justa
+  const CUSTO_BASE = {
+    est:600, ass:700, jnr:900, pln:1400, snr:2200,
+    asc:3000, soc:4500, snm:6000,
+    jsub:2200, jtit:3000, dsb:4000, mstj:5500,
+    padj:2000, prom:2800, pjus:3800, pgj:5000,
+    dadj:1800, def:2400, dch:3200, dge:4500,
+  };
+  const custoVida = CUSTO_BASE[j.cargo_id] || 700;
 
   // ── 8. Saldo ──
   const saldoMes   = renda - despesas - custoVida;
@@ -260,6 +274,12 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
   const cargoIdx  = CARGO_IDX[j.cargo_id] || 0;
   const cap       = REP_CAP[j.cargo_id] || 55;
   let deltaRepPat = 0;
+
+  // Home office: -2 rep/mês se for solo
+  if (isSoloWork && escId === 'home') {
+    const novaRep = Math.max(0, (updates.reputacao ?? j.reputacao ?? 30) - 2);
+    updates.reputacao = novaRep;
+  }
 
   // Moradia
   const morRepBase = MORADIA_REP[morId] ?? 0;
