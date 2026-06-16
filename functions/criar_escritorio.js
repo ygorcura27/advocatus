@@ -124,10 +124,21 @@ exports.convidarSocio = onCall({ region: 'southamerica-east1' }, async (request)
   const convidadoSnap = await db.collection('jogadores').doc(para_uid).get();
   if (!convidadoSnap.exists) throw new HttpsError('not-found', 'Jogador convidado não encontrado.');
   const convidado = convidadoSnap.data();
-  if (!convidado.oab) {
-    throw new HttpsError('failed-precondition', 'O convidado precisa ter OAB aprovada.');
-  }
+  const CARGOS_CONTRATAVEIS = [
+  'est',
+  'ass',
+  'jnr',
+  'pln',
+  'snr'
+  'asc'
+];
 
+  if (!CARGOS_CONTRATAVEIS.includes(convidado.cargo_id)) {
+  throw new HttpsError(
+    'failed-precondition',
+    'Este cargo não pode receber ofertas de escritório.'
+  );
+}
   // Verificar se já existe convite pendente
   const convPend = await db.collection('convites')
     .where('para_uid', '==', para_uid)
