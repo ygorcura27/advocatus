@@ -661,7 +661,7 @@ function renderProcessos(main) {
 }
 
 window.listarProcessos = async function() {
-  const uid = id('proc-uid').value.trim();
+  const uid = document.getElementById('proc-uid').value.trim();
   if (!uid) return;
   try {
     const r = await window._adminFn({ acao:'processos_listar_jogador', payload:{uid} });
@@ -672,7 +672,7 @@ window.listarProcessos = async function() {
           <span style="color:var(--ardosia);font-family:var(--font-mono)">${p.id.slice(0,10)}</span>
           <span>${p.tipo||'—'}</span>
           <span style="color:${p.status==='andamento'?'var(--ouro2)':p.status==='ganho'?'var(--verde3)':'var(--verm3)'}">${p.status}</span>
-          <button class="btn btn-sm btn-ghost" onclick="id('proc-id').value='${p.id}'">Sel.</button>
+          <button class="btn btn-sm btn-ghost" onclick="document.getElementById('proc-id').value='${p.id}'">Sel.</button>
         </div>`).join('');
   } catch (err) { log(`❌ ${err.message}`,'ko'); }
 };
