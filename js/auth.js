@@ -104,12 +104,18 @@ function _atualizarTopbarUsuario(user, jogador) {
 // ════════════════════════════════════════════════════════
 // RELÓGIO GLOBAL
 // ════════════════════════════════════════════════════════
+const _MESES_AUTH = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                    'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 function _atualizarRelogio(server) {
   const el = document.getElementById('server-data');
-  if (el) {
+  if (!el) return;
+  // Prioridade: calendário pessoal do jogador
+  const j = window.JOGADOR;
+  if (j && j.mes_pessoal !== undefined && j.ano_pessoal !== undefined) {
+    el.textContent = `${_MESES_AUTH[j.mes_pessoal]}, Ano ${j.ano_pessoal}`;
+  } else {
     el.textContent = `${server.mes_nome || 'Janeiro'}, Ano ${server.ano_jogo || 1}`;
   }
-  // O tick é manual (por clique) — mostrar energia restante
   _atualizarTickLabel();
 }
 
@@ -130,8 +136,16 @@ function _atualizarTickLabel() {
   }
 }
 
-// Atualizar label quando jogador mudar
-window.addEventListener('jogador:update', () => _atualizarTickLabel());
+// Atualizar relógio e label quando jogador mudar
+window.addEventListener('jogador:update', (e) => {
+  const j = e.detail;
+  if (!j) return;
+  const el = document.getElementById('server-data');
+  if (el && j.mes_pessoal !== undefined && j.ano_pessoal !== undefined) {
+    el.textContent = `${_MESES_AUTH[j.mes_pessoal]}, Ano ${j.ano_pessoal}`;
+  }
+  _atualizarTickLabel();
+});
 
 // ════════════════════════════════════════════════════════
 // LOGOUT

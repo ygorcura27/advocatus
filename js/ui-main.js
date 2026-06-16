@@ -97,11 +97,30 @@ function renderPerfil(j, el) {
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:.5rem;margin-bottom:1.2rem">
-      ${_miniStatCard('💰','Saldo',fmt(j.dinheiro||0),'money')}
-      ${_miniStatCard('📈','Renda/mês',fmt(j.renda_calculada||0),'money')}
-      ${_miniStatCard('💸','Despesas',fmt(j.despesas_calculadas||0),'danger')}
-      ${_miniStatCard('🏅','Reputação',`${j.reputacao||0}/${cap}`,'gold')}
+      ${_miniStatCard('💰','Saldo', _fmtExt(j.dinheiro||0),'money')}
+      ${_miniStatCard('📈','Renda/mês', _fmtExt(j.renda_calculada||0),'money')}
+      ${_miniStatCard('💸','Despesas', _fmtExt(j.despesas_calculadas||0),'danger')}
+      ${_miniStatCardRep('🏅','Reputação', j.reputacao||0, cap)}
     </div>
+
+    <!-- Energia do mês -->
+    ${(() => {
+      const energiaUsada = j.energia_usada_mes||0;
+      const energiaDisp  = Math.max(0, 100 - energiaUsada);
+      const corE = energiaDisp > 50 ? 'var(--verde2)' : energiaDisp > 20 ? 'var(--amber)' : 'var(--verm2)';
+      return `<div style="margin-bottom:1rem;padding:.75rem;background:var(--surface2);border:var(--borda-sub);border-radius:var(--r)">
+        <div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--txt3);margin-bottom:.3rem">
+          <span>⚡ Energia do mês</span>
+          <span style="font-weight:700;color:${corE}">${energiaDisp}/100</span>
+        </div>
+        <div style="height:8px;background:var(--bg2);border-radius:4px;overflow:hidden">
+          <div style="height:100%;width:${energiaDisp}%;background:${corE};border-radius:4px;transition:width .4s"></div>
+        </div>
+        <div style="font-size:.62rem;color:var(--txt4);margin-top:.25rem">
+          Pesquisa -5⚡ · Petição -10⚡ · Diligência -15⚡ · Audiência -20⚡
+        </div>
+      </div>`;
+    })()}
 
     <!-- Atributos -->
     <div class="secao-header">
@@ -755,11 +774,31 @@ window.fazerCursoRecesso = async function(uid, sk, skLabel) {
 // ════════════════════════════════════════════════════════
 // HELPERS UI
 // ════════════════════════════════════════════════════════
+function _fmtExt(n) {
+  if (!n && n !== 0) return '—';
+  if (n >= 1000000) return 'R$ ' + (n/1000000).toFixed(2).replace('.',',') + 'M';
+  return 'R$ ' + Number(n).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
 function _miniStatCard(icon, label, val, tipo) {
-  const cor = tipo==='money'?'var(--verde3)':tipo==='gold'?'var(--ouro2)':tipo==='danger'?'var(--verm3)':'var(--perg)';
+  const cor = tipo==='money'?'var(--verde2)':tipo==='gold'?'var(--ouro2)':tipo==='danger'?'var(--verm2)':'var(--navy)';
   return `<div class="stat-mini">
     <div class="v" style="color:${cor}">${val}</div>
     <div class="l">${icon} ${label}</div>
+  </div>`;
+}
+
+function _miniStatCardRep(icon, label, rep, cap) {
+  const pct    = Math.min(100, Math.round(rep/cap*100));
+  const cor    = pct>=80?'var(--verde2)':pct>=50?'var(--ouro2)':pct>=25?'var(--navy3)':'var(--txt4)';
+  const tier   = pct>=90?'👑 Elite':pct>=70?'⭐ Destaque':pct>=40?'📈 Crescendo':'🌱 Iniciante';
+  return `<div class="stat-mini" style="position:relative;overflow:hidden">
+    <div class="v" style="color:${cor}">${rep}<span style="font-size:.6rem;color:var(--txt4)">/${cap}</span></div>
+    <div class="l">${icon} ${label}</div>
+    <div style="margin-top:.3rem;height:4px;background:var(--bg2);border-radius:2px;overflow:hidden">
+      <div style="height:100%;width:${pct}%;background:${cor};border-radius:2px;transition:width .5s"></div>
+    </div>
+    <div style="font-size:.55rem;color:var(--txt4);margin-top:.15rem;text-align:center">${tier}</div>
   </div>`;
 }
 
