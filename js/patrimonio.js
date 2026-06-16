@@ -221,8 +221,7 @@ window.renderPatrimonio = function(j, el) {
           ${cr.v>0?`<div class="pc-det">${fmt(cr.v)}</div>`:''}
           <div class="pc-det" style="color:#ffa726">${fmt(cr.cm)}/mês</div>
           <div class="pc-rep">Rep: ${cr.rep>=0?'+':''}${cr.rep}</div>
-          ${isAt ? `<div class="pc-ativo">✓ Seu veículo${fin&&fin.parcelas_restantes>0?`<br><span style="font-size:.6rem;color:var(--amber)">${fin.parcelas_restantes}× restantes</span>`:''}</div>`
-          ${fin&&fin.parcelas_restantes>0?`<button style="font-size:.58rem;margin-top:.3rem;background:var(--verm-bg);border:1px solid var(--verm3);color:var(--verm2);padding:.25rem .5rem;border-radius:3px;cursor:pointer;width:100%" onclick="window.devolverCarro('${cr.id}')">↩ Devolver carro (50% de volta)</button>`:''} :
+          ${isAt ? `<div class="pc-ativo">✓ Seu veículo${fin&&fin.parcelas_restantes>0?`<br><span style="font-size:.6rem;color:var(--amber)">${fin.parcelas_restantes}× restantes</span>`:''}</div>${fin&&fin.parcelas_restantes>0?`<button style="font-size:.58rem;margin-top:.3rem;background:var(--verm-bg);border:1px solid var(--verm3);color:var(--verm2);padding:.25rem .5rem;border-radius:3px;cursor:pointer;width:100%" onclick="window.devolverCarro('${cr.id}')">↩ Devolver (50%)</button>`:''}` :
           cr.id === 'onibus' ? `<button class="btn btn-sm btn-ghost" style="width:100%;margin-top:.3rem" onclick="window.escolherCarro('onibus','vista')">Usar</button>` :
           `<div style="display:flex;flex-direction:column;gap:.2rem;margin-top:.3rem">
             ${(j.dinheiro||0)>=cr.v?`<button class="btn btn-sm btn-sec" style="width:100%;font-size:.6rem" onclick="window.escolherCarro('${cr.id}','vista')">À vista ${fmt(cr.v)}</button>`:''}
