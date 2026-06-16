@@ -21,7 +21,7 @@ const ZONAS = {
 };
 
 const MORADIAS = [
-  {id:'pais',         l:'Casa dos pais',            bairro:'—',                zona:'norte',    i:'👨‍👩‍👦', v:0,       rep_al:-3,  rep_cp:-3,  perigo:0, pais:true},
+  {id:'pais',         l:'Casa dos pais',            bairro:'—',                zona:'norte',    i:'👨‍👩‍👦', v:0,       rep_al:0,   rep_cp:0,   perigo:0, pais:true},
   // Zona Sul
   {id:'ipanema',      l:'Apto em Ipanema',           bairro:'Ipanema',          zona:'sul',      i:'🏖️', v:2500000, rep_al:14,  rep_cp:38,  perigo:0},
   {id:'leblon',       l:'Apto em Leblon',            bairro:'Leblon',           zona:'sul',      i:'🏖️', v:3000000, rep_al:15,  rep_cp:40,  perigo:0},
@@ -155,7 +155,7 @@ window.renderPatrimonio = function(j, el) {
   // Coworking só cobra se for solo
   const despEsc  = (!j.escritorio_empregado_id || j.escritorio_id === 'solo') ? (esc?.cm || 0) : 0;
   const despCar  = car?.cm || 0;
-  const despAlug = comprada ? 0 : calcAluguel(mor.v||0);
+  const despAlug = (morId === 'pais' || comprada) ? 0 : calcAluguel(mor?.v||0);
   const despFin  = Object.values(fins).reduce((s,f)=>s+(f.parcelas_restantes>0?f.parcela_mensal:0),0);
   const despEst  = (j.estagiarios||[]).length * 1700;
   const despTotal = despEsc+despCar+despAlug+despFin+despEst+deslocamento;
@@ -190,9 +190,9 @@ window.renderPatrimonio = function(j, el) {
           <div class="pc-nome">${m.l}</div>
           <div class="pc-det">${m.bairro}<br>${ZONAS[m.zona]?.l||m.zona}</div>
           ${m.v>0?`<div class="pc-det">${fmt(m.v)}</div>`:''}
-          ${!m.pais?`<div class="pc-det" style="color:#ffa726">Aluguel: ${fmt(alug)}/mês</div>`:''}
-          <div class="pc-rep" style="color:${m.rep_al<0?'var(--verm3)':'var(--ouro2)'}">
-            Rep: ${m.rep_al>=0?'+':''}${m.rep_al} alug · +${m.rep_cp} próprio
+          ${!m.pais?`<div class="pc-det" style="color:var(--amber)">Aluguel: ${fmt(alug)}/mês</div>`:''}
+          <div class="pc-rep" style="color:${m.pais?'var(--verm2)':m.rep_al<0?'var(--verm2)':'var(--ouro2)'}">
+            ${m.pais?'⚠️ -2 rep/mês se Júnior+':'Rep: '+(m.rep_al>=0?'+':'')+m.rep_al+' alug · +'+m.rep_cp+' próprio'}
           </div>
           ${m.perigo===2?`<div style="font-size:.6rem;color:var(--verm3)">⚠️ Bairro perigoso</div>`:
             m.perigo===1?`<div style="font-size:.6rem;color:#ffa726">⚡ Risco médio</div>`:''}
@@ -212,185 +212,52 @@ window.renderPatrimonio = function(j, el) {
       ${CARROS.map(cr => {
         const isAt = cr.id === carId;
         const fin  = fins[cr.id];
-        const p36  = cr.v > 0 ? Math.ceil(cr.v / 36 * 1.35) : 0;
-        const p48  = cr.v > 0 ? Math.ceil(cr.v / 48 * 1.35) : 0;
-
-        return `
-        <div class="pat-card ${isAt ? 'ativo' : ''}">
+        const p36  = cr.v>0 ? Math.ceil(cr.v/36*1.35) : 0;
+        const p48  = cr.v>0 ? Math.ceil(cr.v/48*1.35) : 0;
+        return `<div class="pat-card ${isAt?'ativo':''}">
           <div class="pc-icon">${cr.i}</div>
           <div class="pc-nome">${cr.l}</div>
           <div class="pc-det">${cr.desc}</div>
-
-          ${cr.v > 0 ? `<div class="pc-det">${fmt(cr.v)}</div>` : ''}
-
-          <div class="pc-det" style="color:#ffa726">
-            ${fmt(cr.cm)}/mês
-          </div>
-
-          <div class="pc-rep">
-            Rep: ${cr.rep >= 0 ? '+' : ''}${cr.rep}
-          </div>
-
-          ${
-            isAt
-              ? `
-                <div class="pc-ativo">
-                  ✓ Seu veículo
-                  ${
-                    fin && fin.parcelas_restantes > 0
-                      ? `
-                        <br>
-                        <span style="font-size:.6rem;color:var(--amber)">
-                          ${fin.parcelas_restantes}× restantes
-                        </span>
-                      `
-                      : ''
-                  }
-                </div>
-
-                ${
-                  fin && fin.parcelas_restantes > 0
-                    ? `
-                      <button
-                        style="font-size:.58rem;margin-top:.3rem;background:var(--verm-bg);border:1px solid var(--verm3);color:var(--verm2);padding:.25rem .5rem;border-radius:3px;cursor:pointer;width:100%"
-                        onclick="window.devolverCarro('${cr.id}')"
-                      >
-                        ↩ Devolver carro (50% de volta)
-                      </button>
-                    `
-                    : ''
-                }
-              `
-              : cr.id === 'onibus'
-                ? `
-                  <button
-                    class="btn btn-sm btn-ghost"
-                    style="width:100%;margin-top:.3rem"
-                    onclick="window.escolherCarro('onibus','vista')"
-                  >
-                    Usar
-                  </button>
-                `
-                : `
-                  <div style="display:flex;flex-direction:column;gap:.2rem;margin-top:.3rem">
-
-                    ${
-                      (j.dinheiro || 0) >= cr.v
-                        ? `
-                          <button
-                            class="btn btn-sm btn-sec"
-                            style="width:100%;font-size:.6rem"
-                            onclick="window.escolherCarro('${cr.id}','vista')"
-                          >
-                            À vista ${fmt(cr.v)}
-                          </button>
-                        `
-                        : ''
-                    }
-
-                    ${
-                      !j.no_serasa
-                        ? `
-                          <button
-                            class="btn btn-sm btn-ghost"
-                            style="width:100%;font-size:.6rem"
-                            onclick="window.escolherCarro('${cr.id}','fin36')"
-                          >
-                            36× ${fmt(p36)}/mês
-                          </button>
-
-                          <button
-                            class="btn btn-sm btn-ghost"
-                            style="width:100%;font-size:.6rem"
-                            onclick="window.escolherCarro('${cr.id}','fin48')"
-                          >
-                            48× ${fmt(p48)}/mês
-                          </button>
-                        `
-                        : `
-                          <div style="font-size:.6rem;color:var(--verm3)">
-                            Financiamento bloqueado (Serasa)
-                          </div>
-                        `
-                    }
-
-                  </div>
-                `
-          }
-
-        </div>
-        `;
+          ${cr.v>0?`<div class="pc-det">${fmt(cr.v)}</div>`:''}
+          <div class="pc-det" style="color:#ffa726">${fmt(cr.cm)}/mês</div>
+          <div class="pc-rep">Rep: ${cr.rep>=0?'+':''}${cr.rep}</div>
+          ${isAt ? `<div class="pc-ativo">✓ Seu veículo${fin&&fin.parcelas_restantes>0?`<br><span style="font-size:.6rem;color:var(--amber)">${fin.parcelas_restantes}× restantes</span>`:''}</div>`
+          ${fin&&fin.parcelas_restantes>0?`<button style="font-size:.58rem;margin-top:.3rem;background:var(--verm-bg);border:1px solid var(--verm3);color:var(--verm2);padding:.25rem .5rem;border-radius:3px;cursor:pointer;width:100%" onclick="window.devolverCarro('${cr.id}')">↩ Devolver carro (50% de volta)</button>`:''} :
+          cr.id === 'onibus' ? `<button class="btn btn-sm btn-ghost" style="width:100%;margin-top:.3rem" onclick="window.escolherCarro('onibus','vista')">Usar</button>` :
+          `<div style="display:flex;flex-direction:column;gap:.2rem;margin-top:.3rem">
+            ${(j.dinheiro||0)>=cr.v?`<button class="btn btn-sm btn-sec" style="width:100%;font-size:.6rem" onclick="window.escolherCarro('${cr.id}','vista')">À vista ${fmt(cr.v)}</button>`:''}
+            ${!(j.no_serasa)?`<button class="btn btn-sm btn-ghost" style="width:100%;font-size:.6rem" onclick="window.escolherCarro('${cr.id}','fin36')">36× ${fmt(p36)}/mês</button>
+            <button class="btn btn-sm btn-ghost" style="width:100%;font-size:.6rem" onclick="window.escolherCarro('${cr.id}','fin48')">48× ${fmt(p48)}/mês</button>`:'<div style="font-size:.6rem;color:var(--verm3)">Financiamento bloqueado (Serasa)</div>'}
+          </div>`}
+        </div>`;
       }).join('')}
     </div>
-    <!-- ESCRITÓRIO PESSOAL -->
-    <!-- ESCRITÓRIO PESSOAL -->
-    <div class="secao-header">
-      <div class="secao-titulo">💼 Espaço de Trabalho</div>
-    </div>
 
+    <!-- ESCRITÓRIO PESSOAL -->
+    <div class="secao-header"><div class="secao-titulo">💼 Espaço de Trabalho</div></div>
     ${j.escritorio_empregado_id && j.escritorio_id !== 'solo'
       ? `<div class="card" style="background:var(--verde-bg);border:1px solid var(--verde3)">
-           <div style="font-size:.8rem;color:var(--verde);font-weight:600">
-             ✅ Você trabalha em ${j.escritorio_nome || 'escritório'}
-           </div>
-           <div style="font-size:.72rem;color:var(--txt3);margin-top:.2rem">
-             Sem custo de espaço — o escritório cobre sua estrutura.
-           </div>
+           <div style="font-size:.8rem;color:var(--verde);font-weight:600">✅ Você trabalha em ${j.escritorio_nome||'escritório'}</div>
+           <div style="font-size:.72rem;color:var(--txt3);margin-top:.2rem">Sem custo de espaço — o escritório cobre sua estrutura.</div>
          </div>`
       : `<div class="grid-cards">
-           ${ESC_PAT
-             .filter(e => e.id !== 'cw' || j.escritorio_id === 'solo' || !j.escritorio_empregado_id)
-             .map(e => {
-               const isAt = e.id === escId;
-
-               const repTxt =
-                 e.rep > 0
-                   ? '+' + e.rep + ' rep/mês'
-                   : e.rep < 0
-                     ? e.rep + ' rep/mês'
-                     : 'Neutro';
-
-               const repCor =
-                 e.rep > 0
-                   ? 'var(--verde2)'
-                   : e.rep < 0
-                     ? 'var(--verm2)'
-                     : 'var(--txt4)';
-
-               return `
-                 <div class="pat-card ${isAt ? 'ativo' : ''}">
-                   <div class="pc-icon">${e.i}</div>
-                   <div class="pc-nome">${e.l}</div>
-
-                   <div class="pc-det" style="color:var(--amber)">
-                     ${e.cm > 0 ? fmt(e.cm) + '/mês' : 'Gratuito'}
-                   </div>
-
-                   <div class="pc-rep" style="color:${repCor}">
-                     ${repTxt}
-                   </div>
-
-                   <div class="pc-det" style="font-size:.6rem">
-                     ${e.desc || ''}
-                   </div>
-
-                   ${isAt
-                     ? `<div class="pc-ativo">✓ Atual</div>`
-                     : `<button
-                          class="btn btn-sm btn-ghost"
-                          style="width:100%;margin-top:.3rem"
-                          onclick="window.escolherEscritorioPat('${e.id}')">
-                          Escolher
-                        </button>`
-                   }
-                 </div>
-               `;
-             })
-             .join('')}
-         </div>`
-    }
-  `;
+           ${ESC_PAT.filter(e => e.id !== 'cw' || j.escritorio_id === 'solo' || !j.escritorio_empregado_id).map(e=>{
+             const isAt = e.id === escId;
+             const repTxt = e.rep > 0 ? \`+\${e.rep} rep/mês\` : e.rep < 0 ? \`\${e.rep} rep/mês\` : 'Neutro';
+             const repCor = e.rep > 0 ? 'var(--verde2)' : e.rep < 0 ? 'var(--verm2)' : 'var(--txt4)';
+             return \`<div class="pat-card \${isAt?'ativo':''}">
+               <div class="pc-icon">\${e.i}</div>
+               <div class="pc-nome">\${e.l}</div>
+               <div class="pc-det" style="color:var(--amber)">\${e.cm > 0 ? fmt(e.cm)+'/mês' : 'Gratuito'}</div>
+               <div class="pc-rep" style="color:\${repCor}">\${repTxt}</div>
+               <div class="pc-det" style="font-size:.6rem">\${e.desc||''}</div>
+               \${isAt ? \`<div class="pc-ativo">✓ Atual</div>\` :
+               \`<button class="btn btn-sm btn-ghost" style="width:100%;margin-top:.3rem" onclick="window.escolherEscritorioPat('\${e.id}')">Escolher</button>\`}
+             </div>\`;
+           }).join('')}
+         </div>`}`;
 };
+
 // ════════════════════════════════════════════════════════
 // AÇÕES
 // ════════════════════════════════════════════════════════
