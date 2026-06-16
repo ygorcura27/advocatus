@@ -252,7 +252,7 @@ const FB_CONFIG = {
   messagingSenderId: "527755299061",
   appId:             "1:527755299061:web:cc75b6f9912d13a44a5dbc",
 };
-const app       = initializeApp(FB);
+const app       = initializeApp(FB_CONFIG);
 const auth      = getAuth(app);
 const db        = getFirestore(app);
 const functions = getFunctions(app, 'southamerica-east1');
