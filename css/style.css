@@ -660,6 +660,14 @@ a:hover { color: var(--navy); }
    RESPONSIVE
    ═══════════════════════════════════════════════════════════ */
 /* ═══════════════════════════════════════════════════════════
+   ELEMENTOS MOBILE-ONLY — ocultos por padrão no desktop
+   ═══════════════════════════════════════════════════════════ */
+.hamburger           { display: none; }
+.sidebar-overlay     { display: none; }
+.bloco-energia-mobile{ display: none; }
+.bottom-nav          { display: none; }
+
+/* ═══════════════════════════════════════════════════════════
    RESPONSIVE — TABLET E MOBILE
    ═══════════════════════════════════════════════════════════ */
 
@@ -684,8 +692,9 @@ a:hover { color: var(--navy); }
     margin-top: var(--topbar-h);
   }
 
-  /* Sidebar vira drawer lateral */
+  /* Sidebar vira drawer lateral — SEMPRE VISÍVEL mas fora da tela */
   .sidebar-left {
+    display: block !important; /* sobrescreve qualquer display:none */
     position: fixed;
     top: 0; left: 0;
     width: 280px;
@@ -722,6 +731,11 @@ a:hover { color: var(--navy); }
   .topbar-nome { display: none; }
   .server-clock .tick { display: none; }
   .server-clock .data-jogo { font-size: .78rem; }
+
+  /* Mostrar elementos mobile */
+  .bloco-energia-mobile { display: flex; }
+  .bottom-nav           { display: flex; }
+  .hamburger            { display: flex; }
 
   /* Hamburger */
   .hamburger {
@@ -854,10 +868,4 @@ a:hover { color: var(--navy); }
   .main-content { padding-bottom: 120px; }
 }
 
-/* Hamburger escondido no desktop */
-@media (min-width: 641px) {
-  .hamburger { display: none; }
-  .sidebar-overlay { display: none !important; }
-  .bloco-energia-mobile { display: none !important; }
-  .bottom-nav { display: none !important; }
-}
+/* display:none para elementos mobile-only já definido acima (regra padrão) */
