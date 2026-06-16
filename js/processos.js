@@ -115,6 +115,12 @@ window.iniciarFluxo = async function(procId) {
   const p = snap.data();
   _estado = { procId, proc: p, fase: 'peca' };
 
+  // Peça só é escolhida UMA VEZ por processo — nas ações seguintes vai direto
+  if (p.peca_escolhida) {
+    _iniciarEscolhaAcao(procId, p);
+    return;
+  }
+
   const pecas = getPecasParaCaso(p.tipo, p.area || 'civil', p.instancia || 1);
   if (!pecas) { _iniciarEscolhaAcao(procId, p); return; }
 
@@ -155,8 +161,8 @@ window.responderPeca = async function(idx) {
   });
 
   if (op.tipo === 'correta') {
-    // ✅ Acertou — +10% chance, prossegue
-    await updateDoc(doc(db, 'processos', procId), { chance_sucesso: Math.min(95, cs + 10) });
+    // ✅ Acertou — +10% chance, prossegue. Marca peça como escolhida.
+    await updateDoc(doc(db, 'processos', procId), { chance_sucesso: Math.min(95, cs + 10), peca_escolhida: true });
     _estado.proc = { ...proc, chance_sucesso: Math.min(95, cs + 10) };
 
     const feedback = document.createElement('div');
@@ -175,8 +181,8 @@ window.responderPeca = async function(idx) {
     document.querySelector('.modal-body').appendChild(btn);
 
   } else if (op.tipo === 'parcial') {
-    // ⚠️ Parcial — -5% chance, prossegue
-    await updateDoc(doc(db, 'processos', procId), { chance_sucesso: Math.max(5, cs - 5) });
+    // ⚠️ Parcial — -5% chance, prossegue. Marca peça como escolhida.
+    await updateDoc(doc(db, 'processos', procId), { chance_sucesso: Math.max(5, cs - 5), peca_escolhida: true });
     _estado.proc = { ...proc, chance_sucesso: Math.max(5, cs - 5) };
 
     const feedback = document.createElement('div');
