@@ -246,7 +246,7 @@ window.renderPatrimonio = function(j, el) {
              const repCor = e.rep > 0 ? 'var(--verde2)' : e.rep < 0 ? 'var(--verm2)' : 'var(--txt4)';
              const btnHtml = isAt
                ? '<div class="pc-ativo">✓ Atual</div>'
-               : '<button class="btn btn-sm btn-ghost" style="width:100%;margin-top:.3rem" onclick="window.escolherEscritorioPat('${e.id}')">Escolher</button>';
+               : '<button class="btn btn-sm btn-ghost" style="width:100%;margin-top:.3rem" onclick="window.escolherEscritorioPat(\'' + e.id + '\')">Escolher</button>';
              return '<div class="pat-card ' + (isAt?'ativo':'') + '">' +
                '<div class="pc-icon">' + e.i + '</div>' +
                '<div class="pc-nome">' + e.l + '</div>' +
