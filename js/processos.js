@@ -551,13 +551,13 @@ function _gerarProcesso(j) {
 
   // Valor por cargo
   const RANGES = {
-    est:{min:0,max:0,dniv:0}, ass:{min:0,max:0,dniv:0},
-    jnr:{min:1000,max:20000,dniv:1},
-    pln:{min:20000,max:200000,dniv:11},
-    snr:{min:200000,max:10000000,dniv:21},
+    est:{min:1000,max:10000,dniv:1}, ass:{min:1000,max:10000,dniv:1},
+    jnr:{min:2500,max:20000,dniv:1},
+    pln:{min:20000,max:150000,dniv:11},
+    snr:{min:150000,max:500000,dniv:21},
     asc:{min:200000,max:10000000,dniv:21},
-    soc:{min:200000,max:10000000,dniv:21},
-    snm:{min:200000,max:10000000,dniv:21},
+    soc:{min:250000,max:10000000,dniv:21},
+    snm:{min:500000,max:100000000,dniv:21},
   };
   const range = RANGES[cargoId] || RANGES.jnr;
   const valor = range.min + Math.floor(Math.random() * (range.max - range.min));
