@@ -129,7 +129,7 @@ exports.convidarSocio = onCall({ region: 'southamerica-east1' }, async (request)
   'ass',
   'jnr',
   'pln',
-  'snr'
+  'snr',
   'asc'
 ];
 
