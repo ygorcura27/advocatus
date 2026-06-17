@@ -72,6 +72,9 @@ export function renderBlocoFinancas(esc, j) {
   `;
 }
 
+// Expor globalmente para ser usado pelo ui-main.js sem import direto
+window.renderBlocoFinancas = renderBlocoFinancas;
+
 // ════════════════════════════════════════════════════════
 // APORTAR CAPITAL (via Cloud Function)
 // ════════════════════════════════════════════════════════
