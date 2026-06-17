@@ -288,81 +288,49 @@ window.iniciarQuiz = async function(procId, acaoId) {
   const a   = ACOES[acaoId];
   if (!a) return;
 
-// Verificar e gastar energia
-const usado = j.energia_usada_mes || 0;
-const disp  = Math.max(
-  0,
-  (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - usado
-);
+  // Verificar e gastar energia
+  const usado = j.energia_usada_mes || 0;
+  const disp  = Math.max(0, (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - usado);
+  if (disp < a.energia) { toast(`⚡ Energia insuficiente (requer ${a.energia}).`, 'ko'); return; }
 
-if (disp < a.energia) {
-  toast(`⚡ Energia insuficiente (requer ${a.energia}).`, 'ko');
-  return;
-}
-
-try {
-  console.log('UID JOGADOR:', uid);
-
+  // Debitar energia imediatamente
   await updateDoc(doc(db, 'jogadores', uid), {
     energia_usada_mes: usado + a.energia,
   });
 
-  console.log('ENERGIA OK');
-
-} catch (err) {
-  console.error('ERRO UPDATE JOGADOR:', err);
-  toast('Erro ao atualizar energia.', 'ko');
-  return;
-}
-
-// Buscar processo atualizado
-let p = _estado?.proc || {};
-
-try {
-  console.log('=== DEBUG QUIZ ===');
-  console.log('procId:', procId);
-  console.log('db:', db);
-  console.log('window.FB_DB:', window.FB_DB);
-  console.log('window.FB_AUTH:', window.FB_AUTH);
-  console.log('window.JOGADOR:', window.JOGADOR);
-
+  // Buscar processo atualizado
   const snap = await getDoc(doc(db, 'processos', procId));
+  const p    = snap.exists() ? snap.data() : _estado?.proc || {};
 
-  console.log('SNAP EXISTS:', snap.exists());
+  const area    = p.area || j?.especialidade || 'civil';
+  const questoes = getQuestoes(area, 3);
 
-  if (snap.exists()) {
-    p = snap.data();
-    console.log('PROCESSO:', p);
-  } else {
-    console.warn('Processo não encontrado:', procId);
-  }
+  _estado = { procId, proc: p, acaoId, fase: 'quiz', questoes, qi: 0, acertos: 0 };
+  _renderQuizQ();
+};
 
-} catch (err) {
-  console.error('ERRO GETDOC PROCESSO:', err);
+function _renderQuizQ() {
+  const { questoes, qi, acaoId } = _estado;
+  const q  = questoes[qi];
+  const a  = ACOES[acaoId];
 
-  toast(
-    `Erro ao carregar processo: ${err.message || err}`,
-    'ko'
+  abrirModal(
+    `${a.l} — Questão ${qi + 1}/3`,
+    `<div class="quiz-wrap">
+      <div class="quiz-header">${a.l} · ${qi + 1}/3 · ${a.skills.join(' + ')}</div>
+      <div class="quiz-prog-bar">
+        <div class="quiz-prog-fill" style="width:${qi / 3 * 100}%"></div>
+      </div>
+      <div class="quiz-questao">${q.q}</div>
+      <div class="quiz-opts">
+        ${q.opts.map((op, i) =>
+          `<button class="quiz-opt" onclick="window.responderQuiz(${i})">${op}</button>`
+        ).join('')}
+      </div>
+    </div>`
   );
-
-  return;
 }
 
-const area = p.area || j?.especialidade || 'civil';
-const questoes = getQuestoes(area, 3);
-
-_estado = {
-  procId,
-  proc: p,
-  acaoId,
-  fase: 'quiz',
-  questoes,
-  qi: 0,
-  acertos: 0
-};
-
-_renderQuizQ();
-};
 window.responderQuiz = function(idx) {
   const { questoes, qi } = _estado;
   const q     = questoes[qi];
