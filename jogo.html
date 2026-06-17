@@ -305,6 +305,8 @@
   import './js/avancar_mes.js';
   import './js/escritorios_npc.js';
   import './js/equipe.js';
+  import './js/relacionamento_dados.js';
+  import './js/relacionamento.js';
   import './js/vagas.js';
   import './js/auth.js';
   import './js/gamestate.js';
@@ -324,7 +326,7 @@ window.avancarMes = async function(forcar) {
   if (!j) { window.toast && window.toast('Carregando... tente novamente.', 'ko'); return; }
 
   const usado      = j.energia_usada_mes || 0;
-  const disponivel = Math.max(0, 100 - usado);
+  const disponivel = Math.max(0, (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - usado);
   // Sem bloqueio — o jogador pode avançar quando quiser
   // O botão fica em destaque quando disponivel <= 5 (energia quase esgotada)
 
@@ -466,7 +468,7 @@ window.addEventListener('jogador:update', (e) => {
   const j    = e.detail;
   if (!j) return;
   const usado = j.energia_usada_mes || 0;
-  const disp  = Math.max(0, 100 - usado);
+  const disp  = Math.max(0, (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - usado);
   const cor   = disp > 50 ? '#4AAB77' : disp > 20 ? '#B7791F' : '#C0392B';
 
   // ── Barra de energia mobile ──
