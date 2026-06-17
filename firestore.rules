@@ -79,6 +79,22 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['lida', 'lida_em']);
         allow delete: if isOwner(uid);
       }
+
+      // ── Subcoleção: relacionamentos ──
+      match /relacionamentos/{relId} {
+        allow read:   if isOwner(uid);
+        allow create: if isOwner(uid);
+        allow update: if isOwner(uid);
+        allow delete: if isOwner(uid);
+      }
+
+      // ── Subcoleção: filhos ──
+      match /filhos/{filhoId} {
+        allow read:   if isOwner(uid);
+        allow create: if isOwner(uid);
+        allow update: if isOwner(uid);
+        allow delete: if isOwner(uid);
+      }
     }
 
     // ══════════════════════════════════════════════════════
@@ -120,19 +136,25 @@ service cloud.firestore {
       // Leitura pública (para rankings e busca)
       allow read: if isAuth();
 
-      // Criação: qualquer advogado autenticado pode criar
+      // Criação: advogado autenticado pode criar seu próprio escritório
       allow create: if isAuth()
-        && request.resource.data.fundador_uid == request.auth.uid
-        && request.resource.data.nivel == 1
-        && request.resource.data.caixa == 0;
+        && request.resource.data.dono_uid == request.auth.uid;
 
-      // Update: apenas sócios
+      // Update: apenas o dono ou sócios
       allow update: if isAuth()
-        && request.auth.uid in resource.data.socios_uids
-        // Fundador não pode ser removido
-        && resource.data.fundador_uid in request.resource.data.socios_uids
-        // Nível só pode crescer
-        && request.resource.data.nivel >= resource.data.nivel;
+        && (resource.data.dono_uid == request.auth.uid
+            || request.auth.uid in resource.data.socios);
+
+      // Subcoleção: funcionários
+      match /funcionarios/{funcId} {
+        allow read:   if isAuth();
+        allow create: if isAuth()
+          && get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid;
+        allow update: if isAuth()
+          && get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid;
+        allow delete: if isAuth()
+          && get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid;
+      }
 
       allow delete: if false;
     }
