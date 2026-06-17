@@ -136,7 +136,7 @@ function renderPerfil(j, el) {
     <!-- Feed de atividade recente -->
     <div class="secao-header">
       <div class="secao-titulo">📋 Atividade Recente</div>
-      <span class="secao-badge">${s.mes_nome||'Janeiro'}, Ano ${s.ano_jogo||1}</span>
+      <span class="secao-badge">${_calJogador(j)}</span>
     </div>
     <div id="feed-atividade">
       <div style="font-size:.78rem;color:var(--ardosia);padding:.5rem 0">Carregando feed...</div>
@@ -176,7 +176,7 @@ async function _carregarFeedAtividade(uid) {
           <div class="activity-text">
             <b>${m.assunto || '—'}</b><br>
             ${(m.corpo||'').slice(0,120)}${m.corpo?.length>120?'…':''}
-            <span class="activity-date">${_formatarData(m.criado_em)}</span>
+            <span class="activity-date">${m.mes_jogo_label || _formatarData(m.criado_em)}</span>
           </div>
         </div>`;
       }).join('') + '</div>';
@@ -302,7 +302,7 @@ function _cardProcessoEnc(id, p) {
 // ESCRITÓRIO
 // ════════════════════════════════════════════════════════
 function renderEscritorio(j, el) {
-  const isSolo  = !j.escritorio_proprio_id && j.escritorio_id === 'solo';
+  const isSolo  = !j.escritorio_proprio_id && (!j.escritorio_empregado_id || j.escritorio_id === 'solo' || !j.escritorio_id);
   const escNome = j.escritorio_nome || 'Advocacia Solo';
 
   // Se está num escritório NPC, mostrar detalhes completos
@@ -855,6 +855,17 @@ function _formatarData(iso) {
     const d = new Date(iso);
     return d.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric' });
   } catch (_) { return iso; }
+}
+
+// Retorna o mês do jogo do jogador no formato "Março, Ano 2"
+function _calJogador(j) {
+  const MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                    'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  if (j && j.mes_pessoal !== undefined && j.ano_pessoal !== undefined) {
+    return MESES_PT[j.mes_pessoal] + ', Ano ' + j.ano_pessoal;
+  }
+  const s = window.SERVER || {};
+  return (s.mes_nome || 'Janeiro') + ', Ano ' + (s.ano_jogo || 1);
 }
 
 function fmt(n) {
