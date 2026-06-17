@@ -849,6 +849,129 @@ function _vagaLabel(v) {
   return MAP[v] || v || '—';
 }
 
+// ════════════════════════════════════════════════════════
+// CRIAR ESCRITÓRIO PRÓPRIO
+// ════════════════════════════════════════════════════════
+window.criarEscritorio = async function() {
+  const j   = window.JOGADOR;
+  const uid = j?.uid || window.JOGADOR_UID;
+  if (!j) return;
+
+  // Verificar requisitos
+  const CARGO_OK = ['jnr','pln','snr','asc','soc','snm'];
+  if (!j.oab) {
+    toast('❌ Você precisa ter a OAB aprovada.', 'ko');
+    return;
+  }
+  if (!CARGO_OK.includes(j.cargo_id)) {
+    toast('❌ Requer Advogado Júnior ou superior.', 'ko');
+    return;
+  }
+  if ((j.dinheiro || 0) < 5000) {
+    toast('❌ Capital mínimo: R$ 5.000 para abrir o escritório.', 'ko');
+    return;
+  }
+
+  abrirModal('🏛️ Criar Escritório Próprio',
+    `<div style="margin-bottom:1rem;font-size:.82rem;color:var(--txt2);line-height:1.7">
+      Você está prestes a abrir seu próprio escritório de advocacia.<br>
+      Como advogado solo, você recebe <b>30% do valor da causa + sucumbência</b> por instância.
+    </div>
+    <div class="campo">
+      <label>Nome do escritório</label>
+      <input type="text" id="esc-nome-input" placeholder="Ex: Cavalcante Advogados" maxlength="60"
+        value="${j.nome_personagem ? j.nome_personagem + ' Advogados' : ''}">
+    </div>
+    <div class="campo">
+      <label>Especialização principal</label>
+      <select id="esc-esp-input">
+        <option value="tributario">Tributário</option>
+        <option value="trabalhista">Trabalhista</option>
+        <option value="civil">Civil</option>
+        <option value="criminal">Criminal</option>
+        <option value="empresarial">Empresarial</option>
+        <option value="previdenciario">Previdenciário</option>
+      </select>
+    </div>
+    <div style="background:var(--surface2);border:var(--borda-sub);border-radius:var(--r);padding:.7rem;font-size:.75rem;color:var(--txt3);line-height:1.8;margin-bottom:.8rem">
+      💰 Capital inicial: <b style="color:var(--verm2)">-R$ 5.000</b><br>
+      📍 Bairro: Centro (pode mudar depois)<br>
+      ⚖️ Tipo: Escritório Individual
+    </div>
+    <div style="display:flex;gap:.5rem">
+      <button class="btn btn-ghost" style="flex:1" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-prim" style="flex:1" onclick="window._confirmarCriarEscritorio()">Abrir escritório →</button>
+    </div>`
+  );
+
+  // Pré-selecionar especialização do jogador
+  setTimeout(() => {
+    const sel = document.getElementById('esc-esp-input');
+    if (sel && j.especialidade) sel.value = j.especialidade;
+  }, 100);
+};
+
+window._confirmarCriarEscritorio = async function() {
+  const j   = window.JOGADOR;
+  const uid = j?.uid || window.JOGADOR_UID;
+
+  const nome = document.getElementById('esc-nome-input')?.value?.trim();
+  const esp  = document.getElementById('esc-esp-input')?.value;
+
+  if (!nome || nome.length < 3) {
+    toast('Digite um nome para o escritório (mínimo 3 caracteres).', 'ko');
+    return;
+  }
+
+  const escId = 'esc_' + uid + '_' + Date.now();
+
+  try {
+    const { doc, setDoc, updateDoc, collection } =
+      await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+    const { db } = await import('./firebase-init.js');
+
+    // Criar documento do escritório
+    await setDoc(doc(db, 'escritorios', escId), {
+      id:          escId,
+      nome,
+      especialidade: esp,
+      dono_uid:    uid,
+      dono_nome:   j.nome_personagem || 'Advogado',
+      tier:        1,
+      bairro:      'Centro',
+      zona:        'centro',
+      prestígio:   10,
+      socios:      [uid],
+      funcionarios:[],
+      criado_mes:  j.mes_pessoal || 0,
+      criado_ano:  j.ano_pessoal || 1,
+      status:      'ativo',
+    });
+
+    // Atualizar jogador
+    await updateDoc(doc(db, 'jogadores', uid), {
+      escritorio_proprio_id:   escId,
+      escritorio_id:           escId,
+      escritorio_nome:         nome,
+      escritorio_empregado_id: null,
+      escritorio_tier:         1,
+      escritorio_esp:          esp,
+      escritorio_bairro:       'Centro',
+      dinheiro:                (j.dinheiro || 0) - 5000,
+    });
+
+    fecharModal();
+    toast(`🏛️ ${nome} aberto! Capital inicial investido: R$ 5.000`, 'ok', 5000);
+
+    // Recarregar painel
+    setTimeout(() => window.navTo && window.navTo('escritorio', null), 800);
+
+  } catch (err) {
+    console.error('[CRIAR ESCRITÓRIO]', err);
+    toast('Erro ao criar escritório: ' + (err.message || 'tente novamente'), 'ko');
+  }
+};
+
 function _formatarData(iso) {
   if (!iso) return '—';
   try {
