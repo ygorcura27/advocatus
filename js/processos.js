@@ -288,17 +288,34 @@ window.iniciarQuiz = async function(procId, acaoId) {
   const a   = ACOES[acaoId];
   if (!a) return;
 
-  // Verificar e gastar energia
-  const usado = j.energia_usada_mes || 0;
-  const disp  = Math.max(0, (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - usado);
-  if (disp < a.energia) { toast(`⚡ Energia insuficiente (requer ${a.energia}).`, 'ko'); return; }
+// Verificar e gastar energia
+const usado = j.energia_usada_mes || 0;
+const disp  = Math.max(
+  0,
+  (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - usado
+);
 
-  // Debitar energia imediatamente
+if (disp < a.energia) {
+  toast(`⚡ Energia insuficiente (requer ${a.energia}).`, 'ko');
+  return;
+}
+
+try {
+  console.log('UID JOGADOR:', uid);
+
   await updateDoc(doc(db, 'jogadores', uid), {
     energia_usada_mes: usado + a.energia,
   });
 
-  // Buscar processo atualizado
+  console.log('ENERGIA OK');
+
+} catch (err) {
+  console.error('ERRO UPDATE JOGADOR:', err);
+  toast('Erro ao atualizar energia.', 'ko');
+  return;
+}
+
+// Buscar processo atualizado
 let p = _estado?.proc || {};
 
 try {
