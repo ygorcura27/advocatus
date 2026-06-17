@@ -356,8 +356,15 @@ window._confirmarDesignar = async function(funcId, procId, escId) {
   const chance  = Math.min(85, 35 + bonus); // nunca > 85% de acerto total
   const sucesso = Math.random() * 100 < chance;
 
+  // Progresso por cargo — escalonado para ser relevante
+  const PROG_SUCESSO = { est:35, ass:45, jnr:55, pln:65, snr:75 };
+  const PROG_FALHA   = { est:15, ass:20, jnr:25, pln:30, snr:35 };
+  const ganhoP = sucesso
+    ? (PROG_SUCESSO[f.cargo_id] || 35)
+    : (PROG_FALHA[f.cargo_id]   || 15);
+
   const progressoAtual = p.progresso || 0;
-  const progressoAlvo  = Math.min(90, progressoAtual + (sucesso ? 25 : 10));
+  const progressoAlvo  = Math.min(90, progressoAtual + ganhoP);
   const chegou90       = progressoAlvo >= 90;
 
   // Atualizar processo
