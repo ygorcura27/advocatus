@@ -207,6 +207,12 @@ window.avancarMes = async function(forcar = false) {
       catch(e) { console.warn('Processar relacionamentos:', e.message); }
     }
 
+    // Processar serviços, clientes e contratos recorrentes (módulo servicos.js)
+    if (window._processarServicosMensal) {
+      try { await window._processarServicosMensal(_j); }
+      catch(e) { console.warn('Processar serviços:', e.message); }
+    }
+
     // Mostrar resumo mensal
     _mostrarResumoMensal(r);
 

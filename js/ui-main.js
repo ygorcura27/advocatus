@@ -42,6 +42,13 @@ function _renderizar() {
         main.innerHTML = '<div class="card" style="color:var(--txt3)">Carregando equipe...</div>';
       }
       break;
+    case 'clientes':
+      if (window.renderClientes) {
+        window.renderClientes(j, main);
+      } else {
+        main.innerHTML = '<div class="card" style="color:var(--txt3)">Carregando clientes...</div>';
+      }
+      break;
     case 'equipe_dummy':       renderEquipe(j, main);        break;
     case 'progressao':   renderProgressao(j, main);    break;
     case 'habilidades':  renderHabilidades(j, main);   break;
