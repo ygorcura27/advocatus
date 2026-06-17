@@ -186,6 +186,21 @@ window.avancarMes = async function(forcar = false) {
 
     if (!r.ok) throw new Error(r.msg || 'Erro desconhecido');
 
+    // Zerar ações dos funcionários do escritório próprio
+    const _j = window.JOGADOR;
+    if (_j?.escritorio_proprio_id) {
+      try {
+        const { collection: _col, getDocs: _get, updateDoc: _upd, doc: _doc } =
+          await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+        const { db: _db } = await import('./firebase-init.js');
+        const _snap = await _get(_col(_db, 'escritorios', _j.escritorio_proprio_id, 'funcionarios'));
+        await Promise.all(_snap.docs.map(d =>
+          _upd(_doc(_db, 'escritorios', _j.escritorio_proprio_id, 'funcionarios', d.id),
+            { acoes_mes_usadas: 0, acao_atual: null })
+        ));
+      } catch(e) { console.warn('Reset funcionários:', e.message); }
+    }
+
     // Mostrar resumo mensal
     _mostrarResumoMensal(r);
 
