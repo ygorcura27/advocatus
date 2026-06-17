@@ -299,37 +299,52 @@ window.iniciarQuiz = async function(procId, acaoId) {
   });
 
   // Buscar processo atualizado
+let p = _estado?.proc || {};
+
+try {
+  console.log('=== DEBUG QUIZ ===');
+  console.log('procId:', procId);
+  console.log('db:', db);
+  console.log('window.FB_DB:', window.FB_DB);
+  console.log('window.FB_AUTH:', window.FB_AUTH);
+  console.log('window.JOGADOR:', window.JOGADOR);
+
   const snap = await getDoc(doc(db, 'processos', procId));
-  const p    = snap.exists() ? snap.data() : _estado?.proc || {};
 
-  const area    = p.area || j?.especialidade || 'civil';
-  const questoes = getQuestoes(area, 3);
+  console.log('SNAP EXISTS:', snap.exists());
 
-  _estado = { procId, proc: p, acaoId, fase: 'quiz', questoes, qi: 0, acertos: 0 };
-  _renderQuizQ();
+  if (snap.exists()) {
+    p = snap.data();
+    console.log('PROCESSO:', p);
+  } else {
+    console.warn('Processo não encontrado:', procId);
+  }
+
+} catch (err) {
+  console.error('ERRO GETDOC PROCESSO:', err);
+
+  toast(
+    `Erro ao carregar processo: ${err.message || err}`,
+    'ko'
+  );
+
+  return;
+}
+
+const area = p.area || j?.especialidade || 'civil';
+const questoes = getQuestoes(area, 3);
+
+_estado = {
+  procId,
+  proc: p,
+  acaoId,
+  fase: 'quiz',
+  questoes,
+  qi: 0,
+  acertos: 0
 };
 
-function _renderQuizQ() {
-  const { questoes, qi, acaoId } = _estado;
-  const q  = questoes[qi];
-  const a  = ACOES[acaoId];
-
-  abrirModal(
-    `${a.l} — Questão ${qi + 1}/3`,
-    `<div class="quiz-wrap">
-      <div class="quiz-header">${a.l} · ${qi + 1}/3 · ${a.skills.join(' + ')}</div>
-      <div class="quiz-prog-bar">
-        <div class="quiz-prog-fill" style="width:${qi / 3 * 100}%"></div>
-      </div>
-      <div class="quiz-questao">${q.q}</div>
-      <div class="quiz-opts">
-        ${q.opts.map((op, i) =>
-          `<button class="quiz-opt" onclick="window.responderQuiz(${i})">${op}</button>`
-        ).join('')}
-      </div>
-    </div>`
-  );
-}
+_renderQuizQ();
 
 window.responderQuiz = function(idx) {
   const { questoes, qi } = _estado;
