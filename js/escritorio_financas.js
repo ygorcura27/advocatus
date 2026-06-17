@@ -23,7 +23,7 @@ export const PERDA_PRODUTIVIDADE_SEM_SALARIO = 0.25; // -25% de produtividade po
 export function renderBlocoFinancas(esc, j) {
   const caixa = esc.caixa || 0;
   const corCaixa = caixa >= 0 ? 'var(--verde2)' : 'var(--verm2)';
-  const socios = esc.socios || [{ uid: esc.dono_uid || esc.fundador_uid, participacao_pct: 100 }];
+  const socios = (esc.socios && esc.socios.length > 0) ? esc.socios : [{ uid: esc.dono_uid || esc.fundador_uid || j.uid || window.JOGADOR_UID, participacao_pct: 100 }];
   const minhaUid = j.uid || window.JOGADOR_UID;
   const meuSocio = socios.find(s => s.uid === minhaUid);
   const minhaCota = meuSocio ? meuSocio.participacao_pct : 100;
@@ -119,7 +119,7 @@ window.abrirModalDistribuirLucros = async function(escId) {
   if (!escSnap.exists()) return;
   const esc = escSnap.data();
   const caixa = esc.caixa || 0;
-  const socios = esc.socios || [{ uid: esc.dono_uid||esc.fundador_uid, participacao_pct:100 }];
+  const socios = (esc.socios && esc.socios.length > 0) ? esc.socios : [{ uid: esc.dono_uid||esc.fundador_uid||window.JOGADOR?.uid||window.JOGADOR_UID, participacao_pct:100 }];
 
   if (caixa <= 0) { toast('Caixa do escritório está zerado ou negativo.', 'ko'); return; }
 
@@ -151,7 +151,8 @@ window.abrirModalDistribuirLucros = async function(escId) {
         const s = JSON.parse(sociosJson);
         preview.innerHTML = s.map(socio => {
           const parte = Math.floor(v * socio.participacao_pct / 100);
-          const label = socio.uid === (window.JOGADOR?.uid||window.JOGADOR_UID) ? 'Você' : socio.uid.slice(0,8);
+          const socioUid = socio.uid || '—';
+          const label = socioUid === (window.JOGADOR?.uid||window.JOGADOR_UID) ? 'Você' : socioUid.slice(0, 8);
           return `<div style="display:flex;justify-content:space-between;padding:.1rem 0">
             <span>${label} (${socio.participacao_pct}%)</span><span style="font-weight:600;color:var(--verde2)">R$ ${parte.toLocaleString('pt-BR')}</span>
           </div>`;
