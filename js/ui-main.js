@@ -322,8 +322,8 @@ function renderEscritorio(j, el) {
   const isSolo  = !j.escritorio_proprio_id && (!j.escritorio_empregado_id || j.escritorio_id === 'solo' || !j.escritorio_id);
   const escNome = j.escritorio_nome || 'Advocacia Solo';
 
-  // Se está num escritório NPC, mostrar detalhes completos
-  if (!isSolo && j.escritorio_id && j.escritorio_id !== 'solo') {
+  // Se está empregado num escritório NPC (não é o dono), mostrar detalhes de empregado
+  if (!isSolo && !j.escritorio_proprio_id && j.escritorio_id && j.escritorio_id !== 'solo') {
     _renderEscritorioNPC(j, el);
     return;
   }
