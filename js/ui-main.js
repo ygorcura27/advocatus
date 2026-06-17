@@ -932,20 +932,21 @@ window._confirmarCriarEscritorio = async function() {
 
     // Criar documento do escritório
     await setDoc(doc(db, 'escritorios', escId), {
-      id:          escId,
+      id:            escId,
       nome,
       especialidade: esp,
-      dono_uid:    uid,
-      dono_nome:   j.nome_personagem || 'Advogado',
-      tier:        1,
-      bairro:      'Centro',
-      zona:        'centro',
-      prestígio:   10,
-      socios:      [uid],
-      funcionarios:[],
-      criado_mes:  j.mes_pessoal || 0,
-      criado_ano:  j.ano_pessoal || 1,
-      status:      'ativo',
+      dono_uid:      uid,
+      dono_nome:     j.nome_personagem || 'Advogado',
+      tier:          1,
+      bairro:        'Centro',
+      zona:          'centro',
+      prestigio:     10,
+      socios:        [uid],
+      socios_uids:   [uid],
+      funcionarios:  [],
+      criado_mes:    j.mes_pessoal || 0,
+      criado_ano:    j.ano_pessoal || 1,
+      status:        'ativo',
     });
 
     // Atualizar jogador
