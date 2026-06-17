@@ -467,6 +467,7 @@ async function _processarSentencaFrontend(procId) {
     const parteRecorre = cs < 70 && Math.random() < 0.55 && instancia < 4;
     await updateDoc(doc(db, 'jogadores', uid), {
       dinheiro:              (j.dinheiro||0) + hon,
+      honorarios_mes:        (j.honorarios_mes||0) + hon, // acumula pra renda do mês
       wins:                  (j.wins||0) + 1,
       wins_ano:              (j.wins_ano||0) + 1,
       reputacao:             Math.min(cap, rep + ganhoRep),
