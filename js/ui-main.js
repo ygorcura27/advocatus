@@ -35,7 +35,14 @@ function _renderizar() {
     case 'perfil':       renderPerfil(j, main);       break;
     case 'processos':    renderProcessos(j, main);     break;
     case 'escritorio':   renderEscritorio(j, main);    break;
-    case 'equipe':       renderEquipe(j, main);        break;
+    case 'equipe':
+      if (window.renderEquipe) {
+        window.renderEquipe(j, main);
+      } else {
+        main.innerHTML = '<div class="card" style="color:var(--txt3)">Carregando equipe...</div>';
+      }
+      break;
+    case 'equipe_dummy':       renderEquipe(j, main);        break;
     case 'progressao':   renderProgressao(j, main);    break;
     case 'habilidades':  renderHabilidades(j, main);   break;
     case 'cursos':       renderCursos(j, main);        break;
@@ -867,8 +874,17 @@ window.criarEscritorio = async function() {
     toast('❌ Requer Advogado Júnior ou superior.', 'ko');
     return;
   }
-  if ((j.dinheiro || 0) < 5000) {
-    toast('❌ Capital mínimo: R$ 5.000 para abrir o escritório.', 'ko');
+  if ((j.dinheiro || 0) < 15000) {
+    toast('❌ Capital mínimo: R$ 15.000 para abrir o escritório.', 'ko');
+    return;
+  }
+  const cap = (window.REP_CAP || {})[j.cargo_id] || 45;
+  if ((j.reputacao || 0) < Math.floor(cap * 0.55)) {
+    toast(`❌ Reputação mínima: ${Math.floor(cap*0.55)}/${cap} (55% do cap do cargo).`, 'ko');
+    return;
+  }
+  if ((j.anos_carreira || 0) < 1) {
+    toast('❌ Requer pelo menos 1 ano de carreira.', 'ko');
     return;
   }
 
@@ -894,9 +910,11 @@ window.criarEscritorio = async function() {
       </select>
     </div>
     <div style="background:var(--surface2);border:var(--borda-sub);border-radius:var(--r);padding:.7rem;font-size:.75rem;color:var(--txt3);line-height:1.8;margin-bottom:.8rem">
-      💰 Capital inicial: <b style="color:var(--verm2)">-R$ 5.000</b><br>
+      💰 Capital inicial: <b style="color:var(--verm2)">-R$ 15.000</b><br>
+      🏢 Custo fixo Tier 1: <b style="color:var(--verm2)">-R$ 3.500/mês</b><br>
       📍 Bairro: Centro (pode mudar depois)<br>
-      ⚖️ Tipo: Escritório Individual
+      👥 Capacidade: 1 estagiário + 1 assistente<br>
+      ⚖️ Honorários: 30% + sucumbência total
     </div>
     <div style="display:flex;gap:.5rem">
       <button class="btn btn-ghost" style="flex:1" onclick="fecharModal()">Cancelar</button>
@@ -958,7 +976,7 @@ window._confirmarCriarEscritorio = async function() {
       escritorio_tier:         1,
       escritorio_esp:          esp,
       escritorio_bairro:       'Centro',
-      dinheiro:                (j.dinheiro || 0) - 5000,
+      dinheiro:                (j.dinheiro || 0) - 15000,
     });
 
     fecharModal();
