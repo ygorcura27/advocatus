@@ -53,7 +53,10 @@ function _renderizar() {
     case 'loja':
       if (window.renderLoja) window.renderLoja(j, main);
       break;
-    case 'vida_pessoal': renderVidaPessoal(j, main);   break;
+    case 'vida_pessoal':
+      if (window.renderVidaPessoal) window.renderVidaPessoal(j, main);
+      else main.innerHTML = '<div class="card" style="color:var(--txt3)">Carregando vida pessoal...</div>';
+      break;
     case 'ranking':
       if (window.renderRanking) window.renderRanking(j, main);
       break;
@@ -582,20 +585,7 @@ function renderConcurso(j, el) {
 // ════════════════════════════════════════════════════════
 // VIDA PESSOAL
 // ════════════════════════════════════════════════════════
-function renderVidaPessoal(j, el) {
-  const ESTADO_CIVIL = { solteiro:'Solteiro(a)', namorando:'Namorando', casado:'Casado(a)', divorciado:'Divorciado(a)' };
-  el.innerHTML = `
-    <div class="secao-header"><div class="secao-titulo">👤 Vida Pessoal</div></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:1rem">
-      ${_miniStatCard('🎂','Idade',`${j.idade||22} anos`,'')}
-      ${_miniStatCard('💑','Estado civil',ESTADO_CIVIL[j.estado_civil]||'Solteiro(a)','')}
-      ${_miniStatCard('👶','Filhos',String(j.filhos||0),'')}
-      ${_miniStatCard('🌿','Geração',`${j.geracao||1}ª geração`,'')}
-    </div>
-    <div class="card" style="color:var(--ardosia2);font-size:.8rem;text-align:center;padding:1.5rem">
-      Sistema de vida pessoal em desenvolvimento. Em breve: relacionamentos, casamento, filhos e herança.
-    </div>`;
-}
+
 
 // ════════════════════════════════════════════════════════
 // INBOX

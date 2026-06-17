@@ -201,6 +201,12 @@ window.avancarMes = async function(forcar = false) {
       } catch(e) { console.warn('Reset funcionários:', e.message); }
     }
 
+    // Processar relacionamentos, academia, filhos (módulo relacionamento.js)
+    if (window._processarRelacionamentosMensal) {
+      try { await window._processarRelacionamentosMensal(_j); }
+      catch(e) { console.warn('Processar relacionamentos:', e.message); }
+    }
+
     // Mostrar resumo mensal
     _mostrarResumoMensal(r);
 

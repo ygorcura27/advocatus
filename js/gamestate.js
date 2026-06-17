@@ -111,7 +111,7 @@ function _atualizarSidebarDireita(j) {
     const el = document.getElementById('bloco-energia');
     if (el) {
       const usado = j.energia_usada_mes || 0;
-      const disp  = Math.max(0, 100 - usado);
+      const disp  = Math.max(0, (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - usado);
       const cor   = disp > 50 ? '#5A9A3A' : disp > 20 ? '#B8922A' : '#A83A3A';
       const pronto = disp <= 5;
       el.innerHTML = `

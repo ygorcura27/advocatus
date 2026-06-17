@@ -290,7 +290,7 @@ window.iniciarQuiz = async function(procId, acaoId) {
 
   // Verificar e gastar energia
   const usado = j.energia_usada_mes || 0;
-  const disp  = Math.max(0, 100 - usado);
+  const disp  = Math.max(0, (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - usado);
   if (disp < a.energia) { toast(`⚡ Energia insuficiente (requer ${a.energia}).`, 'ko'); return; }
 
   // Debitar energia imediatamente
@@ -494,17 +494,36 @@ async function _processarSentencaFrontend(procId) {
       reputacao: Math.max(0, rep-perdaRep),
       xp:        (j.xp||0)+xpGanho, derrotas_consecutivas:dc,
     };
-    if (demitido) { upds.escritorio_id='solo'; upds.escritorio_empregado_id=null; upds.escritorio_nome=null; upds.derrotas_consecutivas=0; }
+    // Demissão por 5 derrotas NÃO se aplica ao dono do próprio escritório
+    const isDono = !!j.escritorio_proprio_id;
+    if (demitido && !isDono) { upds.escritorio_id='solo'; upds.escritorio_empregado_id=null; upds.escritorio_nome=null; upds.derrotas_consecutivas=0; }
+    else if (demitido && isDono) { upds.derrotas_consecutivas=0; } // reseta contagem mas não demite o dono
     await updateDoc(doc(db,'jogadores',uid), upds);
+
+    // Penalizar reputação do escritório próprio também
+    if (j.escritorio_proprio_id) {
+      try {
+        const escSnap = await getDoc(doc(db,'escritorios',j.escritorio_proprio_id));
+        if (escSnap.exists()) {
+          const escRep = escSnap.data().prestigio || 10;
+          await updateDoc(doc(db,'escritorios',j.escritorio_proprio_id), {
+            prestigio: Math.max(0, escRep - Math.ceil(perdaRep * 0.5)),
+          });
+        }
+      } catch(e) { console.warn('Penalidade rep escritório:', e); }
+    }
+
     if (p.tipo_processo==='administrativo' && instancia===1) {
       await updateDoc(doc(db,'processos',procId),{instancia:2,progresso:0,tipo_processo:'judicial',status:'andamento'});
-      _mostrarResultadoSentenca({resultado:'derrota_admin_recurso_judicial',hon:0,demitido,msg:`❌ Decisão administrativa desfavorável. -${perdaRep} rep. Pode recorrer judicialmente.`},procId);
-    } else if (cs>=70 && instancia<4) {
+      _mostrarResultadoSentenca({resultado:'derrota_admin_recurso_judicial',hon:0,demitido:demitido&&!isDono,msg:`❌ Decisão administrativa desfavorável. -${perdaRep} rep. Pode recorrer judicialmente.`},procId);
+    } else if (instancia<4) {
+      // Recurso SEMPRE disponível, independente da chance — decisão é do jogador
       await updateDoc(doc(db,'processos',procId),{recurso_pendente:true,progresso:0,status:'andamento'});
-      _mostrarResultadoSentenca({resultado:'derrota_pode_recorrer',hon:0,cs,demitido,msg:`❌ Derrota. -${perdaRep} rep. +${xpGanho} XP. Chance ${cs}% → pode recorrer.`},procId);
+      const avisoChance = cs < 70 ? ` ⚠️ Chance de sucesso ${cs}% — abaixo de 70%, recurso arriscado.` : ` Chance de sucesso ${cs}%.`;
+      _mostrarResultadoSentenca({resultado:'derrota_pode_recorrer',hon:0,cs,demitido:demitido&&!isDono,msg:`❌ Sentença desfavorável.${avisoChance}\n-${perdaRep} rep. +${xpGanho} XP.`},procId);
     } else {
       await updateDoc(doc(db,'processos',procId),{status:'perdido',encerrado_mes:mesAtual});
-      _mostrarResultadoSentenca({resultado:'derrota_definitiva',hon:0,demitido,msg:`❌ Derrota definitiva. -${perdaRep} rep. +${xpGanho} XP.`},procId);
+      _mostrarResultadoSentenca({resultado:'derrota_definitiva',hon:0,demitido:demitido&&!isDono,msg:`❌ Derrota definitiva — última instância. -${perdaRep} rep. +${xpGanho} XP.`},procId);
     }
   }
 }
@@ -565,7 +584,7 @@ window.tentarAcordo = async function(procId) {
     const suc = Math.floor(p.valor*pct);
     const hon = isSolo ? Math.floor(((p.instancia===1?p.valor*0.30:0)+suc)/2) : Math.floor(suc*0.10/2);
     await updateDoc(doc(db,'processos',procId),{status:'ganho',encerrado_mes:j.mes_global_pessoal||1,hon_total_acumulado:hon});
-    await updateDoc(doc(db,'jogadores',uid),{dinheiro:(j.dinheiro||0)+hon,wins:(j.wins||0)+1,wins_ano:(j.wins_ano||0)+1,derrotas_consecutivas:0});
+    await updateDoc(doc(db,'jogadores',uid),{dinheiro:(j.dinheiro||0)+hon,honorarios_mes:(j.honorarios_mes||0)+hon,wins:(j.wins||0)+1,wins_ano:(j.wins_ano||0)+1,derrotas_consecutivas:0});
     fecharModal(); toast(`🤝 Acordo! +${fmt(hon)} honorários`,'ok');
   } else {
     toast('❌ Proposta de acordo rejeitada.','ko');
@@ -604,7 +623,8 @@ function _gerarProcesso(j) {
   const sk     = j.skills||{};
   const skMed  = ((sk.argumentacao||15)+(sk.oratoria||15)+(sk.pesquisa||18))/3;
   const bonusEsc = window.getBonusEsc ? window.getBonusEsc(j,esp) : 0;
-  const cs     = Math.max(10,Math.min(90,Math.round(50+(skMed-40)*0.4-nivel*0.5+bonusEsc)));
+  const bonusFel = window.getBonusFelicidade ? window.getBonusFelicidade(j) : 0;
+  const cs     = Math.max(10,Math.min(90,Math.round(50+(skMed-40)*0.4-nivel*0.5+bonusEsc+bonusFel)));
   const TIPOS  = {
     tributario:['Execução Fiscal','Repetição de Indébito','Mandado de Segurança Tributário','Impugnação de Auto de Infração','Recurso ao CARF','Compensação Tributária'],
     trabalhista:['Reclamação Trabalhista','Ação de Indenização por Acidente de Trabalho','Ação de Equiparação Salarial','Rescisão Indireta'],
@@ -643,7 +663,7 @@ async function _gastarEnergia(custo, desc) {
   const j   = window.JOGADOR;
   const uid = j?.uid||window.JOGADOR_UID;
   const usado = j?.energia_usada_mes||0;
-  const disp  = Math.max(0,100-usado);
+  const disp  = Math.max(0,(window.getEnergiaTotal?window.getEnergiaTotal(j):100)-usado);
   if (disp < custo) { toast(`⚡ Energia insuficiente (${disp} restantes, requer ${custo}).`,'ko'); return false; }
   try {
     await updateDoc(doc(db,'jogadores',uid),{energia_usada_mes:usado+custo});

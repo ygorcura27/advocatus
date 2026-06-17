@@ -126,7 +126,7 @@ function _atualizarTickLabel() {
   if (!j) { el.textContent = ''; return; }
 
   const usado      = j.energia_usada_mes || 0;
-  const disponivel = Math.max(0, 100 - usado);
+  const disponivel = Math.max(0, (window.getEnergiaTotal?window.getEnergiaTotal(j):100) - usado);
 
   if (disponivel <= 5) {
     el.innerHTML = `<span style="cursor:pointer;text-decoration:underline;color:var(--ouro2)" onclick="window.avancarMes()">▶ Avançar mês</span>`;

@@ -339,7 +339,7 @@ window._confirmarDesignar = async function(funcId, procId, escId) {
 
   // Gastar energia do dono
   const usado = j.energia_usada_mes || 0;
-  const disp  = Math.max(0, 100 - usado);
+  const disp  = Math.max(0, (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - usado);
   if (disp < ci.custo_coord) {
     toast(`⚡ Energia insuficiente (requer ${ci.custo_coord}).`, 'ko');
     return;
