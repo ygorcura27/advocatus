@@ -107,7 +107,22 @@ exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (requ
 
   if (ganhou) {
     const ganhoRep = calcGanhoRep(rep, cap);
-    jogadorUpdates.dinheiro    = (j.dinheiro || 0) + hon;
+    // Honorários vão para o caixa do escritório se houver escritório próprio;
+    // senão, vão direto para o dinheiro pessoal do jogador.
+    let honFoiParaCaixa = false;
+    if (j.escritorio_proprio_id) {
+      const escRef  = db.collection('escritorios').doc(j.escritorio_proprio_id);
+      const escSnap = await escRef.get();
+      if (escSnap.exists) {
+        const esc = escSnap.data();
+        await escRef.update({ caixa: (esc.caixa || 0) + hon });
+        honFoiParaCaixa = true;
+      }
+    }
+    if (!honFoiParaCaixa) {
+      jogadorUpdates.dinheiro       = (j.dinheiro || 0) + hon;
+      jogadorUpdates.honorarios_mes = (j.honorarios_mes || 0) + hon;
+    }
     jogadorUpdates.wins        = (j.wins    || 0) + 1;
     jogadorUpdates.wins_ano    = (j.wins_ano || 0) + 1;
     jogadorUpdates.reputacao   = Math.min(cap, rep + ganhoRep);
@@ -162,27 +177,28 @@ exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (requ
     if (isAdmin && instancia === 1) {
       processoUpdates.instancia        = 2;
       processoUpdates.progresso        = 0;
-      processoUpdates.tipo_processo    = 'judicial';
       processoUpdates.recurso_pendente = false;
       processoUpdates.status           = 'andamento';
       await processoRef.update(processoUpdates);
       await jogadorRef.update(jogadorUpdates);
       resposta = { resultado:'derrota_admin_recurso_judicial', hon:0, demitido,
         msg:`❌ Decisão administrativa desfavorável. -${perdaRep} rep. Você pode recorrer judicialmente.` };
-    } else if (cs >= 70 && podeFazerInstancia(j.cargo_id, instancia+1) && instancia < 4) {
+    } else if (podeFazerInstancia(j.cargo_id, instancia+1) && instancia < 4) {
+      // Recurso SEMPRE disponível, independente da chance — decisão é do jogador
       processoUpdates.recurso_pendente = true;
       processoUpdates.progresso        = 0;
       processoUpdates.status           = 'andamento';
       await processoRef.update(processoUpdates);
       await jogadorRef.update(jogadorUpdates);
+      const avisoChance = cs < 70 ? ` ⚠️ Chance de sucesso ${cs}% — abaixo de 70%, recurso arriscado.` : ` Chance de sucesso ${cs}%.`;
       resposta = { resultado:'derrota_pode_recorrer', hon:0, cs, demitido,
-        msg:`❌ Sentença desfavorável. -${perdaRep} rep. Chance ${cs}% → pode recorrer.` };
+        msg:`❌ Sentença desfavorável.${avisoChance} -${perdaRep} rep.` };
     } else {
       processoUpdates.status        = 'perdido';
       processoUpdates.encerrado_mes = mesAtual;
       await processoRef.update(processoUpdates);
       await jogadorRef.update(jogadorUpdates);
-      const motivo = instancia >= 4 ? 'Instância máxima.' : cs < 70 ? `Chance ${cs}% — recurso não recomendado.` : 'Cargo insuficiente.';
+      const motivo = instancia >= 4 ? 'Instância máxima.' : 'Cargo insuficiente para a próxima instância.';
       resposta = { resultado:'derrota_definitiva', hon:0, demitido,
         msg:`❌ Sentença desfavorável. -${perdaRep} rep. ${motivo}` };
     }

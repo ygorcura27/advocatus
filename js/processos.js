@@ -421,6 +421,29 @@ async function _finalizarQuiz() {
 // ════════════════════════════════════════════════════════
 // SENTENÇA — tenta Cloud Function, fallback no frontend
 // ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════
+// ROTEAMENTO DE HONORÁRIOS — escritório próprio vs pessoal/empregado
+// ════════════════════════════════════════════════════════
+async function _creditarHonorarios(j, uid, hon) {
+  if (j.escritorio_proprio_id) {
+    // Tem escritório próprio: honorários entram no CAIXA DO ESCRITÓRIO, não no bolso
+    const escSnap = await getDoc(doc(db,'escritorios', j.escritorio_proprio_id));
+    if (escSnap.exists()) {
+      const esc = escSnap.data();
+      await updateDoc(doc(db,'escritorios', j.escritorio_proprio_id), {
+        caixa: (esc.caixa||0) + hon,
+      });
+      return { foiParaCaixa: true };
+    }
+  }
+  // Solo sem escritório formal ou empregado: vai direto pro bolso pessoal
+  await updateDoc(doc(db,'jogadores',uid), {
+    dinheiro:       (j.dinheiro||0) + hon,
+    honorarios_mes: (j.honorarios_mes||0) + hon,
+  });
+  return { foiParaCaixa: false };
+}
+
 window.processarSentenca = async function(procId) {
   toast('⏳ Processando sentença...', 'neutro', 2000);
   fecharModal();
@@ -466,25 +489,26 @@ async function _processarSentencaFrontend(procId) {
   if (ganhou) {
     const parteRecorre = cs < 70 && Math.random() < 0.55 && instancia < 4;
     await updateDoc(doc(db, 'jogadores', uid), {
-      dinheiro:              (j.dinheiro||0) + hon,
-      honorarios_mes:        (j.honorarios_mes||0) + hon, // acumula pra renda do mês
       wins:                  (j.wins||0) + 1,
       wins_ano:              (j.wins_ano||0) + 1,
       reputacao:             Math.min(cap, rep + ganhoRep),
       xp:                    (j.xp||0) + xpGanho,
       derrotas_consecutivas: 0,
     });
+    const { foiParaCaixa } = await _creditarHonorarios(j, uid, hon);
     if (parteRecorre) {
       await updateDoc(doc(db, 'processos', procId), {
         instancia: instancia + 1, progresso: 0, status: 'andamento',
         hon_total_acumulado: (p.hon_total_acumulado||0) + hon,
       });
-      _mostrarResultadoSentenca({ resultado:'ganho_continua', hon, msg:`✅ Vitória! +${fmt(hon)} honorários. +${ganhoRep} rep. +${xpGanho} XP.\nParte contrária recorreu — caso sobe de instância.` }, procId);
+      const destinoTxt = foiParaCaixa ? ' (no caixa do escritório)' : '';
+      _mostrarResultadoSentenca({ resultado:'ganho_continua', hon, msg:`✅ Vitória! +${fmt(hon)} honorários${destinoTxt}. +${ganhoRep} rep. +${xpGanho} XP.\nParte contrária recorreu — caso sobe de instância.` }, procId);
     } else {
       await updateDoc(doc(db, 'processos', procId), {
         status:'ganho', encerrado_mes:mesAtual, hon_total_acumulado:(p.hon_total_acumulado||0)+hon,
       });
-      _mostrarResultadoSentenca({ resultado:'ganho_definitivo', hon, msg:`🏆 Vitória definitiva! +${fmt(hon)} honorários. +${ganhoRep} rep. +${xpGanho} XP.` }, procId);
+      const destinoTxt2 = foiParaCaixa ? ' (no caixa do escritório)' : '';
+      _mostrarResultadoSentenca({ resultado:'ganho_definitivo', hon, msg:`🏆 Vitória definitiva! +${fmt(hon)} honorários${destinoTxt2}. +${ganhoRep} rep. +${xpGanho} XP.` }, procId);
     }
   } else {
     const dc = (j.derrotas_consecutivas||0) + 1;
@@ -584,8 +608,9 @@ window.tentarAcordo = async function(procId) {
     const suc = Math.floor(p.valor*pct);
     const hon = isSolo ? Math.floor(((p.instancia===1?p.valor*0.30:0)+suc)/2) : Math.floor(suc*0.10/2);
     await updateDoc(doc(db,'processos',procId),{status:'ganho',encerrado_mes:j.mes_global_pessoal||1,hon_total_acumulado:hon});
-    await updateDoc(doc(db,'jogadores',uid),{dinheiro:(j.dinheiro||0)+hon,honorarios_mes:(j.honorarios_mes||0)+hon,wins:(j.wins||0)+1,wins_ano:(j.wins_ano||0)+1,derrotas_consecutivas:0});
-    fecharModal(); toast(`🤝 Acordo! +${fmt(hon)} honorários`,'ok');
+    await updateDoc(doc(db,'jogadores',uid),{wins:(j.wins||0)+1,wins_ano:(j.wins_ano||0)+1,derrotas_consecutivas:0});
+    const { foiParaCaixa } = await _creditarHonorarios(j, uid, hon);
+    fecharModal(); toast(`🤝 Acordo! +${fmt(hon)} honorários${foiParaCaixa?' (no caixa do escritório)':''}`,'ok');
   } else {
     toast('❌ Proposta de acordo rejeitada.','ko');
   }

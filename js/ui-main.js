@@ -348,7 +348,12 @@ function renderEscritorio(j, el) {
       <div style="font-size:.75rem;color:var(--ardosia);margin-top:1rem">
         ${!j.oab ? 'Requer OAB aprovada' : 'Requer Advogado Júnior ou superior'}
       </div>`}
-    </div>` : `
+    </div>` : j.escritorio_proprio_id ? `
+    <div class="card">
+      <div class="card-titulo">🏛️ ${escNome}</div>
+      <div class="card-sub">Seu escritório próprio.</div>
+    </div>
+    <div id="escritorio-proprio-detalhes">Carregando...</div>` : `
     <div class="card">
       <div class="card-titulo">${escNome}</div>
       <div class="card-sub">Seu escritório atual. Detalhes carregando...</div>
@@ -357,6 +362,26 @@ function renderEscritorio(j, el) {
 
   if (!isSolo && j.escritorio_empregado_id) {
     _carregarEscritorio(j.escritorio_empregado_id);
+  }
+  if (j.escritorio_proprio_id) {
+    _carregarEscritorioProprio(j.escritorio_proprio_id, j);
+  }
+}
+
+async function _carregarEscritorioProprio(escId, j) {
+  try {
+    const { doc: fbDoc, getDoc: fbGetDoc } = await import(
+      'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js'
+    );
+    const { db: fbDb } = await import('./firebase-init.js');
+    const snap = await fbGetDoc(fbDoc(fbDb, 'escritorios', escId));
+    const el = document.getElementById('escritorio-proprio-detalhes');
+    if (!el) return;
+    if (!snap.exists()) { el.innerHTML = '<div class="card">Escritório não encontrado.</div>'; return; }
+    const esc = { id: escId, ...snap.data() };
+    el.innerHTML = (window.renderBlocoFinancas ? window.renderBlocoFinancas(esc, j) : '');
+  } catch (e) {
+    console.error('Erro ao carregar escritório próprio:', e);
   }
 }
 
@@ -958,6 +983,9 @@ window._confirmarCriarEscritorio = async function() {
       prestigio:     10,
       socios:        [uid],
       socios_uids:   [uid],
+      socios:        [{ uid, participacao_pct: 100, cargo: j.cargo_id }], // formato padrão usado pelas Cloud Functions
+      caixa:         0,              // caixa do escritório, SEPARADO do dinheiro pessoal
+      meses_sem_pagar_salario: 0,
       funcionarios:  [],
       criado_mes:    j.mes_pessoal || 0,
       criado_ano:    j.ano_pessoal || 1,
@@ -977,7 +1005,7 @@ window._confirmarCriarEscritorio = async function() {
     });
 
     fecharModal();
-    toast(`🏛️ ${nome} aberto! Capital inicial investido: R$ 5.000`, 'ok', 5000);
+    toast(`🏛️ ${nome} aberto! Capital inicial investido: R$ 15.000`, 'ok', 5000);
 
     // Recarregar painel
     setTimeout(() => window.navTo && window.navTo('escritorio', null), 800);

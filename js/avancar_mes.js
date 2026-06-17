@@ -213,6 +213,12 @@ window.avancarMes = async function(forcar = false) {
       catch(e) { console.warn('Processar serviços:', e.message); }
     }
 
+    // Processar folha de pagamento e caixa do escritório (módulo escritorio_financas.js)
+    if (window._processarFinancasEscritorioMensal) {
+      try { await window._processarFinancasEscritorioMensal(_j); }
+      catch(e) { console.warn('Processar finanças escritório:', e.message); }
+    }
+
     // Mostrar resumo mensal
     _mostrarResumoMensal(r);
 
