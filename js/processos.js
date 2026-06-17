@@ -345,7 +345,7 @@ _estado = {
 };
 
 _renderQuizQ();
-
+};
 window.responderQuiz = function(idx) {
   const { questoes, qi } = _estado;
   const q     = questoes[qi];
