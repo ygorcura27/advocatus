@@ -18,12 +18,43 @@ export const MESES_TOLERANCIA_SALARIO = 3;
 export const PERDA_PRODUTIVIDADE_SEM_SALARIO = 0.25; // -25% de produtividade por mês sem pagar
 
 // ════════════════════════════════════════════════════════
+// NORMALIZAR SÓCIOS — lida com schemas antigos e novos
+// Formatos possíveis no banco:
+//  - socios: [{uid, participacao_pct}]   (formato correto/novo)
+//  - socios: ['uid1', 'uid2']            (formato antigo, array de strings)
+//  - sem campo socios, mas com dono_uid ou fundador_uid
+// ════════════════════════════════════════════════════════
+function _normalizarSocios(esc) {
+  const donoFallback = esc.dono_uid || esc.fundador_uid || window.JOGADOR?.uid || window.JOGADOR_UID;
+
+  if (Array.isArray(esc.socios) && esc.socios.length > 0) {
+    // Verifica se já são objetos válidos com uid e participacao_pct
+    const primeiroValido = esc.socios[0] && typeof esc.socios[0] === 'object' && esc.socios[0].uid;
+    if (primeiroValido) {
+      // Filtra qualquer entrada malformada e garante participacao_pct numérico
+      return esc.socios
+        .filter(s => s && typeof s === 'object' && s.uid)
+        .map(s => ({ uid: s.uid, participacao_pct: s.participacao_pct || 0 }));
+    }
+    // Formato antigo: array de strings (uids). Dono fica com 100%, demais 0%
+    // (não deveria ocorrer em escritórios criados após esta correção)
+    return esc.socios.map((uidStr, i) => ({
+      uid: typeof uidStr === 'string' ? uidStr : donoFallback,
+      participacao_pct: i === 0 ? 100 : 0,
+    }));
+  }
+
+  // Sem array de sócios — fallback: 100% pro dono
+  return [{ uid: donoFallback, participacao_pct: 100 }];
+}
+
+// ════════════════════════════════════════════════════════
 // RENDERIZAR BLOCO DE FINANÇAS (usado no painel Escritório)
 // ════════════════════════════════════════════════════════
 export function renderBlocoFinancas(esc, j) {
   const caixa = esc.caixa || 0;
   const corCaixa = caixa >= 0 ? 'var(--verde2)' : 'var(--verm2)';
-  const socios = (esc.socios && esc.socios.length > 0) ? esc.socios : [{ uid: esc.dono_uid || esc.fundador_uid || j.uid || window.JOGADOR_UID, participacao_pct: 100 }];
+  const socios = _normalizarSocios(esc);
   const minhaUid = j.uid || window.JOGADOR_UID;
   const meuSocio = socios.find(s => s.uid === minhaUid);
   const minhaCota = meuSocio ? meuSocio.participacao_pct : 100;
@@ -119,7 +150,7 @@ window.abrirModalDistribuirLucros = async function(escId) {
   if (!escSnap.exists()) return;
   const esc = escSnap.data();
   const caixa = esc.caixa || 0;
-  const socios = (esc.socios && esc.socios.length > 0) ? esc.socios : [{ uid: esc.dono_uid||esc.fundador_uid||window.JOGADOR?.uid||window.JOGADOR_UID, participacao_pct:100 }];
+  const socios = _normalizarSocios(esc);
 
   if (caixa <= 0) { toast('Caixa do escritório está zerado ou negativo.', 'ko'); return; }
 
