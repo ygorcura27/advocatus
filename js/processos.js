@@ -638,9 +638,9 @@ function _gerarProcesso(j) {
   const mesG   = j.mes_global_pessoal||1;
   const RANGES = {
     est:{min:500,max:5000,dniv:0}, ass:{min:1000,max:10000,dniv:0},
-    jnr:{min:1000,max:20000,dniv:1}, pln:{min:20000,max:200000,dniv:11},
-    snr:{min:150000,max:500000,dniv:21}, asc:{min:200000,max:10000000,dniv:21},
-    soc:{min:250000,max:10000000,dniv:21}, snm:{min:500000,max:100000000,dniv:21},
+    jnr:{min:1000,max:20000,dniv:1}, pln:{min:10000,max:80000,dniv:11},
+    snr:{min:50000,max:250000,dniv:21}, asc:{min:100000,max:400000,dniv:21},
+    soc:{min:250000,max:700000,dniv:21}, snm:{min:350000,max:1500000,dniv:21},
   };
   const range  = RANGES[j.cargo_id]||RANGES.jnr;
   const valor  = range.min+Math.floor(Math.random()*(range.max-range.min));
