@@ -170,11 +170,11 @@ export function gerarOportunidade(tier, prestigioPct) {
 
 function _portePorTier(tier) {
   const pesos = {
-    1: { micro:0.7, pequena:0.3 },
-    2: { micro:0.4, pequena:0.4, media:0.2 },
-    3: { micro:0.2, pequena:0.4, media:0.3, grande:0.1 },
-    4: { micro:0.1, pequena:0.3, media:0.4, grande:0.2 },
-    5: { micro:0.05,pequena:0.2, media:0.35,grande:0.4 },
+    1: { micro:0.85, pequena:0.15 },
+    2: { micro:0.5, pequena:0.4, media:0.1 },
+    3: { micro:0.2, pequena:0.5, media:0.25, grande:0.05 },
+    4: { pequena:0.35, media:0.45, grande:0.2 },
+    5: { pequena:0.15, media:0.45,grande:0.4 },
   }[tier] || { micro:0.7, pequena:0.3 };
 
   const r = Math.random();
