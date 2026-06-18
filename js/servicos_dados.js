@@ -9,25 +9,25 @@
 export const TIPOS_SERVICO = {
   consulta: {
     l:'Consulta Jurídica', icone:'💬', energia:5,
-    valor_min:200, valor_max:2000, prazo_meses:0,
+    valor_min:200, valor_max:1200, prazo_meses:0,
     confianca:5, chance_recorrente:0.15, chance_processo:0.10,
     desc:'Reunião e orientação jurídica inicial.',
   },
   parecer: {
     l:'Parecer Jurídico', icone:'📄', energia:10,
-    valor_min:1000, valor_max:20000, prazo_meses:1,
+    valor_min:1500, valor_max:8000, prazo_meses:1,
     confianca:10, chance_recorrente:0.20, chance_processo:0.20,
     desc:'Parecer técnico tributário, trabalhista ou empresarial.',
   },
   contrato: {
     l:'Elaboração de Contrato', icone:'📝', energia:5,
-    valor_min:500, valor_max:15000, prazo_meses:0,
+    valor_min:800, valor_max:6000, prazo_meses:0,
     confianca:15, chance_recorrente:0.25, chance_processo:0,
     desc:'Elaboração, revisão ou negociação contratual.',
   },
   notificacao: {
     l:'Notificação Extrajudicial', icone:'✉️', energia:3,
-    valor_min:300, valor_max:5000, prazo_meses:0,
+    valor_min:500, valor_max:2500, prazo_meses:0,
     confianca:8, chance_recorrente:0, chance_processo:0.20, chance_resolver:0.30,
     desc:'Notificação para resolução extrajudicial de conflito.',
   },
@@ -45,10 +45,10 @@ export const TIPOS_SERVICO = {
 // ════════════════════════════════════════════════════════
 export const OPORTUNIDADES_POR_TIER = {
   1: { min:1,  max:3  },
-  2: { min:2,  max:5  },
-  3: { min:4,  max:8  },
-  4: { min:8,  max:15 },
-  5: { min:15, max:30 },
+  2: { min:2,  max:4  },
+  3: { min:3,  max:6  },
+  4: { min:6,  max:10 },
+  5: { min:8, max:15 },
 };
 
 // ════════════════════════════════════════════════════════
@@ -64,9 +64,9 @@ export function modificadorNetworking(networking) {
 
 export function multiplicadorPrestigio(prestigioPct) {
   // prestigioPct = % do cap de reputação do cargo (0-100+)
-  if (prestigioPct >= 90) return 3.0;
-  if (prestigioPct >= 70) return 2.0;
-  if (prestigioPct >= 40) return 1.5;
+  if (prestigioPct >= 90) return 1.75;
+  if (prestigioPct >= 70) return 1.50;
+  if (prestigioPct >= 40) return 1.25;
   return 1.0;
 }
 
@@ -80,14 +80,17 @@ export const NOMES_CLIENTE_PF = [
 ];
 
 export const NOMES_CLIENTE_PJ = {
-  micro: ['Padaria Pão Dourado ME','Salão Bela Vista','Oficina São Jorge','Mercadinho Bom Preço',
-          'Estúdio Foto Arte','Clínica Odonto Sorriso ME'],
-  pequena: ['Distribuidora Rio Verde Ltda','Construtora Alves & Filhos','Restaurante Sabor Carioca',
-            'Transportadora Vitória Ltda','Confecções Moda Brasil'],
-  media: ['Indústria Metalúrgica Atlântico','Rede de Farmácias VidaSaúde','Supermercados Boa Compra',
-          'Construtora Horizonte S/A','Grupo Educacional Saber'],
-  grande: ['Conglomerado Industrial Cariri S/A','Rede Varejista Nacional Maxx','Holding Financeira Atlas',
-           'Grupo Logístico TransBrasil','Indústria Petroquímica Sul'],
+  micro: ['Padaria Pão Dourado ME','Salão Bela Vista','Oficina São Jorge','Mercadinho Bom Preço','Estúdio Foto Arte','Clínica Odonto Sorriso ME','Lanchonete Sabor da Vila','Auto Elétrica União',
+'Papelaria Central ME','Farmácia Popular do Bairro','Pet Shop Amigo Fiel','Loja Mix Utilidades','Mecânica Dois Irmãos','Açougue Santa Rita','Bazar Primavera','Casa de Rações Campeão',
+'Lavanderia Água Limpa','Sorveteria Tropical','Floricultura Jardim Feliz','Vidraçaria Cristal ME'],
+  pequena: ['Distribuidora Rio Verde Ltda','Construtora Alves & Filhos','Restaurante Sabor Carioca','Transportadora Vitória Ltda','Confecções Moda Brasil','Atacadão do Lar Ltda','Rede Ponto Farma Ltda',
+'Metalúrgica Alfa Ltda','Comercial Serra Azul Ltda','Grupo Odonto Mais Ltda','Logística Horizonte Ltda','Mercantil Nova Era Ltda','Construtora Vale Forte Ltda','Frigorífico Boa Carne Ltda',
+'Rede de Academias Corpo Ativo','Móveis Elegance Ltda','Distribuidora Atlântica Ltda','Centro Educacional Futuro','Tecnologia Sigma Ltda','Atacado União Comercial Ltda'],
+  media: [Supermercados Guanabara','Dom Atacadista','Supermercados Mundial','Grupo Barcelos','Rede Supermarket','Casas Pedro','Supermercados Boa Compra','Rede de Farmácias VidaSaúde','Indústria Metalúrgica Atlântico',
+'Construtora Horizonte S/A','Grupo Educacional Saber','Grupo DPSP','Petz','Track & Field','Tenda Atacado','Grupo Moura','Unimed Rio','Hospital Copa D’Or','Rede Hortifruti','Grupo Iter','Águas do Rio','Viação Águia Branca',
+'Multilog','Senior Sistemas','Portobello','Grupo Trigo','Reserva','Granado','Ri Happy','Grupo Soma'],],
+  grande: ['Petrobras', 'Vale S.A.', 'Ambev', 'JBS', 'BRF', 'Assaí Atacadista', 'Grupo Pão de Açúcar', 'Carrefour Brasil', 'Magazine Luiza', 'Raízen', 'Localiza', 'Suzano', 'WEG', 'Embraer', 'Klabin', 'Vibra Energia', 'TIM Brasil', 
+'Claro S.A.', 'Grupo Boticário', 'Natura &Co', 'Itaú Unibanco', 'Banco Bradesco', 'Banco Santander Brasil', 'BTG Pactual', 'Stone', 'Totvs', 'CSN', 'Gerdau', 'Cosan', 'Eletrobras'],
 };
 
 // ════════════════════════════════════════════════════════
