@@ -88,7 +88,7 @@ export const NOMES_CLIENTE_PJ = {
 'Rede de Academias Corpo Ativo','Móveis Elegance Ltda','Distribuidora Atlântica Ltda','Centro Educacional Futuro','Tecnologia Sigma Ltda','Atacado União Comercial Ltda'],
   media: ['Supermercados Guanabara','Dom Atacadista','Supermercados Mundial','Grupo Barcelos','Rede Supermarket','Casas Pedro','Supermercados Boa Compra','Rede de Farmácias VidaSaúde','Indústria Metalúrgica Atlântico',
 'Construtora Horizonte S/A','Grupo Educacional Saber','Grupo DPSP','Petz','Track & Field','Tenda Atacado','Grupo Moura','Unimed Rio','Hospital Copa D’Or','Rede Hortifruti','Grupo Iter','Águas do Rio','Viação Águia Branca',
-'Multilog','Senior Sistemas','Portobello','Grupo Trigo','Reserva','Granado','Ri Happy','Grupo Soma'],],
+'Multilog','Senior Sistemas','Portobello','Grupo Trigo','Reserva','Granado','Ri Happy','Grupo Soma'],
   grande: ['Petrobras', 'Vale S.A.', 'Ambev', 'JBS', 'BRF', 'Assaí Atacadista', 'Grupo Pão de Açúcar', 'Carrefour Brasil', 'Magazine Luiza', 'Raízen', 'Localiza', 'Suzano', 'WEG', 'Embraer', 'Klabin', 'Vibra Energia', 'TIM Brasil', 
 'Claro S.A.', 'Grupo Boticário', 'Natura &Co', 'Itaú Unibanco', 'Banco Bradesco', 'Banco Santander Brasil', 'BTG Pactual', 'Stone', 'Totvs', 'CSN', 'Gerdau', 'Cosan', 'Eletrobras'],
 };
