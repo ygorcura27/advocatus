@@ -225,6 +225,12 @@ window.avancarMes = async function(forcar = false) {
       catch(e) { console.warn('Processar cursos:', e.message); }
     }
 
+    // Processar distribuição de processos pelo escritório e deserção (módulo processos.js)
+    if (window._processarDistribuicaoProcessosMensal) {
+      try { await window._processarDistribuicaoProcessosMensal(_j); }
+      catch(e) { console.warn('Processar distribuição processos:', e.message); }
+    }
+
     // Mostrar resumo mensal
     _mostrarResumoMensal(r);
 
