@@ -619,28 +619,54 @@ window.tentarAcordo = async function(procId) {
 // ════════════════════════════════════════════════════════
 // NOVO PROCESSO
 // ════════════════════════════════════════════════════════
+// Limite de novos processos por mês conforme cargo (quando empregado de escritório).
+// Estagiário não gera processo novo — só recebe os distribuídos pelo escritório.
+const LIMITE_NOVOS_PROCESSOS_CARGO = {
+  est: 0, ass: 1, jnr: 2, pln: 3, snr: 5, asc: 7, soc: 10, snm: 15,
+};
+
 window.novoProcesso = async function() {
   const j   = window.JOGADOR;
   if (!j)   return;
   const uid = j.uid||window.JOGADOR_UID;
-  const energiaDisp = Math.max(0,100-(j.energia_usada_mes||0));
+  const energiaDisp = Math.max(0,(window.getEnergiaTotal?window.getEnergiaTotal(j):100)-(j.energia_usada_mes||0));
   if (energiaDisp < 5) { toast('⚡ Energia insuficiente para novos casos.','ko'); return; }
   if (j.em_burnout)    { toast('🔴 Em burnout. Descanse antes de novos casos.','ko'); return; }
+
+  // Se está empregado (não é dono/solo), aplica limite mensal por cargo
+  const isEmpregado = j.escritorio_empregado_id && !j.escritorio_proprio_id;
+  if (isEmpregado) {
+    if (j.cargo_id === 'est') {
+      toast('🔒 Estagiários não geram processos novos — você recebe casos distribuídos pelo escritório.', 'ko', 5000);
+      return;
+    }
+    const limite = LIMITE_NOVOS_PROCESSOS_CARGO[j.cargo_id] ?? 1;
+    const usados = j.processos_novos_mes || 0;
+    if (usados >= limite) {
+      toast(`🔒 Limite mensal de novos casos atingido (${usados}/${limite} no seu cargo).`, 'ko', 5000);
+      return;
+    }
+  }
+
   const proc = _gerarProcesso(j);
   try {
     await addDoc(collection(db,'processos'),proc);
+    if (isEmpregado) {
+      await updateDoc(doc(db,'jogadores',uid), { processos_novos_mes: (j.processos_novos_mes||0)+1 });
+    }
     toast(`📁 Novo caso: ${proc.tipo}`,'ok');
+    setTimeout(()=>window.navTo&&window.navTo('processos',null), 400);
   } catch(err) { toast('Erro ao criar processo.','ko'); }
 };
 
-function _gerarProcesso(j) {
+function _gerarProcesso(j, distribuidoPeloEscritorio=false) {
   const esp    = j.especialidade||'civil';
   const mesG   = j.mes_global_pessoal||1;
   const RANGES = {
     est:{min:500,max:5000,dniv:0}, ass:{min:1000,max:10000,dniv:0},
-    jnr:{min:1000,max:20000,dniv:1}, pln:{min:10000,max:80000,dniv:11},
-    snr:{min:50000,max:250000,dniv:21}, asc:{min:100000,max:400000,dniv:21},
-    soc:{min:250000,max:700000,dniv:21}, snm:{min:350000,max:1500000,dniv:21},
+    jnr:{min:1000,max:20000,dniv:1}, pln:{min:20000,max:200000,dniv:11},
+    snr:{min:150000,max:500000,dniv:21}, asc:{min:200000,max:10000000,dniv:21},
+    soc:{min:250000,max:10000000,dniv:21}, snm:{min:500000,max:100000000,dniv:21},
   };
   const range  = RANGES[j.cargo_id]||RANGES.jnr;
   const valor  = range.min+Math.floor(Math.random()*(range.max-range.min));
@@ -674,6 +700,9 @@ function _gerarProcesso(j) {
     reu:REUS[Math.floor(Math.random()*REUS.length)],
     tribunal:tribs[Math.floor(Math.random()*tribs.length)],
     advogado_uid:j.uid, escritorio_id:j.escritorio_id||null,
+    distribuido_pelo_escritorio: distribuidoPeloEscritorio,
+    escritorio_nome_etiqueta: distribuidoPeloEscritorio ? (j.escritorio_nome||null) : null,
+    prazo_limite_mes: distribuidoPeloEscritorio ? (mesTotalPessoalProc(j)+3) : null, // 3 meses pra concluir
     status:'andamento', instancia:1, progresso:0, chance_sucesso:cs,
     valor, nivel, hon_total_acumulado:0,
     urgente:Math.random()<0.2, recurso_pendente:false,
@@ -695,6 +724,68 @@ async function _gastarEnergia(custo, desc) {
     return true;
   } catch(err) { toast('Erro ao gastar energia.','ko'); return false; }
 }
+
+function mesTotalPessoalProc(j) {
+  return (j.ano_pessoal||1)*12 + (j.mes_pessoal||0);
+}
+
+// ════════════════════════════════════════════════════════
+// DISTRIBUIÇÃO MENSAL DE PROCESSOS PELO ESCRITÓRIO
+// Gera casos automaticamente para funcionários (estagiário+) conforme
+// o porte/tier do escritório, e verifica deserção de prazo (3 meses).
+// ════════════════════════════════════════════════════════
+export async function processarDistribuicaoProcessosMensal(j) {
+  const uid = j.uid || window.JOGADOR_UID;
+
+  // Reset do contador de novos processos do mês (empregados)
+  if (j.escritorio_empregado_id && !j.escritorio_proprio_id) {
+    await updateDoc(doc(db,'jogadores',uid), { processos_novos_mes: 0 });
+  }
+
+  // ── Verificar deserção: processos distribuídos pelo escritório com prazo vencido ──
+  const meusProcsSnap = await getDocs(query(
+    collection(db,'processos'),
+    where('advogado_uid','==',uid),
+    where('status','==','andamento'),
+    where('distribuido_pelo_escritorio','==',true)
+  ));
+  const mesAtualTotal = mesTotalPessoalProc(j);
+  for (const pDoc of meusProcsSnap.docs) {
+    const p = pDoc.data();
+    if (p.prazo_limite_mes && mesAtualTotal > p.prazo_limite_mes) {
+      // Deserção — perde o processo e leva penalidade de reputação
+      const perda = Math.max(1, Math.floor((j.reputacao||0)*0.06));
+      await updateDoc(doc(db,'processos',pDoc.id), { status:'perdido_desercao', encerrado_mes:mesAtualTotal });
+      await updateDoc(doc(db,'jogadores',uid), { reputacao: Math.max(0,(j.reputacao||0)-perda) });
+      await addDoc(collection(db,'jogadores',uid,'inbox'), {
+        de:'sistema', para_uid:uid,
+        assunto:'⚠️ Processo perdido por deserção',
+        corpo:`O processo ${p.numero} (${p.tipo}) ultrapassou o prazo de 3 meses sem conclusão e foi perdido. -${perda} reputação.`,
+        tipo:'sistema', tipo_noticia:'negativo', lida:false, criado_em:new Date().toISOString(),
+      });
+    }
+  }
+
+  // ── Distribuir novo caso automaticamente se está empregado em escritório próprio de alguém ──
+  // (estagiários e demais empregados recebem trabalho mesmo sem poder criar sozinhos)
+  if (j.escritorio_empregado_id && !j.escritorio_proprio_id) {
+    const escSnap = await getDoc(doc(db,'escritorios',j.escritorio_empregado_id));
+    const tier = escSnap.exists() ? (escSnap.data().tier||1) : 1;
+    // Chance de receber caso distribuído este mês, escalando com o tier do escritório
+    const chanceDistribuicao = Math.min(0.9, 0.4 + tier*0.1);
+    if (Math.random() < chanceDistribuicao) {
+      const proc = _gerarProcesso(j, true); // true = distribuído pelo escritório
+      await addDoc(collection(db,'processos'), proc);
+      await addDoc(collection(db,'jogadores',uid,'inbox'), {
+        de:'sistema', para_uid:uid,
+        assunto:'📁 Novo caso distribuído pelo escritório',
+        corpo:`Você recebeu um novo caso: ${proc.tipo}. Prazo para conclusão: 3 meses.`,
+        tipo:'sistema', tipo_noticia:'neutro', lida:false, criado_em:new Date().toISOString(),
+      });
+    }
+  }
+}
+window._processarDistribuicaoProcessosMensal = processarDistribuicaoProcessosMensal;
 
 function fmt(n) {
   if (!n&&n!==0) return '—';

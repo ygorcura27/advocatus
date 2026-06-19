@@ -45,7 +45,21 @@ const NOMES_NPC = {
 window.renderEquipe = async function(j, el) {
   const uid = j.uid || window.JOGADOR_UID;
 
-  // ── Caso 1: nenhum escritório próprio nem vínculo com escritório próprio de outrem ──
+  // ── Caso 1: empregado de escritório NPC ou de outro jogador, sem ser sócio ──
+  // (escritorio_empregado_id existe, mas escritorio_proprio_id não)
+  if (!j.escritorio_proprio_id && j.escritorio_empregado_id) {
+    el.innerHTML = `
+      <div class="secao-header"><div class="secao-titulo">👥 Equipe — ${j.escritorio_nome||'Escritório'}</div></div>
+      <div class="card" style="text-align:center;padding:1.6rem;color:var(--txt3)">
+        🏢 Este escritório é <b>autogerenciado</b> pela própria estrutura (NPC).<br><br>
+        Você atua como advogado contratado e não participa da gestão de contratações,
+        finanças ou demandas administrativas.<br><br>
+        <span style="font-size:.7rem">Para gerenciar uma equipe, torne-se sócio de um escritório ou abra o seu próprio.</span>
+      </div>`;
+    return;
+  }
+
+  // ── Caso 2: nenhum vínculo com nenhum escritório (solo) ──
   const escId = j.escritorio_proprio_id;
   if (!escId) {
     el.innerHTML = `
