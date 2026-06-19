@@ -219,6 +219,12 @@ window.avancarMes = async function(forcar = false) {
       catch(e) { console.warn('Processar finanças escritório:', e.message); }
     }
 
+    // Processar cursos (aprovação/reprovação por frequência) (módulo carreira.js)
+    if (window._processarCursosMensal) {
+      try { await window._processarCursosMensal(_j); }
+      catch(e) { console.warn('Processar cursos:', e.message); }
+    }
+
     // Mostrar resumo mensal
     _mostrarResumoMensal(r);
 

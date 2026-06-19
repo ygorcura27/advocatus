@@ -43,12 +43,15 @@ const NOMES_NPC = {
 // RENDERIZAR PAINEL DE EQUIPE
 // ════════════════════════════════════════════════════════
 window.renderEquipe = async function(j, el) {
-  const escId = j.escritorio_proprio_id || j.escritorio_id;
-  if (!escId || escId === 'solo') {
+  const uid = j.uid || window.JOGADOR_UID;
+
+  // ── Caso 1: nenhum escritório próprio nem vínculo com escritório próprio de outrem ──
+  const escId = j.escritorio_proprio_id;
+  if (!escId) {
     el.innerHTML = `
       <div class="secao-header"><div class="secao-titulo">👥 Equipe</div></div>
       <div class="card" style="text-align:center;padding:2rem;color:var(--txt3)">
-        Você precisa ter um escritório próprio para contratar funcionários.<br>
+        Você precisa ter um escritório próprio para gerenciar contratações.<br>
         <span style="font-size:.72rem">Abra seu escritório em <b>Escritório → Criar Escritório</b>.</span>
       </div>`;
     return;
@@ -56,7 +59,31 @@ window.renderEquipe = async function(j, el) {
 
   const escSnap = await getDoc(doc(db, 'escritorios', escId));
   if (!escSnap.exists()) { el.innerHTML = '<div class="card">Escritório não encontrado.</div>'; return; }
-  const esc  = escSnap.data();
+  const esc = escSnap.data();
+
+  // ── Verificar se o jogador é DONO, SÓCIO ou ASSOCIADO (pode gerenciar) ──
+  // Empregados regulares (Advogado Sênior pra baixo, sem participação societária)
+  // NÃO gerenciam contratações — o escritório se autogerencia.
+  const socios = esc.socios || [];
+  const ehDono = esc.dono_uid === uid || esc.fundador_uid === uid;
+  const ehSocioOuAssociado = socios.some(s => s.uid === uid) || ehDono;
+
+  if (!ehSocioOuAssociado) {
+    // Visão de autogestão para empregado comum (sênior pra baixo, sem sociedade)
+    const fSnap2 = await getDocs(collection(db, 'escritorios', escId, 'funcionarios'));
+    const totalFuncs = fSnap2.size;
+    el.innerHTML = `
+      <div class="secao-header"><div class="secao-titulo">👥 Equipe — ${esc.nome}</div></div>
+      <div class="card" style="text-align:center;padding:1.6rem;color:var(--txt3)">
+        🏢 Este escritório é <b>autogerenciado</b>.<br><br>
+        Você atua como advogado contratado e não participa da gestão de contratações,
+        finanças ou demandas administrativas. Essas decisões cabem aos sócios.<br><br>
+        <span style="font-size:.78rem;color:var(--ouro2)">Equipe atual: ${totalFuncs} funcionário(s) cuidando das demandas do escritório.</span><br>
+        <span style="font-size:.7rem">Para gerenciar um escritório, torne-se sócio ou abra o seu próprio.</span>
+      </div>`;
+    return;
+  }
+
   const tier = esc.tier || 1;
   const cap  = TIER_CAPACIDADE[tier] || TIER_CAPACIDADE[1];
 

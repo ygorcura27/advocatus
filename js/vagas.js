@@ -241,8 +241,32 @@ window._confirmarCandidatura = async function(escId, vagaId, sal) {
 window.sairEscritorio = async function() {
   const j   = window.JOGADOR;
   const uid = j?.uid || window.JOGADOR_UID;
-  if (!confirm('Confirma: sair do escritório e voltar à advocacia solo?')) return;
 
+  // Caso 1: é o DONO do próprio escritório — "sair" significa abandonar a gestão
+  if (j.escritorio_proprio_id) {
+    if (!confirm('Você é o(a) dono(a) deste escritório. Sair significa abandonar a gestão e voltar à advocacia solo. O escritório próprio deixará de existir para você. Confirma?')) return;
+    try {
+      await updateDoc(doc(db, 'jogadores', uid), {
+        escritorio_proprio_id:   null,
+        escritorio_id:           'solo',
+        escritorio_empregado_id: null,
+        escritorio_nome:         null,
+        escritorio_tier:         null,
+        escritorio_esp:          null,
+        escritorio_bairro:       null,
+        vaga_tipo:               'contencioso',
+        sal_base_escritorio:     0,
+      });
+      toast('Você abandonou a gestão do escritório e voltou à advocacia solo.', 'neutro', 5000);
+      setTimeout(()=>window.navTo&&window.navTo('escritorio',null), 600);
+    } catch (err) {
+      toast('Erro ao sair do escritório.', 'ko');
+    }
+    return;
+  }
+
+  // Caso 2: é EMPREGADO de um escritório (NPC ou de outro jogador)
+  if (!confirm('Confirma: sair do escritório e voltar à advocacia solo?')) return;
   try {
     await updateDoc(doc(db, 'jogadores', uid), {
       escritorio_id:           'solo',
@@ -255,6 +279,7 @@ window.sairEscritorio = async function() {
       sal_base_escritorio:     0,
     });
     toast('Você voltou à advocacia solo.', 'neutro');
+    setTimeout(()=>window.navTo&&window.navTo('escritorio',null), 600);
   } catch (err) {
     toast('Erro.', 'ko');
   }

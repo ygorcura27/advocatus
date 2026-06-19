@@ -440,62 +440,183 @@ async function _finalizarConcurso() {
 // ════════════════════════════════════════════════════════
 // CURSOS
 // ════════════════════════════════════════════════════════
+const ENERGIA_FREQUENTAR_AULA = 8;
+
 window.renderCursosPanel = function(j, el) {
-  const feitos = j.cursos_feitos || [];
-  const cap    = window.REP_CAP[j.cargo_id] || 55;
+  const feitos      = j.cursos_feitos || [];
+  const matriculas  = j.cursos_matriculas || {}; // { cursoId: { mes_inicio, presencas, faltas, mes_pessoal_inicio, ano_pessoal_inicio } }
+  const cap         = window.REP_CAP[j.cargo_id] || 55;
+
   el.innerHTML = `
     <div class="secao-header"><div class="secao-titulo">🎓 Cursos & Pós-Graduação</div></div>
     <div style="font-size:.75rem;color:var(--ardosia2);margin-bottom:1rem">
-      Cursos aumentam 2 skills simultaneamente. O custo é deduzido do saldo.
+      Cursos levam meses para concluir. Frequente a aula todo mês — abaixo de 75% de presença, você é reprovado.
     </div>
     <div style="display:flex;flex-direction:column;gap:.5rem">
       ${CURSOS.map(c=>{
-        const feito   = feitos.includes(c.id);
-        const reqIdx  = CARGO_IDX[c.req]??0;
-        const meuIdx  = CARGO_IDX[j.cargo_id]??0;
-        const podeReq = meuIdx >= reqIdx;
-        return `<div class="card" style="opacity:${feito||!podeReq?.65:1}">
+        const feito      = feitos.includes(c.id);
+        const matricula  = matriculas[c.id];
+        const reqIdx     = CARGO_IDX[c.req]??0;
+        const meuIdx     = CARGO_IDX[j.cargo_id]??0;
+        const podeReq    = meuIdx >= reqIdx;
+
+        let acaoHtml;
+        if (feito) {
+          acaoHtml = `<span style="font-size:.72rem;color:var(--verde3);flex-shrink:0">✅ Concluído</span>`;
+        } else if (matricula && matricula.status==='reprovado') {
+          acaoHtml = `<span style="font-size:.68rem;color:var(--verm3);flex-shrink:0">❌ Reprovado</span>`;
+        } else if (matricula && matricula.status==='em_andamento') {
+          const mesesPassados = _mesesDesdeMatricula(j, matricula);
+          const presencas = matricula.presencas||0;
+          const jaFrequentouMes = matricula.ultimo_mes_frequentado===mesTotalPessoal(j);
+          acaoHtml = `<div style="text-align:right">
+            <div style="font-size:.65rem;color:var(--ardosia2)">${presencas}/${mesesPassados} aulas · mês ${mesesPassados+1}/${c.sem}</div>
+            <button class="btn btn-sm btn-sec" ${jaFrequentouMes?'disabled':''} onclick="window.frequentarAula('${c.id}')">
+              ${jaFrequentouMes?'✓ Frequentou':'Frequentar (-'+ENERGIA_FREQUENTAR_AULA+'⚡)'}
+            </button>
+          </div>`;
+        } else if (!podeReq) {
+          acaoHtml = `<span style="font-size:.72rem;color:var(--ardosia);flex-shrink:0">🔒</span>`;
+        } else if ((j.dinheiro||0)>=c.c) {
+          acaoHtml = `<button class="btn btn-sm btn-sec" onclick="window.matricularCurso('${c.id}')">Matricular-se</button>`;
+        } else {
+          acaoHtml = `<span style="font-size:.68rem;color:var(--ardosia);flex-shrink:0">Sem saldo</span>`;
+        }
+
+        return `<div class="card" style="opacity:${feito||(matricula&&matricula.status==='reprovado')||!podeReq?.7:1}">
           <div style="display:flex;align-items:center;gap:.75rem">
             <div style="font-size:1.6rem;flex-shrink:0">${c.i}</div>
             <div style="flex:1">
               <div class="card-titulo">${c.n}</div>
               <div class="card-sub">${c.sem} meses · ${fmt(c.c)}</div>
               <div style="font-size:.7rem;color:var(--ouro2);margin-top:.2rem">
-                +${c.b} ${SK_LABEL[c.sk]||c.sk} · +${c.b2} ${SK_LABEL[c.sk2]||c.sk2}
+                +${c.b} ${SK_LABEL[c.sk]||c.sk} · +${c.b2} ${SK_LABEL[c.sk2]||c.sk2} (ao concluir)
               </div>
               ${!podeReq?`<div style="font-size:.65rem;color:var(--verm3)">Requer: ${CARGOS.find(x=>x.id===c.req)?.l||c.req}</div>`:''}
             </div>
-            ${feito ? `<span style="font-size:.72rem;color:var(--verde3);flex-shrink:0">✅ Concluído</span>` :
-            !podeReq ? `<span style="font-size:.72rem;color:var(--ardosia);flex-shrink:0">🔒</span>` :
-            (j.dinheiro||0)>=c.c ? `<button class="btn btn-sm btn-sec" onclick="window.fazerCurso('${c.id}')">Fazer</button>` :
-            `<span style="font-size:.68rem;color:var(--ardosia);flex-shrink:0">Sem saldo</span>`}
+            ${acaoHtml}
           </div>
         </div>`;
       }).join('')}
     </div>`;
 };
 
-window.fazerCurso = async function(id) {
-  const c  = CURSOS.find(x=>x.id===id);
-  const j  = window.JOGADOR;
+function mesTotalPessoal(j) {
+  return (j.ano_pessoal||1)*12 + (j.mes_pessoal||0);
+}
+function _mesesDesdeMatricula(j, matricula) {
+  return Math.max(0, mesTotalPessoal(j) - matricula.mes_total_inicio);
+}
+
+window.matricularCurso = async function(id) {
+  const c   = CURSOS.find(x=>x.id===id);
+  const j   = window.JOGADOR;
   const uid = j.uid||window.JOGADOR_UID;
   if (!c||!j) return;
   if ((j.dinheiro||0)<c.c){toast('Saldo insuficiente.','ko');return;}
-  if ((j.cursos_feitos||[]).includes(c.id)){toast('Curso já realizado.','');return;}
+  if ((j.cursos_feitos||[]).includes(c.id)){toast('Curso já concluído.','');return;}
 
-  const cap  = window.REP_CAP[j.cargo_id]||55;
-  const sk1  = Math.min(cap, ((j.skills||{})[c.sk]||0)+c.b);
-  const sk2  = Math.min(cap, ((j.skills||{})[c.sk2]||0)+c.b2);
+  const matriculas = j.cursos_matriculas||{};
+  if (matriculas[c.id] && matriculas[c.id].status==='em_andamento') {
+    toast('Você já está matriculado neste curso.','ko'); return;
+  }
+
+  matriculas[c.id] = {
+    status: 'em_andamento',
+    mes_total_inicio: mesTotalPessoal(j),
+    presencas: 0,
+    ultimo_mes_frequentado: null,
+  };
 
   await updateDoc(doc(db,'jogadores',uid),{
-    dinheiro:         (j.dinheiro||0)-c.c,
-    cursos_feitos:    [...(j.cursos_feitos||[]),c.id],
-    [`skills.${c.sk}`]:sk1,
-    [`skills.${c.sk2}`]:sk2,
-    reputacao:        Math.min(100,(j.reputacao||30)+4),
+    dinheiro: (j.dinheiro||0)-c.c,
+    cursos_matriculas: matriculas,
   });
-  toast(`${c.i} ${c.n} concluído! +${c.b} ${SK_LABEL[c.sk]} · +${c.b2} ${SK_LABEL[c.sk2]}`,'ok');
+  toast(`${c.i} Matrícula confirmada em ${c.n}! Frequente as aulas mensalmente — ${c.sem} meses de duração.`,'ok',5000);
+  setTimeout(()=>window.navTo&&window.navTo('cursos',null),600);
 };
+
+window.frequentarAula = async function(id) {
+  const c   = CURSOS.find(x=>x.id===id);
+  const j   = window.JOGADOR;
+  const uid = j.uid||window.JOGADOR_UID;
+  if (!c||!j) return;
+
+  const matriculas = j.cursos_matriculas||{};
+  const m = matriculas[c.id];
+  if (!m || m.status!=='em_andamento') return;
+
+  const mesAtualTotal = mesTotalPessoal(j);
+  if (m.ultimo_mes_frequentado===mesAtualTotal) { toast('Você já frequentou a aula este mês.','ko'); return; }
+
+  const usado = j.energia_usada_mes||0;
+  const disp  = Math.max(0,(window.getEnergiaTotal?window.getEnergiaTotal(j):100)-usado);
+  if (disp < ENERGIA_FREQUENTAR_AULA) { toast(`⚡ Energia insuficiente (requer ${ENERGIA_FREQUENTAR_AULA}).`,'ko'); return; }
+
+  m.presencas = (m.presencas||0)+1;
+  m.ultimo_mes_frequentado = mesAtualTotal;
+  matriculas[c.id]=m;
+
+  await updateDoc(doc(db,'jogadores',uid),{
+    cursos_matriculas: matriculas,
+    energia_usada_mes: usado+ENERGIA_FREQUENTAR_AULA,
+  });
+  toast(`📖 Aula frequentada! Presença: ${m.presencas}/${_mesesDesdeMatricula(j,m)+1} meses.`,'ok',3000);
+  setTimeout(()=>window.navTo&&window.navTo('cursos',null),500);
+};
+
+/**
+ * Chamado pelo avancar_mes.js todo mês — verifica cursos que completaram
+ * a duração total e decide aprovação (>=75% de frequência) ou reprovação.
+ */
+export async function processarCursosMensal(j) {
+  const uid = j.uid||window.JOGADOR_UID;
+  const matriculas = j.cursos_matriculas||{};
+  let cursosFeitos = [...(j.cursos_feitos||[])];
+  let updatesSkills = {};
+  let mudou=false;
+  let notificacoes=[];
+
+  for (const [cursoId, m] of Object.entries(matriculas)) {
+    if (m.status!=='em_andamento') continue;
+    const c = CURSOS.find(x=>x.id===cursoId);
+    if (!c) continue;
+
+    const mesesPassados = mesTotalPessoal(j) - m.mes_total_inicio;
+    if (mesesPassados < c.sem) continue; // ainda não terminou a duração
+
+    const frequencia = (m.presencas||0)/c.sem;
+    if (frequencia >= 0.75) {
+      const cap = window.REP_CAP[j.cargo_id]||55;
+      const sk1 = Math.min(cap, ((j.skills||{})[c.sk]||0)+c.b);
+      const sk2 = Math.min(cap, ((j.skills||{})[c.sk2]||0)+c.b2);
+      updatesSkills[`skills.${c.sk}`]=sk1;
+      updatesSkills[`skills.${c.sk2}`]=sk2;
+      cursosFeitos.push(cursoId);
+      m.status='concluido';
+      notificacoes.push({assunto:`🎓 Aprovado: ${c.n}`,corpo:`Você concluiu o curso com ${Math.round(frequencia*100)}% de frequência! +${c.b} ${SK_LABEL[c.sk]} · +${c.b2} ${SK_LABEL[c.sk2]}.`,tipo:'positivo'});
+    } else {
+      m.status='reprovado';
+      notificacoes.push({assunto:`❌ Reprovado: ${c.n}`,corpo:`Frequência de apenas ${Math.round(frequencia*100)}% — abaixo dos 75% exigidos. Você não foi aprovado e perdeu o investimento.`,tipo:'negativo'});
+    }
+    mudou=true;
+  }
+
+  if (mudou) {
+    await updateDoc(doc(db,'jogadores',uid), {
+      cursos_matriculas: matriculas,
+      cursos_feitos: cursosFeitos,
+      ...updatesSkills,
+    });
+    for (const n of notificacoes) {
+      await addDoc(collection(db,'jogadores',uid,'inbox'), {
+        de:'sistema', para_uid:uid, assunto:n.assunto, corpo:n.corpo,
+        tipo:'sistema', tipo_noticia:n.tipo, lida:false, criado_em:new Date().toISOString(),
+      });
+    }
+  }
+}
+window._processarCursosMensal = processarCursosMensal;
 
 // ════════════════════════════════════════════════════════
 // CONTRATAÇÃO DE EQUIPE

@@ -384,6 +384,11 @@ export async function processarServicosMensal(j) {
     await addDoc(collection(db,'escritorios',escId,'oportunidades'), { ...op, status:'disponivel' });
   }
 
+  // ── 2.1 AUTOGESTÃO: se não há jogador-dono ativo gerenciando, os próprios
+  // funcionários (advogados/sêniores) resolvem as oportunidades automaticamente,
+  // gerando receita contínua para o caixa mesmo sem o dono presente. ──
+  await _processarAutogestaoOportunidades(escId, esc);
+
   // ── 3. Cobrar clientes recorrentes ──
   let receitaRecorrente = 0;
   const clRecSnap = await getDocs(query(collection(db,'escritorios',escId,'clientes'), where('recorrente','==',true)));
@@ -415,6 +420,71 @@ export async function processarServicosMensal(j) {
 }
 
 window._processarServicosMensal = processarServicosMensal;
+
+// ════════════════════════════════════════════════════════
+// AUTOGESTÃO — funcionários resolvem oportunidades sozinhos
+// quando não há sócio/dono ativo gerenciando manualmente.
+// Garante que o escritório nunca fica sem renda mesmo abandonado.
+// ════════════════════════════════════════════════════════
+async function _processarAutogestaoOportunidades(escId, esc) {
+  // Verificar se existe pelo menos um sócio/dono "ativo" (jogador real presente)
+  // Simplificação: se o escritório não tem nenhum funcionário advogado (jnr+),
+  // não há quem resolva sozinho — fica só pro dono mesmo.
+  const fSnap = await getDocs(collection(db,'escritorios',escId,'funcionarios'));
+  const advogadosAtivos = fSnap.docs
+    .map(d=>({id:d.id,...d.data()}))
+    .filter(f => ['jnr','pln','snr'].includes(f.cargo_id) && f.ativo!==false);
+
+  if (advogadosAtivos.length === 0) return; // ninguém pra autogerenciar
+
+  // Pegar oportunidades disponíveis e resolver uma fração automaticamente
+  // (representa o escritório funcionando "no piloto automático")
+  const opSnap = await getDocs(query(
+    collection(db,'escritorios',escId,'oportunidades'),
+    where('status','==','disponivel')
+  ));
+
+  const PRODUTIVIDADE_CARGO_AUTO = { jnr:1.0, pln:1.0, snr:1.0 };
+  let caixaGanho = 0;
+  let resolvidas = 0;
+
+  for (const opDoc of opSnap.docs) {
+    const op = opDoc.data();
+    // Cada advogado resolve no máximo ~2 oportunidades/mês sozinho, distribuído entre eles
+    const capacidadeTotal = advogadosAtivos.length * 2;
+    if (resolvidas >= capacidadeTotal) break;
+
+    const advogadorResolvedor = advogadosAtivos[resolvidas % advogadosAtivos.length];
+    const fracao = PRODUTIVIDADE_CARGO_AUTO[advogadorResolvedor.cargo_id] || 0.8;
+    const valorRecebido = Math.floor(op.valor * fracao);
+
+    caixaGanho += valorRecebido;
+    resolvidas++;
+
+    await updateDoc(doc(db,'escritorios',escId,'oportunidades',opDoc.id), {
+      status:'concluido', valor_recebido:valorRecebido, executor:advogadorResolvedor.nome+' (autogestão)',
+    });
+
+    // Registrar/atualizar cliente na carteira (mesma lógica do fluxo manual)
+    const clSnap = await getDocs(query(collection(db,'escritorios',escId,'clientes'), where('nome','==',op.cliente_nome)));
+    if (clSnap.empty) {
+      await addDoc(collection(db,'escritorios',escId,'clientes'), {
+        nome: op.cliente_nome, tipo: op.cliente_tipo, porte: op.cliente_porte||null,
+        confianca: CONFIANCA_INICIAL + (op.confianca_gerada||0),
+        recorrente:false, valor_mensal:0, criado_em:new Date().toISOString(),
+      });
+    } else {
+      const cDoc=clSnap.docs[0]; const c=cDoc.data();
+      await updateDoc(doc(db,'escritorios',escId,'clientes',cDoc.id), {
+        confianca: Math.min(100,(c.confianca||50)+(op.confianca_gerada||0)),
+      });
+    }
+  }
+
+  if (caixaGanho > 0) {
+    await updateDoc(doc(db,'escritorios',escId), { caixa: (esc.caixa||0) + caixaGanho });
+  }
+}
 
 // ════════════════════════════════════════════════════════
 // HELPERS

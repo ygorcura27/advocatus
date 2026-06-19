@@ -155,15 +155,24 @@ function _botaoProgresso(r) {
   </button>`;
 }
 
+function _formatarIdade(idadeMeses) {
+  const anos  = Math.floor((idadeMeses||0) / 12);
+  const meses = (idadeMeses||0) % 12;
+  if (anos === 0) return meses===1 ? '1 mês' : `${meses} meses`;
+  if (meses === 0) return anos===1 ? '1 ano' : `${anos} anos`;
+  return `${anos} ${anos===1?'ano':'anos'} e ${meses} ${meses===1?'mês':'meses'}`;
+}
+
 function _cardFilho(f) {
-  const idade = f.idade || 0;
-  const custo = custoFilhoPorIdade(idade);
+  const idadeMeses = f.idade_meses!==undefined ? f.idade_meses : Math.round((f.idade||0)*12);
+  const idadeAnosCompletos = Math.floor(idadeMeses/12);
+  const custo = custoFilhoPorIdade(idadeAnosCompletos);
   return `
     <div class="card" style="margin-bottom:.5rem">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div>
           <div style="font-weight:700;color:var(--navy);font-size:.85rem">${f.sexo==='m'?'👦':'👧'} ${f.nome}</div>
-          <div style="font-size:.68rem;color:var(--txt3)">${idade} anos ${f.faculdade?`· Cursando ${f.faculdade}`:''}</div>
+          <div style="font-size:.68rem;color:var(--txt3)">${_formatarIdade(idadeMeses)} ${f.faculdade?`· Cursando ${f.faculdade}`:''}</div>
         </div>
         <div style="text-align:right">
           <div style="font-size:.7rem;color:var(--verm2)">-R$ ${custo}/mês</div>
@@ -452,10 +461,16 @@ export async function processarRelacionamentosMensal(j) {
   const temNamoradaOuMais = rels.some(r => r.estagio !== 'affair');
   let smDelta = 0;
   let felicidadeSomaCompat = 0, felicidadeCount = 0;
+  const mesTotalAtual = (j.ano_pessoal||1)*12 + (j.mes_pessoal||0);
 
   for (const r of rels) {
+    // Guarda de idempotência: se este relacionamento já foi processado neste
+    // mês do jogo, pula — evita duplo processamento de gravidez/decaimento
+    // quando a função é chamada mais de uma vez no mesmo avanço de mês.
+    if (r._mes_processado === mesTotalAtual) continue;
+
     const estagio = ESTAGIOS[r.estagio] || ESTAGIOS.affair;
-    const upd = {};
+    const upd = { _mes_processado: mesTotalAtual };
 
     // Decaimento se não interagiu
     if (!r._ganho_mes_atual) {
@@ -543,18 +558,23 @@ export async function processarRelacionamentosMensal(j) {
   updatesJogador.felicidade   = novaFelicidade;
 
   // ── Filhos: envelhecer e cobrar custos ──
+  // Idade armazenada em MESES inteiros (evita acúmulo de erro de float).
+  // idade_anos (campo legado/derivado) é calculado só para exibição.
   const filhosSnap = await getDocs(collection(db,'jogadores',uid,'filhos'));
   let custoFilhos = 0;
   for (const fDoc of filhosSnap.docs) {
     const f = fDoc.data();
-    const novaIdade = (f.idade||0) + (1/12); // incremento mensal aproximado
-    custoFilhos += custoFilhoPorIdade(f.idade||0);
-    const upd = { idade: novaIdade };
-    if (Math.floor(novaIdade) >= 18 && !f.faculdade) {
-      // Trigger de escolha de faculdade (simplificado: aleatório por ora)
+    const idadeMesesAtual = f.idade_meses!==undefined ? f.idade_meses : Math.round((f.idade||0)*12); // migração de dados antigos
+    const novaIdadeMeses  = idadeMesesAtual + 1;
+    const idadeAnosCompletos = Math.floor(novaIdadeMeses/12);
+
+    custoFilhos += custoFilhoPorIdade(Math.floor(idadeMesesAtual/12));
+    const upd = { idade_meses: novaIdadeMeses, idade: idadeAnosCompletos }; // idade = anos completos, inteiro, sem float
+
+    if (idadeAnosCompletos >= 18 && !f.faculdade) {
       upd.faculdade = Math.random() < 0.3 ? 'Direito' : ['Medicina','Engenharia','Administração'][Math.floor(Math.random()*3)];
     }
-    if (Math.floor(novaIdade) >= 22 && f.faculdade === 'Direito' && !f.jogavel) {
+    if (idadeAnosCompletos >= 22 && f.faculdade === 'Direito' && !f.jogavel) {
       upd.jogavel = true;
     }
     await updateDoc(doc(db,'jogadores',uid,'filhos',fDoc.id), upd);
@@ -580,7 +600,7 @@ async function _gerarFilho(uid, relacionamento) {
   const nome = NOMES_BEBE[sexo][Math.floor(Math.random()*NOMES_BEBE[sexo].length)];
 
   await addDoc(collection(db,'jogadores',uid,'filhos'), {
-    nome, sexo, idade:0,
+    nome, sexo, idade:0, idade_meses:0,
     mae_ou_pai: relacionamento.nome,
     faculdade: null, jogavel:false,
     criado_em: new Date().toISOString(),
