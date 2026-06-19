@@ -464,6 +464,42 @@ body { background: var(--couro); overflow: hidden; }
         <div id="carreira-info"></div>
       </div>
 
+      <div class="campo">
+        <label>Perfil inicial — distribui 10 pontos extras de skill</label>
+        <div class="carreira-grid" id="perfil-grid">
+          <div class="carreira-card" data-perfil="pesquisador" onclick="selecionarPerfil(this)">
+            <span class="ic">🔬</span>
+            <div class="nm">Pesquisador</div>
+            <div class="ds">+6 Pesquisa · +4 Escrita</div>
+          </div>
+          <div class="carreira-card" data-perfil="contencioso" onclick="selecionarPerfil(this)">
+            <span class="ic">⚔️</span>
+            <div class="nm">Contencioso</div>
+            <div class="ds">+6 Argumentação · +4 Oratória</div>
+          </div>
+          <div class="carreira-card" data-perfil="consultivo" onclick="selecionarPerfil(this)">
+            <span class="ic">📋</span>
+            <div class="nm">Consultivo</div>
+            <div class="ds">+6 Escrita · +4 Pesquisa</div>
+          </div>
+          <div class="carreira-card" data-perfil="comercial" onclick="selecionarPerfil(this)">
+            <span class="ic">🤝</span>
+            <div class="nm">Comercial</div>
+            <div class="ds">+6 Negociação · +4 Networking</div>
+          </div>
+          <div class="carreira-card" data-perfil="peticionante" onclick="selecionarPerfil(this)">
+            <span class="ic">✍️</span>
+            <div class="nm">Peticionante</div>
+            <div class="ds">+6 Escrita · +4 Argumentação</div>
+          </div>
+          <div class="carreira-card" data-perfil="audiencista" onclick="selecionarPerfil(this)">
+            <span class="ic">🎤</span>
+            <div class="nm">Audiencista</div>
+            <div class="ds">+6 Oratória · +4 Persuasão</div>
+          </div>
+        </div>
+      </div>
+
       <div id="msg-erro-criacao" style="font-size:.75rem;color:#C88A8A;min-height:1.2rem;margin-bottom:.5rem"></div>
 
       <button class="btn-prim" id="btn-criar" disabled onclick="criarPersonagem()">
@@ -488,27 +524,19 @@ import { getFirestore, doc, getDoc, setDoc, collection,
          query, orderBy, limit, getDocs }               from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 // ── Config Firebase ──
-const FB_CONFIG = {
-  apiKey:            "AIzaSyCiGvGA2OUYSGp2BHM-K05tM39hPk40trY",
-  authDomain:        "advocatus-simultor.firebaseapp.com",
-  projectId:         "advocatus-simultor",
-  storageBucket:     "advocatus-simultor.firebasestorage.app",
-  messagingSenderId: "527755299061",
-  appId:             "1:527755299061:web:cc75b6f9912d13a44a5dbc",
+const FB = {
+  apiKey:            "AIzaSyAjKvYGvb8kFasxaYzze4A5mnsdSjEFOXQ",
+  authDomain:        "advocatus-57f24.firebaseapp.com",
+  projectId:         "advocatus-57f24",
+  storageBucket:     "advocatus-57f24.firebasestorage.app",
+  messagingSenderId: "799917424990",
+  appId:             "1:799917424990:web:064c2d7ce678b901ff8fcf",
 };
-const app  = initializeApp(FB_CONFIG);
+const app  = initializeApp(FB);
 const auth = getAuth(app);
 const db   = getFirestore(app);
 const gp   = new GoogleAuthProvider();
-window.fazerLogin = async function() {
-  try {
-    await signInWithPopup(auth, gp);
-  } catch (err) {
-    console.error(err);
-    const el = document.getElementById('msg-erro');
-    if (el) el.textContent = err.message;
-  }
-};
+
 // ── Estado global ──
 window._auth = auth;
 window._db   = db;
@@ -607,7 +635,7 @@ const CARREIRA_INFO = {
 };
 
 window.selecionarCarreira = (el) => {
-  document.querySelectorAll('.carreira-card').forEach(c => c.classList.remove('selecionado'));
+  document.querySelectorAll('.carreira-card[data-carreira]').forEach(c => c.classList.remove('selecionado'));
   el.classList.add('selecionado');
   const info = document.getElementById('carreira-info');
   info.textContent = CARREIRA_INFO[el.dataset.carreira] || '';
@@ -615,11 +643,18 @@ window.selecionarCarreira = (el) => {
   validarCriacao();
 };
 
+window.selecionarPerfil = (el) => {
+  document.querySelectorAll('.carreira-card[data-perfil]').forEach(c => c.classList.remove('selecionado'));
+  el.classList.add('selecionado');
+  validarCriacao();
+};
+
 window.validarCriacao = () => {
-  const nome = document.getElementById('inp-nome').value.trim();
-  const esp  = document.getElementById('inp-esp').value;
-  const carr = document.querySelector('.carreira-card.selecionado');
-  document.getElementById('btn-criar').disabled = !(nome.length >= 3 && esp && carr);
+  const nome  = document.getElementById('inp-nome').value.trim();
+  const esp   = document.getElementById('inp-esp').value;
+  const carr  = document.querySelector('.carreira-card[data-carreira].selecionado');
+  const perf  = document.querySelector('.carreira-card[data-perfil].selecionado');
+  document.getElementById('btn-criar').disabled = !(nome.length >= 3 && esp && carr && perf);
 };
 
 // ── Criar personagem ──
@@ -629,11 +664,12 @@ window.criarPersonagem = async () => {
 
   const nome     = document.getElementById('inp-nome').value.trim();
   const esp      = document.getElementById('inp-esp').value;
-  const carreira = document.querySelector('.carreira-card.selecionado')?.dataset.carreira;
+  const carreira = document.querySelector('.carreira-card[data-carreira].selecionado')?.dataset.carreira;
+  const perfil   = document.querySelector('.carreira-card[data-perfil].selecionado')?.dataset.perfil;
   const errEl    = document.getElementById('msg-erro-criacao');
 
-  if (!nome || !esp || !carreira) {
-    errEl.textContent = 'Preencha todos os campos.';
+  if (!nome || !esp || !carreira || !perfil) {
+    errEl.textContent = 'Preencha todos os campos, incluindo o perfil inicial.';
     return;
   }
   if (nome.length < 3 || nome.length > 50) {
@@ -651,20 +687,26 @@ window.criarPersonagem = async () => {
     const serverSnap = await getDoc(doc(db, 'config', 'server'));
     const mesGlobal  = serverSnap.exists() ? (serverSnap.data().mes_global || 1) : 1;
 
-    // Boost de skill por especialização
-    const SK_BOOST = {
-      tributario:     'pesquisa',    trabalhista: 'oratoria',
-      civil:          'escrita',     criminal:    'argumentacao',
-      empresarial:    'negociacao',  constitucional:'argumentacao',
-      ambiental:      'pesquisa',    previdenciario:'escrita',
-    };
-    const skBoostKey = SK_BOOST[esp];
+    // Base de skills — todas começam em 10 (sem boost de especialização)
     const skills = {
-      oratoria:15, argumentacao:15, escrita:15,
-      pesquisa:18, negociacao:12, persuasao:12,
-      gestao:8,   networking:10,
+      oratoria:10, argumentacao:10, escrita:10,
+      pesquisa:10, negociacao:10, persuasao:10,
+      gestao:5,   networking:5,
     };
-    if (skBoostKey) skills[skBoostKey] = (skills[skBoostKey] || 0) + 12;
+
+    // 10 pontos extras distribuídos conforme o PERFIL escolhido (6+4)
+    const PERFIL_BOOST = {
+      pesquisador:  { pesquisa:6,     escrita:4      },
+      contencioso:  { argumentacao:6, oratoria:4     },
+      consultivo:   { escrita:6,      pesquisa:4     },
+      comercial:    { negociacao:6,   networking:4   },
+      peticionante: { escrita:6,      argumentacao:4 },
+      audiencista:  { oratoria:6,     persuasao:4    },
+    };
+    const boost = PERFIL_BOOST[perfil] || {};
+    for (const [sk, val] of Object.entries(boost)) {
+      skills[sk] = (skills[sk]||0) + val;
+    }
 
     const personagem = {
       uid:              user.uid,
@@ -673,6 +715,7 @@ window.criarPersonagem = async () => {
       nome_personagem:  nome,
       especialidade:    esp,
       carreira,
+      perfil_inicial:   perfil,
       criado_em:        new Date().toISOString(),
       ultimo_login:     new Date().toISOString(),
 
@@ -685,9 +728,9 @@ window.criarPersonagem = async () => {
       mes_global_inicio:mesGlobal,
       idade:            22,
 
-      // Atributos
-      reputacao:             30,
-      networking:            10,
+      // Atributos — reputação ZERADA (precisa construir do zero)
+      reputacao:             0,
+      networking:            5,
       saude_mental:          80,
       disposicao:            80,
       prestigio_academico:   0,
@@ -696,16 +739,16 @@ window.criarPersonagem = async () => {
 
       skills,
 
-      // Financeiro
-      dinheiro:              carreira === 'adv_privado' ? 12000 : 15000,
+      // Financeiro — capital inicial reduzido, reflete começo de carreira real
+      dinheiro:              5000,
       meses_negativo:        0,
       meses_positivo_streak: 0,
       no_serasa:             false,
       renda_calculada:       0,
       despesas_calculadas:   0,
 
-      // Moradia
-      pat: { moradia:'pais', transporte:'onibus', escritorio:'cw' },
+      // Moradia — mora com os pais por padrão
+      pat: { moradia:'pais', transporte:'onibus', escritorio:'home' },
       moradias_compradas:    {},
       prazo_sair_pais:       0,
       mora_com_pais:         true,
@@ -713,7 +756,7 @@ window.criarPersonagem = async () => {
       // Transporte
       financiamentos:        {},
 
-      // Escritório
+      // Escritório — HOME OFFICE por padrão (não coworking)
       escritorio_id:          'solo',
       escritorio_empregado_id:null,
       escritorio_proprio_id:  null,
