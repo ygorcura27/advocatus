@@ -21,14 +21,27 @@ window.renderVagas = async function(j, el) {
   const esp         = j.especialidade || 'civil';
   const presPerc    = prestigioNoTier(j);
 
-  // ── Buscar convites pendentes na inbox (convite_npc / promocao_npc) ──
+  // ── Buscar convites pendentes na inbox (convite_npc / promocao_npc / convite_escritorio) ──
   const convitesSnap = await getDocs(query(
     collection(db, 'jogadores', uid, 'inbox'),
-    where('tipo', 'in', ['convite_npc', 'promocao_npc'])
+    where('tipo', 'in', ['convite_npc', 'promocao_npc', 'convite_escritorio'])
   ));
-  const convites = convitesSnap.docs
+  const convitesRaw = convitesSnap.docs
     .map(d => ({ id: d.id, ...d.data() }))
     .filter(c => c.status !== 'recusado' && c.status !== 'aceito');
+
+  // Convites de escritórios reais (entre jogadores) precisam buscar o nome/dados do escritório
+  const convites = [];
+  for (const c of convitesRaw) {
+    if (c.tipo === 'convite_escritorio') {
+      const escRealSnap = await getDoc(doc(db, 'escritorios', c.esc_id));
+      if (escRealSnap.exists()) {
+        convites.push({ ...c, _escritorioReal: { id: c.esc_id, ...escRealSnap.data() } });
+      }
+    } else {
+      convites.push(c);
+    }
+  }
 
   // Escritórios com vaga aberta este mês
   const comVaga = compativeis.filter(esc => temVagaAberta(esc));
@@ -221,6 +234,29 @@ window.candidatarVaga = async function(escId, vagaId) {
 // CONVITES RECEBIDOS (inbox: convite_npc / promocao_npc)
 // ════════════════════════════════════════════════════════
 function _cardConvite(c) {
+  if (c.tipo === 'convite_escritorio') {
+    const esc = c._escritorioReal;
+    if (!esc) return '';
+    const CARGO_L = { est:'Estagiário', ass:'Assistente Jurídico', jnr:'Advogado Júnior', pln:'Advogado Pleno', snr:'Advogado Sênior' };
+    const CARGO_SAL = { est:1700, ass:2500, jnr:3500, pln:5500, snr:9000 };
+    const cargoLabel = CARGO_L[c.cargo_id] || c.cargo_id;
+    const sal = CARGO_SAL[c.cargo_id] || 0;
+    return `
+      <div class="card" style="border-left:3px solid var(--verde2)">
+        <div style="display:flex;align-items:start;justify-content:space-between;gap:.8rem">
+          <div style="flex:1">
+            <div style="font-weight:700;font-size:.85rem;color:var(--navy)">🏛️ Convite de Sócio — ${esc.nome}</div>
+            <div style="font-size:.7rem;color:var(--ouro2);margin:.2rem 0">${cargoLabel} · Escritório de jogador real</div>
+            <div style="font-size:.72rem;color:var(--txt3)">Salário: <b style="color:var(--verde2)">R$ ${sal.toLocaleString('pt-BR')}/mês</b></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:.4rem;margin-top:.6rem">
+          <button class="btn btn-sm btn-prim" onclick="window.aceitarConviteEscritorio('${c.id}')">Aceitar</button>
+          <button class="btn btn-sm btn-ghost" onclick="window.recusarConvite('${c.id}')">Recusar</button>
+        </div>
+      </div>`;
+  }
+
   const isPromo = c.tipo === 'promocao_npc';
   const esc     = ESCRITORIOS_NPC.find(e => e.id === c.esc_id);
   const vaga    = TIPOS_VAGA[c.vaga_id];
@@ -243,6 +279,43 @@ function _cardConvite(c) {
       </div>
     </div>`;
 }
+
+window.aceitarConviteEscritorio = async function(msgId) {
+  const j   = window.JOGADOR;
+  const uid = j?.uid || window.JOGADOR_UID;
+
+  const msgSnap = await getDoc(doc(db, 'jogadores', uid, 'inbox', msgId));
+  if (!msgSnap.exists()) { toast('Convite não encontrado.', 'ko'); return; }
+  const c = msgSnap.data();
+
+  const escSnap = await getDoc(doc(db, 'escritorios', c.esc_id));
+  if (!escSnap.exists()) { toast('Escritório não existe mais.', 'ko'); return; }
+  const esc = escSnap.data();
+
+  const CARGO_SAL = { est:1700, ass:2500, jnr:3500, pln:5500, snr:9000 };
+  const sal = CARGO_SAL[c.cargo_id] || 0;
+
+  try {
+    await updateDoc(doc(db, 'jogadores', uid), {
+      escritorio_id:           c.esc_id,
+      escritorio_empregado_id: c.esc_id,
+      escritorio_proprio_id:   null,
+      escritorio_nome:         esc.nome,
+      escritorio_tier:         esc.tier || 1,
+      escritorio_esp:          esc.especialidade || null,
+      escritorio_bairro:       esc.bairro || null,
+      cargo_id:                c.cargo_id,
+      sal_base_escritorio:     sal,
+      derrotas_consecutivas:   0,
+    });
+    await updateDoc(doc(db, 'jogadores', uid, 'inbox', msgId), { status: 'aceito', lida: true });
+    toast(`✅ Bem-vindo(a) a ${esc.nome}!`, 'ok', 5000);
+    setTimeout(() => window.navTo && window.navTo('vagas', null), 600);
+  } catch (err) {
+    toast('Erro ao aceitar convite.', 'ko');
+    console.error(err);
+  }
+};
 
 window.aceitarConvite = async function(msgId) {
   const j   = window.JOGADOR;
