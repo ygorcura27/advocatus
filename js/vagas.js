@@ -295,6 +295,27 @@ window.aceitarConviteEscritorio = async function(msgId) {
   const CARGO_SAL = { est:1700, ass:2500, jnr:3500, pln:5500, snr:9000 };
   const sal = CARGO_SAL[c.cargo_id] || 0;
 
+  // Verificar se ainda há vaga disponível para esse cargo no escritório
+  const TIER_CAPACIDADE = {
+    1: { est:1, ass:1, adv:0 }, 2: { est:2, ass:2, adv:1 },
+    3: { est:3, ass:2, adv:2 }, 4: { est:4, ass:3, adv:3 },
+    5: { est:5, ass:4, adv:4 },
+  };
+  const cap = TIER_CAPACIDADE[esc.tier||1] || TIER_CAPACIDADE[1];
+  const fSnap = await getDocs(collection(db, 'escritorios', c.esc_id, 'funcionarios'));
+  const funcsAtivos = fSnap.docs.map(d=>d.data()).filter(f=>f.ativo!==false);
+  const grupo = c.cargo_id==='est' ? 'est' : c.cargo_id==='ass' ? 'ass' : 'adv';
+  const ocupadas = funcsAtivos.filter(f => {
+    const g = f.cargo_id==='est' ? 'est' : f.cargo_id==='ass' ? 'ass' : 'adv';
+    return g === grupo;
+  }).length;
+  if (ocupadas >= (cap[grupo]||0)) {
+    toast('A vaga já foi ocupada por outro funcionário. Convite expirado.', 'ko', 5000);
+    await updateDoc(doc(db, 'jogadores', uid, 'inbox', msgId), { status: 'recusado', lida: true });
+    setTimeout(() => window.navTo && window.navTo('vagas', null), 600);
+    return;
+  }
+
   try {
     await updateDoc(doc(db, 'jogadores', uid), {
       escritorio_id:           c.esc_id,
@@ -308,6 +329,16 @@ window.aceitarConviteEscritorio = async function(msgId) {
       sal_base_escritorio:     sal,
       derrotas_consecutivas:   0,
     });
+
+    // Registrar o jogador como FUNCIONÁRIO no escritório (aparece pro dono na Equipe)
+    await addDoc(collection(db, 'escritorios', c.esc_id, 'funcionarios'), {
+      nome: j.nome_personagem || 'Advogado', cargo_id: c.cargo_id,
+      tipo: 'jogador', jogador_uid: uid,
+      skills: j.skills || {}, sexo: j.sexo || 'm',
+      ativo: true, acoes_mes_usadas: 0, acao_atual: null,
+      criado_em: new Date().toISOString(),
+    });
+
     await updateDoc(doc(db, 'jogadores', uid, 'inbox', msgId), { status: 'aceito', lida: true });
     toast(`✅ Bem-vindo(a) a ${esc.nome}!`, 'ok', 5000);
     setTimeout(() => window.navTo && window.navTo('vagas', null), 600);
@@ -416,6 +447,21 @@ window.sairEscritorio = async function() {
   // Caso 2: é EMPREGADO de um escritório (NPC ou de outro jogador)
   if (!confirm('Confirma: sair do escritório e voltar à advocacia solo?')) return;
   try {
+    const escIdAntigo = j.escritorio_empregado_id;
+
+    // Se for escritório real (de outro jogador), remover o registro de funcionário
+    if (escIdAntigo) {
+      try {
+        const fSnap = await getDocs(query(
+          collection(db, 'escritorios', escIdAntigo, 'funcionarios'),
+          where('jogador_uid', '==', uid)
+        ));
+        for (const fDoc of fSnap.docs) {
+          await updateDoc(doc(db, 'escritorios', escIdAntigo, 'funcionarios', fDoc.id), { ativo: false, saiu_em: new Date().toISOString() });
+        }
+      } catch (e) { /* escritório NPC não tem essa subcoleção populada — ignora */ }
+    }
+
     await updateDoc(doc(db, 'jogadores', uid), {
       escritorio_id:           'solo',
       escritorio_empregado_id: null,
