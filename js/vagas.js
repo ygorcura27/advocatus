@@ -15,10 +15,20 @@ import {
 // ════════════════════════════════════════════════════════
 // PAINEL DE VAGAS (renderizado em ui-main.js via navTo)
 // ════════════════════════════════════════════════════════
-window.renderVagas = function(j, el) {
+window.renderVagas = async function(j, el) {
+  const uid = j.uid || window.JOGADOR_UID;
   const compativeis = escritoriosCompativeis(j);
   const esp         = j.especialidade || 'civil';
   const presPerc    = prestigioNoTier(j);
+
+  // ── Buscar convites pendentes na inbox (convite_npc / promocao_npc) ──
+  const convitesSnap = await getDocs(query(
+    collection(db, 'jogadores', uid, 'inbox'),
+    where('tipo', 'in', ['convite_npc', 'promocao_npc'])
+  ));
+  const convites = convitesSnap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .filter(c => c.status !== 'recusado' && c.status !== 'aceito');
 
   // Escritórios com vaga aberta este mês
   const comVaga = compativeis.filter(esc => temVagaAberta(esc));
@@ -39,6 +49,15 @@ window.renderVagas = function(j, el) {
   };
 
   el.innerHTML = `
+    ${convites.length > 0 ? `
+    <div class="secao-header">
+      <div class="secao-titulo">📬 Convites Recebidos</div>
+      <span class="secao-badge" style="background:var(--ouro-bg);color:var(--ouro2)">${convites.length} pendente(s)</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:.5rem;margin-bottom:1.4rem">
+      ${convites.map(c => _cardConvite(c)).join('')}
+    </div>` : ''}
+
     <div class="secao-header">
       <div class="secao-titulo">🏢 Vagas Disponíveis</div>
       <span class="secao-badge">${comVaga.length} vaga(s) abertas</span>
@@ -196,6 +215,62 @@ window.candidatarVaga = async function(escId, vagaId) {
     `<button class="btn btn-ghost" onclick="fecharModal()">Cancelar</button>
      <button class="btn btn-prim" onclick="window._confirmarCandidatura('${escId}','${vagaId}',${sal})">Confirmar candidatura →</button>`
   );
+};
+
+// ════════════════════════════════════════════════════════
+// CONVITES RECEBIDOS (inbox: convite_npc / promocao_npc)
+// ════════════════════════════════════════════════════════
+function _cardConvite(c) {
+  const isPromo = c.tipo === 'promocao_npc';
+  const esc     = ESCRITORIOS_NPC.find(e => e.id === c.esc_id);
+  const vaga    = TIPOS_VAGA[c.vaga_id];
+  if (!esc || !vaga) return '';
+
+  return `
+    <div class="card" style="border-left:3px solid ${isPromo?'var(--ouro2)':'var(--navy3)'}">
+      <div style="display:flex;align-items:start;justify-content:space-between;gap:.8rem">
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:.85rem;color:var(--navy)">
+            ${isPromo?'⭐':'📬'} ${isPromo?'Promoção':'Convite'} — ${esc.nome}
+          </div>
+          <div style="font-size:.7rem;color:var(--ouro2);margin:.2rem 0">${vaga.l} · Tier ${esc.tier} · ${esc.bairro}</div>
+          <div style="font-size:.72rem;color:var(--txt3)">Salário: <b style="color:var(--verde2)">R$ ${(c.sal_oferecido||0).toLocaleString('pt-BR')}/mês</b></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:.4rem;margin-top:.6rem">
+        <button class="btn btn-sm btn-prim" onclick="window.aceitarConvite('${c.id}')">Aceitar</button>
+        <button class="btn btn-sm btn-ghost" onclick="window.recusarConvite('${c.id}')">Recusar</button>
+      </div>
+    </div>`;
+}
+
+window.aceitarConvite = async function(msgId) {
+  const j   = window.JOGADOR;
+  const uid = j?.uid || window.JOGADOR_UID;
+
+  const msgSnap = await getDoc(doc(db, 'jogadores', uid, 'inbox', msgId));
+  if (!msgSnap.exists()) { toast('Convite não encontrado.', 'ko'); return; }
+  const c = msgSnap.data();
+
+  // Marca o convite como aceito/lido antes de aplicar a candidatura
+  await updateDoc(doc(db, 'jogadores', uid, 'inbox', msgId), { status: 'aceito', lida: true });
+
+  // Reaproveita a lógica já existente de candidatura
+  await window._confirmarCandidatura(c.esc_id, c.vaga_id, c.sal_oferecido);
+
+  setTimeout(() => window.navTo && window.navTo('vagas', null), 600);
+};
+
+window.recusarConvite = async function(msgId) {
+  const j   = window.JOGADOR;
+  const uid = j?.uid || window.JOGADOR_UID;
+  try {
+    await updateDoc(doc(db, 'jogadores', uid, 'inbox', msgId), { status: 'recusado', lida: true });
+    toast('Convite recusado.', 'neutro', 2500);
+    setTimeout(() => window.navTo && window.navTo('vagas', null), 400);
+  } catch (err) {
+    toast('Erro ao recusar convite.', 'ko');
+  }
 };
 
 window._confirmarCandidatura = async function(escId, vagaId, sal) {
