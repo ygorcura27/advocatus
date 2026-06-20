@@ -4,7 +4,7 @@
  * impacto do escritório no gameplay.
  */
 
-import { doc, updateDoc, collection, addDoc, getDoc, getDocs, query, where }
+import { doc, updateDoc, collection, addDoc, getDoc, getDocs, query, where, arrayUnion, arrayRemove }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { db } from './firebase-init.js';
 import {
@@ -342,11 +342,14 @@ window.aceitarConviteEscritorio = async function(msgId) {
       criado_em: new Date().toISOString(),
     });
 
-    // Atualiza o contador agregado de vagas ocupadas no doc do escritório,
-    // para que o próximo candidato (que não pode ler a lista de funcionários)
-    // consiga checar disponibilidade corretamente.
+    // Atualiza o contador agregado de vagas ocupadas E a lista pública de
+    // UIDs de funcionários ativos (funcionarios_uids) no doc do escritório.
+    // Essa lista é o que permite às Firestore Rules liberar leitura/escrita
+    // dos casos do POOL COLABORATIVO para este funcionário (não dá pra fazer
+    // "where jogador_uid==uid" dentro de uma Rule, daí a lista redundante).
     await updateDoc(doc(db, 'escritorios', c.esc_id), {
       [`vagas_ocupadas.${grupo}`]: ocupadas + 1,
+      funcionarios_uids: arrayUnion(uid),
     });
 
     await updateDoc(doc(db, 'jogadores', uid, 'inbox', msgId), { status: 'aceito', lida: true });
@@ -479,6 +482,7 @@ window.sairEscritorio = async function() {
             const atual = (escSnap.data().vagas_ocupadas || {})[grupo] || 0;
             await updateDoc(doc(db, 'escritorios', escIdAntigo), {
               [`vagas_ocupadas.${grupo}`]: Math.max(0, atual - 1),
+              funcionarios_uids: arrayRemove(uid),
             });
           }
         }

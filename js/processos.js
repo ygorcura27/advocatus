@@ -3,7 +3,7 @@
  * Fluxo: Abrir processo → Peça processual → Ação → Quiz técnico → Resultado
  */
 
-import { collection, addDoc, doc, updateDoc, getDoc }
+import { collection, addDoc, doc, updateDoc, getDoc, getDocs, query, where }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { httpsCallable }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
@@ -26,6 +26,35 @@ const CARGO_IDX = {
   jsub:2, jtit:4, dsb:5, mstj:7, padj:2, prom:4, pjus:5, pgj:7,
   dadj:2, def:4, dch:5, dge:7,
 };
+
+// ── Cargos que podem CONCLUIR (processar sentença) um caso do pool sozinhos.
+// Estagiário e Assistente podem trabalhar normalmente até 90% de progresso,
+// mas a sentença final exige Júnior+ — alguém com OAB no caso, narrativamente.
+const CARGO_IDX_CONCLUSAO_MIN = 2; // jnr
+
+// Progresso máximo que est/ass podem levar um caso do POOL sem supervisão de
+// um advogado (Júnior+) no time. Acima disso, o botão de sentença fica travado
+// até alguém Júnior+ "assinar" a peça.
+const PROGRESSO_MAX_SEM_ADVOGADO = 90;
+
+// ── Limite de NOVOS CASOS QUE O ESCRITÓRIO PODE GERAR PARA O POOL por mês,
+// conforme o Tier. Pensado em ~1,4 caso por funcionário potencial (vide
+// TIER_CAPACIDADE em vagas.js: T1=2, T2=5, T3=7, T4=10, T5=13 vagas), para
+// dar fôlego ao time sem permitir estoque de casos parados.
+const LIMITE_POOL_CASOS_MES_TIER = { 1:3, 2:6, 3:9, 4:13, 5:18 };
+
+// Teto de casos do pool ABERTOS SIMULTANEAMENTE (2x o limite mensal). Sem
+// isso, mesmo limitando a criação mensal, o pool acumularia casos não
+// resolvidos indefinidamente. Trava criação de novos até a fila esvaziar.
+const LIMITE_POOL_CASOS_ABERTOS_TIER = { 1:6, 2:12, 3:18, 4:26, 5:36 };
+
+// Custo de energia do DONO para "captar" um caso e colocá-lo no pool do
+// escritório. Maior que o mínimo de ação (5⚡) porque é prospecção de
+// cliente — uma ação de gestão, não de trabalho técnico no caso em si.
+const ENERGIA_CAPTAR_CASO_POOL = 8;
+
+// Prazo do pool: igual ao individual (3 meses), por consistência.
+const PRAZO_POOL_MESES = 3;
 
 // ════════════════════════════════════════════════════════
 // ESTADO DO FLUXO ATUAL
@@ -67,12 +96,22 @@ function _renderModalProcesso(id, p) {
        </div>`
     : '';
 
+  const cargoIdx       = CARGO_IDX[j.cargo_id] || 0;
+  const ehCasoPool     = !!p.pool_escritorio_id;
+  const travadoPorCargo = ehCasoPool && prog >= PROGRESSO_MAX_SEM_ADVOGADO && cargoIdx < CARGO_IDX_CONCLUSAO_MIN;
+  const avisoCargo = travadoPorCargo
+    ? `<div style="background:var(--amber-bg);border:1px solid var(--amber);border-radius:var(--r);padding:.55rem .75rem;margin-bottom:.7rem;font-size:.72rem;color:var(--amber);text-align:center">
+        🔒 Caso pronto para sentença, mas requer um Advogado Júnior+ do escritório para assinar e concluir.
+       </div>`
+    : '';
+
   abrirModal(`⚖️ ${p.tipo || '—'}`,
     `<div style="background:var(--surface2);border:var(--borda);border-radius:var(--r);padding:.75rem;margin-bottom:.85rem">
       <div style="font-family:var(--font-mono);font-size:.6rem;color:var(--txt4);margin-bottom:.25rem">${p.numero || '—'}</div>
       <div style="font-weight:700;font-size:.9rem;color:var(--navy);margin-bottom:.15rem">${p.autor || '—'} <span style="opacity:.4">vs</span> ${p.reu || '—'}</div>
       <div style="font-size:.7rem;color:var(--ouro2)">${p.tribunal || '—'} · ${inst}</div>
       <div style="font-size:.7rem;color:var(--verde2);margin-top:.25rem">${fmt(p.valor)} · ${honInfo}</div>
+      ${ehCasoPool ? `<div style="font-size:.65rem;color:var(--navy3);margin-top:.3rem">🏢 Caso colaborativo do escritório${p.escritorio_nome_etiqueta?' — '+p.escritorio_nome_etiqueta:''}</div>` : ''}
     </div>
     <div style="margin-bottom:.85rem">
       <div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--txt3);margin-bottom:.2rem">
@@ -90,14 +129,17 @@ function _renderModalProcesso(id, p) {
       </div>
     </div>
     ${avisoEnergia}
-    ${prog >= 100
+    ${avisoCargo}
+    ${prog >= 100 && !travadoPorCargo
       ? `<button class="btn btn-prim btn-block" onclick="window.processarSentenca('${id}')">⚖️ Processar sentença →</button>`
+      : prog >= 100 && travadoPorCargo
+      ? `<button class="btn btn-prim btn-block" disabled style="opacity:.5;cursor:not-allowed">⚖️ Aguardando Advogado Júnior+ →</button>`
       : p.recurso_pendente
       ? `<div style="display:flex;flex-direction:column;gap:.4rem">
            <button class="btn btn-prim btn-block" onclick="window.decidirRecurso('${id}',true)">⚠️ Interpor recurso (${cs}% chance)</button>
            <button class="btn btn-ghost btn-block" onclick="window.decidirRecurso('${id}',false)">✋ Não recorrer</button>
          </div>`
-      : `<button class="btn btn-prim btn-block" ${energiaDisp === 0 ? 'disabled' : ''} onclick="window.iniciarFluxo('${id}')">
+      : `<button class="btn btn-prim btn-block" ${energiaDisp === 0 || (travadoPorCargo) ? 'disabled' : ''} onclick="window.iniciarFluxo('${id}')">
            ▶ Iniciar ação processual →
          </button>`}
     <button class="btn btn-ghost btn-sm btn-block" style="margin-top:.4rem" onclick="window.tentarAcordo('${id}')">
@@ -113,6 +155,15 @@ window.iniciarFluxo = async function(procId) {
   const snap = await getDoc(doc(db, 'processos', procId));
   if (!snap.exists()) return;
   const p = snap.data();
+  const j = window.JOGADOR;
+
+  // Bloqueio adicional: est/ass não podem AVANÇAR caso do pool acima de 90%
+  // sem um Júnior+ no time (a ação em si até pode ocorrer, mas a sentença trava).
+  // Aqui só registramos a contribuição — o travamento real é na sentença.
+  if (p.pool_escritorio_id && j) {
+    await _registrarContribuinte(procId, p, j);
+  }
+
   _estado = { procId, proc: p, fase: 'peca' };
 
   // Peça só é escolhida UMA VEZ por processo — nas ações seguintes vai direto
@@ -445,6 +496,18 @@ async function _creditarHonorarios(j, uid, hon) {
 }
 
 window.processarSentenca = async function(procId) {
+  const j = window.JOGADOR;
+  const cargoIdx = CARGO_IDX[j?.cargo_id] || 0;
+  const snapCheck = await getDoc(doc(db, 'processos', procId));
+  if (snapCheck.exists()) {
+    const pCheck = snapCheck.data();
+    const ehPool = !!pCheck.pool_escritorio_id;
+    if (ehPool && (pCheck.progresso||0) >= PROGRESSO_MAX_SEM_ADVOGADO && cargoIdx < CARGO_IDX_CONCLUSAO_MIN) {
+      toast('🔒 Este caso precisa de um Advogado Júnior+ do escritório para assinar a sentença.', 'ko', 5000);
+      return;
+    }
+  }
+
   toast('⏳ Processando sentença...', 'neutro', 2000);
   fecharModal();
 
@@ -630,8 +693,16 @@ window.novoProcesso = async function() {
   if (!j)   return;
   const uid = j.uid||window.JOGADOR_UID;
   const energiaDisp = Math.max(0,(window.getEnergiaTotal?window.getEnergiaTotal(j):100)-(j.energia_usada_mes||0));
-  if (energiaDisp < 5) { toast('⚡ Energia insuficiente para novos casos.','ko'); return; }
   if (j.em_burnout)    { toast('🔴 Em burnout. Descanse antes de novos casos.','ko'); return; }
+
+  // ── DONO de escritório próprio: gera caso para o POOL COLABORATIVO ──
+  // Limite independente do limite individual de litigância do dono.
+  if (j.escritorio_proprio_id) {
+    await window.novoProcessoPool();
+    return;
+  }
+
+  if (energiaDisp < 5) { toast('⚡ Energia insuficiente para novos casos.','ko'); return; }
 
   // Se está empregado (não é dono/solo), aplica limite mensal por cargo
   const isEmpregado = j.escritorio_empregado_id && !j.escritorio_proprio_id;
@@ -657,6 +728,74 @@ window.novoProcesso = async function() {
     toast(`📁 Novo caso: ${proc.tipo}`,'ok');
     setTimeout(()=>window.navTo&&window.navTo('processos',null), 400);
   } catch(err) { toast('Erro ao criar processo.','ko'); }
+};
+
+// ════════════════════════════════════════════════════════
+// NOVO PROCESSO DO POOL — gerado pelo DONO para o escritório.
+// Fica visível e disponível para QUALQUER funcionário real trabalhar,
+// de forma colaborativa (vários podem contribuir progresso no mesmo caso).
+// Limite mensal por Tier, independente do limite individual do dono como
+// advogado. Energia debitada do dono representa o esforço de "captação".
+// ════════════════════════════════════════════════════════
+window.novoProcessoPool = async function() {
+  const j   = window.JOGADOR;
+  if (!j || !j.escritorio_proprio_id) return;
+  const uid = j.uid || window.JOGADOR_UID;
+
+  if (j.em_burnout) { toast('🔴 Em burnout. Descanse antes de captar novos casos.', 'ko'); return; }
+
+  const energiaDisp = Math.max(0,(window.getEnergiaTotal?window.getEnergiaTotal(j):100)-(j.energia_usada_mes||0));
+  if (energiaDisp < ENERGIA_CAPTAR_CASO_POOL) {
+    toast(`⚡ Energia insuficiente para captar caso (requer ${ENERGIA_CAPTAR_CASO_POOL}⚡).`, 'ko');
+    return;
+  }
+
+  const escSnap = await getDoc(doc(db, 'escritorios', j.escritorio_proprio_id));
+  if (!escSnap.exists()) { toast('Escritório não encontrado.', 'ko'); return; }
+  const esc  = escSnap.data();
+  const tier = esc.tier || 1;
+  const limiteMes     = LIMITE_POOL_CASOS_MES_TIER[tier]     || LIMITE_POOL_CASOS_MES_TIER[1];
+  const limiteAbertos = LIMITE_POOL_CASOS_ABERTOS_TIER[tier] || LIMITE_POOL_CASOS_ABERTOS_TIER[1];
+
+  const usadosMes = esc.pool_casos_criados_mes || 0;
+  if (usadosMes >= limiteMes) {
+    toast(`🔒 Limite mensal de captação atingido (${usadosMes}/${limiteMes} para Tier ${tier}).`, 'ko', 5000);
+    return;
+  }
+
+  // Checar teto de casos abertos simultâneos no pool
+  const abertosSnap = await getDocs(query(
+    collection(db, 'processos'),
+    where('pool_escritorio_id', '==', j.escritorio_proprio_id),
+    where('status', '==', 'andamento')
+  ));
+  if (abertosSnap.size >= limiteAbertos) {
+    toast(`🔒 Fila do escritório cheia (${abertosSnap.size}/${limiteAbertos} casos abertos). Conclua casos antes de captar novos.`, 'ko', 6000);
+    return;
+  }
+
+  const proc = _gerarProcesso(j);
+  proc.pool_escritorio_id        = j.escritorio_proprio_id;
+  proc.escritorio_nome_etiqueta  = esc.nome || j.escritorio_nome || null;
+  proc.distribuido_pelo_escritorio = true;
+  proc.prazo_limite_mes          = mesTotalPessoalProc(j) + PRAZO_POOL_MESES;
+  proc.contribuintes             = []; // [{ uid, nome, progresso_creditado }]
+  proc.advogado_uid              = null; // pool: não pertence a ninguém até alguém atuar
+
+  try {
+    await addDoc(collection(db, 'processos'), proc);
+    await updateDoc(doc(db, 'escritorios', j.escritorio_proprio_id), {
+      pool_casos_criados_mes: usadosMes + 1,
+    });
+    await updateDoc(doc(db, 'jogadores', uid), {
+      energia_usada_mes: (j.energia_usada_mes||0) + ENERGIA_CAPTAR_CASO_POOL,
+    });
+    toast(`📁 Caso captado para o escritório: ${proc.tipo} (${usadosMes+1}/${limiteMes} este mês)`, 'ok', 4000);
+    setTimeout(() => window.navTo && window.navTo('processos', null), 400);
+  } catch (err) {
+    toast('Erro ao captar caso para o escritório.', 'ko');
+    console.error(err);
+  }
 };
 
 function _gerarProcesso(j, distribuidoPeloEscritorio=false) {
@@ -711,8 +850,38 @@ function _gerarProcesso(j, distribuidoPeloEscritorio=false) {
 }
 
 // ════════════════════════════════════════════════════════
-// HELPERS
+// LISTAGEM DO POOL — casos colaborativos do escritório, visíveis a
+// QUALQUER funcionário real (incluindo o dono) para que decidam trabalhar.
+// Chamado pela tela "Meus Processos" (ui-main.js / render de processos).
 // ════════════════════════════════════════════════════════
+export async function buscarCasosPoolEscritorio(j) {
+  const escId = j.escritorio_proprio_id || (j.escritorio_empregado_id && j.escritorio_empregado_id !== 'solo' ? j.escritorio_empregado_id : null);
+  if (!escId) return [];
+  try {
+    const snap = await getDocs(query(
+      collection(db, 'processos'),
+      where('pool_escritorio_id', '==', escId),
+      where('status', '==', 'andamento')
+    ));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (err) {
+    console.warn('[POOL] Erro ao buscar casos do pool:', err);
+    return [];
+  }
+}
+window.buscarCasosPoolEscritorio = buscarCasosPoolEscritorio;
+
+// Registra que este jogador está atuando no caso do pool (primeira vez que
+// ele toca o caso). Usado para ratear a penalidade de deserção depois.
+async function _registrarContribuinte(procId, p, j) {
+  const uid = j.uid || window.JOGADOR_UID;
+  const ja  = (p.contribuintes || []).some(c => c.uid === uid);
+  if (ja) return;
+  const novos = [...(p.contribuintes || []), { uid, nome: j.nome_personagem || 'Advogado' }];
+  await updateDoc(doc(db, 'processos', procId), { contribuintes: novos });
+}
+
+
 async function _gastarEnergia(custo, desc) {
   const j   = window.JOGADOR;
   const uid = j?.uid||window.JOGADOR_UID;
@@ -742,18 +911,25 @@ export async function processarDistribuicaoProcessosMensal(j) {
     await updateDoc(doc(db,'jogadores',uid), { processos_novos_mes: 0 });
   }
 
-  // ── Verificar deserção: processos distribuídos pelo escritório com prazo vencido ──
+  // Reset do contador de captação mensal do pool (dono)
+  if (j.escritorio_proprio_id) {
+    await updateDoc(doc(db,'escritorios',j.escritorio_proprio_id), { pool_casos_criados_mes: 0 });
+  }
+
+  const mesAtualTotal = mesTotalPessoalProc(j);
+
+  // ── Verificar deserção: processos INDIVIDUAIS distribuídos pelo escritório
+  // com prazo vencido (mantém comportamento original — penalidade pessoal). ──
   const meusProcsSnap = await getDocs(query(
     collection(db,'processos'),
     where('advogado_uid','==',uid),
     where('status','==','andamento'),
     where('distribuido_pelo_escritorio','==',true)
   ));
-  const mesAtualTotal = mesTotalPessoalProc(j);
   for (const pDoc of meusProcsSnap.docs) {
     const p = pDoc.data();
+    if (p.pool_escritorio_id) continue; // casos do pool são tratados abaixo
     if (p.prazo_limite_mes && mesAtualTotal > p.prazo_limite_mes) {
-      // Deserção — perde o processo e leva penalidade de reputação
       const perda = Math.max(1, Math.floor((j.reputacao||0)*0.06));
       await updateDoc(doc(db,'processos',pDoc.id), { status:'perdido_desercao', encerrado_mes:mesAtualTotal });
       await updateDoc(doc(db,'jogadores',uid), { reputacao: Math.max(0,(j.reputacao||0)-perda) });
@@ -763,6 +939,63 @@ export async function processarDistribuicaoProcessosMensal(j) {
         corpo:`O processo ${p.numero} (${p.tipo}) ultrapassou o prazo de 3 meses sem conclusão e foi perdido. -${perda} reputação.`,
         tipo:'sistema', tipo_noticia:'negativo', lida:false, criado_em:new Date().toISOString(),
       });
+    }
+  }
+
+  // ── Verificar deserção de casos do POOL COLABORATIVO (apenas o DONO roda
+  // essa checagem uma vez por mês, para não duplicar entre vários funcionários
+  // do mesmo escritório acessando avançar-mês simultaneamente). ──
+  if (j.escritorio_proprio_id) {
+    const poolSnap = await getDocs(query(
+      collection(db,'processos'),
+      where('pool_escritorio_id','==',j.escritorio_proprio_id),
+      where('status','==','andamento')
+    ));
+    for (const pDoc of poolSnap.docs) {
+      const p = pDoc.data();
+      if (!(p.prazo_limite_mes && mesAtualTotal > p.prazo_limite_mes)) continue;
+
+      const progresso     = p.progresso || 0;
+      const contribuintes  = p.contribuintes || [];
+
+      if (progresso === 0 || contribuintes.length === 0) {
+        // Ninguém tocou o caso — pune o ESCRITÓRIO (prestígio), não pessoas.
+        const escSnap = await getDoc(doc(db,'escritorios',j.escritorio_proprio_id));
+        const prestigioAtual = escSnap.exists() ? (escSnap.data().prestigio || 10) : 10;
+        await updateDoc(doc(db,'escritorios',j.escritorio_proprio_id), {
+          prestigio: Math.max(0, prestigioAtual - 3),
+        });
+        await updateDoc(doc(db,'processos',pDoc.id), { status:'perdido_desercao', encerrado_mes:mesAtualTotal });
+        await addDoc(collection(db,'jogadores',uid,'inbox'), {
+          de:'sistema', para_uid:uid,
+          assunto:'⚠️ Caso do escritório perdido por inatividade',
+          corpo:`O caso ${p.numero} (${p.tipo}) ficou ${PRAZO_POOL_MESES} meses no pool sem nenhum funcionário atuar. -3 prestígio do escritório.`,
+          tipo:'sistema', tipo_noticia:'negativo', lida:false, criado_em:new Date().toISOString(),
+        });
+      } else {
+        // Houve progresso parcial — reputação penalizada e RATEADA entre
+        // contribuintes, com fator reduzido (0.6x) por ser responsabilidade
+        // compartilhada, não de uma única pessoa.
+        const FATOR_RATEIO_POOL = 0.6;
+        for (const c of contribuintes) {
+          try {
+            const cSnap = await getDoc(doc(db,'jogadores',c.uid));
+            if (!cSnap.exists()) continue;
+            const cData = cSnap.data();
+            const repC  = cData.reputacao || 30;
+            const perdaBase  = Math.max(1, Math.floor(repC * 0.06));
+            const perdaRateada = Math.max(1, Math.round((perdaBase * FATOR_RATEIO_POOL) / contribuintes.length));
+            await updateDoc(doc(db,'jogadores',c.uid), { reputacao: Math.max(0, repC - perdaRateada) });
+            await addDoc(collection(db,'jogadores',c.uid,'inbox'), {
+              de:'sistema', para_uid:c.uid,
+              assunto:'⚠️ Caso do escritório perdido por deserção',
+              corpo:`O caso colaborativo ${p.numero} (${p.tipo}) ultrapassou o prazo de ${PRAZO_POOL_MESES} meses e foi perdido. -${perdaRateada} reputação (responsabilidade compartilhada entre ${contribuintes.length} contribuinte(s)).`,
+              tipo:'sistema', tipo_noticia:'negativo', lida:false, criado_em:new Date().toISOString(),
+            });
+          } catch (e) { console.warn('[POOL] Erro ao ratear deserção:', e); }
+        }
+        await updateDoc(doc(db,'processos',pDoc.id), { status:'perdido_desercao', encerrado_mes:mesAtualTotal });
+      }
     }
   }
 
