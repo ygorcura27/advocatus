@@ -295,20 +295,23 @@ window.aceitarConviteEscritorio = async function(msgId) {
   const CARGO_SAL = { est:1700, ass:2500, jnr:3500, pln:5500, snr:9000 };
   const sal = CARGO_SAL[c.cargo_id] || 0;
 
-  // Verificar se ainda há vaga disponível para esse cargo no escritório
+  // Verificar se ainda há vaga disponível para esse cargo no escritório.
+  //
+  // IMPORTANTE: não dá para listar `funcionarios` de outro escritório aqui —
+  // as Rules só permitem o dono ler a lista inteira (cada jogador só pode ler
+  // o PRÓPRIO registro). Por isso usamos um contador agregado e público,
+  // mantido no próprio doc do escritório (`vagas_ocupadas: { est, ass, adv }`),
+  // que é atualizado a cada contratação/saída e pode ser lido por qualquer
+  // jogador autenticado (a regra de leitura de /escritorios/{id} já é pública).
   const TIER_CAPACIDADE = {
     1: { est:1, ass:1, adv:0 }, 2: { est:2, ass:2, adv:1 },
     3: { est:3, ass:2, adv:2 }, 4: { est:4, ass:3, adv:3 },
     5: { est:5, ass:4, adv:4 },
   };
   const cap = TIER_CAPACIDADE[esc.tier||1] || TIER_CAPACIDADE[1];
-  const fSnap = await getDocs(collection(db, 'escritorios', c.esc_id, 'funcionarios'));
-  const funcsAtivos = fSnap.docs.map(d=>d.data()).filter(f=>f.ativo!==false);
+  const ocupadasMap = esc.vagas_ocupadas || { est:0, ass:0, adv:0 };
   const grupo = c.cargo_id==='est' ? 'est' : c.cargo_id==='ass' ? 'ass' : 'adv';
-  const ocupadas = funcsAtivos.filter(f => {
-    const g = f.cargo_id==='est' ? 'est' : f.cargo_id==='ass' ? 'ass' : 'adv';
-    return g === grupo;
-  }).length;
+  const ocupadas = ocupadasMap[grupo] || 0;
   if (ocupadas >= (cap[grupo]||0)) {
     toast('A vaga já foi ocupada por outro funcionário. Convite expirado.', 'ko', 5000);
     await updateDoc(doc(db, 'jogadores', uid, 'inbox', msgId), { status: 'recusado', lida: true });
@@ -337,6 +340,13 @@ window.aceitarConviteEscritorio = async function(msgId) {
       skills: j.skills || {}, sexo: j.sexo || 'm',
       ativo: true, acoes_mes_usadas: 0, acao_atual: null,
       criado_em: new Date().toISOString(),
+    });
+
+    // Atualiza o contador agregado de vagas ocupadas no doc do escritório,
+    // para que o próximo candidato (que não pode ler a lista de funcionários)
+    // consiga checar disponibilidade corretamente.
+    await updateDoc(doc(db, 'escritorios', c.esc_id), {
+      [`vagas_ocupadas.${grupo}`]: ocupadas + 1,
     });
 
     await updateDoc(doc(db, 'jogadores', uid, 'inbox', msgId), { status: 'aceito', lida: true });
@@ -374,6 +384,7 @@ window.recusarConvite = async function(msgId) {
     setTimeout(() => window.navTo && window.navTo('vagas', null), 400);
   } catch (err) {
     toast('Erro ao recusar convite.', 'ko');
+    console.error(err);
   }
 };
 
@@ -448,8 +459,10 @@ window.sairEscritorio = async function() {
   if (!confirm('Confirma: sair do escritório e voltar à advocacia solo?')) return;
   try {
     const escIdAntigo = j.escritorio_empregado_id;
+    const cargoAntigo = j.cargo_id;
 
     // Se for escritório real (de outro jogador), remover o registro de funcionário
+    // e decrementar o contador agregado de vagas ocupadas.
     if (escIdAntigo) {
       try {
         const fSnap = await getDocs(query(
@@ -458,6 +471,16 @@ window.sairEscritorio = async function() {
         ));
         for (const fDoc of fSnap.docs) {
           await updateDoc(doc(db, 'escritorios', escIdAntigo, 'funcionarios', fDoc.id), { ativo: false, saiu_em: new Date().toISOString() });
+        }
+        if (fSnap.docs.length > 0 && cargoAntigo) {
+          const grupo = cargoAntigo==='est' ? 'est' : cargoAntigo==='ass' ? 'ass' : 'adv';
+          const escSnap = await getDoc(doc(db, 'escritorios', escIdAntigo));
+          if (escSnap.exists()) {
+            const atual = (escSnap.data().vagas_ocupadas || {})[grupo] || 0;
+            await updateDoc(doc(db, 'escritorios', escIdAntigo), {
+              [`vagas_ocupadas.${grupo}`]: Math.max(0, atual - 1),
+            });
+          }
         }
       } catch (e) { /* escritório NPC não tem essa subcoleção populada — ignora */ }
     }
