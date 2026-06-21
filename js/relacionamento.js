@@ -712,6 +712,57 @@ window.terminarRelacionamento = async function(relId, nome) {
 // Tela com foto/capa, "informações" (traços, região, estágio), e
 // timeline cronológica de eventos registrados via _registrarEvento.
 // ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════
+// FOTO EXPANDIDA (lightbox) — clique no avatar do perfil abre a foto em
+// tamanho grande (até o tamanho original, respeitando a viewport).
+// Implementado de forma independente de abrirModal/fecharModal (que já
+// estaria aberto por baixo, mostrando o perfil) — cria seu próprio
+// overlay por cima de tudo, fechável por clique fora, no X, ou Esc.
+// ════════════════════════════════════════════════════════
+let _fotoExpandidaKeyHandler = null;
+
+window.abrirFotoExpandida = function(url, nome) {
+  if (document.getElementById('foto-expandida-overlay')) return;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'foto-expandida-overlay';
+  overlay.style.cssText = `
+    position:fixed; inset:0; z-index:9999;
+    background:rgba(10,14,24,.88);
+    display:flex; align-items:center; justify-content:center;
+    padding:2rem; cursor:zoom-out;
+  `;
+  overlay.innerHTML = `
+    <img src="${url}" alt="${nome}"
+         style="max-width:min(92vw,720px); max-height:90vh; object-fit:contain;
+                border-radius:4px; box-shadow:var(--sombra2); cursor:default;"
+         onerror="this.onerror=null;this.src='img/npcs/_placeholder.png'">
+    <button aria-label="Fechar"
+            style="position:absolute; top:1rem; right:1.2rem; width:38px; height:38px;
+                   border-radius:50%; border:none; background:rgba(255,255,255,.12);
+                   color:#fff; font-size:1.3rem; line-height:1; cursor:pointer;">×</button>
+  `;
+
+  const fechar = () => {
+    overlay.remove();
+    if (_fotoExpandidaKeyHandler) {
+      document.removeEventListener('keydown', _fotoExpandidaKeyHandler);
+      _fotoExpandidaKeyHandler = null;
+    }
+  };
+
+  // Clique fora da imagem (no fundo escuro) fecha; clique na própria
+  // imagem não propaga, então não fecha por engano.
+  overlay.addEventListener('click', fechar);
+  overlay.querySelector('img').addEventListener('click', (e) => e.stopPropagation());
+  overlay.querySelector('button').addEventListener('click', (e) => { e.stopPropagation(); fechar(); });
+
+  _fotoExpandidaKeyHandler = (e) => { if (e.key === 'Escape') fechar(); };
+  document.addEventListener('keydown', _fotoExpandidaKeyHandler);
+
+  document.body.appendChild(overlay);
+};
+
 window.abrirPerfilNpc = async function(relId) {
   const j   = window.JOGADOR;
   const uid = j?.uid || window.JOGADOR_UID;
@@ -736,7 +787,9 @@ window.abrirPerfilNpc = async function(relId) {
   const html = `
     <div class="fb-profile">
       <div class="fb-header">
-        <img src="${avatarUrl}" alt="${r.nome}" class="fb-avatar" onerror="this.onerror=null;this.src='img/npcs/_placeholder.png'">
+        <img src="${avatarUrl}" alt="${r.nome}" class="fb-avatar" style="cursor:zoom-in"
+             onerror="this.onerror=null;this.src='img/npcs/_placeholder.png'"
+             onclick="window.abrirFotoExpandida('${avatarUrl}', '${r.nome.replace(/'/g, "\\'")}')">
         <div class="fb-header-info">
           <div class="fb-nome">${r.nome}</div>
           <div class="fb-status">${label} de ${j.nome_personagem || 'você'} · há ${meses} ${meses===1?'mês':'meses'}</div>
