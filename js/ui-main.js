@@ -217,6 +217,8 @@ function renderProcessos(j, el) {
     <div class="ornamento">— ✦ —</div>
     <div id="secao-pool-escritorio"></div>
     <div class="ornamento">— ✦ —</div>
+    <div id="secao-carteira-processual"></div>
+    <div class="ornamento">— ✦ —</div>
     <div class="secao-header" style="margin-top:.5rem">
       <div class="secao-titulo">📁 Processos Encerrados</div>
     </div>
@@ -235,6 +237,15 @@ function renderProcessos(j, el) {
   const poolEl = document.getElementById('secao-pool-escritorio');
   if (poolEl && window.renderPoolEscritorio) {
     window.renderPoolEscritorio(poolEl);
+  }
+
+  // Carteira processual (recursos pendentes e decisões de recurso
+  // aguardando o jogador) — antes existia em processos.js mas nenhuma
+  // tela chamava, então processos recorridos ficavam invisíveis mesmo
+  // já estando de fato em fase de recurso no Firestore.
+  const carteiraEl = document.getElementById('secao-carteira-processual');
+  if (carteiraEl && window.renderCarteiraProcessual) {
+    window.renderCarteiraProcessual(carteiraEl);
   }
 }
 

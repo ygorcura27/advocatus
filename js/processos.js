@@ -1962,7 +1962,8 @@ window.iniciarRodadaAudiencia = async function(procId) {
 function _renderSelecaoProvas(procId, p) {
   document.getElementById('modal-body') && null; // no-op, abrirModal cuida do container
   abrirModal('📋 Fase 1 de 3 — Instrução Probatória',
-    `<div class="stitle">Selecione as provas</div>
+    `${_painelContextoProcesso(p)}
+    <div class="stitle">Selecione as provas</div>
     <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.75rem">Escolha até 3 provas. Todas aqui são juridicamente coerentes com os fatos deste processo.</div>
     <div class="pgrid" id="provas-sel" style="margin-bottom:1rem">
       ${p.provas.map((prova, i) => `
@@ -1970,7 +1971,9 @@ function _renderSelecaoProvas(procId, p) {
           <div class="pico">📄</div><div class="pnm">${prova.nome}</div><div class="ptyp">${prova.tipo.toUpperCase()}</div>
         </div>`).join('')}
     </div>
-    <button id="btn-teses-aud" onclick="window.irParaSelecaoTeses('${procId}')">Definir teses jurídicas →</button>`
+    <button class="btn-avancar-fase" id="btn-teses-aud" onclick="window.irParaSelecaoTeses('${procId}')">
+      <span>Definir teses jurídicas</span><span class="baf-seta">→</span>
+    </button>`
   );
   window._provasEscolhidasAud = [];
 }
@@ -1985,7 +1988,8 @@ window.togProvaAudiencia = function(i){
 window.irParaSelecaoTeses = function(procId){
   const p = _estado.proc;
   abrirModal('📋 Fase 1 de 3 — Teses Jurídicas',
-    `<div class="stitle">Selecione até 2 teses</div>
+    `${_painelContextoProcesso(p)}
+    <div class="stitle">Selecione até 2 teses</div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:1rem">
       ${p.teses.map((t,i) => `
         <div class="ti" id="tese-${i}" onclick="window.togTeseAudiencia(${i})">
@@ -1993,7 +1997,9 @@ window.irParaSelecaoTeses = function(procId){
           <div><div class="tnm">${t.nome}</div><div class="tds">${t.fundamento}</div></div>
         </div>`).join('')}
     </div>
-    <button onclick="window.confirmarInstrucaoAudiencia('${procId}')">Iniciar sustentação oral →</button>`
+    <button class="btn-avancar-fase" onclick="window.confirmarInstrucaoAudiencia('${procId}')">
+      <span>Iniciar sustentação oral</span><span class="baf-seta">→</span>
+    </button>`
   );
   window._tesesEscolhidasAud = [];
 };
@@ -2033,7 +2039,8 @@ function _renderRodadaAudiencia(procId, p) {
   ].sort(() => Math.random() - 0.5);
 
   abrirModal('🏛️ Fase 2 de 3 — Audiência',
-    `<div class="ftag">${p.juiz.nome} · rodada ${rd+1} de 3</div>
+    `${_painelContextoProcesso(p)}
+    <div class="ftag">${p.juiz.nome} · rodada ${rd+1} de 3</div>
     <div style="font-size:.72rem;color:var(--txt3);font-style:italic;margin-bottom:.5rem">${p.juiz.hint}</div>
     <div class="abox"><div class="albl">${labelArg}</div><div class="atxt">${arg.txt}</div></div>
     <div style="margin:.75rem 0">
@@ -2152,18 +2159,73 @@ window.processarSentenca = async function(procId) {
 
 function _mostrarResultadoSentenca(r, procId) {
   const icons = { procedente:'🏆', parcial:'⚖️', improcedente:'📋', improcedente_agravada:'❌' };
+  const labelCategoria = {
+    procedente: 'Procedente', parcial: 'Parcialmente Procedente',
+    improcedente: 'Improcedente', improcedente_agravada: 'Improcedente',
+  }[r.categoria] || r.categoria;
+  const corCategoria = r.categoria === 'procedente' ? 'var(--verde2)'
+    : r.categoria === 'parcial' ? 'var(--amber)'
+    : 'var(--verm2)';
+
+  // "Força da fundamentação contra você" — só faz sentido quando o
+  // jogador perdeu (é a força da decisão que jogou contra ele).
+  const fundamentacaoHtml = (r.aguardandoDecisaoDoJogador && r.score !== undefined)
+    ? (() => {
+        const classif = classificarSentenca(100 - r.score);
+        return `<div style="font-size:.7rem;color:var(--txt3);font-style:italic;margin-top:.6rem">Força da fundamentação contra você: <b>${classif.label}</b>. ${classif.desc}</div>`;
+      })()
+    : '';
+
+  let botoesHtml;
+  if (r.aguardandoDecisaoDoJogador) {
+    // Escolha real do jogador — nunca decidida automaticamente.
+    botoesHtml = `
+      <button class="btn-avancar-fase" style="margin-top:1rem" onclick="window.decidirRecursoSentencaProducao('${procId}', true)">
+        <span>⚖️ Recorrer da decisão</span>
+      </button>
+      <button class="btn btn-ghost btn-block" style="margin-top:.5rem" onclick="window.decidirRecursoSentencaProducao('${procId}', false)">
+        Aceitar a derrota e encerrar
+      </button>`;
+  } else {
+    botoesHtml = `<button class="btn btn-prim btn-block" style="margin-top:1rem" onclick="fecharModal();window.navTo&&window.navTo('processos',null)">Fechar</button>`;
+  }
+
   abrirModal(`${icons[r.categoria]||'⚖️'} Sentença`,
-    `<div style="font-size:.85rem;line-height:1.75;margin-bottom:.9rem;color:var(--txt2)">${r.txt}</div>
-    <div class="gains">
+    `<div class="ftag">Sentença Final${r.instanciaSeguinte ? ' · próxima instância: ' + r.instanciaSeguinte : ''}</div>
+    <div class="sh" style="justify-content:flex-start">${labelCategoria}${r.score!==undefined ? `<span class="score-pill" style="background:${corCategoria}22;color:${corCategoria}">score ${r.score}</span>` : ''}</div>
+    <div style="font-size:.85rem;line-height:1.75;margin-bottom:.4rem;color:var(--txt2)">${r.txt}</div>
+    ${fundamentacaoHtml}
+    <div class="gains" style="margin-top:.8rem">
       <span class="gain" style="${r.repDelta<0?'background:rgba(192,57,43,.12);border-color:rgba(192,57,43,.3);color:#e57373':''}">${r.repDelta>=0?'+':''}${r.repDelta} Reputação</span>
       <span class="gain">+${r.xpGanho} XP</span>
     </div>
     ${r.hon > 0 ? `<div style="font-size:.95rem;color:var(--verde2);font-weight:700;margin-top:.65rem">💰 +${fmt(r.hon)} honorários (trânsito em julgado imediato)</div>` : ''}
-    ${r.recorre ? `<div style="font-size:.75rem;color:var(--amber);margin-top:.65rem">📋 A sentença foi recorrida — caso entra na fila do ${r.instanciaSeguinte}. Acesse a carteira processual para sustentar.</div>` : ''}
+    ${r.recorre ? `<div style="font-size:.75rem;color:var(--amber);margin-top:.65rem">📋 A parte contrária recorreu — caso entra na fila do ${r.instanciaSeguinte}. Acesse a carteira processual para sustentar.</div>` : ''}
     ${r.demitido ? `<div style="font-size:.8rem;color:var(--verm2);margin-top:.65rem;font-weight:600">⚠️ Demitido(a) — 5 derrotas consecutivas.</div>` : ''}
-    <button class="btn btn-prim btn-block" style="margin-top:1rem" onclick="fecharModal();window.navTo&&window.navTo('processos',null)">Fechar</button>`
+    ${botoesHtml}`
   );
 }
+
+// ════════════════════════════════════════════════════════
+// DECIDIR RECURSO DA SENTENÇA — chama a Cloud Function que registra a
+// escolha real do jogador (recorrer ou aceitar a derrota) quando o
+// processo está em 'aguardando_decisao_recurso'. Antes esta decisão era
+// tomada automaticamente por sorteio dentro da própria Cloud Function de
+// sentença, sem nunca perguntar ao jogador.
+// ════════════════════════════════════════════════════════
+window.decidirRecursoSentencaProducao = async function(procId, recorrer) {
+  try {
+    const fn = httpsCallable(window.FB_FUNCTIONS, 'decidirRecursoSentenca');
+    const result = await fn({ processo_id: procId, recorrer });
+    if (document.getElementById('modal')?.classList.contains('vis')) fecharModal();
+    toast(result.data.msg, recorrer ? 'ok' : 'neutro');
+    setTimeout(() => window.navTo && window.navTo('processos', null), 400);
+  } catch (err) {
+    console.error('[SENTENÇA] Erro ao decidir recurso:', err);
+    toast('Erro ao processar sua decisão. Tente novamente.', 'ko');
+  }
+};
+
 
 // Honorários só são creditados aqui — no trânsito em julgado de fato.
 // Continua existindo no frontend porque é usada por tentarAcordo() (uma
@@ -2204,19 +2266,53 @@ async function _penalizarPrestigioEscritorio(escritorioId, repDelta) {
 window.renderCarteiraProcessual = async function(el) {
   const j = window.JOGADOR;
   const uid = j.uid || window.JOGADOR_UID;
-  const snap = await getDocs(query(
+  const mesAtualTotal = mesTotalPessoalProc(j);
+
+  // Casos INDIVIDUAIS do jogador (advogado_uid === uid).
+  const snapIndividual = await getDocs(query(
     collection(db, 'processos'),
     where('advogado_uid', '==', uid),
-    where('status', '==', 'recurso_pendente')
+    where('status', 'in', ['recurso_pendente', 'aguardando_decisao_recurso'])
   ));
-  const mesAtualTotal = mesTotalPessoalProc(j);
-  const procs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+  // Casos do POOL do escritório (advogado_uid é null por design — sem
+  // este segundo bloco, recursos de casos colaborativos nunca apareciam
+  // em lugar nenhum, mesmo já estando em fase de recurso de fato).
+  const escId = j.escritorio_proprio_id || (j.escritorio_empregado_id && j.escritorio_empregado_id !== 'solo' ? j.escritorio_empregado_id : null);
+  let snapPool = { docs: [] };
+  if (escId) {
+    snapPool = await getDocs(query(
+      collection(db, 'processos'),
+      where('pool_escritorio_id', '==', escId),
+      where('status', 'in', ['recurso_pendente', 'aguardando_decisao_recurso'])
+    ));
+  }
+
+  const procs = [
+    ...snapIndividual.docs.map(d => ({ id: d.id, ...d.data() })),
+    ...snapPool.docs.map(d => ({ id: d.id, ...d.data() })),
+  ];
 
   el.innerHTML = `
     <div class="secao-header"><div class="secao-titulo">📁 Carteira Processual</div></div>
-    <div style="font-size:.72rem;color:var(--txt3);margin-bottom:1rem">Acompanhe processos aguardando movimentação, recursos disponíveis para jogar, e prazos.</div>
+    <div style="font-size:.72rem;color:var(--txt3);margin-bottom:1rem">Acompanhe processos aguardando sua decisão de recurso, recursos disponíveis para sustentar, e prazos.</div>
     ${procs.length === 0 ? '<div class="card" style="text-align:center;padding:2rem;color:var(--txt3)">Nenhum processo em fila de recurso.</div>' :
       procs.map(p => {
+        // Sentença perdida, ainda aguardando o JOGADOR decidir se recorre
+        // (nunca decidido automaticamente — ver decidirRecursoSentenca).
+        if (p.status === 'aguardando_decisao_recurso') {
+          return `
+          <div class="card" style="margin-bottom:.6rem;border-left:3px solid var(--amber)">
+            <div style="font-family:var(--font-mono);font-size:.6rem;color:var(--txt4)">${p.numero}</div>
+            <div style="font-weight:700;font-size:.85rem;color:var(--navy)">${p.autor} vs ${p.reu}</div>
+            <div style="font-size:.68rem;color:var(--txt3)">${p.tipo} · sentença desfavorável · score ${p.score_anterior}</div>
+            <div style="display:flex;gap:.5rem;margin-top:.6rem">
+              <button class="btn btn-sm btn-prim" style="flex:1" onclick="window.decidirRecursoSentencaProducao('${p.id}', true)">⚖️ Recorrer</button>
+              <button class="btn btn-sm btn-ghost" style="flex:1" onclick="window.decidirRecursoSentencaProducao('${p.id}', false)">Aceitar derrota</button>
+            </div>
+          </div>`;
+        }
+
         const disponivel = p.data_disponivel_recurso && mesTotalPessoalProc({mes_pessoal:p.data_disponivel_recurso.mes, ano_pessoal:p.data_disponivel_recurso.ano}) <= mesAtualTotal;
         const restante = p.prazo_final_recurso ? (mesTotalPessoalProc({mes_pessoal:p.prazo_final_recurso.mes, ano_pessoal:p.prazo_final_recurso.ano}) - mesAtualTotal) : null;
         const recorrenteLbl = p.quem_recorre === 'jogador' ? 'Você recorreu' : 'A parte contrária recorreu';
@@ -2340,7 +2436,7 @@ function _renderPreparacaoRecurso(tribInfo) {
   const pontosAtacados = [...pool].sort(() => Math.random()-0.5).slice(0,2);
 
   abrirModal(`${tribInfo.nome} · Fase 1 de 2 — Preparação`,
-    `<div class="fh">${RECURSO_ATIVO.numero}</div>
+    `${_painelContextoProcesso(RECURSO_ATIVO)}
     <div class="fsub">${tribInfo.nome} ${tribInfo.desc}.</div>
 
     <div class="stitle">Composição do Colegiado</div>
@@ -2366,7 +2462,9 @@ function _renderPreparacaoRecurso(tribInfo) {
           <div><div class="tnm">${e.nome}</div><div class="tds">${e.desc}</div></div>
         </div>`).join('')}
     </div>
-    <button id="btn-prep-recurso" disabled onclick="window.confirmarPreparacaoProducao()">Protocolar Sustentação →</button>`
+    <button class="btn-avancar-fase" id="btn-prep-recurso" disabled onclick="window.confirmarPreparacaoProducao()">
+      <span>Protocolar Sustentação</span><span class="baf-seta">→</span>
+    </button>`
   );
 }
 
@@ -2453,7 +2551,8 @@ function _renderRodadaRecurso() {
   ].sort(() => Math.random() - 0.5);
 
   abrirModal(`Fase 2 de 2 — Julgamento · rodada ${recursoRd+1} de ${ARGS.length}`,
-    `<div class="fh">Sustentação Recursal</div>
+    `${_painelContextoProcesso(RECURSO_ATIVO)}
+    <div class="fh">Sustentação Recursal</div>
     <div class="abox"><div class="albl">${labelParteContraria}</div><div class="atxt">${a.txt}</div></div>
     <div class="stitle" style="margin-bottom:8px">Convencimento individual</div>
     <div class="timeline" id="votos-preview">
@@ -2861,3 +2960,33 @@ function fmt(n) {
   if (n>=1000) return `R$ ${Math.round(n/1000)}k`;
   return `R$ ${Number(n).toLocaleString('pt-BR')}`;
 }
+
+// ════════════════════════════════════════════════════════
+// PAINEL DE CONTEXTO DO PROCESSO — número, partes, valor, tribunal e
+// fatos narrativos, num bloco compacto no topo das telas de audiência e
+// recurso. O modal do jogo é compartilhado (.modal, max-width 520px) e
+// usado por todo o resto da interface, então em vez de duas colunas
+// (como no motor standalone) isso fica resumido em uma faixa horizontal
+// + lista compacta de fatos, sem exigir alargar o modal global.
+// ════════════════════════════════════════════════════════
+function _painelContextoProcesso(p) {
+  const fatos = p.fatos_narrativa || [];
+  return `
+    <div style="background:var(--surface2);border:var(--borda-sub);border-radius:var(--r);padding:.65rem .8rem;margin-bottom:.9rem">
+      <div style="display:flex;justify-content:space-between;align-items:start;gap:.6rem;flex-wrap:wrap">
+        <div style="min-width:0">
+          <div style="font-family:var(--font-mono);font-size:.58rem;color:var(--txt4)">${p.numero || '—'}</div>
+          <div style="font-weight:700;font-size:.82rem;color:var(--navy);line-height:1.3">${p.autor || '—'} <span style="opacity:.4">vs</span> ${p.reu || '—'}</div>
+          <div style="font-size:.66rem;color:var(--ouro2);margin-top:.1rem">${p.tipo || '—'} · ${p.tribunal || '—'}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:.78rem;font-weight:700;color:var(--verde2)">${fmt(p.valor)}</div>
+        </div>
+      </div>
+      ${fatos.length ? `
+        <div style="margin-top:.55rem;padding-top:.5rem;border-top:var(--borda-sub)">
+          ${fatos.map((f,i) => `<div style="font-size:.68rem;color:var(--txt3);line-height:1.45;margin-bottom:.2rem"><span style="color:var(--txt4);font-family:var(--font-mono)">0${i+1}</span> ${f}</div>`).join('')}
+        </div>` : ''}
+    </div>`;
+}
+
