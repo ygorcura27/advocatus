@@ -2237,6 +2237,51 @@ window.renderCarteiraProcessual = async function(el) {
 };
 
 // ════════════════════════════════════════════════════════
+// POOL DO ESCRITÓRIO — listagem dos casos colaborativos visíveis a
+// qualquer funcionário (dono ou empregado) do escritório. Antes essa
+// listagem não tinha nenhuma tela que a chamasse: os casos eram criados
+// no Firestore corretamente (via novoProcessoPool/novoProcessoPoolEmpregado)
+// mas ficavam invisíveis para o jogador, sem nenhuma forma de acessá-los
+// pela interface.
+// ════════════════════════════════════════════════════════
+window.renderPoolEscritorio = async function(el) {
+  const j = window.JOGADOR;
+  if (!j) return;
+  const ehDeEscritorio = j.escritorio_proprio_id || (j.escritorio_empregado_id && j.escritorio_empregado_id !== 'solo');
+  if (!ehDeEscritorio) {
+    el.innerHTML = '';
+    return;
+  }
+
+  const casos = await buscarCasosPoolEscritorio(j);
+  const mesAtualTotal = mesTotalPessoalProc(j);
+  const uid = j.uid || window.JOGADOR_UID;
+
+  el.innerHTML = `
+    <div class="secao-header"><div class="secao-titulo">🏢 Pool do Escritório</div></div>
+    <div style="font-size:.72rem;color:var(--txt3);margin-bottom:1rem">Casos colaborativos disponíveis para qualquer funcionário do escritório trabalhar.</div>
+    ${casos.length === 0 ? '<div class="card" style="text-align:center;padding:2rem;color:var(--txt3)">Nenhum caso no pool no momento. Capte um novo caso para o escritório.</div>' :
+      casos.map(p => {
+        const restante = p.prazo_limite_mes ? (p.prazo_limite_mes - mesAtualTotal) : null;
+        const jaContribui = (p.contribuintes || []).some(c => c.uid === uid);
+        const progresso = p.progresso || 0;
+        return `
+        <div class="card" style="margin-bottom:.6rem">
+          <div style="display:flex;justify-content:space-between;align-items:start">
+            <div>
+              <div style="font-family:var(--font-mono);font-size:.6rem;color:var(--txt4)">${p.numero}</div>
+              <div style="font-weight:700;font-size:.85rem;color:var(--navy)">${p.autor} vs ${p.reu}</div>
+              <div style="font-size:.68rem;color:var(--txt3)">${p.tipo} · progresso ${progresso}%${jaContribui ? ' · você já contribuiu' : ''}</div>
+              ${restante !== null ? `<div style="font-size:.65rem;color:${restante<=1?'var(--verm2)':'var(--txt4)'}">Prazo: ${restante>0?restante+' mês(es) restante(s)':'PRAZO ESGOTADO'}</div>` : ''}
+            </div>
+          </div>
+          <button class="btn btn-sm btn-prim btn-block" style="margin-top:.5rem" onclick="window.abrirProcesso('${p.id}')">⚖️ ${jaContribui?'Continuar':'Assumir'} caso →</button>
+        </div>`;
+      }).join('')}
+    <button class="btn btn-ghost btn-block" style="margin-top:.5rem" onclick="window.novoProcesso()">+ Captar novo caso para o escritório</button>`;
+};
+
+// ════════════════════════════════════════════════════════
 // RECURSO — preparação, composição do colegiado, sustentação, apuração.
 // ════════════════════════════════════════════════════════
 let RECURSO_ATIVO = null;
@@ -2609,9 +2654,18 @@ window.tentarAcordo = async function(procId) {
 };
 
 // ════════════════════════════════════════════════════════
-// NOVO PROCESSO (individual) / NOVO PROCESSO DO POOL (dono de escritório)
+// NOVO PROCESSO — quando o jogador trabalha em escritório (dono OU
+// empregado), TODO processo nasce no POOL do escritório, nunca
+// individual. Geração é sempre manual (o jogador clica "Novo caso"),
+// nunca automática — isso é proposital: gera demanda conforme aceitação
+// real do jogador, evitando gargalo de casos parados que ninguém pediu.
+//
+// Limite mensal por cargo do FUNCIONÁRIO (jnr+ apenas — est/ass não
+// geram, só recebem o que já está no pool). Dono do escritório usa um
+// limite diferente, por Tier do escritório (ver LIMITE_POOL_CASOS_MES_TIER
+// em novoProcessoPool).
 // ════════════════════════════════════════════════════════
-const LIMITE_NOVOS_PROCESSOS_CARGO = { est:0, ass:1, jnr:2, pln:3, snr:5, asc:7, soc:10, snm:15 };
+const LIMITE_NOVOS_PROCESSOS_CARGO = { est:0, ass:0, jnr:2, pln:3, snr:5, asc:7, soc:10, snm:15 };
 
 window.novoProcesso = async function() {
   const j = window.JOGADOR;
@@ -2620,30 +2674,92 @@ window.novoProcesso = async function() {
   const energiaDisp = Math.max(0, (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - (j.energia_usada_mes||0));
   if (j.em_burnout) { toast('🔴 Em burnout. Descanse antes de novos casos.', 'ko'); return; }
 
+  // Dono de escritório: capta pro pool do PRÓPRIO escritório, com limite por Tier.
   if (j.escritorio_proprio_id) { await window.novoProcessoPool(); return; }
-  if (energiaDisp < 5) { toast('⚡ Energia insuficiente para novos casos.', 'ko'); return; }
 
-  const isEmpregado = j.escritorio_empregado_id && !j.escritorio_proprio_id;
-  if (isEmpregado) {
-    if (j.cargo_id === 'est') {
-      toast('🔒 Estagiários não geram processos novos — você recebe casos distribuídos pelo escritório.', 'ko', 5000);
-      return;
-    }
-    const limite = LIMITE_NOVOS_PROCESSOS_CARGO[j.cargo_id] ?? 1;
-    const usados = j.processos_novos_mes || 0;
-    if (usados >= limite) {
-      toast(`🔒 Limite mensal de novos casos atingido (${usados}/${limite} no seu cargo).`, 'ko', 5000);
-      return;
-    }
-  }
+  // Empregado de escritório de outra pessoa (NPC ou jogador): TODO
+  // processo também nasce no pool do empregador, nunca individual —
+  // mesma regra do dono, só que com limite por CARGO em vez de por Tier.
+  const isEmpregado = j.escritorio_empregado_id && j.escritorio_empregado_id !== 'solo';
+  if (isEmpregado) { await window.novoProcessoPoolEmpregado(); return; }
+
+  // Solo (sem escritório): único caso em que o processo continua individual.
+  if (energiaDisp < 5) { toast('⚡ Energia insuficiente para novos casos.', 'ko'); return; }
 
   const proc = _gerarProcessoCompleto(j);
   try {
     await addDoc(collection(db, 'processos'), proc);
-    if (isEmpregado) await updateDoc(doc(db,'jogadores',uid), { processos_novos_mes: (j.processos_novos_mes||0)+1 });
     toast(`📁 Novo caso: ${proc.tipo}`, 'ok');
     setTimeout(() => window.navTo && window.navTo('processos', null), 400);
   } catch (err) { toast('Erro ao criar processo.', 'ko'); console.error(err); }
+};
+
+// ════════════════════════════════════════════════════════
+// NOVO PROCESSO DO POOL — gerado por um FUNCIONÁRIO EMPREGADO (não dono)
+// para o pool do escritório onde trabalha. Espelha novoProcessoPool()
+// (dono), mas usa o limite por CARGO em vez de por Tier do escritório, e
+// nunca debita energia do "dono" — debita do próprio funcionário que
+// captou, como custo de prospecção.
+// ════════════════════════════════════════════════════════
+window.novoProcessoPoolEmpregado = async function() {
+  const j = window.JOGADOR;
+  if (!j || !j.escritorio_empregado_id || j.escritorio_empregado_id === 'solo') return;
+  const uid = j.uid || window.JOGADOR_UID;
+
+  if (j.cargo_id === 'est' || j.cargo_id === 'ass') {
+    toast('🔒 Estagiários e Assistentes não geram processos novos — vocês recebem casos já existentes no pool do escritório.', 'ko', 6000);
+    return;
+  }
+
+  const energiaDisp = Math.max(0, (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - (j.energia_usada_mes||0));
+  if (energiaDisp < ENERGIA_CAPTAR_CASO_POOL) {
+    toast(`⚡ Energia insuficiente para captar caso (requer ${ENERGIA_CAPTAR_CASO_POOL}⚡).`, 'ko');
+    return;
+  }
+
+  const limite = LIMITE_NOVOS_PROCESSOS_CARGO[j.cargo_id] ?? 1;
+  const usados = j.processos_novos_mes || 0;
+  if (usados >= limite) {
+    toast(`🔒 Limite mensal de captação atingido (${usados}/${limite} no seu cargo).`, 'ko', 5000);
+    return;
+  }
+
+  const escSnap = await getDoc(doc(db, 'escritorios', j.escritorio_empregado_id));
+  if (!escSnap.exists()) { toast('Escritório não encontrado.', 'ko'); return; }
+  const esc = escSnap.data();
+
+  // Mesmo teto de casos ABERTOS simultaneamente do escritório (por Tier)
+  // que já existe para o dono — funcionários captando também respeitam
+  // esse limite, para não furar a trava por outra porta.
+  const tier = esc.tier || 1;
+  const limiteAbertos = LIMITE_POOL_CASOS_ABERTOS_TIER[tier] || LIMITE_POOL_CASOS_ABERTOS_TIER[1];
+  const abertosSnap = await getDocs(query(
+    collection(db, 'processos'),
+    where('pool_escritorio_id', '==', j.escritorio_empregado_id),
+    where('status', '==', 'andamento')
+  ));
+  if (abertosSnap.size >= limiteAbertos) {
+    toast(`🔒 Fila do escritório cheia (${abertosSnap.size}/${limiteAbertos} casos abertos). Conclua casos antes de captar novos.`, 'ko', 6000);
+    return;
+  }
+
+  const proc = _gerarProcessoCompleto(j);
+  proc.pool_escritorio_id = j.escritorio_empregado_id;
+  proc.escritorio_nome_etiqueta = esc.nome || j.escritorio_nome || null;
+  proc.distribuido_pelo_escritorio = true;
+  proc.prazo_limite_mes = mesTotalPessoalProc(j) + PRAZO_POOL_MESES;
+  proc.contribuintes = [];
+  proc.advogado_uid = null;
+
+  try {
+    await addDoc(collection(db, 'processos'), proc);
+    await updateDoc(doc(db, 'jogadores', uid), {
+      processos_novos_mes: usados + 1,
+      energia_usada_mes: (j.energia_usada_mes||0) + ENERGIA_CAPTAR_CASO_POOL,
+    });
+    toast(`📁 Caso captado para o escritório: ${proc.tipo} (${usados+1}/${limite} este mês)`, 'ok', 4000);
+    setTimeout(() => window.navTo && window.navTo('processos', null), 400);
+  } catch (err) { toast('Erro ao captar caso para o escritório.', 'ko'); console.error(err); }
 };
 
 window.novoProcessoPool = async function() {
