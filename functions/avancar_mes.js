@@ -387,6 +387,20 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
     logger.warn('Erro na distribuição mensal de processos:', e.message);
   }
 
+  // ── PROCESSAMENTO MENSAL DE SERVIÇOS/CLIENTES (bloco novo) ──
+  // Reset do bug "função existe mas nunca é chamada", idêntico aos casos
+  // de cursos e relacionamentos: servicos.js::processarServicosMensal era
+  // exposta como window._processarServicosMensal "chamada pelo
+  // avancar_mes.js", mas nunca havia chamada real aqui. Resultado
+  // prático: nenhuma oportunidade nova era gerada após o mês inicial do
+  // escritório, clientes recorrentes nunca eram cobrados, e a tela
+  // "Clientes" ficava sempre vazia (0 disponíveis) depois do primeiro mês.
+  try {
+    await _processarServicosMensalCF(db, uid, { ...j, mes_pessoal: novoMes, ano_pessoal: novoAno });
+  } catch (e) {
+    logger.warn('Erro no processamento mensal de serviços/clientes:', e.message);
+  }
+
   // ── PROCESSAMENTO MENSAL DE CURSOS (bloco novo) ──
   // Reset do bug "função existe mas nunca é chamada", idêntico ao caso de
   // relacionamentos: carreira.js::processarCursosMensal era exposta como
@@ -767,6 +781,237 @@ const SK_LABEL_REL = {
 
 function mesTotalPessoalCF(j) {
   return (j.ano_pessoal||1)*12 + (j.mes_pessoal||0);
+}
+
+// ════════════════════════════════════════════════════════
+// PROCESSAMENTO MENSAL DE SERVIÇOS/CLIENTES — portado de
+// servicos.js::processarServicosMensal (frontend, ES Module, exposta
+// como window._processarServicosMensal "chamada pelo avancar_mes.js" —
+// mesmo padrão de bug já corrigido para relacionamentos e cursos:
+// window.* não existe na Cloud Function (Admin SDK, sem DOM/window), e
+// nunca havia chamada real aqui. Resultado prático do bug: nenhuma
+// oportunidade de serviço era gerada após o primeiro mês do escritório,
+// nenhum cliente recorrente era cobrado, e nenhuma demanda automática de
+// empresa contratada disparava — a tela "Clientes" ficava sempre vazia
+// depois do mês inicial.
+// ════════════════════════════════════════════════════════
+const TIPOS_SERVICO_REL = {
+  consulta:    { energia:5,  valor_min:200,  valor_max:2000,  confianca:5,  chance_processo:0.10 },
+  parecer:     { energia:10, valor_min:1000, valor_max:20000, confianca:10, chance_processo:0.20 },
+  contrato:    { energia:5,  valor_min:500,  valor_max:15000, confianca:15, chance_processo:0 },
+  notificacao: { energia:3,  valor_min:300,  valor_max:5000,  confianca:8,  chance_processo:0.20 },
+  cobranca:    { energia:5,  valor_min:0,    valor_max:0,     confianca:10, chance_processo:0.15, pct_min:0.05, pct_max:0.20 },
+};
+const OPORTUNIDADES_POR_TIER_REL = {
+  1: { min:1,  max:3  }, 2: { min:2,  max:5  }, 3: { min:4,  max:8  },
+  4: { min:8,  max:15 }, 5: { min:15, max:30 },
+};
+const NOMES_CLIENTE_PF_REL = [
+  'Roberto Almeida','Sandra Lopes','Marcelo Tavares','Cristina Souza','Eduardo Ramos',
+  'Fernanda Castro','Paulo Henrique Dias','Juliana Mendes','Sérgio Nogueira','Patrícia Aguiar',
+  'André Luiz Barros','Vanessa Pinheiro','Ricardo Monteiro','Beatriz Cunha','Marcos Vinícius Reis',
+];
+const NOMES_CLIENTE_PJ_REL = {
+  micro: ['Padaria Pão Dourado ME','Salão Bela Vista','Oficina São Jorge','Mercadinho Bom Preço',
+          'Estúdio Foto Arte','Clínica Odonto Sorriso ME'],
+  pequena: ['Distribuidora Rio Verde Ltda','Construtora Alves & Filhos','Restaurante Sabor Carioca',
+            'Transportadora Vitória Ltda','Confecções Moda Brasil'],
+  media: ['Indústria Metalúrgica Atlântico','Rede de Farmácias VidaSaúde','Supermercados Boa Compra',
+          'Construtora Horizonte S/A','Grupo Educacional Saber'],
+  grande: ['Conglomerado Industrial Cariri S/A','Rede Varejista Nacional Maxx','Holding Financeira Atlas',
+           'Grupo Logístico TransBrasil','Indústria Petroquímica Sul'],
+};
+const FAIXA_RECORRENTE_REL = {
+  pf:      { min:100,   max:1000   },
+  micro:   { min:1000,  max:3000   },
+  pequena: { min:3000,  max:10000  },
+  media:   { min:10000, max:30000  },
+  grande:  { min:30000, max:100000 },
+};
+const LIMITE_EMPRESAS_TIER_REL = { 1:1, 2:3, 3:5, 4:10, 5:20 };
+const CHANCE_DEMANDA_AUTOMATICA_REL = { micro:0.05, pequena:0.10, media:0.15, grande:0.20 };
+const CONFIANCA_INICIAL_REL = 50;
+const CONFIANCA_RECORRENTE_MIN_REL = 70;
+const PRODUTIVIDADE_CARGO_REL = { est:0.10, ass:0.20, jnr:0.30, pln:0.40, snr:0.50, asc:0.70, soc:1.00, socn:1.00 };
+
+function _modificadorNetworkingCF(networking) {
+  if (networking >= 81) return 1.00;
+  if (networking >= 61) return 0.50;
+  if (networking >= 41) return 0.25;
+  if (networking >= 21) return 0.10;
+  return 0;
+}
+function _multiplicadorPrestigioCF(prestigioPct) {
+  if (prestigioPct >= 90) return 3.0;
+  if (prestigioPct >= 70) return 2.0;
+  if (prestigioPct >= 40) return 1.5;
+  return 1.0;
+}
+function _portePorTierCF(tier) {
+  const pesos = {
+    1: { micro:0.7, pequena:0.3 },
+    2: { micro:0.4, pequena:0.4, media:0.2 },
+    3: { micro:0.2, pequena:0.4, media:0.3, grande:0.1 },
+    4: { micro:0.1, pequena:0.3, media:0.4, grande:0.2 },
+    5: { micro:0.05,pequena:0.2, media:0.35,grande:0.4 },
+  }[tier] || { micro:0.7, pequena:0.3 };
+  const r = Math.random();
+  let acc = 0;
+  for (const [porte, peso] of Object.entries(pesos)) {
+    acc += peso;
+    if (r <= acc) return porte;
+  }
+  return 'micro';
+}
+function _gerarOportunidadeCF(tier, prestigioPct) {
+  const tiposKeys = Object.keys(TIPOS_SERVICO_REL);
+  const tipoKey   = tiposKeys[Math.floor(Math.random()*tiposKeys.length)];
+  const tipo      = TIPOS_SERVICO_REL[tipoKey];
+  const ehPJ = Math.random() < 0.5;
+  const porte = ehPJ ? _portePorTierCF(tier) : null;
+  const cliente_nome = ehPJ
+    ? NOMES_CLIENTE_PJ_REL[porte][Math.floor(Math.random()*NOMES_CLIENTE_PJ_REL[porte].length)]
+    : NOMES_CLIENTE_PF_REL[Math.floor(Math.random()*NOMES_CLIENTE_PF_REL.length)];
+  const mult = _multiplicadorPrestigioCF(prestigioPct);
+  let valor;
+  if (tipoKey === 'cobranca') {
+    const valorRecuperar = 5000 + Math.floor(Math.random()*95000);
+    const pct = tipo.pct_min + Math.random()*(tipo.pct_max-tipo.pct_min);
+    valor = Math.floor(valorRecuperar * pct * mult);
+  } else {
+    valor = Math.floor((tipo.valor_min + Math.random()*(tipo.valor_max-tipo.valor_min)) * mult);
+  }
+  return {
+    tipo: tipoKey, cliente_nome, cliente_tipo: ehPJ?'PJ':'PF', cliente_porte: porte,
+    valor, energia: tipo.energia, confianca_gerada: tipo.confianca,
+    chance_gerar_processo: tipo.chance_processo || 0,
+    criado_em: new Date().toISOString(),
+  };
+}
+function _valorContratoRecorrenteCF(clienteTipo, porte) {
+  const faixa = clienteTipo === 'PF' ? FAIXA_RECORRENTE_REL.pf : (FAIXA_RECORRENTE_REL[porte] || FAIXA_RECORRENTE_REL.micro);
+  return Math.floor(faixa.min + Math.random()*(faixa.max-faixa.min));
+}
+
+async function _gerarProcessoAutomaticoCF(db, j, oportunidade) {
+  const AREAS_SERVICO = {
+    consulta:'civil', parecer:'tributario', contrato:'empresarial',
+    notificacao:'civil', cobranca:'civil',
+  };
+  const area = AREAS_SERVICO[oportunidade.tipo] || 'civil';
+  const valorCausa = oportunidade.valor * (3 + Math.random()*5);
+
+  await db.collection('processos').add({
+    numero: `${String(Math.floor(Math.random()*9999999)).padStart(7,'0')}-${String(Math.floor(Math.random()*99)).padStart(2,'0')}.${j.ano_pessoal||1}.8.19.0001`,
+    tipo: 'Ação decorrente de ' + oportunidade.tipo,
+    area, tipo_processo: 'judicial',
+    autor: j.nome_personagem || 'Advogado', reu: oportunidade.cliente_nome,
+    tribunal: 'TJRJ', advogado_uid: j.uid, escritorio_id: j.escritorio_proprio_id||null,
+    status:'andamento', instancia:1, progresso:0, chance_sucesso:55,
+    valor: Math.floor(valorCausa), nivel:5, hon_total_acumulado:0,
+    urgente:false, recurso_pendente:false,
+    criado_mes: j.mes_pessoal||0, encerrado_mes:null,
+  });
+}
+
+async function _processarServicosMensalCF(db, uid, j) {
+  const escId = j.escritorio_proprio_id;
+  if (!escId) return;
+
+  const escRef  = db.collection('escritorios').doc(escId);
+  const escSnap = await escRef.get();
+  if (!escSnap.exists) return;
+  const esc  = escSnap.data();
+  const tier = esc.tier || 1;
+
+  const oldOpSnap = await escRef.collection('oportunidades').where('status','==','disponivel').get();
+  await Promise.all(oldOpSnap.docs.map(d => d.ref.delete()));
+
+  const faixa = OPORTUNIDADES_POR_TIER_REL[tier] || OPORTUNIDADES_POR_TIER_REL[1];
+  const networking = j.networking || 10;
+  const cap = REP_CAP[j.cargo_id] || 45;
+  const prestigioPct = Math.min(100, Math.round((j.reputacao||0)/cap*100));
+
+  const modNet = _modificadorNetworkingCF(networking);
+  const qtdBase = faixa.min + Math.floor(Math.random()*(faixa.max-faixa.min+1));
+  const qtd = Math.round(qtdBase * (1+modNet));
+
+  for (let i=0; i<qtd; i++) {
+    const op = _gerarOportunidadeCF(tier, prestigioPct);
+    await escRef.collection('oportunidades').add({ ...op, status:'disponivel' });
+  }
+
+  await _processarAutogestaoOportunidadesCF(db, escRef, esc);
+
+  let receitaRecorrente = 0;
+  const clRecSnap = await escRef.collection('clientes').where('recorrente','==',true).get();
+  for (const cDoc of clRecSnap.docs) {
+    receitaRecorrente += cDoc.data().valor_mensal || 0;
+  }
+
+  if (receitaRecorrente > 0) {
+    await db.collection('jogadores').doc(uid).update({
+      dinheiro: (j.dinheiro||0) + receitaRecorrente,
+      honorarios_mes: (j.honorarios_mes||0) + receitaRecorrente,
+    });
+  }
+
+  for (const cDoc of clRecSnap.docs) {
+    const c = cDoc.data();
+    if (c.tipo !== 'PJ' || !c.porte) continue;
+    const chance = CHANCE_DEMANDA_AUTOMATICA_REL[c.porte] || 0.05;
+    if (Math.random() < chance) {
+      await _gerarProcessoAutomaticoCF(db, { ...j, uid }, { tipo:'parecer', cliente_nome:c.nome, valor: c.valor_mensal*10 });
+    }
+  }
+}
+
+async function _processarAutogestaoOportunidadesCF(db, escRef, esc) {
+  const fSnap = await escRef.collection('funcionarios').get();
+  const advogadosAtivos = fSnap.docs
+    .map(d=>({id:d.id,...d.data()}))
+    .filter(f => ['jnr','pln','snr'].includes(f.cargo_id) && f.ativo!==false);
+
+  if (advogadosAtivos.length === 0) return;
+
+  const opSnap = await escRef.collection('oportunidades').where('status','==','disponivel').get();
+
+  let caixaGanho = 0;
+  let resolvidas = 0;
+
+  for (const opDoc of opSnap.docs) {
+    const op = opDoc.data();
+    const capacidadeTotal = advogadosAtivos.length * 2;
+    if (resolvidas >= capacidadeTotal) break;
+
+    const advogadorResolvedor = advogadosAtivos[resolvidas % advogadosAtivos.length];
+    const valorRecebido = Math.floor(op.valor * 1.0);
+
+    caixaGanho += valorRecebido;
+    resolvidas++;
+
+    await opDoc.ref.update({
+      status:'concluido', valor_recebido:valorRecebido, executor:advogadorResolvedor.nome+' (autogestão)',
+    });
+
+    const clSnap = await escRef.collection('clientes').where('nome','==',op.cliente_nome).get();
+    if (clSnap.empty) {
+      await escRef.collection('clientes').add({
+        nome: op.cliente_nome, tipo: op.cliente_tipo, porte: op.cliente_porte||null,
+        confianca: CONFIANCA_INICIAL_REL + (op.confianca_gerada||0),
+        recorrente:false, valor_mensal:0, criado_em:new Date().toISOString(),
+      });
+    } else {
+      const cDoc=clSnap.docs[0]; const c=cDoc.data();
+      await cDoc.ref.update({
+        confianca: Math.min(100,(c.confianca||50)+(op.confianca_gerada||0)),
+      });
+    }
+  }
+
+  if (caixaGanho > 0) {
+    await escRef.update({ caixa: (esc.caixa||0) + caixaGanho });
+  }
 }
 
 async function _processarCursosMensalCF(db, uid, j) {
@@ -1183,6 +1428,7 @@ async function _gerarFilhoCF(db, uid, relacionamento) {
 // ════════════════════════════════════════════════════════
 exports._processarRelacionamentosMensalCF = _processarRelacionamentosMensalCF;
 exports._processarCursosMensalCF = _processarCursosMensalCF;
+exports._processarServicosMensalCF = _processarServicosMensalCF;
 exports._liberarNpcCF = _liberarNpcCF;
 exports._marcarNpcEmTempoCF = _marcarNpcEmTempoCF;
 exports.EFEITO_TRACO_REL = EFEITO_TRACO_REL;
