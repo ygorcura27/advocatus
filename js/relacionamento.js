@@ -735,7 +735,6 @@ window.abrirPerfilNpc = async function(relId) {
 
   const html = `
     <div class="fb-profile">
-      <div class="fb-capa" style="background-image:url('${avatarUrl}')" onerror="this.style.backgroundImage=''"></div>
       <div class="fb-header">
         <img src="${avatarUrl}" alt="${r.nome}" class="fb-avatar" onerror="this.onerror=null;this.src='img/npcs/_placeholder.png'">
         <div class="fb-header-info">
