@@ -2277,8 +2277,7 @@ window.renderPoolEscritorio = async function(el) {
           </div>
           <button class="btn btn-sm btn-prim btn-block" style="margin-top:.5rem" onclick="window.abrirProcesso('${p.id}')">⚖️ ${jaContribui?'Continuar':'Assumir'} caso →</button>
         </div>`;
-      }).join('')}
-    <button class="btn btn-ghost btn-block" style="margin-top:.5rem" onclick="window.novoProcesso()">+ Captar novo caso para o escritório</button>`;
+      }).join('')}`;
 };
 
 // ════════════════════════════════════════════════════════

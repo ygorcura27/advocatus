@@ -215,6 +215,8 @@ function renderProcessos(j, el) {
       <div style="font-size:.78rem;color:var(--ardosia)">Carregando processos...</div>
     </div>
     <div class="ornamento">— ✦ —</div>
+    <div id="secao-pool-escritorio"></div>
+    <div class="ornamento">— ✦ —</div>
     <div class="secao-header" style="margin-top:.5rem">
       <div class="secao-titulo">📁 Processos Encerrados</div>
     </div>
@@ -223,6 +225,17 @@ function renderProcessos(j, el) {
     </div>`;
 
   _carregarProcessos(j.uid);
+
+  // Pool do escritório (dono ou empregado) — antes ficava completamente
+  // invisível: os casos eram criados certo no Firestore via
+  // novoProcessoPool/novoProcessoPoolEmpregado, mas nenhuma tela os
+  // listava. renderPoolEscritorio() já existe em processos.js e cuida de
+  // checar se o jogador trabalha em escritório, buscar os casos e
+  // renderizar — ou deixar o container vazio se for solo.
+  const poolEl = document.getElementById('secao-pool-escritorio');
+  if (poolEl && window.renderPoolEscritorio) {
+    window.renderPoolEscritorio(poolEl);
+  }
 }
 
 async function _carregarProcessos(uid) {
