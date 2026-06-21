@@ -6,22 +6,26 @@
  * Callable: chamada pelo botão "Avançar Mês" do jogador.
  * Substitui o Cloud Scheduler — o tempo é controlado pelo jogador.
  *
- * Regras:
- * - Energia deve estar abaixo de ENERGIA_MIN (20) OU jogador força manualmente
- * - COOLDOWN_HORAS = 0 durante beta (mude depois dos testes)
- * - Processa apenas o jogador que chamou (não batch)
+ * v2 — Adicionado o bloco de DISTRIBUIÇÃO MENSAL DE PROCESSOS (reset de
+ * `pool_casos_criados_mes` e `processos_novos_mes`, deserção de processos
+ * individuais e do pool colaborativo, sinalização de distribuição
+ * automática de novos casos). Essa lógica existia antes apenas no
+ * frontend (js/processos.js::processarDistribuicaoProcessosMensal),
+ * exposta como window._processarDistribuicaoProcessosMensal, mas NUNCA
+ * era chamada por nada — o avanço de mês real sempre rodou só por esta
+ * Cloud Function, que não sabia da existência dela. Resultado prático do
+ * bug: os contadores mensais de captação de caso nunca zeravam,
+ * acumulando indefinidamente mês após mês (ex.: limite "3/3 atingido"
+ * aparecendo mesmo sem ter captado nenhum caso naquele mês).
  */
 
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getFirestore }       = require('firebase-admin/firestore');
 const { logger }             = require('firebase-functions');
 
-// ── Configuração ──
-const COOLDOWN_JANEIRO_MIN = 60;  // minutos de espera obrigatória após virar janeiro (modo férias)
-const ENERGIA_MIN          = 20;  // abaixo disso o botão fica em destaque
+const COOLDOWN_JANEIRO_MIN = 60;
 const ENERGIA_TOTAL        = 100;
 
-// ── Tabelas (espelho do frontend) ──
 const REP_CAP = {
   est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100, snm:100,
   jsub:55, jtit:70, dsb:85, mstj:100,
@@ -32,7 +36,6 @@ const REP_CAP = {
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
-// Rep mensal por moradia
 const MORADIA_REP = {
   pais:0, belford:-1, sao_joao:-1, nilop:-1, nova_iguacu:-1, caxias_apto:-1,
   bangu:-1, realengo:-1, santa_cruz:0, campo_grande:1, madureira:0,
@@ -44,7 +47,6 @@ const MORADIA_REP = {
   botafogo2:5, lagoa:7, barra_lux:8, ipanema:9, leblon:10,
 };
 
-// Rep mensal por transporte
 const CARRO_REP = {
   onibus:0, kwid:0, mobi:0, hb20:0, gol:0, onix:1,
   polo:1, cronos:1, tracker:2, t_cross:2,
@@ -52,12 +54,10 @@ const CARRO_REP = {
   tiguan:5, hilux:4, bmw3:7, class_c:8, audi_a4:7, range_v:10,
 };
 
-// Penalidade por ausência de moradia/carro adequados por cargo
 const CARGO_IDX = {est:0,ass:1,jnr:2,pln:3,snr:4,asc:5,soc:6,snm:7,
                    jsub:2,jtit:4,dsb:5,mstj:7,padj:2,prom:4,pjus:5,pgj:7,
                    dadj:2,def:4,dch:5,dge:7};
 
-// Valor de imóveis (para calcular aluguel)
 const IMOVEL_VALOR = {
   pais:0, belford:150000, sao_joao:160000, nilop:170000,
   nova_iguacu:220000, caxias_apto:200000, bangu:220000, realengo:180000,
@@ -78,8 +78,6 @@ const CARRO_CM = {
   compass:2500, corolla:2200, civic:2100, tiguan:3200, hr_v:2300,
   hilux:3500, bmw3:4500, class_c:5000, audi_a4:4400, range_v:7000,
 };
-
-const ESCRITORIO_CM = { cw:600, sal:3000, esm:7500, esp:18000 };
 
 const CARGO_SAL_MIN = {
   est:1700, ass:2500, jnr:3500, pln:5750, snr:10600, asc:20000, soc:35000, snm:65000,
@@ -105,6 +103,13 @@ const IMOVEL_PERIGO = {
   ipanema:0, leblon:0, barra_lux:0,
 };
 
+// ── Tabelas do pool colaborativo (espelho de js/processos.js) ──
+const PRAZO_POOL_MESES = 3;
+
+function mesTotalPessoal(mesPessoal, anoPessoal) {
+  return (anoPessoal||1)*12 + (mesPessoal||0);
+}
+
 // ════════════════════════════════════════════════════════
 // CALLABLE PRINCIPAL
 // ════════════════════════════════════════════════════════
@@ -124,16 +129,6 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
   const j = jogadorSnap.data();
   const s = serverSnap.exists ? serverSnap.data() : {};
 
-  // ── Verificar energia ──
-  const energiaRestante = Math.max(0, (j.energia || ENERGIA_TOTAL) - (j.energia_usada_mes || 0));
-  if (energiaRestante > ENERGIA_MIN) {
-    throw new HttpsError('failed-precondition',
-      'Voce ainda tem ' + energiaRestante + ' de energia. Use mais acoes antes de avancar o mes.');
-  }
-
-  // ── Cooldown de janeiro: 1 hora de ferias obrigatorias ──
-  // So aplica quando o jogador esta EM janeiro (mes_pessoal === 0)
-  // e tentou avancar antes do fim do cooldown.
   const mesAtualJogador = j.mes_pessoal !== undefined ? j.mes_pessoal : 0;
   if (mesAtualJogador === 0 && j.janeiro_bloqueado_ate) {
     const bloqueadoAte = new Date(j.janeiro_bloqueado_ate).getTime();
@@ -149,14 +144,10 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
     }
   }
 
-  // ════════════════════════════════════════════════════
-  // PROCESSAR O MÊS
-  // ════════════════════════════════════════════════════
   const updates = {};
   const mensagens = [];
 
-  // ── 1. Avançar calendário pessoal ──
-  const mesAtualJog = j.mes_pessoal ?? 0;       // 0-11
+  const mesAtualJog = j.mes_pessoal ?? 0;
   const anoAtualJog = j.ano_pessoal ?? 1;
   const novoMes     = (mesAtualJog + 1) % 12;
   const novoAno     = novoMes === 0 ? anoAtualJog + 1 : anoAtualJog;
@@ -170,21 +161,18 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
   updates.energia            = ENERGIA_TOTAL;
   updates.energia_usada_mes  = 0;
 
-  // ── 2. Idade ──
   updates.idade = 22 + Math.floor(mesGlobal / 12);
 
-  // ── 3. Aposentadoria ──
   if (updates.idade >= 75 && !j.aposentado) {
     updates.aposentado = true;
     mensagens.push({ assunto:'🎓 Aposentadoria', corpo:'Você atingiu 75 anos. Escolha um herdeiro para continuar sua dinastia.', tipo:'sistema' });
-    await _commit(db, uid, updates, mensagens);
+    await _commit(db, uid, updates, mensagens, novoMes, novoAno);
     return { ok:true, mes:`${MESES[novoMes]}, Ano ${novoAno}`, aposentado:true };
   }
 
-  // ── 4. Study queue ──
   const studyQueue = j.study_queue || [];
-  const prontos    = studyQueue.filter(s => s.mes_conclusao <= mesGlobal);
-  const pendentes  = studyQueue.filter(s => s.mes_conclusao > mesGlobal);
+  const prontos    = studyQueue.filter(s2 => s2.mes_conclusao <= mesGlobal);
+  const pendentes  = studyQueue.filter(s2 => s2.mes_conclusao > mesGlobal);
   const newSkills  = { ...(j.skills || {}) };
   for (const est of prontos) {
     const cap = REP_CAP[j.cargo_id] || 55;
@@ -196,7 +184,6 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
     updates.study_queue = pendentes;
   }
 
-  // ── 5. Financiamentos ──
   const fins = { ...(j.financiamentos || {}) };
   let finsAlterados = false;
   for (const [id, fin] of Object.entries(fins)) {
@@ -210,11 +197,11 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
   }
   if (finsAlterados) updates.financiamentos = fins;
 
-  // ── 6. Calcular renda ──
   let renda = 0;
-  if (j.escritorio_id !== 'solo' && j.escritorio_empregado_id) {
+  const isSoloRenda = !j.escritorio_empregado_id || j.escritorio_id === 'solo' || j.escritorio_proprio_id;
+
+  if (!isSoloRenda) {
     if (j.sal_base_escritorio && j.sal_base_escritorio > 0) {
-      // Salario negociado ao entrar no escritorio NPC
       renda = j.sal_base_escritorio;
     } else {
       const salMin = CARGO_SAL_MIN[j.cargo_id] || 1700;
@@ -222,22 +209,21 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
       const repF   = Math.min(1, (j.reputacao || 30) / 100);
       renda = Math.floor(salMin + (salMax - salMin) * repF * (j.sal_mult || 1.0));
     }
+  } else {
+    renda = j.honorarios_mes || 0;
   }
 
-  // ── 7. Calcular despesas ──
   const morId    = j.pat?.moradia   || 'pais';
   const carId    = j.pat?.transporte|| 'onibus';
   const escId    = j.pat?.escritorio|| 'cw';
   const comprada = j.moradias_compradas?.[morId];
 
   let despesas = 0;
-  // Espaço de trabalho: home=gratuito, NPC=gratuito, solo=cobra coworking/sala
   const ESCRITORIO_CM_LOCAL = { home:0, cw:600, sal:3000, esm:7500, esp:18000 };
   const isSoloWork = !j.escritorio_empregado_id || j.escritorio_id === 'solo';
   if (isSoloWork) {
     despesas += ESCRITORIO_CM_LOCAL[escId] || 0;
   }
-  // Debuff de rep do home office (aplicado no bloco de patrimônio mais abaixo)
   if (morId !== 'pais' && !comprada) {
     const v = IMOVEL_VALOR[morId] || 0;
     despesas += v < 500000 ? Math.floor(v*0.0055) : v < 1000000 ? Math.floor(v*0.004) : Math.floor(v*0.003);
@@ -247,7 +233,6 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
     if (fin.parcelas_restantes > 0) despesas += fin.parcela_mensal || 0;
   }
   despesas += (j.estagiarios || []).length * 1700;
-  // Custo de vida por cargo — escalonado de forma justa
   const CUSTO_BASE = {
     est:600, ass:700, jnr:900, pln:1400, snr:2200,
     asc:3000, soc:4500, snm:6000,
@@ -257,69 +242,72 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
   };
   const custoVida = CUSTO_BASE[j.cargo_id] || 700;
 
-  // ── 8. Saldo ──
   const saldoMes   = renda - despesas - custoVida;
   updates.dinheiro = (j.dinheiro || 0) + saldoMes;
   updates.renda_calculada     = renda;
+  updates.honorarios_mes      = 0;
+
+  if (j.escritorio_proprio_id) {
+    try {
+      const funcSnap = await db
+        .collection('escritorios')
+        .doc(j.escritorio_proprio_id)
+        .collection('funcionarios')
+        .get();
+      const resets = funcSnap.docs.map(d =>
+        d.ref.update({ acoes_mes_usadas: 0, acao_atual: null })
+      );
+      await Promise.all(resets);
+    } catch(e) {
+      logger.warn('Erro ao resetar ações dos funcionários:', e.message);
+    }
+  }
   updates.despesas_calculadas = despesas;
   updates.saldo_mes_calculado = saldoMes;
 
-  // ── 9. Serasa ──
   const finResult = _processarFinanceiro(j, updates.dinheiro, saldoMes);
   Object.assign(updates, finResult.updates);
   if (finResult.msg) mensagens.push(finResult.msg);
 
-  // ── 10. REPUTAÇÃO POR PATRIMÔNIO ──
   const repAtual  = updates.reputacao ?? j.reputacao ?? 30;
   const cargoIdx  = CARGO_IDX[j.cargo_id] || 0;
   const cap       = REP_CAP[j.cargo_id] || 55;
   let deltaRepPat = 0;
 
-  // Home office: -2 rep/mês se for solo
   if (isSoloWork && escId === 'home') {
     const novaRep = Math.max(0, (updates.reputacao ?? j.reputacao ?? 30) - 2);
     updates.reputacao = novaRep;
   }
 
-  // Moradia
   const morRepBase = MORADIA_REP[morId] ?? 0;
   if (morRepBase < 0) {
-    deltaRepPat += morRepBase; // penalidade
+    deltaRepPat += morRepBase;
   } else if (morRepBase > 0) {
-    // Bônus proporcional ao espaço até o cap (decrescente)
     const espaco = Math.max(0, cap - repAtual);
     deltaRepPat += Math.min(morRepBase, Math.max(1, Math.floor(espaco * 0.15)));
   }
-  // Mora com os pais sendo Júnior+ → penalidade extra
   if (morId === 'pais' && cargoIdx >= 2) deltaRepPat -= 2;
 
-  // Transporte
   const carRepBase = CARRO_REP[carId] ?? 0;
   if (carRepBase > 0) {
     const espaco = Math.max(0, cap - (repAtual + deltaRepPat));
     deltaRepPat += Math.min(carRepBase, Math.max(1, Math.floor(espaco * 0.10)));
   }
-  // Ônibus sendo Pleno+ → penalidade
   if (carId === 'onibus' && cargoIdx >= 3) deltaRepPat -= 1;
-  // Carro fraco sendo Sênior+ (kwid/mobi/hb20/gol) → penalidade
   const carrosFracos = ['kwid','mobi','hb20','gol'];
   if (carrosFracos.includes(carId) && cargoIdx >= 4) deltaRepPat -= 1;
 
-  // Escritório sendo Sócio+ sem escritório médio+ → penalidade
   if (['esm','esp'].includes(escId) && cargoIdx >= 6) {
     // tem escritório adequado — sem penalidade
   } else if (['cw','sal'].includes(escId) && cargoIdx >= 6) {
     deltaRepPat -= 2;
   }
 
-  // Bairro perigoso → penalidade adicional
   if ((IMOVEL_PERIGO[morId] || 0) === 2) deltaRepPat -= 1;
 
-  // Aplicar delta de patrimônio
   const repDepoisPat = Math.max(0, Math.min(cap, repAtual + deltaRepPat));
   updates.reputacao = repDepoisPat;
 
-  // ── 11. Prazo moradia ──
   if (morId === 'pais' && j.oab && cargoIdx >= 2) {
     const prazo = (j.prazo_sair_pais || 0) + 1;
     updates.prazo_sair_pais = prazo;
@@ -330,7 +318,6 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
     updates.prazo_sair_pais = 0;
   }
 
-  // ── 12. Atributos ──
   const energiaGasta = j.energia_usada_mes || 0;
   let saudeMental    = j.saude_mental ?? 80;
   let disposicao     = j.disposicao   ?? 80;
@@ -339,14 +326,12 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
   else if (energiaGasta < 30)  { saudeMental = Math.min(100, saudeMental + 3); disposicao = Math.min(100, disposicao + 3); }
   disposicao = Math.max(0, disposicao - 2);
 
-  // Assalto em bairro perigoso
   if ((IMOVEL_PERIGO[morId] || 0) === 2 && Math.random() < 0.01) {
     const perda = Math.floor((updates.dinheiro || 0) * 0.10);
     updates.dinheiro = Math.max(0, (updates.dinheiro || 0) - perda);
     mensagens.push({ assunto:'🚨 Assalto!', corpo:`Você foi assaltado. -R$ ${perda.toLocaleString('pt-BR')} (10% do saldo).`, tipo:'urgente' });
   }
 
-  // Burnout
   if (saudeMental < 20 && !j.em_burnout) {
     updates.em_burnout      = true;
     updates.burnout_ate_mes = mesGlobal + 3;
@@ -361,9 +346,7 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
   updates.saude_mental = saudeMental;
   updates.disposicao   = disposicao;
 
-  // ── 13. Janeiro: bônus anual + recesso + bloqueio 1h ──
   if (isJaneiro) {
-    // Gravar timestamp de desbloqueio: agora + 60 minutos
     const desbloqueioTs = new Date(Date.now() + COOLDOWN_JANEIRO_MIN * 60 * 1000).toISOString();
     updates.janeiro_bloqueado_ate = desbloqueioTs;
     const wA = j.wins_ano || 0, lA = j.losses_ano || 0, tot = wA + lA;
@@ -386,13 +369,25 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
     mensagens.push({ assunto:'🏖️ Recesso Judiciário', corpo:'Janeiro: tribunais em recesso. Escolha sua atividade no jogo.', tipo:'sistema' });
   }
 
-  // ── 14. Anos de carreira ──
   if (mesGlobal % 12 === 0) {
     updates.anos_carreira = (j.anos_carreira || 0) + 1;
   }
 
-  // ── 15. Salvar ──
-  await _commit(db, uid, updates, mensagens);
+  // ── DISTRIBUIÇÃO MENSAL DE PROCESSOS (bloco novo) ──
+  // Reset dos contadores mensais de captação/criação de casos, deserção
+  // de processos individuais e do pool colaborativo. Usa o NOVO mês
+  // (novoMes/novoAno, já calculado acima), não o antigo.
+  try {
+    const processosMsgs = await _processarDistribuicaoProcessosMensal(db, uid, j, {
+      mes_pessoal: novoMes,
+      ano_pessoal: novoAno,
+    }, updates);
+    mensagens.push(...processosMsgs);
+  } catch (e) {
+    logger.warn('Erro na distribuição mensal de processos:', e.message);
+  }
+
+  await _commit(db, uid, updates, mensagens, novoMes, novoAno);
 
   logger.info(`[AVANÇAR] ${uid} → ${MESES[novoMes]}, Ano ${novoAno}`);
 
@@ -410,6 +405,129 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
     }
   };
 });
+
+// ════════════════════════════════════════════════════════
+// DISTRIBUIÇÃO MENSAL DE PROCESSOS — portado de
+// js/processos.js::processarDistribuicaoProcessosMensal (que existia só
+// no frontend, sem nunca ser chamado por nada). Adaptado para Admin SDK.
+// Retorna um array de mensagens de inbox para o _commit() principal
+// gravar — não grava diretamente, para que tudo entre num único batch.
+// ════════════════════════════════════════════════════════
+async function _processarDistribuicaoProcessosMensal(db, uid, j, novoCalendario, updates) {
+  const mensagens = [];
+  const mesAtualTotal = mesTotalPessoal(novoCalendario.mes_pessoal, novoCalendario.ano_pessoal);
+
+  if (j.escritorio_empregado_id && !j.escritorio_proprio_id) {
+    updates.processos_novos_mes = 0;
+  }
+
+  // Este é o reset que faltava e causava o bug "limite 3/3 atingido sem
+  // ter captado nada esse mês".
+  if (j.escritorio_proprio_id) {
+    try {
+      await db.collection('escritorios').doc(j.escritorio_proprio_id).update({ pool_casos_criados_mes: 0 });
+    } catch (e) { logger.warn('Erro ao resetar pool_casos_criados_mes:', e.message); }
+  }
+
+  const meusProcsSnap = await db.collection('processos')
+    .where('advogado_uid', '==', uid)
+    .where('status', '==', 'andamento')
+    .where('distribuido_pelo_escritorio', '==', true)
+    .get();
+
+  for (const pDoc of meusProcsSnap.docs) {
+    const p = pDoc.data();
+    if (p.pool_escritorio_id) continue;
+    if (p.prazo_limite_mes && mesAtualTotal > p.prazo_limite_mes) {
+      const repAtual = updates.reputacao ?? j.reputacao ?? 30;
+      const perda = Math.max(1, Math.floor(repAtual * 0.06));
+      await pDoc.ref.update({ status: 'perdido_desercao', encerrado_mes: mesAtualTotal });
+      updates.reputacao = Math.max(0, repAtual - perda);
+      mensagens.push({
+        assunto: '⚠️ Processo perdido por deserção',
+        corpo: `O processo ${p.numero} (${p.tipo}) ultrapassou o prazo de 3 meses sem conclusão e foi perdido. -${perda} reputação.`,
+        tipo: 'negativo',
+      });
+    }
+  }
+
+  if (j.escritorio_proprio_id) {
+    const poolSnap = await db.collection('processos')
+      .where('pool_escritorio_id', '==', j.escritorio_proprio_id)
+      .where('status', '==', 'andamento')
+      .get();
+
+    for (const pDoc of poolSnap.docs) {
+      const p = pDoc.data();
+      if (!(p.prazo_limite_mes && mesAtualTotal > p.prazo_limite_mes)) continue;
+
+      const progresso = p.progresso || 0;
+      const contribuintes = p.contribuintes || [];
+
+      if (progresso === 0 || contribuintes.length === 0) {
+        try {
+          const escSnap = await db.collection('escritorios').doc(j.escritorio_proprio_id).get();
+          const prestigioAtual = escSnap.exists ? (escSnap.data().prestigio || 10) : 10;
+          await db.collection('escritorios').doc(j.escritorio_proprio_id).update({ prestigio: Math.max(0, prestigioAtual - 3) });
+        } catch (e) { logger.warn('Erro ao penalizar prestígio do escritório:', e.message); }
+        await pDoc.ref.update({ status: 'perdido_desercao', encerrado_mes: mesAtualTotal });
+        mensagens.push({
+          assunto: '⚠️ Caso do escritório perdido por inatividade',
+          corpo: `O caso ${p.numero} (${p.tipo}) ficou ${PRAZO_POOL_MESES} meses no pool sem nenhum funcionário atuar. -3 prestígio do escritório.`,
+          tipo: 'negativo',
+        });
+      } else {
+        const FATOR_RATEIO_POOL = 0.6;
+        const batchRateio = db.batch();
+        for (const c of contribuintes) {
+          try {
+            const cRef = db.collection('jogadores').doc(c.uid);
+            const cSnap = await cRef.get();
+            if (!cSnap.exists) continue;
+            const cData = cSnap.data();
+            const repC = cData.reputacao || 30;
+            const perdaBase = Math.max(1, Math.floor(repC * 0.06));
+            const perdaRateada = Math.max(1, Math.round((perdaBase * FATOR_RATEIO_POOL) / contribuintes.length));
+            batchRateio.update(cRef, { reputacao: Math.max(0, repC - perdaRateada) });
+            const inboxRef = cRef.collection('inbox').doc();
+            batchRateio.set(inboxRef, {
+              de: 'sistema', para_uid: c.uid,
+              assunto: '⚠️ Caso do escritório perdido por deserção',
+              corpo: `O caso colaborativo ${p.numero} (${p.tipo}) ultrapassou o prazo de ${PRAZO_POOL_MESES} meses e foi perdido. -${perdaRateada} reputação (responsabilidade compartilhada entre ${contribuintes.length} contribuinte(s)).`,
+              tipo: 'sistema', tipo_noticia: 'negativo', lida: false, criado_em: new Date().toISOString(),
+            });
+          } catch (e) { logger.warn('[POOL] Erro ao ratear deserção:', e.message); }
+        }
+        try { await batchRateio.commit(); } catch (e) { logger.warn('Erro ao commitar rateio de deserção:', e.message); }
+        await pDoc.ref.update({ status: 'perdido_desercao', encerrado_mes: mesAtualTotal });
+      }
+    }
+  }
+
+  // Geração de novo caso automático: a geração jurídica completa
+  // (tributo/lado/teses/provas/colegiado) usa o motor compartilhado de
+  // functions/shared/banco_juridico.js. Em vez de duplicar essa lógica
+  // aqui, sinaliza via flag + inbox; a geração efetiva acontece no
+  // frontend (js/processos.js) na próxima vez que o jogador abrir a aba
+  // de Processos.
+  if (j.escritorio_empregado_id && !j.escritorio_proprio_id) {
+    try {
+      const escSnap = await db.collection('escritorios').doc(j.escritorio_empregado_id).get();
+      const tier = escSnap.exists ? (escSnap.data().tier || 1) : 1;
+      const chanceDistribuicao = Math.min(0.9, 0.4 + tier * 0.1);
+      if (Math.random() < chanceDistribuicao) {
+        updates.caso_pendente_distribuicao = true;
+        mensagens.push({
+          assunto: '📁 Novo caso a caminho',
+          corpo: 'Seu escritório vai te distribuir um novo caso. Acesse a aba Processos para recebê-lo.',
+          tipo: 'neutro',
+        });
+      }
+    } catch (e) { logger.warn('Erro ao sortear distribuição automática:', e.message); }
+  }
+
+  return mensagens;
+}
 
 // ════════════════════════════════════════════════════════
 // SISTEMA FINANCEIRO
@@ -455,7 +573,7 @@ function _processarFinanceiro(j, novoDinheiro, saldoMes) {
 // ════════════════════════════════════════════════════════
 // HELPER: salvar + inbox
 // ════════════════════════════════════════════════════════
-async function _commit(db, uid, updates, mensagens) {
+async function _commit(db, uid, updates, mensagens, novoMes, novoAno) {
   const batch = db.batch();
   batch.update(db.collection('jogadores').doc(uid), {
     ...updates,
@@ -463,6 +581,8 @@ async function _commit(db, uid, updates, mensagens) {
   });
   for (const m of mensagens) {
     const ref = db.collection('jogadores').doc(uid).collection('inbox').doc();
+    const MESES_CF = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                      'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
     batch.set(ref, {
       de: 'sistema', para_uid: uid,
       assunto: m.assunto || '—',
@@ -471,6 +591,7 @@ async function _commit(db, uid, updates, mensagens) {
       tipo_noticia: m.tipo || 'neutro',
       lida:    false,
       criado_em: new Date().toISOString(),
+      mes_jogo_label: MESES_CF[novoMes] + ', Ano ' + novoAno,
     });
   }
   await batch.commit();
