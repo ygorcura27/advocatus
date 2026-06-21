@@ -434,7 +434,7 @@ window.buscarJogador = async function() {
   try {
     const r = await window._adminFn({ acao:'jogador_get', payload:{uid} });
     const j = r.data.data;
-    document.getElementById('resultado-busca').innerHTML = `
+    document.getElementBy$Id('resultado-busca').innerHTML = `
       <div class="ctrl-card">
         <div style="font-weight:600;color:var(--perg);margin-bottom:.5rem">${j.nome_personagem||'—'} <span style="font-size:.65rem;font-family:var(--font-mono);color:var(--ardosia)">${j.uid}</span></div>
         <pre style="font-size:.68rem;color:var(--ardosia2);max-height:200px;overflow:auto;font-family:var(--font-mono)">${JSON.stringify({
@@ -456,10 +456,10 @@ window.abrirEditarUID = function(uid, nome) {
   document.querySelectorAll('.admin-nav-item').forEach(e=>e.classList.remove('ativo'));
   const el = document.querySelector('.admin-nav-item[onclick*="editar_jogador"]');
   if (el) el.classList.add('ativo');
-  const main = document.getElementById('admin-main');
+  const main = document.getElementBy$Id('admin-main');
   renderEditarJogador(main);
   setTimeout(() => {
-    const inp = document.getElementById('busca-uid');
+    const inp = document.getElementBy$Id('busca-uid');
     if (inp) inp.value = uid;
     toast(`UID ${nome||uid} carregado.`,'ok');
   }, 100);
@@ -469,7 +469,7 @@ window.abrirEditarUID = function(uid, nome) {
 // HELPERS
 // ====================================================
 
-window.id = function(el) {
+window.$id = function(el) {
   return document.getElementById(el);
 };
 // ════════════════════════════════════════════════════════
@@ -498,8 +498,8 @@ function renderFinanceiro(main) {
 
         <button class="btn btn-sec btn-block"
           onclick="acaoAdmin('jogador_set_dinheiro',{
-            uid:document.getElementById('fin-uid').value.trim(),
-            valor:+document.getElementById('fin-val').value
+            uid:document.getElementBy$Id('fin-uid').value.trim(),
+            valor:+document.getElementBy$Id('fin-val').value
           })">
           Definir saldo
         </button>
@@ -520,8 +520,8 @@ function renderFinanceiro(main) {
 
         <button class="btn btn-sec btn-block"
           onclick="acaoAdmin('jogador_add_dinheiro',{
-            uid:document.getElementById('fadd-uid').value.trim(),
-            valor:+document.getElementById('fadd-val').value
+            uid:document.getElementBy$Id('fadd-uid').value.trim(),
+            valor:+document.getElementBy$Id('fadd-val').value
           })">
           Adicionar
         </button>
@@ -537,7 +537,7 @@ function renderFinanceiro(main) {
 
         <button class="btn btn-danger btn-block"
           onclick="acaoAdmin('jogador_reset_financeiro',{
-            uid:document.getElementById('ser-uid').value.trim()
+            uid:document.getElementBy$Id('ser-uid').value.trim()
           })">
           Limpar Serasa e histórico negativo
         </button>
@@ -558,8 +558,8 @@ function renderFinanceiro(main) {
 
         <button class="btn btn-sec btn-block"
           onclick="acaoAdmin('jogador_set_reputacao',{
-            uid:document.getElementById('rep-uid').value.trim(),
-            valor:+document.getElementById('rep-val').value
+            uid:document.getElementBy$Id('rep-uid').value.trim(),
+            valor:+document.getElementBy$Id('rep-val').value
           })">
           Definir reputação
         </button>
@@ -599,9 +599,9 @@ function renderFinanceiro(main) {
 
       <button class="btn btn-sec"
         onclick="acaoAdmin('jogador_set_atributo',{
-          uid:document.getElementById('atr-uid').value.trim(),
-          atributo:document.getElementById('atr-nome').value,
-          valor:+document.getElementById('atr-val').value
+          uid:document.getElementBy$Id('atr-uid').value.trim(),
+          atributo:document.getElementBy$Id('atr-nome').value,
+          valor:+document.getElementBy$Id('atr-val').value
         })">
         Aplicar
       </button>
@@ -630,14 +630,14 @@ function renderSkills(main) {
           <select id="sk-nome">${SKILLS.map(s=>`<option value="${s}">${s}</option>`).join('')}</select>
         </div>
         <div class="ctrl-campo"><label>Valor (0–100)</label><input type="number" id="sk-val" min="0" max="100" value="50"></div>
-        <button class="btn btn-sec btn-block" onclick="acaoAdmin('jogador_set_skill',{uid:id('sk-uid').value.trim(),skill:id('sk-nome').value,valor:+id('sk-val').value})">Aplicar</button>
+        <button class="btn btn-sec btn-block" onclick="acaoAdmin('jogador_set_skill',{uid:$id('sk-uid').value.trim(),skill:$id('sk-nome').value,valor:+$id('sk-val').value})">Aplicar</button>
       </div>
       <div class="ctrl-card">
         <div class="ctrl-card-titulo">Resetar todas as skills</div>
         <div class="ctrl-campo"><label>UID</label><input type="text" id="skr-uid" placeholder="UID"></div>
-        <button class="btn btn-danger btn-block" onclick="acaoAdmin('jogador_reset_skills',{uid:id('skr-uid').value.trim()},'Confirma reset de skills?')">Reset skills para valores iniciais</button>
+        <button class="btn btn-danger btn-block" onclick="acaoAdmin('jogador_reset_skills',{uid:$id('skr-uid').value.trim()},'Confirma reset de skills?')">Reset skills para valores iniciais</button>
         <div style="margin-top:.5rem"></div>
-        <button class="btn btn-sec btn-block" onclick="acaoAdmin('jogador_max_skills',{uid:id('skr-uid').value})">Maxar skills no cap do cargo</button>
+        <button class="btn btn-sec btn-block" onclick="acaoAdmin('jogador_max_skills',{uid:$id('skr-uid').value})">Maxar skills no cap do cargo</button>
       </div>
     </div>
     <div class="ctrl-card"><div class="ctrl-card-titulo">📋 Log</div>
@@ -660,22 +660,22 @@ function renderCargo(main) {
           <select id="cg-cargo">${CARGOS.map(c=>`<option value="${c}">${c}</option>`).join('')}</select>
         </div>
         <div style="font-size:.68rem;color:var(--ardosia2);margin-bottom:.5rem">OAB concedida automaticamente para Júnior+.</div>
-        <button class="btn btn-sec btn-block" onclick="acaoAdmin('jogador_set_cargo',{uid:id('cg-uid').value.trim(),cargo_id:id('cg-cargo').value})">Definir cargo</button>
+        <button class="btn btn-sec btn-block" onclick="acaoAdmin('jogador_set_cargo',{uid:$id('cg-uid').value.trim(),cargo_id:$id('cg-cargo').value})">Definir cargo</button>
       </div>
       <div class="ctrl-card">
         <div class="ctrl-card-titulo">OAB / Concurso</div>
         <div class="ctrl-campo"><label>UID</label><input type="text" id="oab-uid" placeholder="UID"></div>
         <div style="display:flex;gap:.5rem;margin-bottom:.5rem">
-          <button class="btn btn-sec" style="flex:1" onclick="acaoAdmin('jogador_set_oab',{uid:id('oab-uid').value.trim(),aprovado:true})">Conceder OAB ✅</button>
-          <button class="btn btn-danger" style="flex:1" onclick="acaoAdmin('jogador_set_oab',{uid:id('oab-uid').value.trim(),aprovado:false})">Revogar OAB</button>
+          <button class="btn btn-sec" style="flex:1" onclick="acaoAdmin('jogador_set_oab',{uid:$id('oab-uid').value.trim(),aprovado:true})">Conceder OAB ✅</button>
+          <button class="btn btn-danger" style="flex:1" onclick="acaoAdmin('jogador_set_oab',{uid:$id('oab-uid').value.trim(),aprovado:false})">Revogar OAB</button>
         </div>
-        <button class="btn btn-sec btn-block" onclick="acaoAdmin('jogador_set_concurso',{uid:id('oab-uid').value.trim(),aprovado:true})">Aprovar no concurso público</button>
+        <button class="btn btn-sec btn-block" onclick="acaoAdmin('jogador_set_concurso',{uid:$id('oab-uid').value.trim(),aprovado:true})">Aprovar no concurso público</button>
       </div>
       <div class="ctrl-card">
         <div class="ctrl-card-titulo">Definir XP</div>
         <div class="ctrl-campo"><label>UID</label><input type="text" id="xp-uid" placeholder="UID"></div>
         <div class="ctrl-campo"><label>XP</label><input type="number" id="xp-val" value="1000"></div>
-        <button class="btn btn-sec btn-block" onclick="acaoAdmin('jogador_set_xp',{uid:id('xp-uid').value.trim(),xp:+id('xp-val').value})">Definir XP</button>
+        <button class="btn btn-sec btn-block" onclick="acaoAdmin('jogador_set_xp',{uid:$id('xp-uid').value.trim(),xp:+$id('xp-val').value})">Definir XP</button>
       </div>
     </div>
     <div class="ctrl-card"><div class="ctrl-card-titulo">📋 Log</div>
@@ -692,7 +692,7 @@ function renderSaude(main) {
     <div class="ctrl-card" style="max-width:400px">
       <div class="ctrl-card-titulo">Curar burnout e restaurar saúde</div>
       <div class="ctrl-campo"><label>UID do jogador</label><input type="text" id="burn-uid" placeholder="UID"></div>
-      <button class="btn btn-sec btn-block" onclick="acaoAdmin('jogador_curar_burnout',{uid:id('burn-uid').value.trim()})">
+      <button class="btn btn-sec btn-block" onclick="acaoAdmin('jogador_curar_burnout',{uid:$id('burn-uid').value.trim()})">
         Curar burnout (saúde+disposição → 80)
       </button>
     </div>
@@ -715,7 +715,7 @@ function renderReset(main) {
         Mantém: nome, especialidade, geração.
       </p>
       <div class="ctrl-campo"><label>UID do jogador</label><input type="text" id="rst-uid" placeholder="UID"></div>
-      <button class="btn btn-danger btn-block" onclick="acaoAdmin('jogador_reset_completo',{uid:id('rst-uid').value.trim()},'ATENÇÃO: Reset completo é irreversível. Confirmar?')">
+      <button class="btn btn-danger btn-block" onclick="acaoAdmin('jogador_reset_completo',{uid:$id('rst-uid').value.trim()},'ATENÇÃO: Reset completo é irreversível. Confirmar?')">
         🔄 Resetar jogador completamente
       </button>
     </div>
