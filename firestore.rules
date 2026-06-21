@@ -194,6 +194,42 @@ service cloud.firestore {
           && get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid;
       }
 
+      // Subcoleção: oportunidades de serviço — apenas dono/sócios do
+      // escritório podem ver e gerenciar (aceitar, delegar, recusar).
+      // Sem essa regra, a tela "Clientes" falha com "Missing or
+      // insufficient permissions" ao tentar listar oportunidades.
+      match /oportunidades/{opId} {
+        allow read: if isAuth()
+          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid
+              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios);
+        allow create: if isAuth()
+          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid
+              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios);
+        allow update: if isAuth()
+          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid
+              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios);
+        allow delete: if isAuth()
+          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid
+              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios);
+      }
+
+      // Subcoleção: carteira de clientes — mesmo padrão de acesso das
+      // oportunidades (apenas dono/sócios).
+      match /clientes/{clienteId} {
+        allow read: if isAuth()
+          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid
+              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios);
+        allow create: if isAuth()
+          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid
+              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios);
+        allow update: if isAuth()
+          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid
+              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios);
+        allow delete: if isAuth()
+          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid
+              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios);
+      }
+
       allow delete: if false;
     }
 
