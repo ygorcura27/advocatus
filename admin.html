@@ -918,7 +918,7 @@ function renderLog(main) {
         ? '<span class="log-info">Nenhuma ação realizada ainda.</span>'
         : _logHistorico.map(l=>`<div class="${l.tipo}">${l.msg}</div>`).join('')}
     </div>
-    <button class="btn btn-ghost btn-sm" style="margin-top:.5rem" onclick="_logHistorico=[];renderLog(document.getElementById('admin-main'))">Limpar log</button>`;
+    <button class="btn btn-ghost btn-sm" style="margin-top:.5rem" onclick="_logHistorico=[];renderLog(document.getElementBy$Id('admin-main'))">Limpar log</button>`;
 }
 
 // ════════════════════════════════════════════════════════
@@ -950,7 +950,7 @@ window.acaoAdmin = async function(acao, payload, confirmar) {
 // ════════════════════════════════════════════════════════
 
 function log(msg, tipo='info') {
-  const logEl = document.getElementById('admin-log');
+  const logEl = document.getElementBy$Id('admin-log');
   if (!logEl) return;
   const line = document.createElement('div');
   line.className = `log-${tipo}`;
@@ -967,7 +967,7 @@ function fmt(n) {
 }
 
 window.toast = function(msg, tipo='neutro') {
-  const c = document.getElementById('toast-container');
+  const c = document.getElementBy$Id('toast-container');
   if (!c) return;
   const el = document.createElement('div');
   el.className = `toast ${tipo}`;
