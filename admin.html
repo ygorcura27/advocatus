@@ -745,8 +745,8 @@ function renderProcessos(main) {
           <select id="proc-res"><option value="ganho">Ganho</option><option value="perdido">Perdido</option></select>
         </div>
         <div style="display:flex;gap:.5rem">
-          <button class="btn btn-sec" style="flex:1" onclick="acaoAdmin('processo_encerrar',{processo_id:id('proc-id').value.trim(),resultado:id('proc-res').value})">Encerrar</button>
-          <button class="btn btn-danger" style="flex:1" onclick="acaoAdmin('processo_deletar',{processo_id:id('proc-id').value.trim()},'Deletar processo?')">Deletar</button>
+          <button class="btn btn-sec" style="flex:1" onclick="acaoAdmin('processo_encerrar',{processo_id:$id('proc-id').value.trim(),resultado:$id('proc-res').value})">Encerrar</button>
+          <button class="btn btn-danger" style="flex:1" onclick="acaoAdmin('processo_deletar',{processo_id:$id('proc-id').value.trim()},'Deletar processo?')">Deletar</button>
         </div>
       </div>
     </div>
@@ -756,18 +756,18 @@ function renderProcessos(main) {
 }
 
 window.listarProcessos = async function() {
-  const uid = document.getElementById('proc-uid').value.trim();
+  const uid = document.getElementBy$Id('proc-uid').value.trim();
   if (!uid) return;
   try {
     const r = await window._adminFn({ acao:'processos_listar_jogador', payload:{uid} });
     const lista = r.data.data || [];
-    document.getElementById('proc-lista').innerHTML = lista.length === 0
+    document.getElementBy$Id('proc-lista').innerHTML = lista.length === 0
       ? '<div style="color:var(--ardosia)">Nenhum processo.</div>'
       : lista.map(p=>`<div style="display:flex;justify-content:space-between;padding:.3rem 0;border-bottom:var(--borda-sub)">
           <span style="color:var(--ardosia);font-family:var(--font-mono)">${p.id.slice(0,10)}</span>
           <span>${p.tipo||'—'}</span>
           <span style="color:${p.status==='andamento'?'var(--ouro2)':p.status==='ganho'?'var(--verde3)':'var(--verm3)'}">${p.status}</span>
-          <button class="btn btn-sm btn-ghost" onclick="document.getElementById('proc-id').value='${p.id}'">Sel.</button>
+          <button class="btn btn-sm btn-ghost" onclick="document.getElementBy$Id('proc-id').value='${p.id}'">Sel.</button>
         </div>`).join('');
   } catch (err) { log(`❌ ${err.message}`,'ko'); }
 };
@@ -791,8 +791,8 @@ function renderEscritorios(main) {
         <div class="ctrl-campo"><label>Prestígio (0–100)</label><input type="number" id="esc-pres" min="0" max="100" value="50"></div>
         <div class="ctrl-campo"><label>Nível (1–7)</label><input type="number" id="esc-nivel" min="1" max="7" value="1"></div>
         <div style="display:flex;gap:.5rem">
-          <button class="btn btn-sec" style="flex:1" onclick="acaoAdmin('escritorio_set_prestigio',{escritorio_id:id('esc-edit-id').value.trim(),prestigio:+id('esc-pres').value})">Prestígio</button>
-          <button class="btn btn-sec" style="flex:1" onclick="acaoAdmin('escritorio_set_nivel',{escritorio_id:id('esc-edit-id').value.trim(),nivel:+id('esc-nivel').value})">Nível</button>
+          <button class="btn btn-sec" style="flex:1" onclick="acaoAdmin('escritorio_set_prestigio',{escritorio_id:$id('esc-edit-id').value.trim(),prestigio:+$id('esc-pres').value})">Prestígio</button>
+          <button class="btn btn-sec" style="flex:1" onclick="acaoAdmin('escritorio_set_nivel',{escritorio_id:$id('esc-edit-id').value.trim(),nivel:+$id('esc-nivel').value})">Nível</button>
         </div>
       </div>
     </div>
@@ -802,16 +802,16 @@ function renderEscritorios(main) {
 }
 
 window.buscarEscritorio = async function() {
-  const escId = id('esc-id').value.trim();
+  const escId = $id('esc-id').value.trim();
   if (!escId) return;
   try {
     const r = await window._adminFn({ acao:'escritorio_get', payload:{escritorio_id:escId} });
     const e = r.data.data;
     const NIVEL_L = ['','Autônomo','Individual','Boutique','Regional','Nacional','Full Service','Big Law'];
-    document.getElementById('esc-info').innerHTML = `
+    document.getElementBy$Id('esc-info').innerHTML = `
       <div><b>${e.nome}</b> · Nível ${NIVEL_L[e.nivel]||e.nivel} · Prestígio ${e.prestigio}</div>
       <div style="color:var(--ardosia2)">${(e.socios_uids||[]).length} sócio(s) · ${e.total_casos||0} casos</div>`;
-    id('esc-edit-id').value = escId;
+    $id('esc-edit-id').value = escId;
   } catch(err){log(`❌ ${err.message}`,'ko');}
 };
 
@@ -827,18 +827,18 @@ function renderMensagens(main) {
         <div class="ctrl-campo"><label>UID</label><input type="text" id="msg-uid" placeholder="UID do jogador"></div>
         <div class="ctrl-campo"><label>Assunto</label><input type="text" id="msg-assunto" placeholder="Assunto"></div>
         <div class="ctrl-campo"><label>Corpo</label><textarea id="msg-corpo" rows="3" placeholder="Mensagem..." style="width:100%;background:rgba(255,255,255,.05);border:var(--borda);color:var(--perg);padding:.45rem .7rem;border-radius:var(--r);font-family:var(--font-sans);font-size:.8rem;outline:none;resize:vertical"></textarea></div>
-        <button class="btn btn-sec btn-block" onclick="acaoAdmin('enviar_mensagem_sistema',{uid:id('msg-uid').value.trim(),assunto:id('msg-assunto').value,corpo:id('msg-corpo').value,tipo:'sistema'})">Enviar</button>
+        <button class="btn btn-sec btn-block" onclick="acaoAdmin('enviar_mensagem_sistema',{uid:$id('msg-uid').value.trim(),assunto:$id('msg-assunto').value,corpo:$id('msg-corpo').value,tipo:'sistema'})">Enviar</button>
       </div>
       <div class="ctrl-card">
         <div class="ctrl-card-titulo">Mensagem para TODOS os jogadores</div>
         <div class="ctrl-campo"><label>Assunto</label><input type="text" id="all-assunto" placeholder="Aviso global"></div>
         <div class="ctrl-campo"><label>Corpo</label><textarea id="all-corpo" rows="3" placeholder="Mensagem para todos..." style="width:100%;background:rgba(255,255,255,.05);border:var(--borda);color:var(--perg);padding:.45rem .7rem;border-radius:var(--r);font-family:var(--font-sans);font-size:.8rem;outline:none;resize:vertical"></textarea></div>
-        <button class="btn btn-danger btn-block" onclick="acaoAdmin('enviar_mensagem_todos',{assunto:id('all-assunto').value,corpo:id('all-corpo').value},'Enviar para todos os jogadores?')">📢 Enviar para todos</button>
+        <button class="btn btn-danger btn-block" onclick="acaoAdmin('enviar_mensagem_todos',{assunto:$id('all-assunto').value,corpo:$id('all-corpo').value},'Enviar para todos os jogadores?')">📢 Enviar para todos</button>
       </div>
       <div class="ctrl-card">
         <div class="ctrl-card-titulo">Limpar inbox</div>
         <div class="ctrl-campo"><label>UID</label><input type="text" id="clr-uid" placeholder="UID do jogador"></div>
-        <button class="btn btn-danger btn-block" onclick="acaoAdmin('limpar_inbox',{uid:id('clr-uid').value.trim()},'Limpar todas as mensagens?')">Limpar inbox</button>
+        <button class="btn btn-danger btn-block" onclick="acaoAdmin('limpar_inbox',{uid:$id('clr-uid').value.trim()},'Limpar todas as mensagens?')">Limpar inbox</button>
       </div>
     </div>
     <div class="ctrl-card"><div class="ctrl-card-titulo">📋 Log</div>
@@ -859,7 +859,7 @@ function renderBeta(main) {
           Dá R$100k, rep 40, skills 45, OAB, cargo Júnior. Para testers.
         </p>
         <div class="ctrl-campo"><label>UID</label><input type="text" id="beta-uid" placeholder="UID do jogador"></div>
-        <button class="btn btn-sec btn-block" onclick="acaoAdmin('beta_dar_starter_pack',{uid:id('beta-uid').value.trim()})">Conceder Starter Pack</button>
+        <button class="btn btn-sec btn-block" onclick="acaoAdmin('beta_dar_starter_pack',{uid:$id('beta-uid').value.trim()})">Conceder Starter Pack</button>
       </div>
       <div class="ctrl-card">
         <div class="ctrl-card-titulo">Simular próximo tick</div>
@@ -882,7 +882,7 @@ window.simularTick = async function() {
   try {
     const r = await window._adminFn({ acao:'beta_testar_tick', payload:{uid} });
     const s = r.data.simulacao;
-    document.getElementById('sim-resultado').innerHTML = `
+    document.getElementBy$Id('sim-resultado').innerHTML = `
       <div style="background:rgba(255,255,255,.04);border:var(--borda);border-radius:var(--r);padding:.6rem;font-family:var(--font-mono)">
         <div><b>${s.jogador}</b> · ${s.cargo} · ${s.mes_atual}</div>
         <div>Renda: <span style="color:var(--verde3)">${fmt(s.renda)}</span></div>
