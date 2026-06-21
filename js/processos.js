@@ -2733,102 +2733,13 @@ async function _gastarEnergia(custo, desc) {
   catch (err) { toast('Erro ao gastar energia.', 'ko'); return false; }
 }
 
-// ════════════════════════════════════════════════════════
-// DISTRIBUIÇÃO MENSAL — deserção (individual e pool) e novos casos
-// distribuídos automaticamente. Mesma lógica do processos.js original,
-// com pequenos ajustes para o novo formato de processo (provas/teses
-// não se aplicam à deserção, só ao fluxo de jogo).
-// ════════════════════════════════════════════════════════
-export async function processarDistribuicaoProcessosMensal(j) {
-  const uid = j.uid || window.JOGADOR_UID;
 
-  if (j.escritorio_empregado_id && !j.escritorio_proprio_id) {
-    await updateDoc(doc(db,'jogadores',uid), { processos_novos_mes: 0 });
-  }
-  if (j.escritorio_proprio_id) {
-    await updateDoc(doc(db,'escritorios',j.escritorio_proprio_id), { pool_casos_criados_mes: 0 });
-  }
-
-  const mesAtualTotal = mesTotalPessoalProc(j);
-
-  const meusProcsSnap = await getDocs(query(
-    collection(db,'processos'), where('advogado_uid','==',uid),
-    where('status','==','andamento'), where('distribuido_pelo_escritorio','==',true)
-  ));
-  for (const pDoc of meusProcsSnap.docs) {
-    const p = pDoc.data();
-    if (p.pool_escritorio_id) continue;
-    if (p.prazo_limite_mes && mesAtualTotal > p.prazo_limite_mes) {
-      const perda = Math.max(1, Math.floor((j.reputacao||0)*0.06));
-      await updateDoc(doc(db,'processos',pDoc.id), { status:'perdido_desercao', encerrado_mes:mesAtualTotal });
-      await updateDoc(doc(db,'jogadores',uid), { reputacao: Math.max(0,(j.reputacao||0)-perda) });
-      await addDoc(collection(db,'jogadores',uid,'inbox'), {
-        de:'sistema', para_uid:uid, assunto:'⚠️ Processo perdido por deserção',
-        corpo:`O processo ${p.numero} (${p.tipo}) ultrapassou o prazo de 3 meses sem conclusão e foi perdido. -${perda} reputação.`,
-        tipo:'sistema', tipo_noticia:'negativo', lida:false, criado_em:new Date().toISOString(),
-      });
-    }
-  }
-
-  if (j.escritorio_proprio_id) {
-    const poolSnap = await getDocs(query(
-      collection(db,'processos'), where('pool_escritorio_id','==',j.escritorio_proprio_id), where('status','==','andamento')
-    ));
-    for (const pDoc of poolSnap.docs) {
-      const p = pDoc.data();
-      if (!(p.prazo_limite_mes && mesAtualTotal > p.prazo_limite_mes)) continue;
-      const progresso = p.progresso || 0;
-      const contribuintes = p.contribuintes || [];
-      if (progresso === 0 || contribuintes.length === 0) {
-        const escSnap = await getDoc(doc(db,'escritorios',j.escritorio_proprio_id));
-        const prestigioAtual = escSnap.exists() ? (escSnap.data().prestigio || 10) : 10;
-        await updateDoc(doc(db,'escritorios',j.escritorio_proprio_id), { prestigio: Math.max(0, prestigioAtual - 3) });
-        await updateDoc(doc(db,'processos',pDoc.id), { status:'perdido_desercao', encerrado_mes:mesAtualTotal });
-        await addDoc(collection(db,'jogadores',uid,'inbox'), {
-          de:'sistema', para_uid:uid, assunto:'⚠️ Caso do escritório perdido por inatividade',
-          corpo:`O caso ${p.numero} (${p.tipo}) ficou ${PRAZO_POOL_MESES} meses no pool sem nenhum funcionário atuar. -3 prestígio do escritório.`,
-          tipo:'sistema', tipo_noticia:'negativo', lida:false, criado_em:new Date().toISOString(),
-        });
-      } else {
-        const FATOR_RATEIO_POOL = 0.6;
-        for (const c of contribuintes) {
-          try {
-            const cSnap = await getDoc(doc(db,'jogadores',c.uid));
-            if (!cSnap.exists()) continue;
-            const cData = cSnap.data();
-            const repC = cData.reputacao || 30;
-            const perdaBase = Math.max(1, Math.floor(repC*0.06));
-            const perdaRateada = Math.max(1, Math.round((perdaBase*FATOR_RATEIO_POOL)/contribuintes.length));
-            await updateDoc(doc(db,'jogadores',c.uid), { reputacao: Math.max(0, repC - perdaRateada) });
-            await addDoc(collection(db,'jogadores',c.uid,'inbox'), {
-              de:'sistema', para_uid:c.uid, assunto:'⚠️ Caso do escritório perdido por deserção',
-              corpo:`O caso colaborativo ${p.numero} (${p.tipo}) ultrapassou o prazo de ${PRAZO_POOL_MESES} meses e foi perdido. -${perdaRateada} reputação (responsabilidade compartilhada entre ${contribuintes.length} contribuinte(s)).`,
-              tipo:'sistema', tipo_noticia:'negativo', lida:false, criado_em:new Date().toISOString(),
-            });
-          } catch (e) { console.warn('[POOL] Erro ao ratear deserção:', e); }
-        }
-        await updateDoc(doc(db,'processos',pDoc.id), { status:'perdido_desercao', encerrado_mes:mesAtualTotal });
-      }
-    }
-  }
-
-  if (j.escritorio_empregado_id && !j.escritorio_proprio_id) {
-    const escSnap = await getDoc(doc(db,'escritorios',j.escritorio_empregado_id));
-    const tier = escSnap.exists() ? (escSnap.data().tier||1) : 1;
-    const chanceDistribuicao = Math.min(0.9, 0.4 + tier*0.1);
-    if (Math.random() < chanceDistribuicao) {
-      const proc = _gerarProcessoCompleto(j, true);
-      await addDoc(collection(db,'processos'), proc);
-      await addDoc(collection(db,'jogadores',uid,'inbox'), {
-        de:'sistema', para_uid:uid, assunto:'📁 Novo caso distribuído pelo escritório',
-        corpo:`Você recebeu um novo caso: ${proc.tipo}. Prazo para conclusão: 3 meses.`,
-        tipo:'sistema', tipo_noticia:'neutro', lida:false, criado_em:new Date().toISOString(),
-      });
-    }
-  }
-}
-window._processarDistribuicaoProcessosMensal = processarDistribuicaoProcessosMensal;
-
+// (A função processarDistribuicaoProcessosMensal foi REMOVIDA deste
+// arquivo — ela nunca era chamada por nada no frontend (window.avancarMes
+// é definido apenas pela Cloud Function avancar_mes.js, que não conhecia
+// esta função). Migrada para dentro de functions/avancar_mes.js, que é
+// onde o avanço de mês de fato acontece. Manter aqui seria deixar uma
+// segunda fonte de verdade morta e divergente da implementação real.)
 function fmt(n) {
   if (!n && n!==0) return '—';
   if (n>=1000000) return `R$ ${(n/1000000).toFixed(1)}M`;
