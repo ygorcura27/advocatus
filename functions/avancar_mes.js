@@ -387,6 +387,21 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
     logger.warn('Erro na distribuição mensal de processos:', e.message);
   }
 
+  // ── PROCESSAMENTO MENSAL DE CURSOS (bloco novo) ──
+  // Reset do bug "função existe mas nunca é chamada", idêntico ao caso de
+  // relacionamentos: carreira.js::processarCursosMensal era exposta como
+  // window._processarCursosMensal "chamada pelo avancar_mes.js", mas
+  // nunca havia chamada real aqui (Admin SDK não tem window.* mesmo que
+  // houvesse). Resultado prático: matrículas nunca eram avaliadas, cursos
+  // nunca aprovavam/reprovavam de fato. Precisa rodar ANTES do bloco de
+  // relacionamentos abaixo, pois o bônus de afinidade do traço 'academica'
+  // depende de saber se um curso foi aprovado NESTE mesmo mês.
+  try {
+    await _processarCursosMensalCF(db, uid, { ...j, mes_pessoal: novoMes, ano_pessoal: novoAno });
+  } catch (e) {
+    logger.warn('Erro no processamento mensal de cursos:', e.message);
+  }
+
   // ── PROCESSAMENTO MENSAL DE RELACIONAMENTOS (bloco novo) ──
   // Reset do contador _ganho_mes_atual (afinidade), decaimento, gravidez,
   // flagras, envelhecimento de filhos. Esta lógica existia em
@@ -399,7 +414,7 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
   // afinidade (GANHO_MAX_MENSAL) permanentemente após o primeiro mês em
   // que fosse atingido com qualquer pessoa.
   try {
-    await _processarRelacionamentosMensalCF(db, uid, j, { mes_pessoal: novoMes, ano_pessoal: novoAno });
+    await _processarRelacionamentosMensalCF(db, uid, j, { mes_pessoal: novoMes, ano_pessoal: novoAno }, updates.idade);
   } catch (e) {
     logger.warn('Erro no processamento mensal de relacionamentos:', e.message);
   }
@@ -614,20 +629,8 @@ async function _commit(db, uid, updates, mensagens, novoMes, novoAno) {
   await batch.commit();
 }
 
-// ════════════════════════════════════════════════════════
-// PROCESSAMENTO MENSAL DE RELACIONAMENTOS — portado de
-// relacionamento.js::processarRelacionamentosMensal (frontend, ES Module)
-// para Admin SDK. Mesma lógica de decaimento, gravidez, flagra,
-// envelhecimento de filhos, e — o ponto crítico do bug original — reset
-// de _ganho_mes_atual (limite mensal de afinidade por pessoa).
-//
-// IMPORTANTE: mantém o mesmo conteúdo das tabelas em
-// js/relacionamento_dados.js. Qualquer ajuste de balanceamento feito lá
-// (ESTAGIOS, INTERACOES, GANHO_MAX_MENSAL, etc.) precisa ser replicado
-// manualmente aqui — não há um módulo compartilhado físico entre
-// frontend (ES Module) e Cloud Function (CommonJS) por padrão deste
-// projeto (mesma decisão já tomada para o banco jurídico).
-// ════════════════════════════════════════════════════════
+
+
 const ESTAGIOS_REL = {
   affair:   { cap:50,  decai:10, termino_chance:0.03, tempo_chance:0.05 },
   namorado: { cap:100, decai:8,  termino_chance:0.02, tempo_chance:0.03 },
@@ -657,6 +660,60 @@ const ACADEMIA_REL = {
   perda_sem_uso: 1,
 };
 const CUSTO_FILHO_REL = { bebe:800, crianca:1200, jovem:2000 };
+const MATERIALISTA_TOLERANCIA_REL = { meses_tolerancia: 6, perda_afinidade_mes: 10 };
+
+// Efeitos mecânicos de traço — espelho de js/relacionamento_dados.js::EFEITO_TRACO.
+// Ver o comentário da seção acima sobre duplicação manual entre ES Module
+// (frontend) e Cloud Function (CommonJS): qualquer ajuste de balanceamento
+// feito lá precisa ser replicado aqui manualmente.
+const EFEITO_TRACO_REL = {
+  academica:    { afinidade_curso_concluido: 5 },
+  ambiciosa:    { afinidade_promocao: 4, afinidade_sem_evolucao_12m: -5 },
+  caseira:      { limite_energia_mes: 80, afinidade_excesso_energia: -4 },
+  aventureira:  { exige_viagem_por_ano: true, afinidade_sem_viagem_ano: -5,
+                   afinidade_viagem_nacional_extra: 5, afinidade_viagem_internacional_extra: 10 },
+  romantica:    { multiplicador_ganho: 1.20, multiplicador_dano_sm_termino: 1.50 },
+  independente: { multiplicador_decaimento: 0.50 },
+  ciumenta:     { chance_evento_mensal: 0.02, chance_termino_evento: 0.15 },
+  materialista: { afinidade_aniversario_sem_presente: -10, afinidade_presente: 10, multiplicador_custo_eventos: 1.20 },
+  familiar:     { afinidade_nascimento: 15, idade_limite_sem_filhos: 30, afinidade_mes_sem_filhos_apos_limite: -10 },
+  conservadora: { prazo_ideal_anos_namoro: 2, afinidade_mes_apos_prazo_sem_proposta: -5 },
+  moderna:      { isenta_penalidade_tempo: true },
+  carente:      { multiplicador_ganho: 1.25, multiplicador_perda: 1.50 },
+  competitiva:  { afinidade_promocao: 8, afinidade_sem_evolucao_12m: -5 },
+};
+
+/** Soma os efeitos de todos os traços presentes na lista (ex.: ['ambiciosa','competitiva'] empilham afinidade_promocao). */
+function _efeitosDosTracos(tracos) {
+  const efeitos = (tracos||[]).map(t => EFEITO_TRACO_REL[t]).filter(Boolean);
+  return efeitos;
+}
+
+/** Libera/trava o lock global do NPC (npcs_locks/{npcId}) — equivalente
+ * Admin SDK das funções homônimas em js/relacionamento.js (frontend). */
+async function _liberarNpcCF(db, npcId) {
+  if (!npcId) return;
+  try {
+    await db.collection('npcs_locks').doc(npcId).update({
+      status: 'disponivel', jogador_uid: null, relacionamento_id: null,
+      atualizado_em: new Date().toISOString(),
+    });
+  } catch (e) {
+    // Lock pode não existir ainda em dados antigos (relacionamentos criados
+    // antes desta feature, sem npc_id salvo) — não é erro fatal.
+  }
+}
+async function _marcarNpcEmTempoCF(db, npcId, uid, relId) {
+  if (!npcId) return;
+  try {
+    await db.collection('npcs_locks').doc(npcId).update({
+      status: 'tempo', jogador_uid: uid, relacionamento_id: relId,
+      atualizado_em: new Date().toISOString(),
+    });
+  } catch (e) {
+    // idem
+  }
+}
 
 function custoFilhoPorIdadeCF(idade) {
   if (idade <= 5)  return CUSTO_FILHO_REL.bebe;
@@ -677,7 +734,120 @@ const NOMES_BEBE_CF = {
   f: ['Helena','Alice','Laura','Maria','Sofia','Valentina','Júlia','Lívia'],
 };
 
-async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario) {
+// ════════════════════════════════════════════════════════
+// PROCESSAMENTO MENSAL DE CURSOS — portado de
+// carreira.js::processarCursosMensal (frontend, ES Module, com o mesmo
+// comentário "Chamado pelo avancar_mes.js todo mês" que nunca foi de fato
+// implementado — idêntico ao bug já corrigido para relacionamentos).
+// Verifica matrículas que completaram a duração, decide aprovação
+// (>=75% de frequência) e aplica os ganhos de skill.
+//
+// NOVO: ao aprovar um curso, aplica o bônus de afinidade do traço
+// 'academica' nas NPCs ativas que o tenham (EFEITO_TRACO_REL.academica
+// .afinidade_curso_concluido) — mesmo conceito de "evolução pessoal
+// reconhecida pela parceira" já usado para Ambiciosa/Competitiva com
+// promoções de carreira.
+// ════════════════════════════════════════════════════════
+const CURSOS_REL = [
+  {id:'arb',  n:'Curso de Arbitragem',         sem:6,  sk:'negociacao',  b:25, sk2:'persuasao',    b2:15},
+  {id:'mba',  n:'MBA Compliance Corporativo',  sem:16, sk:'gestao',      b:30, sk2:'networking',   b2:10},
+  {id:'llm',  n:'LLM Direito Tributário',      sem:12, sk:'pesquisa',    b:30, sk2:'argumentacao', b2:15},
+  {id:'int',  n:'Tributação Internacional',    sem:8,  sk:'pesquisa',    b:20, sk2:'negociacao',   b2:10},
+  {id:'lit',  n:'Litigância Estratégica',      sem:4,  sk:'oratoria',    b:22, sk2:'persuasao',    b2:18},
+  {id:'crf',  n:'Especialização CARF/TRF',     sem:10, sk:'argumentacao',b:25, sk2:'pesquisa',     b2:15},
+  {id:'ges',  n:'MBA Gestão de Escritório',    sem:12, sk:'gestao',      b:30, sk2:'networking',   b2:12},
+  {id:'esc',  n:'Escrita Jurídica Avançada',   sem:5,  sk:'escrita',     b:25, sk2:'argumentacao', b2:10},
+  {id:'juri', n:'Tribunal do Júri — Plenário', sem:3,  sk:'oratoria',    b:20, sk2:'persuasao',    b2:20},
+];
+const SK_LABEL_REL = {
+  oratoria:'Oratória', argumentacao:'Argumentação', escrita:'Escrita Jurídica',
+  pesquisa:'Pesquisa/Leg.', negociacao:'Negociação', persuasao:'Persuasão',
+  gestao:'Gestão', networking:'Networking',
+};
+
+function mesTotalPessoalCF(j) {
+  return (j.ano_pessoal||1)*12 + (j.mes_pessoal||0);
+}
+
+async function _processarCursosMensalCF(db, uid, j) {
+  const matriculas = j.cursos_matriculas || {};
+  let cursosFeitos = [...(j.cursos_feitos||[])];
+  let updatesSkills = {};
+  let mudou = false;
+  let notificacoes = [];
+  let cursoAprovadoNesteMs = false;
+
+  for (const [cursoId, m] of Object.entries(matriculas)) {
+    if (m.status !== 'em_andamento') continue;
+    const c = CURSOS_REL.find(x => x.id === cursoId);
+    if (!c) continue;
+
+    const mesesPassados = mesTotalPessoalCF(j) - m.mes_total_inicio;
+    if (mesesPassados < c.sem) continue; // ainda não terminou a duração
+
+    const frequencia = (m.presencas||0) / c.sem;
+    if (frequencia >= 0.75) {
+      const cap = REP_CAP[j.cargo_id] || 55;
+      const sk1 = Math.min(cap, ((j.skills||{})[c.sk]||0) + c.b);
+      const sk2 = Math.min(cap, ((j.skills||{})[c.sk2]||0) + c.b2);
+      updatesSkills[`skills.${c.sk}`] = sk1;
+      updatesSkills[`skills.${c.sk2}`] = sk2;
+      cursosFeitos.push(cursoId);
+      m.status = 'concluido';
+      cursoAprovadoNesteMs = true;
+      notificacoes.push({
+        assunto: `🎓 Aprovado: ${c.n}`,
+        corpo: `Você concluiu o curso com ${Math.round(frequencia*100)}% de frequência! +${c.b} ${SK_LABEL_REL[c.sk]} · +${c.b2} ${SK_LABEL_REL[c.sk2]}.`,
+        tipo: 'positivo',
+      });
+    } else {
+      m.status = 'reprovado';
+      notificacoes.push({
+        assunto: `❌ Reprovado: ${c.n}`,
+        corpo: `Frequência de apenas ${Math.round(frequencia*100)}% — abaixo dos 75% exigidos. Você não foi aprovado e perdeu o investimento.`,
+        tipo: 'negativo',
+      });
+    }
+    mudou = true;
+  }
+
+  if (mudou) {
+    await db.collection('jogadores').doc(uid).update({
+      cursos_matriculas: matriculas,
+      cursos_feitos: cursosFeitos,
+      ...updatesSkills,
+    });
+    for (const n of notificacoes) {
+      await db.collection('jogadores').doc(uid).collection('inbox').add({
+        de:'sistema', para_uid:uid, assunto:n.assunto, corpo:n.corpo,
+        tipo:'sistema', tipo_noticia:n.tipo, lida:false, criado_em:new Date().toISOString(),
+      });
+    }
+  }
+
+  // ── Acadêmica: bônus de afinidade nas NPCs ativas com esse traço, ao
+  // concluir (aprovar) qualquer curso neste mês. ──
+  if (cursoAprovadoNesteMs) {
+    try {
+      const relSnap = await db.collection('jogadores').doc(uid).collection('relacionamentos')
+        .where('ativo', '==', true).get();
+      for (const relDoc of relSnap.docs) {
+        const r = relDoc.data();
+        const tracos = r.tracos || [];
+        if (!tracos.includes('academica')) continue;
+        const estagio = ESTAGIOS_REL[r.estagio] || ESTAGIOS_REL.affair;
+        const bonus = EFEITO_TRACO_REL.academica.afinidade_curso_concluido;
+        const novaAfinidade = Math.min(estagio.cap, (r.afinidade||0) + bonus);
+        await relDoc.ref.update({ afinidade: novaAfinidade });
+      }
+    } catch (e) {
+      logger.warn('Erro ao aplicar bônus de Acadêmica por curso concluído:', e.message);
+    }
+  }
+}
+
+
+async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, novaIdadeJogador) {
   const updatesJogador = {};
 
   // ── Academia: bônus ou perda de energia ──
@@ -696,11 +866,27 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario) {
     .where('ativo', '==', true).get();
   const rels = relSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
+  // Busca de filhos UMA VEZ (fora do loop) para a checagem de Familiar
+  // ("sem filhos COM ELA após os 30") — evita N queries redundantes para
+  // N relacionamentos ativos. Monta um Set de relacionamento_id que já
+  // geraram filho, para lookup O(1) dentro do loop abaixo.
+  const filhosSnapParaChecagem = await db.collection('jogadores').doc(uid).collection('filhos').get();
+  const relacionamentosComFilho = new Set(
+    filhosSnapParaChecagem.docs.map(d => d.data().relacionamento_id).filter(Boolean)
+  );
+
   const numAffairs = rels.filter(r => r.estagio === 'affair').length;
   const temNamoradaOuMais = rels.some(r => r.estagio !== 'affair');
   let smDelta = 0;
   let felicidadeSomaCompat = 0, felicidadeCount = 0;
   const mesTotalAtual = (novoCalendario.ano_pessoal||1)*12 + (novoCalendario.mes_pessoal||0);
+
+  // Idade do jogador SUBIU este mês? (mesmo gatilho de updates.idade no
+  // callable principal: 22 + Math.floor(mesGlobal/12), recalculada todo
+  // mês mas só muda de VALOR nos meses-aniversário). Se sim, é o mesmo
+  // "mês-aniversário" em que as NPCs namoradas também envelhecem +1.
+  const idadeSubiuEsteMes = typeof novaIdadeJogador === 'number'
+    && novaIdadeJogador > (j.idade || 22);
 
   for (const r of rels) {
     // Guarda de idempotência: evita processar duas vezes o mesmo mês de
@@ -709,10 +895,22 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario) {
 
     const estagio = ESTAGIOS_REL[r.estagio] || ESTAGIOS_REL.affair;
     const upd = { _mes_processado: mesTotalAtual };
+    const tracos = r.tracos || [];
+    const efeitos = _efeitosDosTracos(tracos);
 
-    // Decaimento se não interagiu o suficiente este mês
+    // ── Idade da NPC: sobe +1 no MESMO mês-aniversário do jogador ──
+    // (só se ela já tiver um campo de idade salvo — relacionamentos
+    // criados antes desta feature podem não ter; nesse caso não
+    // inventamos uma idade do zero aqui, fica para uma migração futura).
+    if (idadeSubiuEsteMes && typeof r.idade === 'number') {
+      upd.idade = r.idade + 1;
+    }
+
+    // ── Decaimento, ajustado por Independente (-50%) ──
+    let decaimento = estagio.decai;
+    for (const e of efeitos) if (e.multiplicador_decaimento !== undefined) decaimento *= e.multiplicador_decaimento;
     if (!r._ganho_mes_atual) {
-      upd.afinidade = Math.max(0, (r.afinidade||0) - estagio.decai);
+      upd.afinidade = Math.max(0, (r.afinidade||0) - Math.round(decaimento));
     }
     // ESTE é o reset que faltava — sem ele, GANHO_MAX_MENSAL (25) era
     // atingido uma vez e nunca mais liberava novas interações com aquela
@@ -720,7 +918,7 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario) {
     upd._ganho_mes_atual = 0;
     upd._meses = (r._meses||0) + 1;
 
-    // Sexo: tolerância e penalidades
+    // ── Sexo: tolerância e penalidades ──
     let mesesSemSexo = r.sexo_mes_atual ? 0 : (r.meses_sem_sexo||0) + 1;
     upd.meses_sem_sexo = mesesSemSexo;
     upd.sexo_mes_atual = false;
@@ -729,7 +927,84 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario) {
       upd.afinidade = Math.max(0, (upd.afinidade ?? r.afinidade) - SEXO_CONFIG_REL.perda_afinidade_mes);
     }
 
-    // Gravidez
+    // ── Materialista: tolerância de "tempo sem presente" — incrementa o
+    // contador todo mês (resetado para 0 em relacionamento.js::darPresente
+    // sempre que o jogador dá qualquer presente); a partir do limite de
+    // tolerância, penaliza por mês até receber outro. Simplificação
+    // deliberada (sem vínculo a aniversário específico — ver decisão de
+    // design registrada na conversa que introduziu este sistema). ──
+    if (tracos.includes('materialista')) {
+      const mesesSemPresente = (r.meses_sem_presente||0) + 1;
+      upd.meses_sem_presente = mesesSemPresente;
+      if (mesesSemPresente >= MATERIALISTA_TOLERANCIA_REL.meses_tolerancia) {
+        upd.afinidade = Math.max(0, (upd.afinidade ?? r.afinidade) - MATERIALISTA_TOLERANCIA_REL.perda_afinidade_mes);
+      }
+    }
+
+    // ── Conservadora: penaliza se passou do prazo ideal de namoro sem proposta ──
+    // (afeta apenas estágio 'namorado' — 'noivo'/'esposo' já progrediram).
+    if (r.estagio === 'namorado') {
+      for (const e of efeitos) {
+        if (e.prazo_ideal_anos_namoro !== undefined) {
+          const mesesNoEstagio = r._meses || 0;
+          const prazoMeses = e.prazo_ideal_anos_namoro * 12;
+          if (mesesNoEstagio > prazoMeses) {
+            upd.afinidade = Math.max(0, (upd.afinidade ?? r.afinidade) + e.afinidade_mes_apos_prazo_sem_proposta);
+          }
+        }
+      }
+    }
+
+    // ── Familiar: penaliza se o JOGADOR passou dos 30 sem filhos COM ELA ──
+    // (checa especificamente este relacionamento via relacionamentosComFilho,
+    // montado uma vez no início da função — não basta o jogador ter filho
+    // com OUTRA pessoa, a NPC familiar quer um filho DELA).
+    for (const e of efeitos) {
+      if (e.idade_limite_sem_filhos !== undefined) {
+        const idadeJogadorAtual = novaIdadeJogador ?? j.idade ?? 22;
+        const temFilhoComEla = relacionamentosComFilho.has(r.id);
+        if (idadeJogadorAtual > e.idade_limite_sem_filhos && !temFilhoComEla) {
+          upd.afinidade = Math.max(0, (upd.afinidade ?? r.afinidade) + e.afinidade_mes_sem_filhos_apos_limite);
+        }
+      }
+    }
+
+    // ── Ambiciosa/Competitiva: penaliza se o jogador está há 12+ meses
+    // sem promoção (ver carreira.js::promover, que grava
+    // ultima_promocao_mes_total a cada vez que sobe de cargo). Os efeitos
+    // EMPILHAM, simétrico ao bônus de promoção. ──
+    {
+      let penalidadeSemEvolucao = 0;
+      for (const e of efeitos) {
+        if (e.afinidade_sem_evolucao_12m !== undefined) penalidadeSemEvolucao += e.afinidade_sem_evolucao_12m;
+      }
+      if (penalidadeSemEvolucao !== 0) {
+        const ultimaPromoMes = j.ultima_promocao_mes_total ?? 0; // 0 = nunca foi promovido (conta desde o início)
+        const mesesSemEvoluir = mesTotalAtual - ultimaPromoMes;
+        if (mesesSemEvoluir >= 12) {
+          upd.afinidade = Math.max(0, (upd.afinidade ?? r.afinidade) + penalidadeSemEvolucao);
+        }
+      }
+    }
+
+    // ── Aventureira: checagem ANUAL (só no mês-aniversário) se viajou ──
+    // Hook conectado: relacionamento.js::interagirRelacionamento grava
+    // viajou_no_ano=true sempre que o jogador faz viagem_nac ou viagem_int
+    // com QUALQUER NPC (não precisa ser ela mesma viajando — é o jogador
+    // que viaja, com ela ou com outra pessoa, dado que o estado de "viajou
+    // este ano" é por relacionamento individual). Se o relacionamento foi
+    // criado ANTES desta feature (sem o campo gravado), `r.viajou_no_ano`
+    // vem `undefined` e a checagem é pulada — evita penalizar dados
+    // antigos por uma migração que não rodou.
+    const ehAventureira = tracos.includes('aventureira');
+    if (ehAventureira && idadeSubiuEsteMes && r.viajou_no_ano !== undefined) {
+      if (!r.viajou_no_ano) {
+        upd.afinidade = Math.max(0, (upd.afinidade ?? r.afinidade) + EFEITO_TRACO_REL.aventureira.afinidade_sem_viagem_ano);
+      }
+      upd.viajou_no_ano = false; // reseta o contador para o novo ano, em qualquer caso
+    }
+
+    // ── Gravidez ──
     if (r.sexo_mes_atual && !r.gravida && CHANCE_GRAVIDEZ_REL[r.estagio]) {
       if (Math.random() < CHANCE_GRAVIDEZ_REL[r.estagio]) {
         upd.gravida = true;
@@ -742,13 +1017,50 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario) {
         upd.gravida = false;
         upd.mes_gravidez = 0;
         smDelta += 10;
+        // Familiar: bônus de afinidade no nascimento
+        for (const e of efeitos) {
+          if (e.afinidade_nascimento !== undefined) {
+            upd.afinidade = Math.min(estagio.cap, (upd.afinidade ?? r.afinidade) + e.afinidade_nascimento);
+          }
+        }
       } else {
         upd.mes_gravidez = novoMesGrav;
       }
     }
 
-    // Flagra de affair
-    if (temNamoradaOuMais && r.estagio !== 'affair' && numAffairs > 0) {
+    // ── Ciumenta: evento mensal de conflito, com chance de virar término ──
+    // (independente do fluxo de tempo/término "natural" abaixo — checado
+    // primeiro porque é mais específico ao traço).
+    let ciumentaTerminou = false;
+    for (const e of efeitos) {
+      if (e.chance_evento_mensal !== undefined && Math.random() < e.chance_evento_mensal) {
+        if (Math.random() < e.chance_termino_evento) {
+          upd.ativo = false;
+          smDelta -= IMPACTO_SM_REL.termino[r.estagio] || 10;
+          ciumentaTerminou = true;
+          await db.collection('jogadores').doc(uid).collection('inbox').add({
+            de:'sistema', para_uid:uid,
+            assunto:'😒 Ciúmes descontrolado',
+            corpo:`${r.nome} terminou com você após uma crise de ciúmes.`,
+            tipo:'sistema', tipo_noticia:'negativo', lida:false, criado_em:new Date().toISOString(),
+          });
+        } else {
+          upd.afinidade = Math.max(0, (upd.afinidade ?? r.afinidade) - 5);
+          await db.collection('jogadores').doc(uid).collection('inbox').add({
+            de:'sistema', para_uid:uid,
+            assunto:'😒 Crise de ciúmes',
+            corpo:`${r.nome} teve uma crise de ciúmes este mês. -5 afinidade.`,
+            tipo:'sistema', tipo_noticia:'negativo', lida:false, criado_em:new Date().toISOString(),
+          });
+        }
+      }
+    }
+
+    // ── Flagra de affair / término ou tempo "natural" ──
+    // (pulado se a Ciumenta já encerrou o relacionamento este mês).
+    if (ciumentaTerminou) {
+      // já tratado acima — não roda os outros ramos de término/tempo.
+    } else if (temNamoradaOuMais && r.estagio !== 'affair' && numAffairs > 0) {
       if (Math.random() < FLAGRA_REL.chance_namorada_com_affair) {
         upd.ativo = false;
         upd.afinidade = 0;
@@ -767,10 +1079,23 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario) {
       }
     } else if (Math.random() < estagio.termino_chance) {
       upd.ativo = false;
-      smDelta -= IMPACTO_SM_REL.termino[r.estagio] || 10;
+      let danoTermino = IMPACTO_SM_REL.termino[r.estagio] || 10;
+      // Romântica: término dói 50% mais na saúde mental do jogador.
+      for (const e of efeitos) if (e.multiplicador_dano_sm_termino !== undefined) danoTermino *= e.multiplicador_dano_sm_termino;
+      smDelta -= Math.round(danoTermino);
     } else if (Math.random() < estagio.tempo_chance) {
       upd.afinidade = Math.max(0, Math.floor((upd.afinidade ?? r.afinidade) * 0.7));
       smDelta -= IMPACTO_SM_REL.tempo[r.estagio] || 5;
+      // "Dar um tempo": trava o NPC globalmente para o MESMO jogador —
+      // outros não podem conhecê-la enquanto isso, só ele pode reatar.
+      if (r.npc_id) await _marcarNpcEmTempoCF(db, r.npc_id, uid, r.id);
+    }
+
+    // Se o relacionamento foi encerrado (qualquer um dos ramos acima:
+    // ciumenta, flagra, ou término natural), libera o NPC de volta ao
+    // mundo — qualquer outro jogador pode conhecê-la a partir de agora.
+    if (upd.ativo === false && r.npc_id) {
+      await _liberarNpcCF(db, r.npc_id);
     }
 
     await db.collection('jogadores').doc(uid).collection('relacionamentos').doc(r.id).update(upd);
@@ -826,6 +1151,18 @@ async function _gerarFilhoCF(db, uid, relacionamento) {
   await db.collection('jogadores').doc(uid).collection('filhos').add({
     nome, sexo, idade:0, idade_meses:0,
     mae_ou_pai: relacionamento.nome,
+    // Vínculo com o relacionamento que gerou este filho — necessário para
+    // a checagem de Familiar ("sem filhos com ELA após os 30 anos"), que
+    // precisa saber se o jogador já teve filho especificamente com esta
+    // NPC, não com qualquer uma. relacionamento.id é o ID do documento em
+    // jogadores/{uid}/relacionamentos/{id} (presente no objeto `r` usado
+    // no loop de _processarRelacionamentosMensalCF); npc_id é a chave
+    // global da ficha (ex.: 'natalia_borges'), salva como redundância
+    // segura — sobrevive mesmo se o documento de relacionamento for
+    // apagado, já que aponta para a ficha-fonte em vez do registro do
+    // namoro em si.
+    relacionamento_id: relacionamento.id || null,
+    npc_id: relacionamento.npc_id || null,
     faculdade: null, jogavel:false,
     criado_em: new Date().toISOString(),
   });
@@ -837,3 +1174,16 @@ async function _gerarFilhoCF(db, uid, relacionamento) {
     tipo:'sistema', tipo_noticia:'positivo', lida:false, criado_em:new Date().toISOString(),
   });
 }
+
+// ════════════════════════════════════════════════════════
+// EXPORTS DE TESTE — não usados pelo functions/index.js de produção
+// (que só consome exports.avancarMes). Expostos aqui apenas para
+// permitir testes funcionais locais (mock) de _processarRelacionamentosMensalCF
+// e dos helpers de lock, sem precisar emular o onCall completo.
+// ════════════════════════════════════════════════════════
+exports._processarRelacionamentosMensalCF = _processarRelacionamentosMensalCF;
+exports._processarCursosMensalCF = _processarCursosMensalCF;
+exports._liberarNpcCF = _liberarNpcCF;
+exports._marcarNpcEmTempoCF = _marcarNpcEmTempoCF;
+exports.EFEITO_TRACO_REL = EFEITO_TRACO_REL;
+
