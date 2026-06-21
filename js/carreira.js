@@ -3,11 +3,12 @@
  * Progressão, OAB, concurso público, cursos, contratação de equipe.
  */
 
-import { doc, updateDoc, collection, addDoc }
+import { doc, updateDoc, collection, addDoc, getDocs, query, where }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { httpsCallable }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
 import { db } from './firebase-init.js';
+import { EFEITO_TRACO, ESTAGIOS } from './relacionamento_dados.js';
 
 // ════════════════════════════════════════════════════════
 // CARGOS
@@ -194,9 +195,15 @@ window.promover = async function() {
   const prox = CARGOS[idx+1];
   if (!prox || !_podePromover(j, prox)) { toast('Requisitos não atingidos.','ko'); return; }
 
+  const mesTotalAtual = (j.ano_pessoal||1)*12 + (j.mes_pessoal||0);
+
   await updateDoc(doc(db, 'jogadores', uid), {
     cargo_id:      prox.id,
     reputacao:     Math.max(j.reputacao||30, prox.rep_min||0),
+    // Usado pelo avanço mensal para detectar "12 meses sem evolução"
+    // (penalidade de Ambiciosa/Competitiva) — ver EFEITO_TRACO em
+    // relacionamento_dados.js::afinidade_sem_evolucao_12m.
+    ultima_promocao_mes_total: mesTotalAtual,
   });
   toast(`🎉 Promovido(a) para ${prox.l}!`, 'ok');
 
@@ -208,7 +215,42 @@ window.promover = async function() {
     tipo:'sistema', tipo_noticia:'positivo', lida:false,
     criado_em:new Date().toISOString(),
   });
+
+  // ── Ambiciosa/Competitiva: bônus de afinidade nas NPCs com esses traços,
+  // empilhando se ela tiver os dois (ver EFEITO_TRACO.ambiciosa/.competitiva
+  // .afinidade_promocao em relacionamento_dados.js). ──
+  try {
+    await _aplicarBonusPromocaoNosRelacionamentos(uid);
+  } catch (e) {
+    console.warn('[CARREIRA] Erro ao aplicar bônus de promoção nos relacionamentos:', e.message);
+  }
 };
+
+/**
+ * Aplica o bônus de afinidade de "promoção" em todas as NPCs ativas que
+ * tenham os traços 'ambiciosa' e/ou 'competitiva' — os bônus EMPILHAM
+ * (ambiciosa +4 E competitiva +8 = +12) por decisão de design, já que
+ * esses dois traços são narrativamente compatíveis entre si.
+ */
+async function _aplicarBonusPromocaoNosRelacionamentos(uid) {
+  const relSnap = await getDocs(query(
+    collection(db, 'jogadores', uid, 'relacionamentos'),
+    where('ativo', '==', true)
+  ));
+
+  for (const relDoc of relSnap.docs) {
+    const r = relDoc.data();
+    const tracos = r.tracos || [];
+    let bonus = 0;
+    if (tracos.includes('ambiciosa'))   bonus += EFEITO_TRACO.ambiciosa.afinidade_promocao;
+    if (tracos.includes('competitiva')) bonus += EFEITO_TRACO.competitiva.afinidade_promocao;
+    if (bonus === 0) continue;
+
+    const estagio = ESTAGIOS[r.estagio] || ESTAGIOS.affair;
+    const novaAfinidade = Math.min(estagio.cap, (r.afinidade||0) + bonus);
+    await updateDoc(doc(db,'jogadores',uid,'relacionamentos',relDoc.id), { afinidade: novaAfinidade });
+  }
+}
 
 // ════════════════════════════════════════════════════════
 // OAB

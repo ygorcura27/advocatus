@@ -3,15 +3,113 @@
  * Sistema de namoro, traços de personalidade, gravidez, filhos e herdeiros.
  */
 
-import { collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where }
+import { collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where, orderBy, limit,
+         runTransaction }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { db } from './firebase-init.js';
 import {
   TRACOS, LOCAIS_CONHECER, ESTAGIOS, IMPACTO_SM, INTERACOES, GANHO_MAX_MENSAL,
-  PROGRESSAO, CHANCE_GRAVIDEZ, DURACAO_GESTACAO, ACADEMIA, SEXO_CONFIG, FLAGRA,
-  calcCompatibilidade, gerarParceiroNPC, labelEstagio, efeitoFelicidadeChance,
+  PROGRESSAO, CHANCE_GRAVIDEZ, DURACAO_GESTACAO, ACADEMIA, SEXO_CONFIG, FLAGRA, EFEITO_TRACO,
+  PRESENTES, MATERIALISTA_TOLERANCIA,
+  calcCompatibilidade, fichasElegiveis, candidatoDeFicha, labelEstagio, efeitoFelicidadeChance,
   efeitoFelicidadeCompatibilidade, custoFilhoPorIdade, custoAcademia,
 } from './relacionamento_dados.js';
+
+// ════════════════════════════════════════════════════════
+// NPCs GLOBAIS — LOCK DE EXCLUSIVIDADE
+// Cada NPC é uma entidade ÚNICA no mundo, compartilhada entre todos os
+// jogadores. O documento npcs_locks/{npcId} guarda quem está namorando
+// ou "em tempo" com ela agora — enquanto travada, ela não aparece para
+// mais ninguém em "Conhecer Pessoas". Término libera o lock; "dar um
+// tempo" mantém a trava apenas para o MESMO jogador (só ele pode reatar
+// ou terminar de vez — outros continuam sem vê-la).
+// ════════════════════════════════════════════════════════
+function _npcLockRef(npcId) {
+  return doc(db, 'npcs_locks', npcId);
+}
+
+/**
+ * Tenta travar um NPC para este jogador (transação — evita corrida entre
+ * dois jogadores clicando "trocar contato" no mesmo NPC ao mesmo tempo).
+ * Retorna true se conseguiu travar, false se já estava indisponível.
+ */
+async function _travarNpcParaJogador(npcId, uid, relacionamentoId, nome) {
+  try {
+    return await runTransaction(db, async (tx) => {
+      const ref  = _npcLockRef(npcId);
+      const snap = await tx.get(ref);
+      const atual = snap.exists() ? snap.data() : null;
+
+      if (atual && atual.status !== 'disponivel' && atual.jogador_uid !== uid) {
+        return false; // outro jogador já está com ela
+      }
+
+      tx.set(ref, {
+        nome, status: 'namorando',
+        jogador_uid: uid, relacionamento_id: relacionamentoId,
+        atualizado_em: new Date().toISOString(),
+      });
+      return true;
+    });
+  } catch (e) {
+    console.warn('[NPC LOCK] Erro ao travar:', e);
+    return false;
+  }
+}
+
+/**
+ * Marca o NPC como "em tempo" — só o mesmo uid pode reatar ou terminar.
+ *
+ * ⚠️ TODO/PENDÊNCIA CONHECIDA: esta função existe aqui no frontend mas
+ * "dar um tempo" é hoje um evento ALEATÓRIO MENSAL que só acontece dentro
+ * da Cloud Function avancarMes (functions/avancar_mes.js,
+ * _processarRelacionamentosMensalCF), não por nenhuma ação manual do
+ * jogador neste arquivo. Ou seja: ESTA função aqui (frontend) ainda não
+ * tem nenhum caller real — é a versão equivalente em CommonJS/Admin SDK,
+ * dentro da Cloud Function, que precisa chamar a MESMA regra de negócio
+ * quando sortear "upd.afinidade = ...*0.7" (tempo). Repetir aqui o padrão
+ * de bug já documentado no projeto ("função existe mas nunca é chamada")
+ * seria grave justamente no sistema de exclusividade — sem o hook do lado
+ * da Cloud Function, o NPC nunca entra em status 'tempo' de verdade.
+ */
+async function _marcarNpcEmTempo(npcId, uid, relacionamentoId) {
+  try {
+    await updateDoc(_npcLockRef(npcId), {
+      status: 'tempo', jogador_uid: uid, relacionamento_id: relacionamentoId,
+      atualizado_em: new Date().toISOString(),
+    });
+  } catch (e) { console.warn('[NPC LOCK] Erro ao marcar tempo:', e); }
+}
+
+/** Libera o NPC de volta para o mundo (término definitivo). */
+async function _liberarNpc(npcId) {
+  try {
+    await updateDoc(_npcLockRef(npcId), {
+      status: 'disponivel', jogador_uid: null, relacionamento_id: null,
+      atualizado_em: new Date().toISOString(),
+    });
+  } catch (e) { console.warn('[NPC LOCK] Erro ao liberar:', e); }
+}
+
+/**
+ * Busca o status de lock de várias fichas de uma vez. Firestore não tem
+ * "IN" arbitrariamente grande de forma simples aqui, então busca-se
+ * individualmente — o conjunto é pequeno (até ~22 fichas no banco
+ * inteiro), barato para o padrão de uso deste jogo.
+ */
+async function _statusLocksDeFichas(fichas) {
+  const resultados = await Promise.all(fichas.map(async f => {
+    try {
+      const snap = await getDoc(_npcLockRef(f.id));
+      return { id: f.id, lock: snap.exists() ? snap.data() : null };
+    } catch (e) {
+      return { id: f.id, lock: null };
+    }
+  }));
+  const mapa = {};
+  for (const r of resultados) mapa[r.id] = r.lock;
+  return mapa;
+}
 
 // ════════════════════════════════════════════════════════
 // PAINEL PRINCIPAL — VIDA PESSOAL
@@ -105,6 +203,15 @@ function _renderAcademia(j) {
     </div>`;
 }
 
+// ════════════════════════════════════════════════════════
+// AVATAR DO NPC — usa a foto da ficha (img/npcs/{foto}); se o
+// relacionamento foi criado ANTES desta feature (sem campo `foto`
+// salvo), cai num placeholder genérico em vez de quebrar a tela.
+// ════════════════════════════════════════════════════════
+function _avatarUrlNpc(r) {
+  return r.foto ? `img/npcs/${r.foto}` : 'img/npcs/_placeholder.png';
+}
+
 function _cardRelacionamento(r, j) {
   const estagio  = ESTAGIOS[r.estagio] || ESTAGIOS.affair;
   const label    = labelEstagio(r.estagio, r.sexo);
@@ -116,16 +223,20 @@ function _cardRelacionamento(r, j) {
   return `
     <div class="card" style="margin-bottom:.6rem;border-left:3px solid ${r.estagio==='affair'?'var(--verm3)':'var(--navy3)'}">
       <div style="display:flex;align-items:start;justify-content:space-between;gap:.8rem">
-        <div style="flex:1">
-          <div style="font-weight:700;font-size:.92rem;color:var(--navy)">${r.nome}</div>
-          <div style="font-size:.68rem;color:var(--ouro2);margin-bottom:.3rem">${label} · ${meses} meses · ${tracosLabel}</div>
-          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem">
-            <div style="flex:1;height:6px;background:var(--bg2);border-radius:3px;overflow:hidden">
-              <div style="height:100%;width:${pct}%;background:${cor};border-radius:3px"></div>
+        <div style="display:flex;gap:.6rem;flex:1;cursor:pointer" onclick="window.abrirPerfilNpc('${r.id}')">
+          <img src="${_avatarUrlNpc(r)}" alt="${r.nome}" class="rel-avatar-mini"
+               onerror="this.onerror=null;this.src='img/npcs/_placeholder.png'">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:.92rem;color:var(--navy)">${r.nome}</div>
+            <div style="font-size:.68rem;color:var(--ouro2);margin-bottom:.3rem">${label} · ${meses} meses · ${tracosLabel}</div>
+            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem">
+              <div style="flex:1;height:6px;background:var(--bg2);border-radius:3px;overflow:hidden">
+                <div style="height:100%;width:${pct}%;background:${cor};border-radius:3px"></div>
+              </div>
+              <span style="font-size:.68rem;font-weight:700;color:${cor}">${r.afinidade}/${estagio.cap}</span>
             </div>
-            <span style="font-size:.68rem;font-weight:700;color:${cor}">${r.afinidade}/${estagio.cap}</span>
+            ${r.gravida ? `<div style="font-size:.7rem;color:var(--verde2);font-weight:600">🤰 Gestação: mês ${r.mes_gravidez}/9</div>` : ''}
           </div>
-          ${r.gravida ? `<div style="font-size:.7rem;color:var(--verde2);font-weight:600">🤰 Gestação: mês ${r.mes_gravidez}/9</div>` : ''}
         </div>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.6rem">
@@ -133,6 +244,9 @@ function _cardRelacionamento(r, j) {
           `<button class="btn btn-sm btn-ghost" onclick="window.interagirRelacionamento('${r.id}','${k}')" title="${v.l}">
             ${v.icone} -${v.energia}⚡
           </button>`).join('')}
+        <button class="btn btn-sm btn-ghost" onclick="window.abrirLojaPresentes('${r.id}','${r.nome}')" title="Dar presente">
+          🎁 Presente
+        </button>
         ${_botaoProgresso(r)}
         <button class="btn btn-sm btn-danger" onclick="window.terminarRelacionamento('${r.id}','${r.nome}')">
           Terminar
@@ -230,11 +344,38 @@ window.irParaLocal = async function(localKey) {
 
   // Sexo oposto ao do jogador (assumindo jogador heterossexual por padrão — pode ser configurável)
   const sexoParceiro = (j.sexo === 'f') ? 'm' : 'f';
+
+  // Regra de idade: só aparecem NPCs com 18 <= idade <= idade do jogador.
+  // As fichas já vêm com idade calculada dinamicamente (idade_base + anos
+  // que o jogador envelheceu desde o início).
+  const elegiveisPorIdade = fichasElegiveis(sexoParceiro, j.idade || 22);
+
+  // Excluir NPCs já travadas por OUTRO jogador (namorando ou em tempo).
+  // Quem está travada pelo PRÓPRIO uid (ex.: já é affair dele mesmo) também
+  // é excluída aqui — "Conhecer Pessoas" é para gente NOVA, não para quem
+  // ele já está vendo (essa pessoa já aparece na lista de relacionamentos).
+  const locks = await _statusLocksDeFichas(elegiveisPorIdade);
+  const livres = elegiveisPorIdade.filter(f => {
+    const lock = locks[f.id];
+    return !lock || lock.status === 'disponivel';
+  });
+
+  if (livres.length === 0) {
+    fecharModal();
+    toast('😕 Não há ninguém novo disponível para conhecer agora. Tente outro local ou volte mais tarde.', 'neutro', 5000);
+    return;
+  }
+
+  // Sorteia até 3 das elegíveis-e-livres (pode dar menos que 3 se não houver
+  // candidatas suficientes — comportamento esperado, não é bug).
+  const pool = [...livres];
   const candidatos = [];
-  for (let i=0; i<3; i++) {
-    const p = gerarParceiroNPC(sexoParceiro);
-    const compat = calcCompatibilidade(j.tracos_pessoais || [], p.tracos);
-    candidatos.push({ ...p, compatibilidade: compat });
+  for (let i = 0; i < 3 && pool.length > 0; i++) {
+    const idx = Math.floor(Math.random()*pool.length);
+    const ficha = pool.splice(idx, 1)[0];
+    const c = candidatoDeFicha(ficha);
+    const compat = calcCompatibilidade(j.tracos_pessoais || [], c.tracos);
+    candidatos.push({ ...c, compatibilidade: compat });
   }
 
   fecharModal();
@@ -245,14 +386,19 @@ window.irParaLocal = async function(localKey) {
     </div>
     <div style="display:flex;flex-direction:column;gap:.5rem">
       ${candidatos.map((c,i) => `
-        <div class="card" style="margin-bottom:0">
-          <div style="font-weight:700;color:var(--navy);font-size:.85rem">${c.nome}, ${c.idade} anos</div>
-          <div style="font-size:.68rem;color:var(--ouro2);margin:.2rem 0">
-            ${c.tracos.map(t=>TRACOS[t]?.icone+' '+TRACOS[t]?.l).join(' · ')}
+        <div class="card" style="margin-bottom:0;display:flex;gap:.6rem;align-items:flex-start">
+          <img src="img/npcs/${c.foto}" alt="${c.nome}" class="rel-avatar-mini"
+               onerror="this.onerror=null;this.src='img/npcs/_placeholder.png'">
+          <div style="flex:1">
+            <div style="font-weight:700;color:var(--navy);font-size:.85rem">${c.nome}, ${c.idade} anos</div>
+            <div style="font-size:.65rem;color:var(--txt4);margin-bottom:.15rem">📍 ${c.regiao}</div>
+            <div style="font-size:.68rem;color:var(--ouro2);margin:.2rem 0">
+              ${c.tracos.map(t=>TRACOS[t]?.icone+' '+TRACOS[t]?.l).join(' · ')}
+            </div>
+            <button class="btn btn-sm btn-prim btn-block" onclick='window.iniciarAffair(${JSON.stringify(c).replace(/'/g,"&apos;")})'>
+              Trocar contato (iniciar Affair)
+            </button>
           </div>
-          <button class="btn btn-sm btn-prim btn-block" onclick='window.iniciarAffair(${JSON.stringify(c).replace(/'/g,"&apos;")})'>
-            Trocar contato (iniciar Affair)
-          </button>
         </div>`).join('')}
     </div>`
   );
@@ -267,14 +413,40 @@ window.iniciarAffair = async function(candidato) {
   const numAffairs = relSnap.docs.filter(d => d.data().estagio === 'affair').length;
 
   try {
-    await addDoc(collection(db, 'jogadores', uid, 'relacionamentos'), {
+    // Cria primeiro o documento de relacionamento (precisamos do ID dele
+    // para gravar no lock), depois tenta travar o NPC globalmente. Se a
+    // trava falhar (alguém pegou no meio tempo), desfaz o relacionamento
+    // criado — evita duas entidades "namorando a mesma pessoa".
+    const relRef = await addDoc(collection(db, 'jogadores', uid, 'relacionamentos'), {
+      npc_id: candidato.id || null,
       nome: candidato.nome, sexo: candidato.sexo, tracos: candidato.tracos,
+      foto: candidato.foto || null, regiao: candidato.regiao || null,
+      idade: candidato.idade || null,
       compatibilidade: compat, estagio: 'affair', afinidade: 5,
       ativo: true, gravida: false, mes_gravidez: 0,
-      meses_sem_sexo: 0, _meses: 0,
+      meses_sem_sexo: 0, meses_sem_presente: 0, _meses: 0,
+      viajou_no_ano: false,
       iniciado_mes_total: (j.ano_pessoal||1)*12 + (j.mes_pessoal||0),
       criado_em: new Date().toISOString(),
     });
+
+    if (candidato.id) {
+      const travou = await _travarNpcParaJogador(candidato.id, uid, relRef.id, candidato.nome);
+      if (!travou) {
+        // Outro jogador conseguiu travar primeiro entre a listagem e o
+        // clique — desfazer o relacionamento criado e avisar.
+        await deleteDoc(relRef);
+        fecharModal();
+        toast(`😕 ${candidato.nome} já está sendo conhecida por outro jogador. Tente outra pessoa.`, 'ko', 5000);
+        return;
+      }
+    }
+
+    await _registrarEvento(uid, relRef.id, {
+      tipo: 'inicio', label: `Vocês se conheceram e trocaram contato`,
+      mes_pessoal: j.mes_pessoal||0, ano_pessoal: j.ano_pessoal||1,
+    });
+
     fecharModal();
     toast(`💌 Você iniciou um affair com ${candidato.nome}!`, 'ok', 4000);
     setTimeout(()=>window.navTo&&window.navTo('vida_pessoal',null), 600);
@@ -282,6 +454,21 @@ window.iniciarAffair = async function(candidato) {
     toast('Erro: ' + err.message, 'ko');
   }
 };
+
+// ════════════════════════════════════════════════════════
+// REGISTRO DE EVENTOS (timeline do relacionamento) — cada interação
+// significativa grava um documento em
+// jogadores/{uid}/relacionamentos/{relId}/eventos/{eventoId}, exibido
+// depois na tela de perfil do NPC (estilo Facebook 2010).
+// ════════════════════════════════════════════════════════
+async function _registrarEvento(uid, relId, evento) {
+  try {
+    await addDoc(collection(db, 'jogadores', uid, 'relacionamentos', relId, 'eventos'), {
+      ...evento,
+      criado_em: new Date().toISOString(),
+    });
+  } catch (e) { console.warn('[RELACIONAMENTO] Erro ao registrar evento:', e); }
+}
 
 // ════════════════════════════════════════════════════════
 // INTERAGIR COM RELACIONAMENTO
@@ -308,12 +495,25 @@ window.interagirRelacionamento = async function(relId, interacaoKey) {
     return;
   }
 
-  // Multiplicadores por traço
+  // Multiplicadores por traço (afetam o ganho de QUALQUER interação)
   let multGanho = 1.0;
-  if ((r.tracos||[]).includes('romantica')) multGanho *= 1.20;
-  if ((r.tracos||[]).includes('carente'))   multGanho *= 1.25;
+  if ((r.tracos||[]).includes('romantica')) multGanho *= EFEITO_TRACO.romantica.multiplicador_ganho;
+  if ((r.tracos||[]).includes('carente'))   multGanho *= EFEITO_TRACO.carente.multiplicador_ganho;
 
-  const ganho = Math.min(GANHO_MAX_MENSAL - ganhoMesAtual, Math.round(inter.afinidade * multGanho));
+  let ganho = Math.min(GANHO_MAX_MENSAL - ganhoMesAtual, Math.round(inter.afinidade * multGanho));
+
+  // Aventureira: bônus EXTRA de afinidade específico para viagens (além do
+  // multiplicador geral acima, que não se aplica aqui — são bônus fixos
+  // somados ao ganho da interação). Marca viajou_no_ano=true, que destrava
+  // a checagem anual em avancar_mes.js (sem este hook, a penalidade por
+  // "não viajou no ano" ficava desativada por segurança).
+  const ehAventureira = (r.tracos||[]).includes('aventureira');
+  if (ehAventureira && interacaoKey === 'viagem_nac') {
+    ganho = Math.min(GANHO_MAX_MENSAL - ganhoMesAtual, ganho + EFEITO_TRACO.aventureira.afinidade_viagem_nacional_extra);
+  } else if (ehAventureira && interacaoKey === 'viagem_int') {
+    ganho = Math.min(GANHO_MAX_MENSAL - ganhoMesAtual, ganho + EFEITO_TRACO.aventureira.afinidade_viagem_internacional_extra);
+  }
+
   const estagio = ESTAGIOS[r.estagio] || ESTAGIOS.affair;
   const novaAfinidade = Math.min(estagio.cap, (r.afinidade||0) + ganho);
 
@@ -321,6 +521,14 @@ window.interagirRelacionamento = async function(relId, interacaoKey) {
     afinidade: novaAfinidade,
     _ganho_mes_atual: ganhoMesAtual + ganho,
   };
+
+  // Qualquer viagem (nacional ou internacional) com QUALQUER NPC conta como
+  // "viajou no ano" — destrava o reset anual da penalidade de Aventureira
+  // (ver _processarRelacionamentosMensalCF em avancar_mes.js). Gravado
+  // mesmo para NPCs sem o traço, sem custo — é só um contador inofensivo.
+  if (interacaoKey === 'viagem_nac' || interacaoKey === 'viagem_int') {
+    updates.viajou_no_ano = true;
+  }
 
   // Sexo: ganho de saúde mental + reset do contador
   let smGanho = 0;
@@ -334,7 +542,93 @@ window.interagirRelacionamento = async function(relId, interacaoKey) {
   await updateDoc(doc(db,'jogadores',uid), { energia_usada_mes: usado + inter.energia,
     ...(smGanho ? { saude_mental: Math.min(100, (j.saude_mental||80) + smGanho) } : {}) });
 
+  // Registrar na timeline do relacionamento — usado pela tela de perfil
+  // estilo Facebook 2010 para montar o "histórico de interações".
+  await _registrarEvento(uid, relId, {
+    tipo: interacaoKey, label: `Você e ${r.nome} ${_fraseInteracao(interacaoKey)}`,
+    mes_pessoal: j.mes_pessoal||0, ano_pessoal: j.ano_pessoal||1,
+  });
+
   toast(`${inter.icone} +${ganho} afinidade${smGanho?` · +${smGanho} saúde mental`:''}`, 'ok', 3000);
+  setTimeout(()=>window.navTo&&window.navTo('vida_pessoal',null), 500);
+};
+
+// Frase narrativa curta por tipo de interação, usada no evento da timeline.
+function _fraseInteracao(interacaoKey) {
+  const FRASES = {
+    mensagem:    'trocaram mensagens',
+    jantar:      'foram jantar',
+    passeio:     'fizeram um passeio',
+    viagem_nac:  'viajaram pelo Brasil',
+    viagem_int:  'viajaram para o exterior',
+    intimidade:  'tiveram um momento de intimidade',
+  };
+  return FRASES[interacaoKey] || 'passaram um tempo juntos';
+}
+
+// ════════════════════════════════════════════════════════
+// LOJA DE PRESENTES — qualquer NPC recebe o ganho base de afinidade do
+// presente; NPCs com o traço 'materialista' recebem um bônus extra fixo
+// por cima (EFEITO_TRACO.materialista.afinidade_presente) e têm o
+// contador de "meses sem presente" resetado (usado pela penalidade de
+// tolerância em avancar_mes.js — ver MATERIALISTA_TOLERANCIA).
+// ════════════════════════════════════════════════════════
+window.abrirLojaPresentes = function(relId, nome) {
+  abrirModal(`🎁 Presente para ${nome}`,
+    `<div style="font-size:.75rem;color:var(--txt3);margin-bottom:1rem">
+      Escolha um presente. NPCs materialistas valorizam presentes mais caros.
+    </div>
+    <div style="display:flex;flex-direction:column;gap:.4rem">
+      ${Object.entries(PRESENTES).map(([k,v]) => `
+        <button class="btn btn-ghost btn-block" style="text-align:left;padding:.65rem .85rem" onclick="window.darPresente('${relId}','${k}')">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div style="font-weight:600;font-size:.82rem;color:var(--navy)">${v.icone} ${v.l}</div>
+              <div style="font-size:.65rem;color:var(--txt3)">+${v.afinidade} afinidade base</div>
+            </div>
+            <div style="font-size:.72rem;color:var(--ouro2);flex-shrink:0;margin-left:.5rem">R$ ${v.custo.toLocaleString('pt-BR')}</div>
+          </div>
+        </button>`).join('')}
+    </div>`
+  );
+};
+
+window.darPresente = async function(relId, presenteKey) {
+  const j   = window.JOGADOR;
+  const uid = j?.uid || window.JOGADOR_UID;
+  const presente = PRESENTES[presenteKey];
+  if (!presente) return;
+
+  if ((j.dinheiro||0) < presente.custo) {
+    toast(`Saldo insuficiente. Este presente custa R$ ${presente.custo.toLocaleString('pt-BR')}.`, 'ko');
+    return;
+  }
+
+  const relRef  = doc(db, 'jogadores', uid, 'relacionamentos', relId);
+  const relSnap = await getDoc(relRef);
+  if (!relSnap.exists()) return;
+  const r = relSnap.data();
+
+  const ehMaterialista = (r.tracos||[]).includes('materialista');
+  let ganho = presente.afinidade;
+  if (ehMaterialista) ganho += EFEITO_TRACO.materialista.afinidade_presente;
+
+  const estagio = ESTAGIOS[r.estagio] || ESTAGIOS.affair;
+  const novaAfinidade = Math.min(estagio.cap, (r.afinidade||0) + ganho);
+
+  await updateDoc(relRef, {
+    afinidade: novaAfinidade,
+    meses_sem_presente: 0, // reseta o contador de tolerância de Materialista
+  });
+  await updateDoc(doc(db,'jogadores',uid), { dinheiro: (j.dinheiro||0) - presente.custo });
+
+  await _registrarEvento(uid, relId, {
+    tipo: 'presente', label: `Você deu de presente: ${presente.l} para ${r.nome}`,
+    mes_pessoal: j.mes_pessoal||0, ano_pessoal: j.ano_pessoal||1,
+  });
+
+  fecharModal();
+  toast(`${presente.icone} +${ganho} afinidade${ehMaterialista?' (ela amou o presente!)':''}`, 'ok', 4000);
   setTimeout(()=>window.navTo&&window.navTo('vida_pessoal',null), 500);
 };
 
@@ -373,6 +667,11 @@ window.progredirRelacionamento = async function(relId, progKey) {
   });
   await updateDoc(doc(db,'jogadores',uid), { dinheiro: (j.dinheiro||0) - p.custo });
 
+  await _registrarEvento(uid, relId, {
+    tipo: 'progressao', label: `${p.acao.replace('Pedir em','Você pediu')} para ${r.nome} — ${r.nome} aceitou!`,
+    mes_pessoal: j.mes_pessoal||0, ano_pessoal: j.ano_pessoal||1,
+  });
+
   fecharModal();
   toast(`🎉 ${r.nome} aceitou! Agora vocês são ${labelEstagio(novoEstagio, r.sexo)}.`, 'ok', 6000);
   setTimeout(()=>window.navTo&&window.navTo('vida_pessoal',null), 800);
@@ -394,8 +693,86 @@ window.terminarRelacionamento = async function(relId, nome) {
   await updateDoc(doc(db,'jogadores',uid,'relacionamentos',relId), { ativo:false, terminado_em:new Date().toISOString() });
   await updateDoc(doc(db,'jogadores',uid), { saude_mental: Math.max(0, (j.saude_mental||80) - impacto) });
 
+  // Término definitivo (manual, pelo jogador) sempre LIBERA o NPC de volta
+  // para o mundo — diferente de "dar um tempo" (sorteado mensalmente pela
+  // Cloud Function), que mantém a trava só para este jogador.
+  if (r.npc_id) await _liberarNpc(r.npc_id);
+
+  await _registrarEvento(uid, relId, {
+    tipo: 'termino', label: `Você e ${nome} terminaram o relacionamento`,
+    mes_pessoal: j.mes_pessoal||0, ano_pessoal: j.ano_pessoal||1,
+  });
+
   toast(`💔 Você terminou com ${nome}. -${impacto} saúde mental.`, 'neutro', 5000);
   setTimeout(()=>window.navTo&&window.navTo('vida_pessoal',null), 600);
+};
+
+// ════════════════════════════════════════════════════════
+// PERFIL DO NPC — ESTILO FACEBOOK 2010
+// Tela com foto/capa, "informações" (traços, região, estágio), e
+// timeline cronológica de eventos registrados via _registrarEvento.
+// ════════════════════════════════════════════════════════
+window.abrirPerfilNpc = async function(relId) {
+  const j   = window.JOGADOR;
+  const uid = j?.uid || window.JOGADOR_UID;
+
+  const relSnap = await getDoc(doc(db,'jogadores',uid,'relacionamentos',relId));
+  if (!relSnap.exists()) { toast('Relacionamento não encontrado.', 'ko'); return; }
+  const r = relSnap.data();
+
+  const eventosSnap = await getDocs(query(
+    collection(db,'jogadores',uid,'relacionamentos',relId,'eventos'),
+    orderBy('criado_em','desc'),
+    limit(30)
+  ));
+  const eventos = eventosSnap.docs.map(d => d.data());
+
+  const estagio = ESTAGIOS[r.estagio] || ESTAGIOS.affair;
+  const label = labelEstagio(r.estagio, r.sexo);
+  const meses = _mesesNoRelacionamento(r, j);
+  const avatarUrl = _avatarUrlNpc(r);
+  const MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+  const html = `
+    <div class="fb-profile">
+      <div class="fb-capa" style="background-image:url('${avatarUrl}')" onerror="this.style.backgroundImage=''"></div>
+      <div class="fb-header">
+        <img src="${avatarUrl}" alt="${r.nome}" class="fb-avatar" onerror="this.onerror=null;this.src='img/npcs/_placeholder.png'">
+        <div class="fb-header-info">
+          <div class="fb-nome">${r.nome}</div>
+          <div class="fb-status">${label} de ${j.nome_personagem || 'você'} · há ${meses} ${meses===1?'mês':'meses'}</div>
+        </div>
+      </div>
+      <div class="fb-body">
+        <div class="fb-col-esq">
+          <div class="fb-box">
+            <div class="fb-box-titulo">Informações</div>
+            <div class="fb-info-linha">📍 <b>Região:</b> ${r.regiao || 'Não informado'}</div>
+            <div class="fb-info-linha">💑 <b>Relacionamento:</b> ${label}</div>
+            <div class="fb-info-linha">📊 <b>Compatibilidade:</b> ${r.compatibilidade||50}%</div>
+            <div class="fb-info-linha">💗 <b>Afinidade:</b> ${r.afinidade}/${estagio.cap}</div>
+          </div>
+          <div class="fb-box">
+            <div class="fb-box-titulo">Características</div>
+            ${(r.tracos||[]).map(t => `<div class="fb-traco">${TRACOS[t]?.icone||''} ${TRACOS[t]?.l||t}</div>`).join('') || '<div style="font-size:.7rem;color:var(--txt4)">Nenhuma característica registrada.</div>'}
+          </div>
+        </div>
+        <div class="fb-col-dir">
+          <div class="fb-box">
+            <div class="fb-box-titulo">Linha do tempo</div>
+            ${eventos.length === 0
+              ? '<div style="font-size:.72rem;color:var(--txt4);padding:.5rem 0">Nenhuma interação registrada ainda.</div>'
+              : eventos.map(ev => `
+                <div class="fb-evento">
+                  <div class="fb-evento-data">${MESES_PT[ev.mes_pessoal]||''}, Ano ${ev.ano_pessoal}</div>
+                  <div class="fb-evento-texto">${ev.label}</div>
+                </div>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  abrirModal(`👤 Perfil`, html);
 };
 
 // ════════════════════════════════════════════════════════
@@ -502,6 +879,10 @@ export async function processarRelacionamentosMensal(j) {
         upd.gravida = false;
         upd.mes_gravidez = 0;
         smDelta += 10; // saúde mental do nascimento
+        await _registrarEvento(uid, r.id, {
+          tipo: 'nascimento', label: `O filho de você e ${r.nome} nasceu`,
+          mes_pessoal: j.mes_pessoal||0, ano_pessoal: j.ano_pessoal||1,
+        });
       } else {
         upd.mes_gravidez = novoMes;
       }
@@ -519,6 +900,10 @@ export async function processarRelacionamentosMensal(j) {
           assunto:`💔 Flagrado(a) traindo!`,
           corpo:`${r.nome} descobriu seu affair e terminou o relacionamento. -${FLAGRA.penalidade_sm} saúde mental.`,
           tipo:'sistema', tipo_noticia:'negativo', lida:false, criado_em:new Date().toISOString(),
+        });
+        await _registrarEvento(uid, r.id, {
+          tipo: 'flagra', label: `${r.nome} descobriu um affair e terminou com você`,
+          mes_pessoal: j.mes_pessoal||0, ano_pessoal: j.ano_pessoal||1,
         });
       }
     }
