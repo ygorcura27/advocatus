@@ -387,6 +387,23 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
     logger.warn('Erro na distribuição mensal de processos:', e.message);
   }
 
+  // ── PROCESSAMENTO MENSAL DE RELACIONAMENTOS (bloco novo) ──
+  // Reset do contador _ganho_mes_atual (afinidade), decaimento, gravidez,
+  // flagras, envelhecimento de filhos. Esta lógica existia em
+  // relacionamento.js::processarRelacionamentosMensal, exposta como
+  // window._processarRelacionamentosMensal "para ser chamada pelo
+  // avancar_mes.js" — mas isso nunca foi de fato implementado aqui, e
+  // window.* não existe no ambiente da Cloud Function (Admin SDK, sem
+  // DOM/window) mesmo que existisse a chamada. Resultado prático do bug:
+  // _ganho_mes_atual nunca era resetado, travando o limite mensal de
+  // afinidade (GANHO_MAX_MENSAL) permanentemente após o primeiro mês em
+  // que fosse atingido com qualquer pessoa.
+  try {
+    await _processarRelacionamentosMensalCF(db, uid, j, { mes_pessoal: novoMes, ano_pessoal: novoAno });
+  } catch (e) {
+    logger.warn('Erro no processamento mensal de relacionamentos:', e.message);
+  }
+
   await _commit(db, uid, updates, mensagens, novoMes, novoAno);
 
   logger.info(`[AVANÇAR] ${uid} → ${MESES[novoMes]}, Ano ${novoAno}`);
@@ -595,4 +612,228 @@ async function _commit(db, uid, updates, mensagens, novoMes, novoAno) {
     });
   }
   await batch.commit();
+}
+
+// ════════════════════════════════════════════════════════
+// PROCESSAMENTO MENSAL DE RELACIONAMENTOS — portado de
+// relacionamento.js::processarRelacionamentosMensal (frontend, ES Module)
+// para Admin SDK. Mesma lógica de decaimento, gravidez, flagra,
+// envelhecimento de filhos, e — o ponto crítico do bug original — reset
+// de _ganho_mes_atual (limite mensal de afinidade por pessoa).
+//
+// IMPORTANTE: mantém o mesmo conteúdo das tabelas em
+// js/relacionamento_dados.js. Qualquer ajuste de balanceamento feito lá
+// (ESTAGIOS, INTERACOES, GANHO_MAX_MENSAL, etc.) precisa ser replicado
+// manualmente aqui — não há um módulo compartilhado físico entre
+// frontend (ES Module) e Cloud Function (CommonJS) por padrão deste
+// projeto (mesma decisão já tomada para o banco jurídico).
+// ════════════════════════════════════════════════════════
+const ESTAGIOS_REL = {
+  affair:   { cap:50,  decai:10, termino_chance:0.03, tempo_chance:0.05 },
+  namorado: { cap:100, decai:8,  termino_chance:0.02, tempo_chance:0.03 },
+  noivo:    { cap:150, decai:5,  termino_chance:0.01, tempo_chance:0.02 },
+  esposo:   { cap:200, decai:3,  termino_chance:0.005,tempo_chance:0.01 },
+};
+const IMPACTO_SM_REL = {
+  tempo:   { affair:5,  namorado:10, noivo:15, esposo:20 },
+  termino: { affair:10, namorado:20, noivo:35, esposo:50 },
+};
+const CHANCE_GRAVIDEZ_REL = { namorado: 0.02, noivo: 0.04, esposo: 0.08 };
+const DURACAO_GESTACAO_REL = 9;
+const SEXO_CONFIG_REL = {
+  ganho_saude_mental: 1,
+  meses_tolerancia: 3,
+  perda_saude_mental_mes: 1,
+  perda_afinidade_mes: 3,
+};
+const FLAGRA_REL = {
+  chance_por_affair_extra: 0.08,
+  chance_namorada_com_affair: 0.12,
+  penalidade_sm: 25,
+};
+const ACADEMIA_REL = {
+  bonus_por_mes: 1,
+  bonus_max: 25,
+  perda_sem_uso: 1,
+};
+const CUSTO_FILHO_REL = { bebe:800, crianca:1200, jovem:2000 };
+
+function custoFilhoPorIdadeCF(idade) {
+  if (idade <= 5)  return CUSTO_FILHO_REL.bebe;
+  if (idade <= 17) return CUSTO_FILHO_REL.crianca;
+  if (idade <= 22) return CUSTO_FILHO_REL.jovem;
+  return 0;
+}
+function efeitoFelicidadeCompatibilidadeCF(compat) {
+  if (compat >= 90) return 10;
+  if (compat >= 70) return 5;
+  if (compat >= 50) return 0;
+  if (compat >= 30) return -5;
+  return -10;
+}
+
+const NOMES_BEBE_CF = {
+  m: ['Lucas','Gabriel','Pedro','Davi','Miguel','Arthur','Heitor','Théo'],
+  f: ['Helena','Alice','Laura','Maria','Sofia','Valentina','Júlia','Lívia'],
+};
+
+async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario) {
+  const updatesJogador = {};
+
+  // ── Academia: bônus ou perda de energia ──
+  if (j.academia_ativa) {
+    const bonusAtual = j.academia_bonus_energia || 0;
+    if (j.academia_usada_mes) {
+      updatesJogador.academia_bonus_energia = Math.min(ACADEMIA_REL.bonus_max, bonusAtual + ACADEMIA_REL.bonus_por_mes);
+    } else {
+      updatesJogador.academia_bonus_energia = Math.max(0, bonusAtual - ACADEMIA_REL.perda_sem_uso);
+    }
+    updatesJogador.academia_usada_mes = false;
+  }
+
+  // ── Relacionamentos: decaimento, eventos, gravidez ──
+  const relSnap = await db.collection('jogadores').doc(uid).collection('relacionamentos')
+    .where('ativo', '==', true).get();
+  const rels = relSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+  const numAffairs = rels.filter(r => r.estagio === 'affair').length;
+  const temNamoradaOuMais = rels.some(r => r.estagio !== 'affair');
+  let smDelta = 0;
+  let felicidadeSomaCompat = 0, felicidadeCount = 0;
+  const mesTotalAtual = (novoCalendario.ano_pessoal||1)*12 + (novoCalendario.mes_pessoal||0);
+
+  for (const r of rels) {
+    // Guarda de idempotência: evita processar duas vezes o mesmo mês de
+    // jogo se a function rodar mais de uma vez (ex.: retry de rede).
+    if (r._mes_processado === mesTotalAtual) continue;
+
+    const estagio = ESTAGIOS_REL[r.estagio] || ESTAGIOS_REL.affair;
+    const upd = { _mes_processado: mesTotalAtual };
+
+    // Decaimento se não interagiu o suficiente este mês
+    if (!r._ganho_mes_atual) {
+      upd.afinidade = Math.max(0, (r.afinidade||0) - estagio.decai);
+    }
+    // ESTE é o reset que faltava — sem ele, GANHO_MAX_MENSAL (25) era
+    // atingido uma vez e nunca mais liberava novas interações com aquela
+    // pessoa, em nenhum mês futuro.
+    upd._ganho_mes_atual = 0;
+    upd._meses = (r._meses||0) + 1;
+
+    // Sexo: tolerância e penalidades
+    let mesesSemSexo = r.sexo_mes_atual ? 0 : (r.meses_sem_sexo||0) + 1;
+    upd.meses_sem_sexo = mesesSemSexo;
+    upd.sexo_mes_atual = false;
+    if (mesesSemSexo >= SEXO_CONFIG_REL.meses_tolerancia) {
+      smDelta -= SEXO_CONFIG_REL.perda_saude_mental_mes;
+      upd.afinidade = Math.max(0, (upd.afinidade ?? r.afinidade) - SEXO_CONFIG_REL.perda_afinidade_mes);
+    }
+
+    // Gravidez
+    if (r.sexo_mes_atual && !r.gravida && CHANCE_GRAVIDEZ_REL[r.estagio]) {
+      if (Math.random() < CHANCE_GRAVIDEZ_REL[r.estagio]) {
+        upd.gravida = true;
+        upd.mes_gravidez = 1;
+      }
+    } else if (r.gravida) {
+      const novoMesGrav = (r.mes_gravidez||0) + 1;
+      if (novoMesGrav >= DURACAO_GESTACAO_REL) {
+        await _gerarFilhoCF(db, uid, r);
+        upd.gravida = false;
+        upd.mes_gravidez = 0;
+        smDelta += 10;
+      } else {
+        upd.mes_gravidez = novoMesGrav;
+      }
+    }
+
+    // Flagra de affair
+    if (temNamoradaOuMais && r.estagio !== 'affair' && numAffairs > 0) {
+      if (Math.random() < FLAGRA_REL.chance_namorada_com_affair) {
+        upd.ativo = false;
+        upd.afinidade = 0;
+        smDelta -= FLAGRA_REL.penalidade_sm;
+        await db.collection('jogadores').doc(uid).collection('inbox').add({
+          de:'sistema', para_uid:uid,
+          assunto:'💔 Flagrado(a) traindo!',
+          corpo:`${r.nome} descobriu seu affair e terminou o relacionamento. -${FLAGRA_REL.penalidade_sm} saúde mental.`,
+          tipo:'sistema', tipo_noticia:'negativo', lida:false, criado_em:new Date().toISOString(),
+        });
+      }
+    } else if (r.estagio === 'affair' && numAffairs > 1) {
+      if (Math.random() < FLAGRA_REL.chance_por_affair_extra * (numAffairs-1)) {
+        upd.ativo = false;
+        upd.afinidade = 0;
+      }
+    } else if (Math.random() < estagio.termino_chance) {
+      upd.ativo = false;
+      smDelta -= IMPACTO_SM_REL.termino[r.estagio] || 10;
+    } else if (Math.random() < estagio.tempo_chance) {
+      upd.afinidade = Math.max(0, Math.floor((upd.afinidade ?? r.afinidade) * 0.7));
+      smDelta -= IMPACTO_SM_REL.tempo[r.estagio] || 5;
+    }
+
+    await db.collection('jogadores').doc(uid).collection('relacionamentos').doc(r.id).update(upd);
+
+    if (upd.ativo !== false) {
+      felicidadeSomaCompat += efeitoFelicidadeCompatibilidadeCF(r.compatibilidade||50);
+      felicidadeCount++;
+    }
+  }
+
+  // ── Felicidade ──
+  const felicidadeBase = j.felicidade !== undefined ? j.felicidade : 50;
+  const smAtual = Math.max(0, Math.min(100, (j.saude_mental||80) + smDelta));
+  const felicidadeCompat = felicidadeCount > 0 ? Math.round(felicidadeSomaCompat / felicidadeCount) : 0;
+  const novaFelicidade = Math.max(0, Math.min(100, Math.round(
+    felicidadeBase*0.5 + smAtual*0.3 + felicidadeCompat + 25*0.2
+  )));
+
+  updatesJogador.saude_mental = smAtual;
+  updatesJogador.felicidade = novaFelicidade;
+
+  // ── Filhos: envelhecer e cobrar custo ──
+  const filhosSnap = await db.collection('jogadores').doc(uid).collection('filhos').get();
+  let custoFilhos = 0;
+  for (const fDoc of filhosSnap.docs) {
+    const f = fDoc.data();
+    const idadeMesesAtual = f.idade_meses!==undefined ? f.idade_meses : Math.round((f.idade||0)*12);
+    const novaIdadeMeses = idadeMesesAtual + 1;
+    const idadeAnosCompletos = Math.floor(novaIdadeMeses/12);
+
+    custoFilhos += custoFilhoPorIdadeCF(Math.floor(idadeMesesAtual/12));
+    const upd = { idade_meses: novaIdadeMeses, idade: idadeAnosCompletos };
+
+    if (idadeAnosCompletos >= 18 && !f.faculdade) {
+      upd.faculdade = Math.random() < 0.3 ? 'Direito' : ['Medicina','Engenharia','Administração'][Math.floor(Math.random()*3)];
+    }
+    if (idadeAnosCompletos >= 22 && f.faculdade === 'Direito' && !f.jogavel) {
+      upd.jogavel = true;
+    }
+    await db.collection('jogadores').doc(uid).collection('filhos').doc(fDoc.id).update(upd);
+  }
+  updatesJogador.custo_filhos_mes = custoFilhos;
+
+  if (Object.keys(updatesJogador).length > 0) {
+    await db.collection('jogadores').doc(uid).update(updatesJogador);
+  }
+}
+
+async function _gerarFilhoCF(db, uid, relacionamento) {
+  const sexo = Math.random() < 0.5 ? 'm' : 'f';
+  const nome = NOMES_BEBE_CF[sexo][Math.floor(Math.random()*NOMES_BEBE_CF[sexo].length)];
+
+  await db.collection('jogadores').doc(uid).collection('filhos').add({
+    nome, sexo, idade:0, idade_meses:0,
+    mae_ou_pai: relacionamento.nome,
+    faculdade: null, jogavel:false,
+    criado_em: new Date().toISOString(),
+  });
+
+  await db.collection('jogadores').doc(uid).collection('inbox').add({
+    de:'sistema', para_uid:uid,
+    assunto:`👶 ${nome} nasceu!`,
+    corpo:`Parabéns! ${nome} nasceu. +10 saúde mental, +20 felicidade nos próximos meses.`,
+    tipo:'sistema', tipo_noticia:'positivo', lida:false, criado_em:new Date().toISOString(),
+  });
 }
