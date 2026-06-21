@@ -86,6 +86,14 @@ service cloud.firestore {
         allow create: if isOwner(uid);
         allow update: if isOwner(uid);
         allow delete: if isOwner(uid);
+
+        // ── Sub-subcoleção: eventos (timeline do perfil estilo Facebook) ──
+        match /eventos/{eventoId} {
+          allow read:   if isOwner(uid);
+          allow create: if isOwner(uid);
+          allow update: if isOwner(uid);
+          allow delete: if isOwner(uid);
+        }
       }
 
       // ── Subcoleção: filhos ──
@@ -95,6 +103,36 @@ service cloud.firestore {
         allow update: if isOwner(uid);
         allow delete: if isOwner(uid);
       }
+    }
+
+    // ══════════════════════════════════════════════════════
+    // NPCs GLOBAIS — LOCK DE EXCLUSIVIDADE
+    // Cada NPC é única no mundo, compartilhada entre todos os jogadores.
+    // Qualquer jogador autenticado precisa LER todos os locks (para saber
+    // quem está disponível em "Conhecer Pessoas"). A ESCRITA só é permitida
+    // quando o documento está livre/inexistente (travar uma NPC nova) OU
+    // quando o próprio jogador já é o dono atual do lock (reatar, dar um
+    // tempo, terminar/liberar) — nunca permite "roubar" o lock de outro uid.
+    // ══════════════════════════════════════════════════════
+    match /npcs_locks/{npcId} {
+      allow read: if isAuth();
+
+      allow create: if isAuth()
+        && request.resource.data.jogador_uid == request.auth.uid;
+
+      allow update: if isAuth()
+        && (
+          // Lock estava livre — qualquer jogador autenticado pode travar
+          resource.data.status == 'disponivel'
+          // OU o jogador já é o dono atual (reatar, dar um tempo, liberar)
+          || resource.data.jogador_uid == request.auth.uid
+        )
+        // O novo dono do lock, após a escrita, só pode ser o próprio
+        // jogador que está fazendo a requisição (ou null, ao liberar)
+        && (request.resource.data.jogador_uid == request.auth.uid
+            || request.resource.data.jogador_uid == null);
+
+      allow delete: if false;
     }
 
     // ══════════════════════════════════════════════════════
