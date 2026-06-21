@@ -1,0 +1,289 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ══════════════════════════════════════════════════════
+    // FUNÇÕES AUXILIARES
+    // ══════════════════════════════════════════════════════
+
+    // Verifica se o usuário está autenticado
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // Verifica se o uid do request bate com o documento
+    function isOwner(uid) {
+      return isAuth() && request.auth.uid == uid;
+    }
+
+    // Verifica se o usuário é sócio do escritório
+    function isSocio(escritorioData) {
+      return isAuth() &&
+        request.auth.uid in escritorioData.socios_uids;
+    }
+
+    // Verifica se o campo não está sendo alterado
+    function notChanging(field) {
+      return !(field in request.resource.data) ||
+        request.resource.data[field] == resource.data[field];
+    }
+
+    // ══════════════════════════════════════════════════════
+    // CONFIG DO SERVIDOR (somente leitura para jogadores)
+    // ══════════════════════════════════════════════════════
+    match /config/{doc} {
+      allow read: if isAuth();
+      allow write: if false; // somente Cloud Functions escrevem aqui
+    }
+
+    // ══════════════════════════════════════════════════════
+    // JOGADORES
+    // ══════════════════════════════════════════════════════
+    match /jogadores/{uid} {
+      // Qualquer autenticado pode LER dados públicos de outro jogador
+      // (para rankings, escritórios, convites)
+      allow read: if isAuth();
+
+      // Criação: apenas o próprio usuário cria seu documento
+      allow create: if isOwner(uid)
+        && request.resource.data.uid == uid
+        && request.resource.data.reputacao <= 30
+        && request.resource.data.dinheiro <= 15000;
+
+      // Update: apenas o próprio usuário
+      // Validações de valores (reputação, dinheiro, etc.) ficam nas Cloud Functions;
+      // aqui só garantimos que o dono é quem está editando e que campos
+      // estruturais não são adulterados pelo cliente.
+      allow update: if isOwner(uid)
+        && notChanging('uid')
+        && notChanging('criado_em')
+        && notChanging('geracao');
+
+      // Deleção não permitida pelo cliente
+      allow delete: if false;
+
+      // ── Subcoleção: mensagens/inbox ──
+      match /inbox/{msgId} {
+        allow read: if isOwner(uid);
+        // Criação de mensagem: qualquer autenticado pode enviar para outro
+        allow create: if isAuth()
+          && request.resource.data.de == request.auth.uid
+          && request.resource.data.lida == false;
+        // Update: apenas o destinatário (marcar como lida/aceita/recusada).
+        //
+        // IMPORTANTE: usamos notChanging() em vez de keys().hasOnly(['lida','status']).
+        // updateDoc() faz merge parcial no Firestore, mas request.resource.data
+        // nas Rules representa o DOCUMENTO COMPLETO já mesclado (todos os campos
+        // antigos + os novos enviados). Como toda mensagem da inbox tem campos
+        // como 'de', 'assunto', 'corpo', 'tipo', etc., um hasOnly(['lida','status'])
+        // nunca passa — o doc resultante sempre tem muito mais chaves que essas.
+        // Isso causava o erro "Missing or insufficient permissions" ao aceitar/recusar.
+        //
+        // Em vez disso, garantimos que os campos estruturais/de conteúdo da
+        // mensagem não podem ser alterados pelo destinatário — só o status de
+        // leitura/resposta pode mudar.
+        allow update: if isOwner(uid)
+          && notChanging('de')
+          && notChanging('para_uid')
+          && notChanging('assunto')
+          && notChanging('corpo')
+          && notChanging('tipo')
+          && notChanging('tipo_noticia')
+          && notChanging('esc_id')
+          && notChanging('cargo_id')
+          && notChanging('vaga_id')
+          && notChanging('sal_oferecido')
+          && notChanging('criado_em');
+        allow delete: if isOwner(uid);
+      }
+
+      // ── Subcoleção: relacionamentos ──
+      match /relacionamentos/{relId} {
+        allow read:   if isOwner(uid);
+        allow create: if isOwner(uid);
+        allow update: if isOwner(uid);
+        allow delete: if isOwner(uid);
+      }
+
+      // ── Subcoleção: filhos ──
+      match /filhos/{filhoId} {
+        allow read:   if isOwner(uid);
+        allow create: if isOwner(uid);
+        allow update: if isOwner(uid);
+        allow delete: if isOwner(uid);
+      }
+    }
+
+    // ══════════════════════════════════════════════════════
+    // PROCESSOS
+    // ══════════════════════════════════════════════════════
+    match /processos/{processoId} {
+      // Função auxiliar: o usuário é o DONO do escritório, ou consta na lista
+      // pública `funcionarios_uids` mantida no doc do escritório (atualizada
+      // pelo app a cada contratação/saída — ver vagas.js). Não dá para fazer
+      // uma query "where jogador_uid==uid" dentro de uma Rule, por isso essa
+      // lista redundante existe especificamente para viabilizar este check.
+      function ehFuncionarioDoEscritorio(escId) {
+        return escId != null &&
+          exists(/databases/$(database)/documents/escritorios/$(escId)) &&
+          (
+            get(/databases/$(database)/documents/escritorios/$(escId)).data.dono_uid == request.auth.uid ||
+            request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escId)).data.funcionarios_uids
+          );
+      }
+
+      // Leitura: advogado titular do caso, OU qualquer funcionário do
+      // escritório quando o caso é um POOL_ESCRITORIO_ID daquele escritório
+      // (caso colaborativo — todos no time precisam ver para poder atuar).
+      allow read: if isAuth() && (
+        resource.data.advogado_uid == request.auth.uid ||
+        (resource.data.pool_escritorio_id != null &&
+          ehFuncionarioDoEscritorio(resource.data.pool_escritorio_id))
+      );
+
+      // Criação: o advogado cria seu próprio processo (advogado_uid = uid);
+      // OU o dono de escritório cria um caso para o POOL (advogado_uid nulo,
+      // pool_escritorio_id = o escritório do qual ele é dono).
+      allow create: if isAuth() && (
+        (request.resource.data.advogado_uid == request.auth.uid
+          && request.resource.data.status == 'andamento'
+          && request.resource.data.progresso == 0)
+        ||
+        (request.resource.data.advogado_uid == null
+          && request.resource.data.pool_escritorio_id != null
+          && get(/databases/$(database)/documents/escritorios/$(request.resource.data.pool_escritorio_id)).data.dono_uid == request.auth.uid
+          && request.resource.data.status == 'andamento'
+          && request.resource.data.progresso == 0)
+      );
+
+      // Update: o advogado titular do caso pode atualizar normalmente;
+      // OU, em caso de POOL, qualquer funcionário do escritório dono do pool
+      // pode atualizar progresso/chance/status — mas nunca o valor da causa
+      // nem o pool_escritorio_id (não pode "roubar" o caso pra outro escritório).
+      allow update: if isAuth() && (
+        (resource.data.advogado_uid == request.auth.uid
+          && notChanging('advogado_uid')
+          && notChanging('valor')
+          && request.resource.data.instancia >= resource.data.instancia)
+        ||
+        (resource.data.pool_escritorio_id != null
+          && notChanging('valor')
+          && notChanging('pool_escritorio_id')
+          && request.resource.data.instancia >= resource.data.instancia
+          && ehFuncionarioDoEscritorio(resource.data.pool_escritorio_id))
+      );
+
+      // Deleção não permitida
+      allow delete: if false;
+    }
+
+    // ══════════════════════════════════════════════════════
+    // ESCRITÓRIOS
+    // ══════════════════════════════════════════════════════
+    match /escritorios/{escritorioId} {
+      // Leitura pública (para rankings e busca)
+      allow read: if isAuth();
+
+      // Criação: advogado autenticado pode criar seu próprio escritório
+      allow create: if isAuth()
+        && request.resource.data.dono_uid == request.auth.uid;
+
+      // Update: apenas o dono ou sócios
+      allow update: if isAuth()
+        && (resource.data.dono_uid == request.auth.uid
+            || request.auth.uid in resource.data.socios);
+
+      // Subcoleção: funcionários
+      match /funcionarios/{funcId} {
+        // Leitura: dono do escritório OU o próprio jogador que é funcionário
+        // (necessário para que o jogador veja/gerencie seu próprio vínculo,
+        // e para validações de capacidade de vaga no momento de aceitar convite)
+        allow read: if isAuth()
+          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid
+              || (resource != null && resource.data.jogador_uid == request.auth.uid));
+        // Dono pode criar/gerenciar qualquer funcionário (NPC ou jogador).
+        // Um jogador real também pode criar SEU PRÓPRIO registro ao aceitar
+        // um convite, e atualizar/desativar apenas o seu próprio registro
+        // (ex: ao sair do escritório).
+        allow create: if isAuth()
+          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid
+              || request.resource.data.jogador_uid == request.auth.uid);
+        allow update: if isAuth()
+          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid
+              || resource.data.jogador_uid == request.auth.uid);
+        allow delete: if isAuth()
+          && get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid;
+      }
+
+      // Subcoleção: oportunidades de serviço
+      match /oportunidades/{opId} {
+        allow read:   if isAuth()
+          && get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid;
+        allow create, update, delete: if isAuth()
+          && get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid;
+      }
+
+      // Subcoleção: carteira de clientes
+      match /clientes/{clienteId} {
+        allow read:   if isAuth()
+          && get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid;
+        allow create, update, delete: if isAuth()
+          && get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid;
+      }
+
+      allow delete: if false;
+    }
+
+    // ══════════════════════════════════════════════════════
+    // RANKINGS (somente leitura para jogadores)
+    // ══════════════════════════════════════════════════════
+    match /rankings/{tipo} {
+      allow read: if isAuth();
+      allow write: if false; // apenas Cloud Functions
+    }
+
+    // ══════════════════════════════════════════════════════
+    // EVENTOS GLOBAIS (somente leitura)
+    // ══════════════════════════════════════════════════════
+    match /eventos/{eventoId} {
+      allow read: if isAuth();
+      allow write: if false;
+    }
+
+    // ══════════════════════════════════════════════════════
+    // CONVITES DE ESCRITÓRIO
+    // ══════════════════════════════════════════════════════
+    match /convites/{conviteId} {
+      // Destinatário e remetente podem ler
+      allow read: if isAuth() && (
+        resource.data.para_uid == request.auth.uid ||
+        resource.data.de_uid == request.auth.uid
+      );
+      // Sócio do escritório pode criar convite
+      allow create: if isAuth()
+        && request.resource.data.de_uid == request.auth.uid
+        && request.resource.data.status == 'pendente';
+      // Destinatário aceita ou recusa
+      allow update: if isAuth()
+        && resource.data.para_uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['status', 'respondido_em'])
+        && request.resource.data.status in ['aceito', 'recusado'];
+      allow delete: if false;
+    }
+
+    // ══════════════════════════════════════════════════════
+    // SESSÕES DE QUIZ/PROVA (temporárias)
+    // ══════════════════════════════════════════════════════
+    match /sessoes_prova/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // ══════════════════════════════════════════════════════
+    // BLOQUEAR TUDO QUE NÃO FOI EXPLICITAMENTE PERMITIDO
+    // ══════════════════════════════════════════════════════
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

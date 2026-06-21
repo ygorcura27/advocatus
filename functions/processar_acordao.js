@@ -1,0 +1,277 @@
+'use strict';
+
+/**
+ * PROCESSAR ACÓRDÃO — Advocatus Online (motor jurídico v8, colegiado)
+ * Callable: chamado pelo frontend ao final da sustentação recursal
+ * (2 rodadas concluídas).
+ *
+ * SEGURANÇA: esta função RECALCULA o resultado do julgamento colegiado
+ * do ZERO, a partir de:
+ *   - `colegiado_recurso` (composição sorteada: nomes/classes/sensibilidade
+ *     individual, persistida no Firestore assim que decidida na preparação)
+ *   - `estrategias_recurso` (até 2 estratégias escolhidas na preparação)
+ *   - `historico_respostas_recurso` (qual tipo de resposta foi escolhido
+ *     em cada uma das 2 rodadas de sustentação)
+ *
+ * Nunca confia em SCORES_JULGADOR ou em qualquer score calculado no
+ * navegador — esses só existem para exibição otimista da UI.
+ */
+
+const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { getFirestore }       = require('firebase-admin/firestore');
+const { logger }             = require('firebase-functions');
+const banco = require('./shared/banco_juridico.js');
+
+const REP_CAP = {
+  est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100, snm:100,
+  jsub:55, jtit:70, dsb:85, mstj:100,
+  padj:55, prom:70, pjus:85, pgj:100,
+  dadj:55, def:70, dch:85, dge:100,
+};
+function repCapDoCargo(cargoId) { return REP_CAP[cargoId] || 55; }
+
+function fmt(n) {
+  if (!n && n!==0) return '—';
+  if (n>=1000000) return `R$ ${(n/1000000).toFixed(1)}M`;
+  if (n>=1000) return `R$ ${Math.round(n/1000)}k`;
+  return `R$ ${Number(n).toLocaleString('pt-BR')}`;
+}
+
+function mesTotalPessoal(j) { return (j.ano_pessoal||1)*12 + (j.mes_pessoal||0); }
+
+// ── TABELA DE CATEGORIA POR PLACAR — idêntica à do motor v8.
+function categoriaPorPlacar(votosReformar, votosManter, totalVotos) {
+  if (votosManter > votosReformar) return 'mantem';
+  const goleada = totalVotos === 3 ? votosReformar === 3 : votosReformar >= 4;
+  return goleada ? 'reforma_total' : 'reforma_parcial';
+}
+function acessoProximaInstanciaTravado(votosFavorRecorrente, totalVotos) {
+  if (totalVotos === 3) return votosFavorRecorrente === 0;
+  return votosFavorRecorrente <= 1;
+}
+
+// ── RECÁLCULO DOS VOTOS — reproduz exatamente a mesma fórmula do
+// frontend (responderRecursoProducao), mas a partir do colegiado e do
+// histórico persistidos no Firestore, nunca de estado de memória do cliente.
+function recalcularVotos(p) {
+  const quemRecorre = p.quem_recorre;
+  const colegiado = p.colegiado_recurso || [];
+  const estrategiasEscolhidas = p.estrategias_recurso || [];
+  const historico = p.historico_respostas_recurso || [];
+  const ARGS = banco.argsRecursoPara(quemRecorre);
+  const ESTRATEGIAS = banco.estrategiasRecursoPara(quemRecorre);
+
+  const scores = colegiado.map(jz => ({ ...jz, score: jz.score_inicial }));
+
+  for (const { rodada, tipo } of historico) {
+    const a = ARGS[rodada];
+    if (!a) continue;
+    const euSouDefesa = quemRecorre === 'parte_contraria';
+    const sinal = euSouDefesa ? -1 : 1;
+    const baseD = (tipo === a.ideal ? 7 : tipo === a.neutro ? 1 : -10) * sinal;
+    const temaDaRodada = rodada === 0 ? 'prova_documental' : 'prazo';
+    const temaDoTipo = tipo === 'agressiva' ? 'agressivo' : tipo === 'passiva' ? 'passivo' : null;
+
+    scores.forEach(jz => {
+      let d = baseD;
+      if (tipo === 'tecnica') d += banco.pesoTemaPorClasse(temaDaRodada, jz.classe) * 0.5 * sinal;
+      if (temaDoTipo) d += banco.pesoTemaPorClasse(temaDoTipo, jz.classe) * sinal;
+      estrategiasEscolhidas.forEach(idx => {
+        const est = ESTRATEGIAS[idx];
+        if (est) d += banco.pesoTemaPorClasse(est.afeta, jz.classe) * 0.6 * sinal;
+      });
+      d *= (jz.sensibilidade || 1);
+      jz.score = Math.max(5, Math.min(95, jz.score + d));
+    });
+  }
+  return scores;
+}
+
+exports.processarAcordao = onCall({ region: 'southamerica-east1' }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
+
+  const uid = request.auth.uid;
+  const { processo_id } = request.data;
+  if (!processo_id) throw new HttpsError('invalid-argument', 'processo_id obrigatório.');
+
+  const db = getFirestore();
+  const processoRef = db.collection('processos').doc(processo_id);
+  const jogadorRef = db.collection('jogadores').doc(uid);
+
+  const [processoSnap, jogadorSnap] = await Promise.all([processoRef.get(), jogadorRef.get()]);
+  if (!processoSnap.exists) throw new HttpsError('not-found', 'Processo não encontrado.');
+  if (!jogadorSnap.exists) throw new HttpsError('not-found', 'Jogador não encontrado.');
+
+  const p = processoSnap.data();
+  const j = jogadorSnap.data();
+
+  if (p.advogado_uid !== uid) throw new HttpsError('permission-denied', 'Processo não é seu.');
+  if (p.status !== 'recurso_pendente') throw new HttpsError('failed-precondition', 'Processo não está em fase de recurso.');
+  if (!p.colegiado_recurso || !p.colegiado_recurso.length) throw new HttpsError('failed-precondition', 'Colegiado ainda não foi sorteado.');
+
+  const ARGS = banco.argsRecursoPara(p.quem_recorre);
+  if ((p.historico_respostas_recurso || []).length < ARGS.length) {
+    throw new HttpsError('failed-precondition', 'Sustentação recursal ainda não foi concluída.');
+  }
+
+  // ── RECALCULA o placar — única fonte de verdade do resultado.
+  const scores = recalcularVotos(p);
+  const totalVotos = scores.length;
+  const votosReformar = scores.filter(s => s.score >= 50).length;
+  const votosManter = totalVotos - votosReformar;
+  const placar = votosManter > votosReformar ? `${votosManter} x ${votosReformar}` : `${votosReformar} x ${votosManter}`;
+  const categoria = categoriaPorPlacar(votosReformar, votosManter, totalVotos);
+  const vencedoresSaoReforma = votosReformar >= votosManter;
+  const scoresVencedores = scores.filter(s => (s.score>=50)===vencedoresSaoReforma).map(s=>s.score);
+  const novoScore = scoresVencedores.reduce((s,v)=>s+v,0) / scoresVencedores.length;
+
+  const recorrenteEhJogador = p.quem_recorre === 'jogador';
+  const cap = repCapDoCargo(j.cargo_id);
+  const rep = j.reputacao || 30;
+
+  let repDelta, txt, ico, cor;
+  if (categoria === 'mantem') {
+    ico = recorrenteEhJogador ? '📋' : '✅'; cor = recorrenteEhJogador ? '#e57373' : '#3aaa6a';
+    txt = recorrenteEhJogador
+      ? 'O tribunal negou provimento ao recurso — a sentença que te era desfavorável permanece de pé.'
+      : 'O tribunal manteve a decisão recorrida — sua vitória na origem foi confirmada.';
+    repDelta = recorrenteEhJogador ? -Math.round((100-novoScore)*0.15) : 0;
+  } else if (categoria === 'reforma_parcial') {
+    ico = '⚖️'; cor = '#ef9f27';
+    txt = recorrenteEhJogador
+      ? 'O tribunal deu parcial provimento ao seu recurso — parte da sentença desfavorável foi revertida a seu favor.'
+      : 'O tribunal reformou parcialmente a decisão — parte da sua vitória na origem foi reduzida.';
+    repDelta = recorrenteEhJogador ? Math.round(novoScore*0.18) : -Math.floor(rep*0.03);
+  } else {
+    ico = recorrenteEhJogador ? '🏆' : '❌'; cor = recorrenteEhJogador ? '#3aaa6a' : '#e57373';
+    txt = recorrenteEhJogador
+      ? 'O tribunal acolheu integralmente seu recurso — a sentença de origem foi revertida a seu favor.'
+      : 'O tribunal reverteu integralmente a decisão de origem — sua vitória foi cassada.';
+    // Penalidade de cassação proporcional ao CAP DO CARGO, não ao score
+    // anterior — uma cassação não pode tirar quase toda a reputação
+    // possível de um cargo de uma vez.
+    repDelta = recorrenteEhJogador ? Math.round(novoScore*0.3) : -Math.round(cap*0.15);
+  }
+
+  const xpGanho = banco.xpPorDecisao(p.instancia_seguinte, novoScore);
+  await jogadorRef.update({
+    reputacao: Math.max(0, Math.min(cap, rep + repDelta)),
+    xp: (j.xp||0) + xpGanho,
+  });
+
+  const votosFavorQuemTentaSubir = categoria === 'mantem' ? votosReformar : votosManter;
+  const travado = acessoProximaInstanciaTravado(votosFavorQuemTentaSubir, totalVotos);
+  const ehTopo = p.instancia_seguinte === 'STF';
+  const quemPerdeuAgora = categoria === 'mantem' ? p.quem_recorre : (p.quem_recorre === 'jogador' ? 'parte_contraria' : 'jogador');
+
+  const jogadorGanhouEsteJulgamento = (categoria === 'mantem' && p.quem_recorre === 'parte_contraria')
+    || (categoria !== 'mantem' && p.quem_recorre === 'jogador');
+
+  const resposta = {
+    placar, categoria, ico, cor, txt, repDelta, xpGanho,
+    ehTopo, travado, parteContrariaRecorreu: false, transitouSemRecurso: false,
+    podeRecorrer: false, proxTribunalNome: null, honCreditado: 0, honNoCaixa: false,
+  };
+
+  let transitouAgora = false;
+  if (ehTopo || travado) {
+    transitouAgora = true;
+  } else {
+    const proxTribunal = banco.tribunalRecursal(p, p.instancia_seguinte);
+    resposta.proxTribunalNome = banco.PERFIL_TRIBUNAL[proxTribunal].nome;
+    if (quemPerdeuAgora === 'parte_contraria') {
+      const recorreContraria = banco.decidirRecurso(novoScore);
+      if (recorreContraria) {
+        const { dataDisponivel, prazoFinal } = banco.calcularPrazosRecurso(j.mes_pessoal||0, j.ano_pessoal||1);
+        await processoRef.update({
+          instancia_seguinte: proxTribunal,
+          quem_recorre: 'parte_contraria',
+          score_anterior: novoScore,
+          data_disponivel_recurso: dataDisponivel,
+          prazo_final_recurso: prazoFinal,
+          colegiado_recurso: null,
+          estrategias_recurso: null,
+          historico_respostas_recurso: null,
+        });
+        resposta.parteContrariaRecorreu = true;
+      } else {
+        transitouAgora = true;
+        resposta.transitouSemRecurso = true;
+      }
+    } else {
+      resposta.podeRecorrer = true;
+      // Persiste o score deste julgamento — necessário para
+      // decidirProximaInstancia() calcular a base inicial do próximo
+      // colegiado corretamente quando o jogador decidir recorrer.
+      await processoRef.update({ score_anterior: novoScore });
+    }
+  }
+
+  if (transitouAgora) {
+    await processoRef.update({
+      status: jogadorGanhouEsteJulgamento ? 'ganho' : 'perdido',
+      encerrado_mes: mesTotalPessoal(j),
+    });
+    if (jogadorGanhouEsteJulgamento && p.hon_pendente > 0) {
+      if (j.escritorio_proprio_id) {
+        const escRef = db.collection('escritorios').doc(j.escritorio_proprio_id);
+        const escSnap = await escRef.get();
+        if (escSnap.exists) {
+          await escRef.update({ caixa: (escSnap.data().caixa||0) + p.hon_pendente });
+          resposta.honNoCaixa = true;
+        }
+      } else {
+        await jogadorRef.update({
+          dinheiro: (j.dinheiro||0) + p.hon_pendente,
+          honorarios_mes: (j.honorarios_mes||0) + p.hon_pendente,
+        });
+      }
+      resposta.honCreditado = p.hon_pendente;
+    }
+  }
+
+  return resposta;
+});
+
+// ════════════════════════════════════════════════════════
+// DECIDIR PRÓXIMA INSTÂNCIA — callable leve, chamada quando é O JOGADOR
+// quem decide se recorre (categoria='reforma' e ele perdeu este
+// julgamento). Mantida no servidor (não no cliente) para que o roteamento
+// de instância (qual tribunal vem a seguir) nunca seja escrito
+// diretamente pelo navegador.
+// ════════════════════════════════════════════════════════
+exports.decidirProximaInstancia = onCall({ region: 'southamerica-east1' }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
+  const uid = request.auth.uid;
+  const { processo_id, recorrer } = request.data;
+  if (!processo_id) throw new HttpsError('invalid-argument', 'processo_id obrigatório.');
+
+  const db = getFirestore();
+  const processoRef = db.collection('processos').doc(processo_id);
+  const jogadorRef = db.collection('jogadores').doc(uid);
+  const [processoSnap, jogadorSnap] = await Promise.all([processoRef.get(), jogadorRef.get()]);
+  if (!processoSnap.exists) throw new HttpsError('not-found', 'Processo não encontrado.');
+  if (!jogadorSnap.exists) throw new HttpsError('not-found', 'Jogador não encontrado.');
+
+  const p = processoSnap.data();
+  const j = jogadorSnap.data();
+  if (p.advogado_uid !== uid) throw new HttpsError('permission-denied', 'Processo não é seu.');
+
+  if (!recorrer) {
+    await processoRef.update({ status: 'perdido', encerrado_mes: mesTotalPessoal(j) });
+    return { msg: 'Decisão aceita. Processo encerrado — trânsito em julgado.' };
+  }
+
+  const proxTribunal = banco.tribunalRecursal(p, p.instancia_seguinte);
+  const { dataDisponivel, prazoFinal } = banco.calcularPrazosRecurso(j.mes_pessoal||0, j.ano_pessoal||1);
+  await processoRef.update({
+    instancia_seguinte: proxTribunal,
+    quem_recorre: 'jogador',
+    data_disponivel_recurso: dataDisponivel,
+    prazo_final_recurso: prazoFinal,
+    colegiado_recurso: null,
+    estrategias_recurso: null,
+    historico_respostas_recurso: null,
+  });
+  return { msg: `Recurso protocolado. Acesse a carteira para sustentar no ${proxTribunal}.` };
+});

@@ -1,298 +1,196 @@
 'use strict';
 
 /**
- * PROCESSAR SENTENÇA — Advocatus Online
+ * PROCESSAR SENTENÇA — Advocatus Online (v2, motor jurídico v8)
+ * Callable: chamado pelo frontend ao final da audiência de 1ª instância
+ * (3 rodadas de sustentação oral concluídas).
  *
- * Callable function: chamada pelo cliente quando o progresso do caso atinge 100%.
- * Executa no servidor para garantir integridade dos honorários e resultados.
+ * SEGURANÇA: esta função RECALCULA o convencimento do ZERO a partir de
+ * `historico_respostas_audiencia` (registro bruto de qual tipo de resposta
+ * o jogador escolheu em cada rodada), nunca confiando no campo
+ * `convencimento` salvo no Firestore pelo cliente — esse campo é só
+ * exibição otimista da UI e pode ter sido adulterado.
  *
- * Regras:
- * - Solo: 30% valor causa (contingência, só 1ª inst.) + % sucumbência por instância
- * - Escritório: 10% da sucumbência do escritório por instância
- * - Estado perde processo admin. → trânsito em julgado imediato (não recorre)
- * - Cargo mínimo por instância: Pleno+ para 2ª, Sênior+ para STJ/STF
+ * Usa o banco jurídico compartilhado em functions/shared/banco_juridico.js
+ * (mesmo conteúdo de js/shared/banco_juridico.js no frontend — ver aviso
+ * de sincronização manual nesse módulo).
  */
 
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getFirestore }       = require('firebase-admin/firestore');
 const { logger }             = require('firebase-functions');
+const banco = require('./shared/banco_juridico.js');
 
-// % de sucumbência por instância
-const SUCES_PCT = { 1: 0.10, 2: 0.10, 3: 0.05, 4: 0.05 };
-
-// Cargo mínimo por instância (2ª = TJ/CARF, 3ª = STJ, 4ª = STF)
-const CARGO_INSTANCIA = {
-  2: ['pln','snr','asc','soc','snm','jtit','dsb','mstj','prom','pjus','pgj','def','dch','dge'],
-  3: ['snr','asc','soc','snm','dsb','mstj','pjus','pgj','dch','dge'],
-  4: ['snr','asc','soc','snm','dsb','mstj','pjus','pgj','dch','dge'],
+const REP_CAP = {
+  est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100, snm:100,
+  jsub:55, jtit:70, dsb:85, mstj:100,
+  padj:55, prom:70, pjus:85, pgj:100,
+  dadj:55, def:70, dch:85, dge:100,
 };
+function repCapDoCargo(cargoId) { return REP_CAP[cargoId] || 55; }
 
-function podeFazerInstancia(cargoId, instancia) {
-  if (instancia <= 1) return true;
-  const permitidos = CARGO_INSTANCIA[instancia] || [];
-  return permitidos.includes(cargoId);
+function fmt(n) {
+  if (!n && n!==0) return '—';
+  if (n>=1000000) return `R$ ${(n/1000000).toFixed(1)}M`;
+  if (n>=1000) return `R$ ${Math.round(n/1000)}k`;
+  return `R$ ${Number(n).toLocaleString('pt-BR')}`;
 }
 
-function calcHonorarios(processo, instancia, isSolo, jogador) {
+function mesTotalPessoal(j) { return (j.ano_pessoal||1)*12 + (j.mes_pessoal||0); }
 
-  // Estagiário e Assistente não recebem honorários
-  if (['est', 'ass'].includes(jogador.cargo_id)) {
-    return 0;
+// ── RECÁLCULO DO CONVENCIMENTO — reproduz EXATAMENTE a mesma fórmula do
+// frontend (ver responderAudiencia em processos.js), mas a partir do
+// histórico bruto, nunca do valor já calculado e salvo pelo cliente.
+function recalcularConvencimento(p) {
+  const historico = p.historico_respostas_audiencia || [];
+  let cv = p.dificuldade_extra ? 28 : 38;
+
+  for (const { rodada, tipo } of historico) {
+    const arg = p.args_audiencia[rodada];
+    if (!arg) continue; // rodada inválida — ignora silenciosamente
+
+    let d = tipo === arg.ideal ? 11 : tipo === arg.neutro ? 2 : -14;
+    const perfilJuiz = p.juiz.perfil_oculto;
+    if (perfilJuiz === 'formalista' && tipo === 'tecnica') d += 5;
+    if (perfilJuiz === 'garantista' && tipo === 'agressiva') d += 5;
+    if (perfilJuiz === 'conservador' && tipo === 'passiva') d -= 9;
+    if (perfilJuiz === 'formalista' && tipo === 'agressiva') d -= 4;
+
+    const provasSel = (p.provas_selecionadas || []).map(i => p.provas[i]).filter(Boolean);
+    const fm = provasSel.length ? provasSel.reduce((s,pr) => s + (pr.forca || 60), 0) / provasSel.length : 60;
+    if (fm >= 85 && tipo !== 'passiva') d += 5;
+    else if (fm >= 65 && tipo !== 'passiva') d += 2;
+    else if (fm < 50) d -= 4;
+    else if (fm < 35) d -= 8;
+
+    const tesesSel = p.teses_selecionadas || [];
+    d += tesesSel.length * 2;
+    if (tesesSel.length === 0) d -= 4;
+
+    cv = Math.max(5, Math.min(95, cv + d));
   }
-
-  const pct         = SUCES_PCT[instancia] || 0.10;
-  const sucumbencia = Math.floor(processo.valor * pct);
-
-  if (isSolo) {
-    const contingencia = instancia === 1
-      ? Math.floor(processo.valor * 0.30)
-      : 0;
-
-    return contingencia + sucumbencia;
-  }
-
-  // Escritório: advogado recebe 10% da sucumbência do escritório
-  return Math.floor(sucumbencia * 0.10);
+  return cv;
 }
 
 exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (request) => {
-  if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'Autenticação necessária.');
-  }
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
 
-  const uid         = request.auth.uid;
+  const uid = request.auth.uid;
   const { processo_id } = request.data;
+  if (!processo_id) throw new HttpsError('invalid-argument', 'processo_id obrigatório.');
 
-  if (!processo_id) {
-    throw new HttpsError('invalid-argument', 'processo_id é obrigatório.');
-  }
+  const db = getFirestore();
+  const processoRef = db.collection('processos').doc(processo_id);
+  const jogadorRef = db.collection('jogadores').doc(uid);
 
-  const db           = getFirestore();
-  const processoRef  = db.collection('processos').doc(processo_id);
-  const jogadorRef   = db.collection('jogadores').doc(uid);
-
-  // ── Carregar dados em paralelo ──
-  const [processoSnap, jogadorSnap, serverSnap] = await Promise.all([
-    processoRef.get(),
-    jogadorRef.get(),
-    db.collection('config').doc('server').get(),
-  ]);
-
+  const [processoSnap, jogadorSnap] = await Promise.all([processoRef.get(), jogadorRef.get()]);
   if (!processoSnap.exists) throw new HttpsError('not-found', 'Processo não encontrado.');
-  if (!jogadorSnap.exists)  throw new HttpsError('not-found', 'Jogador não encontrado.');
+  if (!jogadorSnap.exists) throw new HttpsError('not-found', 'Jogador não encontrado.');
 
   const p = processoSnap.data();
   const j = jogadorSnap.data();
-  const s = serverSnap.data() || {};
 
-  // ── Validações de segurança ──
-  if (p.advogado_uid !== uid) {
-    throw new HttpsError('permission-denied', 'Este processo não é seu.');
-  }
-  if (p.status !== 'andamento') {
-    throw new HttpsError('failed-precondition', 'Processo já encerrado.');
-  }
-  if ((p.progresso || 0) < 100) {
-    throw new HttpsError('failed-precondition', 'Progresso insuficiente para sentença.');
-  }
+  if (p.advogado_uid !== uid) throw new HttpsError('permission-denied', 'Processo não é seu.');
+  if (p.status !== 'andamento') throw new HttpsError('failed-precondition', 'Processo já encerrado ou em outra fase.');
+  if ((p.rodada_audiencia || 0) < 3) throw new HttpsError('failed-precondition', 'Audiência ainda não foi concluída (3 rodadas).');
 
-  const instancia   = p.instancia || 1;
-  const cs          = p.chance_sucesso || 50;
-  const isSolo      = !j.escritorio_empregado_id || j.escritorio_id === 'solo';
-  const isAdmin     = p.tipo_processo === 'administrativo';
-  const reuEhEstado = p.reu_eh_estado === true;
-  const mesAtual    = s.mes_global || 1;
+  // ── RECALCULA o score — esta é a única fonte de verdade do resultado.
+  const score = recalcularConvencimento(p);
+  const souReu = p.meu_lado === 'reu';
+  const favoravelAoJogador = score >= 58;
+  const mesAtual = j.mes_global_pessoal || mesTotalPessoal(j);
+  const cap = repCapDoCargo(j.cargo_id);
+  const rep = j.reputacao || 30;
 
-  // ── Determinar resultado ──
-  const roll   = Math.random() * 100;
-  const ganhou = roll < cs;
-
-  logger.info(`[SENTENÇA] ${processo_id} | cs:${cs}% | roll:${roll.toFixed(1)} | ganhou:${ganhou}`);
-
-  // ── Calcular honorários ──
-  const hon = calcHonorarios(p, instancia, isSolo, j);
-  const honTotal = (p.hon_total_acumulado || 0) + hon;
-
-  // ── Preparar updates ──
-  const processoUpdates = {
-    hon_total_acumulado: honTotal,
-    resultado_instancia: ganhou ? 'ganho' : 'perdido',
-    chance_aplicada:     cs,
-    roll_aplicado:       roll,
-    processado_mes:      mesAtual,
-  };
-
-  const jogadorUpdates = {};
-
-  let resposta = {};
-
-  if (ganhou) {
-    // ═══════════════ VITÓRIA ═══════════════
-    jogadorUpdates.dinheiro    = (j.dinheiro || 0) + hon;
-    jogadorUpdates.wins        = (j.wins    || 0) + 1;
-    jogadorUpdates.wins_ano    = (j.wins_ano || 0) + 1;
-    jogadorUpdates.reputacao   = Math.min(100, (j.reputacao || 30) + 5);
-    jogadorUpdates.derrotas_consecutivas = 0;
-    const xpGanho = 25 * instancia;
-    jogadorUpdates.xp = (j.xp || 0) + xpGanho;
-
-    // Estado perde processo administrativo → trânsito imediato (não pode recorrer)
-    const estadoNaoPodeRecorrer = isAdmin && reuEhEstado;
-
-    // Probabilidade de a parte contrária recorrer
-    const partePodeRecorrer = !estadoNaoPodeRecorrer && instancia < 4;
-    const parteRecorre      = partePodeRecorrer && cs < 70 && Math.random() < 0.55;
-
-    if (parteRecorre) {
-      const novaInst = instancia + 1;
-
-      // Verificar se o jogador pode atuar na próxima instância
-      if (!podeFazerInstancia(j.cargo_id, novaInst)) {
-        // Encerra: jogador não pode atuar nessa instância
-        processoUpdates.status        = 'encerrado_cargo';
-        processoUpdates.encerrado_mes = mesAtual;
-        await processoRef.update(processoUpdates);
-        await jogadorRef.update(jogadorUpdates);
-
-        resposta = {
-          resultado:  'ganho_encerrado_cargo',
-          hon,
-          honTotal,
-          msg: `Vitória! Mas ${p.reu} recorreu via instância superior e seu cargo atual (${j.cargo_id}) não permite atuar lá. Caso encerrado com honorários parciais.`,
-          detalhes: { instancia, hon, honTotal, cs, roll },
-        };
-      } else {
-        // Continua na próxima instância
-        const novaHonRef = calcHonorarios(p, novaInst, isSolo);
-        processoUpdates.instancia          = novaInst;
-        processoUpdates.progresso          = 0;
-        processoUpdates.recurso_pendente   = false;
-        processoUpdates.hon_prox_instancia = novaHonRef;
-        processoUpdates.status             = 'andamento';
-
-        await processoRef.update(processoUpdates);
-        await jogadorRef.update(jogadorUpdates);
-
-        const RECURSO_LABEL = {
-          tributario:    { 2:'Apelação/Remessa Necessária', 3:'Recurso Especial (STJ)', 4:'Recurso Extraordinário (STF)' },
-          trabalhista:   { 2:'Recurso Ordinário (TRT)',     3:'Recurso de Revista (TST)', 4:'Recurso Extraordinário (STF)' },
-          civil:         { 2:'Apelação (TJRJ)',             3:'Recurso Especial (STJ)',   4:'Recurso Extraordinário (STF)' },
-          criminal:      { 2:'Apelação Criminal',           3:'Recurso Especial (STJ)',   4:'Recurso Extraordinário (STF)' },
-          empresarial:   { 2:'Apelação (TJRJ)',             3:'Recurso Especial (STJ)',   4:'Recurso Extraordinário (STF)' },
-          constitucional:{ 2:'ROC',                         3:'Embargos de Divergência', 4:'Recurso Extraordinário (STF)' },
-          ambiental:     { 2:'Apelação/Remessa Necessária', 3:'Recurso Especial (STJ)',   4:'Recurso Extraordinário (STF)' },
-          previdenciario:{ 2:'Recurso Inominado (TNU)',     3:'Recurso Especial (STJ)',   4:'Recurso Extraordinário (STF)' },
-        };
-        const area    = p.area || 'civil';
-        const recLabel = RECURSO_LABEL[area]?.[novaInst] || `${novaInst}ª Instância`;
-
-        resposta = {
-          resultado:     'ganho_continua',
-          hon,
-          honTotal,
-          novaInstancia: novaInst,
-          recLabel,
-          msg: `Vitória! Honorários recebidos: R$ ${hon.toLocaleString('pt-BR')}. ${p.reu} recorreu via ${recLabel}.`,
-          detalhes: { instancia, novaInst, hon, honTotal, cs, roll },
-        };
-      }
-    } else {
-      // Trânsito em julgado
-      processoUpdates.status        = 'ganho';
-      processoUpdates.encerrado_mes = mesAtual;
-
-      await processoRef.update(processoUpdates);
-      await jogadorRef.update(jogadorUpdates);
-
-      resposta = {
-        resultado: 'ganho_definitivo',
-        hon,
-        honTotal,
-        transitoJulgado: true,
-        estadoNaoPodeRecorrer,
-        msg: `🏆 Vitória definitiva! Trânsito em julgado. Honorários totais: R$ ${honTotal.toLocaleString('pt-BR')}.`,
-        detalhes: { instancia, hon, honTotal, cs, roll },
-      };
-    }
-
+  let categoria, repDelta, txt;
+  if (score >= 80) {
+    categoria = 'procedente';
+    txt = souReu ? 'Pedido julgado totalmente IMPROCEDENTE — sua defesa prevaleceu integralmente.' : 'Pedido julgado totalmente PROCEDENTE.';
+    repDelta = Math.max(1, Math.floor((cap - rep) * 0.08));
+  } else if (score >= 58) {
+    categoria = 'parcial';
+    txt = 'Pedido julgado PARCIALMENTE PROCEDENTE.';
+    repDelta = Math.max(1, Math.floor((cap - rep) * 0.05));
+  } else if (score >= 38) {
+    categoria = 'improcedente';
+    txt = souReu ? 'Pedido julgado PROCEDENTE contra a defesa.' : 'Pedido julgado IMPROCEDENTE.';
+    repDelta = -Math.max(1, Math.floor(rep * 0.05));
   } else {
-    // ═══════════════ DERROTA ═══════════════
-    jogadorUpdates.losses    = (j.losses    || 0) + 1;
-    jogadorUpdates.losses_ano = (j.losses_ano || 0) + 1;
-    jogadorUpdates.reputacao = Math.max(0, (j.reputacao || 30) - 5);
-    const dc = (j.derrotas_consecutivas || 0) + 1;
-    jogadorUpdates.derrotas_consecutivas = dc;
-
-    // Verificar demissão (5 derrotas consecutivas ou rep abaixo do threshold)
-    const escritorio       = j.escritorio_id || 'solo';
-    const repMin           = 5; // threshold mínimo — escritórios verificam no cliente
-    let demitido           = false;
-    if (dc >= 5 && escritorio !== 'solo') {
-      demitido = true;
-      jogadorUpdates.escritorio_empregado_id = null;
-      jogadorUpdates.derrotas_consecutivas   = 0;
-    }
-
-    // Processo administrativo perdido → pode recorrer judicialmente
-    if (isAdmin && instancia === 1) {
-      processoUpdates.instancia        = 2;
-      processoUpdates.progresso        = 0;
-      processoUpdates.tipo_processo    = 'judicial';
-      processoUpdates.recurso_pendente = false;
-      processoUpdates.status           = 'andamento';
-
-      await processoRef.update(processoUpdates);
-      await jogadorRef.update(jogadorUpdates);
-
-      resposta = {
-        resultado: 'derrota_admin_recurso_judicial',
-        hon:       0,
-        msg:       'Decisão administrativa desfavorável. Você pode recorrer judicialmente — o caso avança para a esfera judicial.',
-        demitido,
-        detalhes: { instancia, cs, roll },
-      };
-
-    } else if (cs >= 70 && podeFazerInstancia(j.cargo_id, instancia + 1) && instancia < 4) {
-      // Pode recorrer
-      processoUpdates.recurso_pendente = true;
-      processoUpdates.progresso        = 0;
-      processoUpdates.status           = 'andamento';
-
-      await processoRef.update(processoUpdates);
-      await jogadorRef.update(jogadorUpdates);
-
-      resposta = {
-        resultado: 'derrota_pode_recorrer',
-        hon:       0,
-        cs,
-        msg: `Sentença desfavorável. Sua chance de sucesso era ${cs}% (acima de 70%). Você pode interpor recurso.`,
-        demitido,
-        detalhes: { instancia, cs, roll },
-      };
-
-    } else {
-      // Caso encerrado definitivamente
-      processoUpdates.status        = 'perdido';
-      processoUpdates.encerrado_mes = mesAtual;
-
-      await processoRef.update(processoUpdates);
-      await jogadorRef.update(jogadorUpdates);
-
-      const motivo = instancia >= 4
-        ? 'Instância máxima atingida — trânsito em julgado.'
-        : cs < 70
-          ? `Chance de sucesso ${cs}% — abaixo de 70%, recurso não recomendado.`
-          : 'Cargo insuficiente para instância superior.';
-
-      resposta = {
-        resultado: 'derrota_definitiva',
-        hon:       0,
-        msg: `❌ Sentença desfavorável. ${motivo}`,
-        demitido,
-        detalhes: { instancia, cs, roll },
-      };
-    }
+    categoria = 'improcedente_agravada';
+    txt = souReu ? 'Pedido julgado totalmente PROCEDENTE contra a defesa, com condenação agravada.' : 'Pedido julgado IMPROCEDENTE, com condenação em honorários.';
+    repDelta = -Math.max(1, Math.floor(rep * 0.08));
   }
 
-  return resposta;
+  const xpGanho = banco.xpPorDecisao('1grau', score);
+
+  const isSolo = !j.escritorio_empregado_id || j.escritorio_id === 'solo';
+  const suc = Math.floor(p.valor * 0.10);
+  const honPotencial = favoravelAoJogador ? (isSolo ? Math.floor(p.valor * 0.30 + suc) : Math.floor(suc * 0.10)) : 0;
+
+  const dc = (j.derrotas_consecutivas || 0) + 1;
+  const demitido = !favoravelAoJogador && dc >= 5 && j.escritorio_empregado_id && j.escritorio_empregado_id !== 'solo' && !j.escritorio_proprio_id;
+
+  const updatesJogador = {
+    reputacao: Math.max(0, Math.min(cap, rep + repDelta)),
+    xp: (j.xp || 0) + xpGanho,
+    derrotas_consecutivas: favoravelAoJogador ? 0 : dc,
+  };
+  if (favoravelAoJogador) { updatesJogador.wins = (j.wins||0)+1; updatesJogador.wins_ano = (j.wins_ano||0)+1; }
+  else { updatesJogador.losses = (j.losses||0)+1; updatesJogador.losses_ano = (j.losses_ano||0)+1; }
+  if (demitido) {
+    updatesJogador.escritorio_id = 'solo';
+    updatesJogador.escritorio_empregado_id = null;
+    updatesJogador.escritorio_nome = null;
+    updatesJogador.derrotas_consecutivas = 0;
+  }
+  await jogadorRef.update(updatesJogador);
+
+  const recorre = banco.decidirRecurso(favoravelAoJogador ? score : 100 - score);
+
+  if (recorre) {
+    const { dataDisponivel, prazoFinal } = banco.calcularPrazosRecurso(j.mes_pessoal||0, j.ano_pessoal||1);
+    const quemRecorre = favoravelAoJogador ? 'parte_contraria' : 'jogador';
+    await processoRef.update({
+      status: 'recurso_pendente',
+      instancia_atual: '1grau',
+      quem_recorre: quemRecorre,
+      score_anterior: score,
+      hon_pendente: honPotencial,
+      data_disponivel_recurso: dataDisponivel,
+      prazo_final_recurso: prazoFinal,
+      encerrado_mes: null,
+      convencimento: score, // sincroniza o valor real recalculado de volta
+    });
+    return { categoria, txt, repDelta, xpGanho, recorre: true, instanciaSeguinte: p.instancia_seguinte, demitido };
+  } else {
+    if (favoravelAoJogador && honPotencial > 0) {
+      if (j.escritorio_proprio_id) {
+        const escRef = db.collection('escritorios').doc(j.escritorio_proprio_id);
+        const escSnap = await escRef.get();
+        if (escSnap.exists) await escRef.update({ caixa: (escSnap.data().caixa||0) + honPotencial });
+      } else {
+        await jogadorRef.update({
+          dinheiro: (updatesJogador.dinheiro ?? j.dinheiro ?? 0) + honPotencial,
+          honorarios_mes: (j.honorarios_mes||0) + honPotencial,
+        });
+      }
+    }
+    await processoRef.update({
+      status: favoravelAoJogador ? 'ganho' : 'perdido',
+      encerrado_mes: mesAtual,
+      hon_total_acumulado: favoravelAoJogador ? honPotencial : 0,
+      convencimento: score,
+    });
+    if (j.escritorio_proprio_id && !favoravelAoJogador) {
+      try {
+        const escRef = db.collection('escritorios').doc(j.escritorio_proprio_id);
+        const escSnap = await escRef.get();
+        if (escSnap.exists) {
+          const escRep = escSnap.data().prestigio || 10;
+          await escRef.update({ prestigio: Math.max(0, escRep - Math.ceil(Math.abs(repDelta) * 0.5)) });
+        }
+      } catch (e) { logger.warn('Penalidade rep escritório falhou:', e); }
+    }
+    return { categoria, txt, repDelta, xpGanho, recorre: false, hon: honPotencial, demitido };
+  }
 });

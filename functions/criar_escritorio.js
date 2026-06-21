@@ -94,6 +94,127 @@ exports.criarEscritorio = onCall({ region: 'southamerica-east1' }, async (reques
 });
 
 // ════════════════════════════════════════════════════════
+// DISTRIBUIR LUCROS DO ESCRITÓRIO ENTRE SÓCIOS
+// ════════════════════════════════════════════════════════
+exports.distribuirLucros = onCall({ region: 'southamerica-east1' }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
+
+  const uid = request.auth.uid;
+  const { escritorio_id, valor } = request.data;
+
+  if (!escritorio_id) throw new HttpsError('invalid-argument', 'escritorio_id obrigatório.');
+  if (!valor || valor <= 0) throw new HttpsError('invalid-argument', 'Valor deve ser positivo.');
+
+  const db     = getFirestore();
+  const escRef = db.collection('escritorios').doc(escritorio_id);
+  const escSnap = await escRef.get();
+  if (!escSnap.exists) throw new HttpsError('not-found', 'Escritório não encontrado.');
+  const esc = escSnap.data();
+
+  // Normaliza sócios — lida com schema antigo (array de strings) e novo (array de objetos)
+  function normalizarSociosCF(escData) {
+    const donoFallback = escData.dono_uid || escData.fundador_uid;
+    if (Array.isArray(escData.socios) && escData.socios.length > 0) {
+      const primeiroValido = escData.socios[0] && typeof escData.socios[0] === 'object' && escData.socios[0].uid;
+      if (primeiroValido) {
+        return escData.socios
+          .filter(s => s && typeof s === 'object' && s.uid)
+          .map(s => ({ uid: s.uid, participacao_pct: s.participacao_pct || 0 }));
+      }
+      // Array de strings (uids) — formato legado
+      return escData.socios.map((uidStr, i) => ({
+        uid: typeof uidStr === 'string' ? uidStr : donoFallback,
+        participacao_pct: i === 0 ? 100 : 0,
+      }));
+    }
+    return [{ uid: donoFallback, participacao_pct: 100 }];
+  }
+
+  const socios = normalizarSociosCF(esc);
+
+  // Apenas sócios podem solicitar distribuição (aceita ambos os schemas: dono_uid ou fundador_uid)
+  const ehSocio = socios.some(s => s.uid === uid)
+    || esc.fundador_uid === uid
+    || esc.dono_uid === uid;
+  if (!ehSocio) {
+    throw new HttpsError('permission-denied', 'Apenas sócios podem distribuir lucros.');
+  }
+
+  const caixa = esc.caixa || 0;
+  if (valor > caixa) {
+    throw new HttpsError('failed-precondition', `Valor maior que o caixa disponível (R$ ${caixa.toLocaleString('pt-BR')}).`);
+  }
+
+  const listaSocios = socios;
+
+  const distribuicao = [];
+  const batch = db.batch();
+
+  for (const socio of listaSocios) {
+    const pct   = socio.participacao_pct || 0;
+    const parte = Math.floor(valor * pct / 100);
+    if (parte <= 0) continue;
+
+    const socioRef  = db.collection('jogadores').doc(socio.uid);
+    const socioSnap = await socioRef.get();
+    if (!socioSnap.exists) continue;
+    const socioData = socioSnap.data();
+
+    batch.update(socioRef, { dinheiro: (socioData.dinheiro || 0) + parte });
+    distribuicao.push({ uid: socio.uid, pct, valor: parte });
+  }
+
+  batch.update(escRef, { caixa: caixa - valor });
+  await batch.commit();
+
+  logger.info(`[DISTRIBUIR LUCROS] ${escritorio_id}: R$ ${valor} distribuído entre ${distribuicao.length} sócio(s)`);
+
+  return {
+    ok: true,
+    distribuicao,
+    caixa_restante: caixa - valor,
+    msg: `R$ ${valor.toLocaleString('pt-BR')} distribuídos entre ${distribuicao.length} sócio(s).`,
+  };
+});
+
+// ════════════════════════════════════════════════════════
+// APORTAR CAPITAL NO ESCRITÓRIO
+// ════════════════════════════════════════════════════════
+exports.aportarCapital = onCall({ region: 'southamerica-east1' }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
+
+  const uid = request.auth.uid;
+  const { escritorio_id, valor } = request.data;
+
+  if (!escritorio_id) throw new HttpsError('invalid-argument', 'escritorio_id obrigatório.');
+  if (!valor || valor <= 0) throw new HttpsError('invalid-argument', 'Valor deve ser positivo.');
+
+  const db = getFirestore();
+  const jogadorRef  = db.collection('jogadores').doc(uid);
+  const jogadorSnap = await jogadorRef.get();
+  if (!jogadorSnap.exists) throw new HttpsError('not-found', 'Jogador não encontrado.');
+  const j = jogadorSnap.data();
+
+  if ((j.dinheiro || 0) < valor) {
+    throw new HttpsError('failed-precondition', 'Saldo pessoal insuficiente.');
+  }
+
+  const escRef  = db.collection('escritorios').doc(escritorio_id);
+  const escSnap = await escRef.get();
+  if (!escSnap.exists) throw new HttpsError('not-found', 'Escritório não encontrado.');
+  const esc = escSnap.data();
+
+  const batch = db.batch();
+  batch.update(jogadorRef, { dinheiro: (j.dinheiro || 0) - valor });
+  batch.update(escRef,     { caixa:    (esc.caixa  || 0) + valor });
+  await batch.commit();
+
+  logger.info(`[APORTAR CAPITAL] ${uid} aportou R$ ${valor} em ${escritorio_id}`);
+
+  return { ok: true, novo_caixa: (esc.caixa||0) + valor, msg: `R$ ${valor.toLocaleString('pt-BR')} aportados no caixa do escritório.` };
+});
+
+// ════════════════════════════════════════════════════════
 // CONVIDAR SÓCIO
 // ════════════════════════════════════════════════════════
 exports.convidarSocio = onCall({ region: 'southamerica-east1' }, async (request) => {
@@ -124,21 +245,10 @@ exports.convidarSocio = onCall({ region: 'southamerica-east1' }, async (request)
   const convidadoSnap = await db.collection('jogadores').doc(para_uid).get();
   if (!convidadoSnap.exists) throw new HttpsError('not-found', 'Jogador convidado não encontrado.');
   const convidado = convidadoSnap.data();
-  const CARGOS_CONTRATAVEIS = [
-  'est',
-  'ass',
-  'jnr',
-  'pln',
-  'snr',
-  'asc'
-];
+  if (!convidado.oab) {
+    throw new HttpsError('failed-precondition', 'O convidado precisa ter OAB aprovada.');
+  }
 
-  if (!CARGOS_CONTRATAVEIS.includes(convidado.cargo_id)) {
-  throw new HttpsError(
-    'failed-precondition',
-    'Este cargo não pode receber ofertas de escritório.'
-  );
-}
   // Verificar se já existe convite pendente
   const convPend = await db.collection('convites')
     .where('para_uid', '==', para_uid)
