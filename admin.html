@@ -16,7 +16,6 @@ body { background: var(--couro); overflow-x: hidden; }
   margin-top: var(--topbar-h);
 }
 
-/* Sidebar admin */
 .admin-sidebar {
   background: rgba(0,0,0,.25);
   border-right: var(--borda);
@@ -48,7 +47,6 @@ body { background: var(--couro); overflow-x: hidden; }
 .admin-nav-item:hover { background: rgba(255,255,255,.05); color: var(--perg); }
 .admin-nav-item.ativo { background: rgba(184,146,42,.12); color: var(--ouro2); border: var(--borda); }
 
-/* Área central admin */
 .admin-main {
   padding: 1.5rem;
   overflow-y: auto;
@@ -76,7 +74,6 @@ body { background: var(--couro); overflow-x: hidden; }
   border-radius: var(--r);
 }
 
-/* Grid de controles */
 .ctrl-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -97,7 +94,6 @@ body { background: var(--couro); overflow-x: hidden; }
   margin-bottom: .6rem;
 }
 
-/* Inputs compactos */
 .ctrl-campo { margin-bottom: .6rem; }
 .ctrl-campo label {
   display: block;
@@ -120,7 +116,6 @@ body { background: var(--couro); overflow-x: hidden; }
 }
 .ctrl-campo input:focus { border-color: var(--ouro2); }
 
-/* Log de resultados */
 #admin-log {
   background: rgba(0,0,0,.3);
   border: var(--borda);
@@ -138,7 +133,6 @@ body { background: var(--couro); overflow-x: hidden; }
 .log-info   { color: var(--ardosia2); }
 .log-gold   { color: var(--ouro2); }
 
-/* Tabela de jogadores */
 #tabela-jogadores {
   width: 100%;
   border-collapse: collapse;
@@ -162,7 +156,6 @@ body { background: var(--couro); overflow-x: hidden; }
 #tabela-jogadores tr:hover td { background: rgba(255,255,255,.03); }
 .uid-cell { font-family: var(--font-mono); font-size: .62rem; color: var(--ardosia); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* Info card servidor */
 .server-info-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -182,7 +175,6 @@ body { background: var(--couro); overflow-x: hidden; }
 </head>
 <body>
 
-<!-- TOPBAR -->
 <header class="topbar">
   <div class="logo">Advocatus<em>Online</em> <span style="font-size:.65rem;color:var(--verm3);margin-left:.5rem">⚙️ ADMIN</span></div>
   <div style="margin-left:auto;display:flex;gap:.8rem;align-items:center">
@@ -194,7 +186,6 @@ body { background: var(--couro); overflow-x: hidden; }
 
 <div class="admin-layout">
 
-  <!-- SIDEBAR -->
   <nav class="admin-sidebar">
     <div class="admin-nav-titulo">Servidor</div>
     <div class="admin-nav-item ativo" onclick="painelAdmin('servidor',this)">⏰ Calendário</div>
@@ -223,7 +214,6 @@ body { background: var(--couro); overflow-x: hidden; }
     <div class="admin-nav-item" onclick="painelAdmin('log',this)">📋 Log de ações</div>
   </nav>
 
-  <!-- ÁREA CENTRAL -->
   <main class="admin-main" id="admin-main">
     <div style="text-align:center;padding:3rem;color:var(--ardosia)">
       <div style="font-size:2rem;margin-bottom:.5rem">⚙️</div>
@@ -232,7 +222,6 @@ body { background: var(--couro); overflow-x: hidden; }
   </main>
 </div>
 
-<!-- Toast -->
 <div id="toast-container"></div>
 
 <script type="module">
@@ -263,17 +252,14 @@ window._db        = db;
 window._adminFn   = adminFn;
 window._adminUID  = null;
 
-// ── Auth check ──
 onAuthStateChanged(auth, async user => {
   if (!user) { window.location.href = '/index.html'; return; }
   document.getElementById('admin-uid').textContent = user.uid;
   window._adminUID = user.uid;
-  // Verificar se é admin chamando uma ação simples
   try {
     const r = await adminFn({ acao:'server_get', payload:{} });
     if (!r.data.ok) throw new Error('Não autorizado');
     window._serverData = r.data.data;
-    // Carregar painel inicial
     window.painelAdmin('servidor', document.querySelector('.admin-nav-item.ativo'));
   } catch (err) {
     document.getElementById('admin-main').innerHTML = `
@@ -291,7 +277,6 @@ onAuthStateChanged(auth, async user => {
 
 window.fazerLogout = async () => { await signOut(auth); window.location.href='/index.html'; };
 
-// ── Dispatcher de painéis ──
 window.painelAdmin = function(painel, el) {
   document.querySelectorAll('.admin-nav-item').forEach(e => e.classList.remove('ativo'));
   if (el) el.classList.add('ativo');
@@ -316,9 +301,6 @@ window.painelAdmin = function(painel, el) {
   }
 };
 
-// ════════════════════════════════════════════════════════
-// SERVIDOR
-// ════════════════════════════════════════════════════════
 function renderServidor(main) {
   const s = window._serverData || {};
   main.innerHTML = `
@@ -345,7 +327,7 @@ function renderServidor(main) {
         <div class="ctrl-campo"><label>Mês (0=Jan…11=Dez)</label><input type="number" id="set-mes" min="0" max="11" value="${s.mes_jogo||0}"></div>
         <div class="ctrl-campo"><label>Ano de jogo</label><input type="number" id="set-ano" min="1" value="${s.ano_jogo||1}"></div>
         <div class="ctrl-campo"><label>Mês global (absoluto)</label><input type="number" id="set-mesg" min="1" value="${s.mes_global||1}"></div>
-        <button class="btn btn-sec btn-block" onclick="acaoAdmin('server_set_mes',{mes_jogo:+id('set-mes').value,ano_jogo:+id('set-ano').value,mes_global:+id('set-mesg').value})">
+        <button class="btn btn-sec btn-block" onclick="acaoAdmin('server_set_mes',{mes_jogo:+$id('set-mes').value,ano_jogo:+$id('set-ano').value,mes_global:+$id('set-mesg').value})">
           Aplicar
         </button>
       </div>
@@ -370,9 +352,6 @@ function renderServidor(main) {
     </div>`;
 }
 
-// ════════════════════════════════════════════════════════
-// LISTAR JOGADORES
-// ════════════════════════════════════════════════════════
 async function renderJogadores(main) {
   main.innerHTML = `
     <div class="admin-header"><div class="admin-titulo">👥 Jogadores</div></div>
@@ -408,9 +387,6 @@ async function renderJogadores(main) {
   }
 }
 
-// ════════════════════════════════════════════════════════
-// EDITAR JOGADOR (formulário de busca por UID)
-// ════════════════════════════════════════════════════════
 function renderEditarJogador(main) {
   main.innerHTML = `
     <div class="admin-header"><div class="admin-titulo">✏️ Editar Jogador</div></div>
@@ -429,12 +405,12 @@ function renderEditarJogador(main) {
 }
 
 window.buscarJogador = async function() {
-  const uid = id('busca-uid').value.trim();
+  const uid = $id('busca-uid').value.trim();
   if (!uid) { toast('Digite um UID.','ko'); return; }
   try {
     const r = await window._adminFn({ acao:'jogador_get', payload:{uid} });
     const j = r.data.data;
-    document.getElementBy$Id('resultado-busca').innerHTML = `
+    document.getElementById('resultado-busca').innerHTML = `
       <div class="ctrl-card">
         <div style="font-weight:600;color:var(--perg);margin-bottom:.5rem">${j.nome_personagem||'—'} <span style="font-size:.65rem;font-family:var(--font-mono);color:var(--ardosia)">${j.uid}</span></div>
         <pre style="font-size:.68rem;color:var(--ardosia2);max-height:200px;overflow:auto;font-family:var(--font-mono)">${JSON.stringify({
@@ -451,30 +427,32 @@ window.buscarJogador = async function() {
 };
 
 window.abrirEditarUID = function(uid, nome) {
-  // Navega para o painel de edição com o UID pré-preenchido
   window._uid_editando = uid;
   document.querySelectorAll('.admin-nav-item').forEach(e=>e.classList.remove('ativo'));
   const el = document.querySelector('.admin-nav-item[onclick*="editar_jogador"]');
   if (el) el.classList.add('ativo');
-  const main = document.getElementBy$Id('admin-main');
+  const main = document.getElementById('admin-main');
   renderEditarJogador(main);
   setTimeout(() => {
-    const inp = document.getElementBy$Id('busca-uid');
+    const inp = document.getElementById('busca-uid');
     if (inp) inp.value = uid;
     toast(`UID ${nome||uid} carregado.`,'ok');
   }, 100);
 };
-  
+
 // ====================================================
 // HELPERS
 // ====================================================
-
+// Renomeado de id() para $id() — "id" colidia com o atributo `id` dos
+// próprios elementos do formulário dentro do escopo especial criado por
+// atributos onclick="..." inline (o navegador prioriza referências de
+// elementos do form antes de variáveis globais nesse contexto), causando
+// "Uncaught TypeError: id is not a function" mesmo com window.id
+// corretamente definida como função. $id não colide com nada.
 window.$id = function(el) {
   return document.getElementById(el);
 };
-// ════════════════════════════════════════════════════════
-// FINANCEIRO
-// ════════════════════════════════════════════════════════
+
 function renderFinanceiro(main) {
   main.innerHTML = `
     <div class="admin-header">
@@ -498,8 +476,8 @@ function renderFinanceiro(main) {
 
         <button class="btn btn-sec btn-block"
           onclick="acaoAdmin('jogador_set_dinheiro',{
-            uid:document.getElementBy$Id('fin-uid').value.trim(),
-            valor:+document.getElementBy$Id('fin-val').value
+            uid:document.getElementById('fin-uid').value.trim(),
+            valor:+document.getElementById('fin-val').value
           })">
           Definir saldo
         </button>
@@ -520,8 +498,8 @@ function renderFinanceiro(main) {
 
         <button class="btn btn-sec btn-block"
           onclick="acaoAdmin('jogador_add_dinheiro',{
-            uid:document.getElementBy$Id('fadd-uid').value.trim(),
-            valor:+document.getElementBy$Id('fadd-val').value
+            uid:document.getElementById('fadd-uid').value.trim(),
+            valor:+document.getElementById('fadd-val').value
           })">
           Adicionar
         </button>
@@ -537,7 +515,7 @@ function renderFinanceiro(main) {
 
         <button class="btn btn-danger btn-block"
           onclick="acaoAdmin('jogador_reset_financeiro',{
-            uid:document.getElementBy$Id('ser-uid').value.trim()
+            uid:document.getElementById('ser-uid').value.trim()
           })">
           Limpar Serasa e histórico negativo
         </button>
@@ -558,8 +536,8 @@ function renderFinanceiro(main) {
 
         <button class="btn btn-sec btn-block"
           onclick="acaoAdmin('jogador_set_reputacao',{
-            uid:document.getElementBy$Id('rep-uid').value.trim(),
-            valor:+document.getElementBy$Id('rep-val').value
+            uid:document.getElementById('rep-uid').value.trim(),
+            valor:+document.getElementById('rep-val').value
           })">
           Definir reputação
         </button>
@@ -599,9 +577,9 @@ function renderFinanceiro(main) {
 
       <button class="btn btn-sec"
         onclick="acaoAdmin('jogador_set_atributo',{
-          uid:document.getElementBy$Id('atr-uid').value.trim(),
-          atributo:document.getElementBy$Id('atr-nome').value,
-          valor:+document.getElementBy$Id('atr-val').value
+          uid:document.getElementById('atr-uid').value.trim(),
+          atributo:document.getElementById('atr-nome').value,
+          valor:+document.getElementById('atr-val').value
         })">
         Aplicar
       </button>
@@ -615,9 +593,7 @@ function renderFinanceiro(main) {
     </div>
   `;
 }
-// ════════════════════════════════════════════════════════
-// SKILLS
-// ════════════════════════════════════════════════════════
+
 function renderSkills(main) {
   const SKILLS = ['oratoria','argumentacao','escrita','pesquisa','negociacao','persuasao','gestao','networking'];
   main.innerHTML = `
@@ -645,9 +621,6 @@ function renderSkills(main) {
     </div>`;
 }
 
-// ════════════════════════════════════════════════════════
-// CARGO / OAB
-// ════════════════════════════════════════════════════════
 function renderCargo(main) {
   const CARGOS = ['est','ass','jnr','pln','snr','asc','soc','snm','jsub','jtit','dsb','mstj','padj','prom','pjus','pgj','dadj','def','dch','dge'];
   main.innerHTML = `
@@ -683,9 +656,6 @@ function renderCargo(main) {
     </div>`;
 }
 
-// ════════════════════════════════════════════════════════
-// SAÚDE / BURNOUT
-// ════════════════════════════════════════════════════════
 function renderSaude(main) {
   main.innerHTML = `
     <div class="admin-header"><div class="admin-titulo">🧠 Burnout & Saúde Mental</div></div>
@@ -702,9 +672,6 @@ function renderSaude(main) {
     </div>`;
 }
 
-// ════════════════════════════════════════════════════════
-// RESET COMPLETO
-// ════════════════════════════════════════════════════════
 function renderReset(main) {
   main.innerHTML = `
     <div class="admin-header"><div class="admin-titulo">🔄 Reset Completo de Jogador</div></div>
@@ -725,9 +692,6 @@ function renderReset(main) {
     </div>`;
 }
 
-// ════════════════════════════════════════════════════════
-// PROCESSOS
-// ════════════════════════════════════════════════════════
 function renderProcessos(main) {
   main.innerHTML = `
     <div class="admin-header"><div class="admin-titulo">⚖️ Gerenciar Processos</div></div>
@@ -756,25 +720,22 @@ function renderProcessos(main) {
 }
 
 window.listarProcessos = async function() {
-  const uid = document.getElementBy$Id('proc-uid').value.trim();
+  const uid = document.getElementById('proc-uid').value.trim();
   if (!uid) return;
   try {
     const r = await window._adminFn({ acao:'processos_listar_jogador', payload:{uid} });
     const lista = r.data.data || [];
-    document.getElementBy$Id('proc-lista').innerHTML = lista.length === 0
+    document.getElementById('proc-lista').innerHTML = lista.length === 0
       ? '<div style="color:var(--ardosia)">Nenhum processo.</div>'
       : lista.map(p=>`<div style="display:flex;justify-content:space-between;padding:.3rem 0;border-bottom:var(--borda-sub)">
           <span style="color:var(--ardosia);font-family:var(--font-mono)">${p.id.slice(0,10)}</span>
           <span>${p.tipo||'—'}</span>
           <span style="color:${p.status==='andamento'?'var(--ouro2)':p.status==='ganho'?'var(--verde3)':'var(--verm3)'}">${p.status}</span>
-          <button class="btn btn-sm btn-ghost" onclick="document.getElementBy$Id('proc-id').value='${p.id}'">Sel.</button>
+          <button class="btn btn-sm btn-ghost" onclick="document.getElementById('proc-id').value='${p.id}'">Sel.</button>
         </div>`).join('');
   } catch (err) { log(`❌ ${err.message}`,'ko'); }
 };
 
-// ════════════════════════════════════════════════════════
-// ESCRITÓRIOS
-// ════════════════════════════════════════════════════════
 function renderEscritorios(main) {
   main.innerHTML = `
     <div class="admin-header"><div class="admin-titulo">🏢 Escritórios</div></div>
@@ -808,16 +769,13 @@ window.buscarEscritorio = async function() {
     const r = await window._adminFn({ acao:'escritorio_get', payload:{escritorio_id:escId} });
     const e = r.data.data;
     const NIVEL_L = ['','Autônomo','Individual','Boutique','Regional','Nacional','Full Service','Big Law'];
-    document.getElementBy$Id('esc-info').innerHTML = `
+    document.getElementById('esc-info').innerHTML = `
       <div><b>${e.nome}</b> · Nível ${NIVEL_L[e.nivel]||e.nivel} · Prestígio ${e.prestigio}</div>
       <div style="color:var(--ardosia2)">${(e.socios_uids||[]).length} sócio(s) · ${e.total_casos||0} casos</div>`;
     $id('esc-edit-id').value = escId;
   } catch(err){log(`❌ ${err.message}`,'ko');}
 };
 
-// ════════════════════════════════════════════════════════
-// MENSAGENS
-// ════════════════════════════════════════════════════════
 function renderMensagens(main) {
   main.innerHTML = `
     <div class="admin-header"><div class="admin-titulo">📬 Mensagens</div></div>
@@ -846,9 +804,6 @@ function renderMensagens(main) {
     </div>`;
 }
 
-// ════════════════════════════════════════════════════════
-// BETA
-// ════════════════════════════════════════════════════════
 function renderBeta(main) {
   main.innerHTML = `
     <div class="admin-header"><div class="admin-titulo">🚀 Ferramentas Beta</div></div>
@@ -877,12 +832,12 @@ function renderBeta(main) {
 }
 
 window.simularTick = async function() {
-  const uid = id('sim-uid').value.trim();
+  const uid = $id('sim-uid').value.trim();
   if (!uid) return;
   try {
     const r = await window._adminFn({ acao:'beta_testar_tick', payload:{uid} });
     const s = r.data.simulacao;
-    document.getElementBy$Id('sim-resultado').innerHTML = `
+    document.getElementById('sim-resultado').innerHTML = `
       <div style="background:rgba(255,255,255,.04);border:var(--borda);border-radius:var(--r);padding:.6rem;font-family:var(--font-mono)">
         <div><b>${s.jogador}</b> · ${s.cargo} · ${s.mes_atual}</div>
         <div>Renda: <span style="color:var(--verde3)">${fmt(s.renda)}</span></div>
@@ -893,9 +848,6 @@ window.simularTick = async function() {
   } catch(err){log(`❌ ${err.message}`,'ko');}
 };
 
-// ════════════════════════════════════════════════════════
-// EVENTOS
-// ════════════════════════════════════════════════════════
 function renderEventos(main) {
   main.innerHTML = `
     <div class="admin-header"><div class="admin-titulo">⚡ Eventos Globais</div></div>
@@ -905,9 +857,6 @@ function renderEventos(main) {
     </div>`;
 }
 
-// ════════════════════════════════════════════════════════
-// LOG DE AÇÕES
-// ════════════════════════════════════════════════════════
 let _logHistorico = [];
 
 function renderLog(main) {
@@ -918,12 +867,9 @@ function renderLog(main) {
         ? '<span class="log-info">Nenhuma ação realizada ainda.</span>'
         : _logHistorico.map(l=>`<div class="${l.tipo}">${l.msg}</div>`).join('')}
     </div>
-    <button class="btn btn-ghost btn-sm" style="margin-top:.5rem" onclick="_logHistorico=[];renderLog(document.getElementBy$Id('admin-main'))">Limpar log</button>`;
+    <button class="btn btn-ghost btn-sm" style="margin-top:.5rem" onclick="_logHistorico=[];renderLog(document.getElementById('admin-main'))">Limpar log</button>`;
 }
 
-// ════════════════════════════════════════════════════════
-// AÇÃO GENÉRICA (chama Cloud Function)
-// ════════════════════════════════════════════════════════
 window.acaoAdmin = async function(acao, payload, confirmar) {
   if (confirmar && !confirm(confirmar)) return;
   try {
@@ -933,7 +879,6 @@ window.acaoAdmin = async function(acao, payload, confirmar) {
     log(`✅ ${msg}`, 'ok');
     _logHistorico.push({ tipo:'log-ok', msg:`[${new Date().toLocaleTimeString('pt-BR')}] ${acao}: ${msg}` });
     toast(msg.slice(0,80), 'ok');
-    // Se for um reset do servidor, recarregar dados
     if (acao.startsWith('server_')) {
       const srv = await window._adminFn({ acao:'server_get', payload:{} });
       window._serverData = srv.data.data;
@@ -945,12 +890,8 @@ window.acaoAdmin = async function(acao, payload, confirmar) {
   }
 };
 
-// ════════════════════════════════════════════════════════
-// HELPERS
-// ════════════════════════════════════════════════════════
-
 function log(msg, tipo='info') {
-  const logEl = document.getElementBy$Id('admin-log');
+  const logEl = document.getElementById('admin-log');
   if (!logEl) return;
   const line = document.createElement('div');
   line.className = `log-${tipo}`;
@@ -967,7 +908,7 @@ function fmt(n) {
 }
 
 window.toast = function(msg, tipo='neutro') {
-  const c = document.getElementBy$Id('toast-container');
+  const c = document.getElementById('toast-container');
   if (!c) return;
   const el = document.createElement('div');
   el.className = `toast ${tipo}`;
