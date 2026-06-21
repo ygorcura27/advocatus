@@ -1255,3 +1255,90 @@ a:hover { color: var(--navy); }
 }
 .btn-avancar-fase:hover:not(:disabled) .baf-seta { transform: translateX(5px); }
 .btn-avancar-fase:disabled .baf-seta { color: var(--txt4); }
+
+/* ═══════════════════════════════════════════════════════════
+   HABILIDADES — banners ilustrados por skill (substituem os cards
+   genéricos brancos). Cada skill tem uma imagem em
+   img/habilidades/{chave}.png como fundo do card inteiro; número de
+   skill, barra de progresso e botão de estudar ficam sobrepostos na
+   parte inferior, dentro de uma faixa com gradiente escuro que garante
+   legibilidade independente do conteúdo da imagem.
+   ═══════════════════════════════════════════════════════════ */
+.skill-banner-card {
+  position: relative;
+  aspect-ratio: 2.4 / 1;
+  border-radius: var(--r2);
+  overflow: hidden;
+  background-color: var(--navy); /* fallback se a imagem não carregar */
+  background-size: cover;
+  background-position: center;
+  box-shadow: var(--sombra);
+  transition: box-shadow .2s, transform .15s;
+}
+.skill-banner-card:hover { box-shadow: var(--sombra2); transform: translateY(-1px); }
+
+.skills-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .75rem;
+}
+@media (max-width: 640px) {
+  .skills-grid { grid-template-columns: 1fr; }
+}
+
+.skill-banner-estrela {
+  position: absolute;
+  top: .5rem; right: .6rem;
+  font-size: 1rem;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,.6));
+  z-index: 2;
+}
+
+.skill-banner-rodape {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  padding: .6rem .8rem .65rem;
+  background: linear-gradient(180deg, transparent 0%, rgba(10,16,30,.55) 35%, rgba(10,16,30,.92) 100%);
+}
+
+.skill-banner-val {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ouro);
+  text-shadow: 0 1px 3px rgba(0,0,0,.5);
+}
+
+.skill-banner-card .skill-bar {
+  height: 4px;
+  background: rgba(255,255,255,.18);
+}
+
+.skill-banner-pendente {
+  font-size: .62rem;
+  color: var(--ouro-light);
+  text-align: center;
+}
+
+.skill-banner-btn {
+  display: block;
+  width: 100%;
+  padding: .4rem .6rem;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(201,162,39,.5);
+  border-radius: var(--r);
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: .68rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.skill-banner-btn:hover {
+  background: rgba(201,162,39,.22);
+  border-color: var(--ouro);
+}
+
+@media (max-width: 640px) {
+  .skill-banner-card { aspect-ratio: 16 / 9; }
+}

@@ -588,29 +588,30 @@ function renderHabilidades(j, el) {
       <span class="secao-badge">Cap: ${cap} · Vaga: ${_vagaLabel(vaga)}</span>
     </div>
     <div style="font-size:.73rem;color:var(--ardosia2);margin-bottom:1rem">
-      Skills marcadas com ⭐ são prioritárias para sua vaga atual. Estudar custa R$500 e demora 1 mês.
+      Skills marcadas com ⭐ são prioritárias para sua vaga atual. Estudar custa R$400 e demora 1 mês.
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem">
+    <div class="skills-grid">
       ${SKDEF.map(sk => {
         const val     = skills[sk.k] || 0;
         const isPrior = prioridades.includes(sk.k);
         const emEst   = queue.some(q => q.skill === sk.k);
+        const pct     = Math.round(val/cap*100);
         return `
-        <div class="card" style="border-color:rgba(184,146,42,${isPrior?.3:.15})">
-          <div class="skill-header">
-            <span>${isPrior?'⭐ ':''}<b style="color:${isPrior?'var(--ouro2)':'var(--perg)'}">${sk.l}</b></span>
-            <span class="sk-val">${val}/${cap}</span>
+        <div class="skill-banner-card" style="background-image:url('img/habilidades/${sk.k}.png');${isPrior?'box-shadow:0 0 0 2px var(--ouro2), var(--sombra2);':''}">
+          ${isPrior ? `<span class="skill-banner-estrela">⭐</span>` : ''}
+          <div class="skill-banner-rodape">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.3rem">
+              <span class="skill-banner-val">${val}<span style="opacity:.6;font-size:.7em">/${cap}</span></span>
+            </div>
+            <div class="skill-bar" style="margin-bottom:.5rem">
+              <div class="skill-fill ${isPrior?'destaque':''}" style="width:${pct}%"></div>
+            </div>
+            ${emEst
+              ? `<div class="skill-banner-pendente">⏳ Estudo em andamento — resultado no próximo mês</div>`
+              : `<button class="skill-banner-btn" onclick="window.estudarSkill && window.estudarSkill('${sk.k}','${sk.l}')">
+                  📖 Estudar +3 · R$400 · 1 mês
+                </button>`}
           </div>
-          <div style="font-size:.65rem;color:var(--ardosia);margin-bottom:.3rem">${sk.desc}</div>
-          <div class="skill-bar">
-            <div class="skill-fill ${isPrior?'destaque':''}" style="width:${Math.round(val/cap*100)}%"></div>
-          </div>
-          ${emEst
-            ? `<div class="skill-pendente">⏳ Estudo em andamento — resultado no próximo mês</div>`
-            : `<button class="btn btn-sm btn-ghost" style="margin-top:.4rem;width:100%;font-size:.65rem"
-                onclick="window.estudarSkill && window.estudarSkill('${sk.k}','${sk.l}')">
-                📖 Estudar +3 · R$400 · 1 mês
-              </button>`}
         </div>`;
       }).join('')}
     </div>`;
