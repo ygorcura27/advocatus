@@ -373,7 +373,7 @@ window.irParaLocal = async function(localKey) {
   for (let i = 0; i < 3 && pool.length > 0; i++) {
     const idx = Math.floor(Math.random()*pool.length);
     const ficha = pool.splice(idx, 1)[0];
-    const c = candidatoDeFicha(ficha);
+    const c = candidatoDeFicha(ficha, sexoParceiro);
     const compat = calcCompatibilidade(j.tracos_pessoais || [], c.tracos);
     candidatos.push({ ...c, compatibilidade: compat });
   }

@@ -424,10 +424,10 @@ export function fichasElegiveis(sexoParceiro, idadeJogadorAtual, idadeJogadorIni
  * compatibilidade de assinatura com chamadas existentes; agora recebe
  * a ficha já filtrada por elegibilidade em vez de sortear do banco todo.
  */
-export function candidatoDeFicha(ficha) {
+export function candidatoDeFicha(ficha, sexo) {
   return {
     id: ficha.id, nome: ficha.nome, foto: ficha.foto, regiao: ficha.regiao,
-    idade: ficha.idade, tracos: ficha.tracos,
+    idade: ficha.idade, tracos: ficha.tracos, sexo,
   };
 }
 
