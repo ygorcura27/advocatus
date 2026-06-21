@@ -238,25 +238,34 @@ exports.processarAcordao = onCall({ region: 'southamerica-east1' }, async (reque
       status: jogadorGanhouEsteJulgamento ? 'ganho' : 'perdido',
       encerrado_mes: mesTotalPessoal(j),
     });
-    if (jogadorGanhouEsteJulgamento && p.hon_pendente > 0) {
-      // Destino é o escritório DO CASO (pool_escritorio_id), não o
-      // escritório pessoal de quem processou o acórdão — mesma correção
-      // aplicada em processar_sentenca.js.
+    if (jogadorGanhouEsteJulgamento) {
+      // hon_pendente só existe quando o jogador tinha GANHO a sentença
+      // original e a parte contrária recorreu (a sentença já calculou o
+      // honorário potencial naquele momento). Quando é o jogador quem
+      // recorreu de uma DERROTA e venceu agora no tribunal, hon_pendente
+      // nunca foi definido — esta é a primeira vitória real do processo,
+      // então o honorário precisa ser calculado aqui, sobre o valor da
+      // causa, usando a mesma taxa de sucumbência recursal (10%) usada
+      // na sentença de 1ª instância (sem o componente de 30% de
+      // contingência, que é específico de honorário contratual da
+      // sentença original, não de recurso).
+      const honAcordao = (p.hon_pendente > 0) ? p.hon_pendente : Math.floor((p.valor || 0) * 0.10);
+
       const escritorioDoCaso = p.pool_escritorio_id || j.escritorio_proprio_id;
       if (escritorioDoCaso) {
         const escRef = db.collection('escritorios').doc(escritorioDoCaso);
         const escSnap = await escRef.get();
         if (escSnap.exists) {
-          await escRef.update({ caixa: (escSnap.data().caixa||0) + p.hon_pendente });
+          await escRef.update({ caixa: (escSnap.data().caixa||0) + honAcordao });
           resposta.honNoCaixa = true;
         }
       } else {
         await jogadorRef.update({
-          dinheiro: (j.dinheiro||0) + p.hon_pendente,
-          honorarios_mes: (j.honorarios_mes||0) + p.hon_pendente,
+          dinheiro: (j.dinheiro||0) + honAcordao,
+          honorarios_mes: (j.honorarios_mes||0) + honAcordao,
         });
       }
-      resposta.honCreditado = p.hon_pendente;
+      resposta.honCreditado = honAcordao;
     }
   }
 

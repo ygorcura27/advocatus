@@ -2686,8 +2686,8 @@ function _mostrarResultadoAcordao(r) {
     htmlProx = `
       <div style="font-size:11px;color:#e2c97e;margin-top:10px;margin-bottom:8px">📋 Placar ${r.placar} permite que você recorra ao ${r.proxTribunalNome}.</div>
       <div style="display:flex;gap:8px">
-        <button onclick="window.recorrerProximaInstanciaProducao(true)" style="flex:1">⚖️ Recorrer ao ${r.proxTribunalNome}</button>
-        <button class="btn-ghost" onclick="window.recorrerProximaInstanciaProducao(false)" style="flex:1">Aceitar e encerrar</button>
+        <button class="btn-avancar-fase" style="flex:1;margin-top:0" onclick="window.recorrerProximaInstanciaProducao(true)"><span>⚖️ Recorrer ao ${r.proxTribunalNome}</span></button>
+        <button class="btn btn-ghost" style="flex:1" onclick="window.recorrerProximaInstanciaProducao(false)">Aceitar e encerrar</button>
       </div>`;
   }
   if (r.honCreditado > 0) {
@@ -2707,7 +2707,9 @@ function _mostrarResultadoAcordao(r) {
         <span class="gain">+${r.xpGanho} XP</span>
       </div>
       ${htmlProx}
-      <button onclick="fecharModal();window.navTo&&window.navTo('processos',null)" style="margin-top:16px">📁 Voltar à carteira</button>
+      <button class="btn-avancar-fase" style="margin-top:16px" onclick="fecharModal();window.navTo&&window.navTo('processos',null)">
+        <span>📁 Voltar à carteira</span>
+      </button>
     </div>`
   );
 }
