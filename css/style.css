@@ -1347,3 +1347,132 @@ a:hover { color: var(--navy); }
 @media (max-width: 640px) {
   .skill-banner-card { aspect-ratio: 16 / 9; }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   PERFIL DE RELACIONAMENTO — estilo Facebook 2010 (capa + foto +
+   coluna de informações + timeline de eventos). Aberto via clique no
+   nome/avatar do NPC dentro do card de relacionamento em Vida Pessoal.
+   ═══════════════════════════════════════════════════════════ */
+
+/* Avatar pequeno usado dentro do card de relacionamento e na lista de
+   "Conhecer Pessoas" */
+.rel-avatar-mini {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 2px solid var(--navy-light);
+  background: var(--bg2);
+}
+
+.fb-profile {
+  background: var(--surface);
+  border-radius: var(--r2);
+  overflow: hidden;
+  margin: -1.2rem; /* compensa o padding do modal-body para a capa ir até a borda */
+}
+
+.fb-capa {
+  height: 130px;
+  background-color: var(--navy2);
+  background-size: cover;
+  background-position: center 20%;
+  filter: blur(1.5px) brightness(.75);
+  position: relative;
+}
+
+.fb-header {
+  display: flex;
+  align-items: flex-end;
+  gap: .9rem;
+  padding: 0 1.1rem .8rem;
+  margin-top: -42px;
+  background: var(--surface);
+}
+
+.fb-avatar {
+  width: 84px; height: 84px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid var(--surface);
+  box-shadow: var(--sombra2);
+  background: var(--bg2);
+  flex-shrink: 0;
+}
+
+.fb-header-info { padding-bottom: .2rem; }
+.fb-nome {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--navy);
+  line-height: 1.15;
+}
+.fb-status {
+  font-size: .72rem;
+  color: var(--txt3);
+  margin-top: .1rem;
+}
+
+.fb-body {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: .8rem;
+  padding: .9rem 1.1rem 1.1rem;
+}
+.fb-col-esq, .fb-col-dir { min-width: 0; }
+@media (max-width: 640px) {
+  .fb-body { grid-template-columns: 1fr; }
+}
+
+.fb-box {
+  background: var(--surface2);
+  border: var(--borda-sub);
+  border-radius: var(--r);
+  padding: .75rem .85rem;
+  margin-bottom: .7rem;
+}
+.fb-box-titulo {
+  font-size: .68rem;
+  color: var(--txt3);
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  font-weight: 700;
+  margin-bottom: .55rem;
+  padding-bottom: .4rem;
+  border-bottom: var(--borda-sub);
+}
+.fb-info-linha {
+  font-size: .76rem;
+  color: var(--txt2);
+  margin-bottom: .4rem;
+  line-height: 1.4;
+}
+.fb-traco {
+  display: inline-block;
+  font-size: .68rem;
+  color: var(--navy3);
+  background: var(--navy-light);
+  border-radius: 20px;
+  padding: .18rem .55rem;
+  margin: 0 .25rem .25rem 0;
+}
+
+.fb-evento {
+  padding: .5rem 0;
+  border-bottom: var(--borda-sub);
+}
+.fb-evento:last-child { border-bottom: none; }
+.fb-evento-data {
+  font-size: .6rem;
+  color: var(--ouro2);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-bottom: .15rem;
+}
+.fb-evento-texto {
+  font-size: .76rem;
+  color: var(--txt2);
+  line-height: 1.4;
+}
