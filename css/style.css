@@ -1302,11 +1302,16 @@ a:hover { color: var(--navy); }
 }
 
 .skill-banner-val {
-  font-family: var(--font-serif);
-  font-size: 1.05rem;
+  font-family: var(--font-mono);
+  font-size: 1.5rem;
   font-weight: 700;
   color: var(--ouro);
-  text-shadow: 0 1px 3px rgba(0,0,0,.5);
+  text-shadow: 0 2px 6px rgba(0,0,0,.75), 0 0 14px rgba(201,162,39,.35);
+  font-variant-numeric: tabular-nums;
+}
+.skill-banner-val-cap {
+  opacity: .6;
+  font-size: .68em;
 }
 
 .skill-banner-card .skill-bar {

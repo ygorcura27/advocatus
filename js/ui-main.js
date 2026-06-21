@@ -600,8 +600,8 @@ function renderHabilidades(j, el) {
         <div class="skill-banner-card" style="background-image:url('img/habilidades/${sk.k}.png');${isPrior?'box-shadow:0 0 0 2px var(--ouro2), var(--sombra2);':''}">
           ${isPrior ? `<span class="skill-banner-estrela">⭐</span>` : ''}
           <div class="skill-banner-rodape">
-            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.3rem">
-              <span class="skill-banner-val">${val}<span style="opacity:.6;font-size:.7em">/${cap}</span></span>
+            <div style="display:flex;justify-content:flex-end;align-items:baseline;margin-bottom:.3rem">
+              <span class="skill-banner-val">${val}<span class="skill-banner-val-cap">/${cap}</span></span>
             </div>
             <div class="skill-bar" style="margin-bottom:.5rem">
               <div class="skill-fill ${isPrior?'destaque':''}" style="width:${pct}%"></div>
