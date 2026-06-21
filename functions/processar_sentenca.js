@@ -38,6 +38,37 @@ function fmt(n) {
 
 function mesTotalPessoal(j) { return (j.ano_pessoal||1)*12 + (j.mes_pessoal||0); }
 
+const CARGO_IDX = {
+  est:0, ass:1, jnr:2, pln:3, snr:4, asc:5, soc:6, snm:7,
+  jsub:2, jtit:4, dsb:5, mstj:7, padj:2, prom:4, pjus:5, pgj:7,
+  dadj:2, def:4, dch:5, dge:7,
+};
+const CARGO_IDX_CONCLUSAO_MIN = 2; // jnr — estagiário/assistente não processam sentença
+
+// ── AUTORIZAÇÃO PARA PROCESSAR SENTENÇA/ACÓRDÃO ──
+// Casos INDIVIDUAIS (advogado_uid === uid): só o próprio dono.
+// Casos do POOL (pool_escritorio_id existe, advogado_uid é null por
+// design — ver novoProcessoPool/novoProcessoPoolEmpregado em
+// js/processos.js): qualquer jogador que pertença ao MESMO escritório
+// (dono ou empregado) e tenha cargo Júnior+ pode processar — é
+// colaborativo por natureza, não pertence a quem "tocou primeiro".
+// Antes desta correção, a checagem rígida (advogado_uid !== uid)
+// rejeitava TODO caso do pool com 403 "Processo não é seu", porque
+// advogado_uid nunca é preenchido nesses casos (fica null mesmo depois
+// de alguém trabalhar nele).
+async function autorizadoParaProcessar(db, p, uid, j) {
+  if (p.advogado_uid === uid) return true; // caso individual, dono de fato
+
+  if (p.pool_escritorio_id) {
+    const escId = j.escritorio_proprio_id || j.escritorio_empregado_id;
+    if (escId !== p.pool_escritorio_id) return false; // não é do mesmo escritório
+    const cargoIdx = CARGO_IDX[j.cargo_id] ?? -1;
+    return cargoIdx >= CARGO_IDX_CONCLUSAO_MIN; // Júnior+ apenas
+  }
+
+  return false;
+}
+
 // ── RECÁLCULO DO CONVENCIMENTO — reproduz EXATAMENTE a mesma fórmula do
 // frontend (ver responderAudiencia em processos.js), mas a partir do
 // histórico bruto, nunca do valor já calculado e salvo pelo cliente.
@@ -90,7 +121,9 @@ exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (requ
   const p = processoSnap.data();
   const j = jogadorSnap.data();
 
-  if (p.advogado_uid !== uid) throw new HttpsError('permission-denied', 'Processo não é seu.');
+  if (!(await autorizadoParaProcessar(db, p, uid, j))) {
+    throw new HttpsError('permission-denied', 'Você não tem permissão para processar este processo (cargo insuficiente ou não pertence ao escritório do caso).');
+  }
   if (p.status !== 'andamento') throw new HttpsError('failed-precondition', 'Processo já encerrado ou em outra fase.');
   if ((p.rodada_audiencia || 0) < 3) throw new HttpsError('failed-precondition', 'Audiência ainda não foi concluída (3 rodadas).');
 
@@ -163,9 +196,16 @@ exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (requ
     });
     return { categoria, txt, repDelta, xpGanho, recorre: true, instanciaSeguinte: p.instancia_seguinte, demitido };
   } else {
+    // O destino dos honorários é o escritório DO CASO (p.pool_escritorio_id
+    // ou j.escritorio_proprio_id quando é caso individual do próprio dono),
+    // não o escritório pessoal de quem processou — relevante quando um
+    // colega Júnior+ processa um caso do pool de outra pessoa: os
+    // honorários vão para o caixa do escritório do caso, nunca para o
+    // bolso pessoal de quem clicou em "processar sentença".
+    const escritorioDoCaso = p.pool_escritorio_id || j.escritorio_proprio_id;
     if (favoravelAoJogador && honPotencial > 0) {
-      if (j.escritorio_proprio_id) {
-        const escRef = db.collection('escritorios').doc(j.escritorio_proprio_id);
+      if (escritorioDoCaso) {
+        const escRef = db.collection('escritorios').doc(escritorioDoCaso);
         const escSnap = await escRef.get();
         if (escSnap.exists) await escRef.update({ caixa: (escSnap.data().caixa||0) + honPotencial });
       } else {
@@ -181,9 +221,9 @@ exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (requ
       hon_total_acumulado: favoravelAoJogador ? honPotencial : 0,
       convencimento: score,
     });
-    if (j.escritorio_proprio_id && !favoravelAoJogador) {
+    if (escritorioDoCaso && !favoravelAoJogador) {
       try {
-        const escRef = db.collection('escritorios').doc(j.escritorio_proprio_id);
+        const escRef = db.collection('escritorios').doc(escritorioDoCaso);
         const escSnap = await escRef.get();
         if (escSnap.exists) {
           const escRep = escSnap.data().prestigio || 10;

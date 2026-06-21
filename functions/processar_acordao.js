@@ -39,6 +39,30 @@ function fmt(n) {
 
 function mesTotalPessoal(j) { return (j.ano_pessoal||1)*12 + (j.mes_pessoal||0); }
 
+const CARGO_IDX = {
+  est:0, ass:1, jnr:2, pln:3, snr:4, asc:5, soc:6, snm:7,
+  jsub:2, jtit:4, dsb:5, mstj:7, padj:2, prom:4, pjus:5, pgj:7,
+  dadj:2, def:4, dch:5, dge:7,
+};
+const CARGO_IDX_CONCLUSAO_MIN = 2; // jnr
+
+// ── AUTORIZAÇÃO — mesma lógica de functions/processar_sentenca.js
+// (ver comentário lá para o histórico do bug que isto corrige: casos do
+// pool têm advogado_uid null por design, então a checagem antiga
+// rejeitava com 403 todo recurso/acórdão de caso colaborativo).
+async function autorizadoParaProcessar(db, p, uid, j) {
+  if (p.advogado_uid === uid) return true;
+
+  if (p.pool_escritorio_id) {
+    const escId = j.escritorio_proprio_id || j.escritorio_empregado_id;
+    if (escId !== p.pool_escritorio_id) return false;
+    const cargoIdx = CARGO_IDX[j.cargo_id] ?? -1;
+    return cargoIdx >= CARGO_IDX_CONCLUSAO_MIN;
+  }
+
+  return false;
+}
+
 // ── TABELA DE CATEGORIA POR PLACAR — idêntica à do motor v8.
 function categoriaPorPlacar(votosReformar, votosManter, totalVotos) {
   if (votosManter > votosReformar) return 'mantem';
@@ -105,7 +129,9 @@ exports.processarAcordao = onCall({ region: 'southamerica-east1' }, async (reque
   const p = processoSnap.data();
   const j = jogadorSnap.data();
 
-  if (p.advogado_uid !== uid) throw new HttpsError('permission-denied', 'Processo não é seu.');
+  if (!(await autorizadoParaProcessar(db, p, uid, j))) {
+    throw new HttpsError('permission-denied', 'Você não tem permissão para processar este processo (cargo insuficiente ou não pertence ao escritório do caso).');
+  }
   if (p.status !== 'recurso_pendente') throw new HttpsError('failed-precondition', 'Processo não está em fase de recurso.');
   if (!p.colegiado_recurso || !p.colegiado_recurso.length) throw new HttpsError('failed-precondition', 'Colegiado ainda não foi sorteado.');
 
@@ -213,8 +239,12 @@ exports.processarAcordao = onCall({ region: 'southamerica-east1' }, async (reque
       encerrado_mes: mesTotalPessoal(j),
     });
     if (jogadorGanhouEsteJulgamento && p.hon_pendente > 0) {
-      if (j.escritorio_proprio_id) {
-        const escRef = db.collection('escritorios').doc(j.escritorio_proprio_id);
+      // Destino é o escritório DO CASO (pool_escritorio_id), não o
+      // escritório pessoal de quem processou o acórdão — mesma correção
+      // aplicada em processar_sentenca.js.
+      const escritorioDoCaso = p.pool_escritorio_id || j.escritorio_proprio_id;
+      if (escritorioDoCaso) {
+        const escRef = db.collection('escritorios').doc(escritorioDoCaso);
         const escSnap = await escRef.get();
         if (escSnap.exists) {
           await escRef.update({ caixa: (escSnap.data().caixa||0) + p.hon_pendente });
@@ -255,7 +285,9 @@ exports.decidirProximaInstancia = onCall({ region: 'southamerica-east1' }, async
 
   const p = processoSnap.data();
   const j = jogadorSnap.data();
-  if (p.advogado_uid !== uid) throw new HttpsError('permission-denied', 'Processo não é seu.');
+  if (!(await autorizadoParaProcessar(db, p, uid, j))) {
+    throw new HttpsError('permission-denied', 'Você não tem permissão para decidir sobre este processo (cargo insuficiente ou não pertence ao escritório do caso).');
+  }
 
   if (!recorrer) {
     await processoRef.update({ status: 'perdido', encerrado_mes: mesTotalPessoal(j) });
