@@ -93,7 +93,16 @@ function recalcularVotos(p) {
     const euSouDefesa = quemRecorre === 'parte_contraria';
     const sinal = euSouDefesa ? -1 : 1;
     const baseD = (tipo === a.ideal ? 7 : tipo === a.neutro ? 1 : -10) * sinal;
-    const temaDaRodada = rodada === 0 ? 'prova_documental' : 'prazo';
+    // ── TEMA DO ARGUMENTO — antes hardcoded por posição de rodada
+    // (rodada 0 = sempre 'prova_documental', rodada 1 = sempre 'prazo'),
+    // descolado do conteúdo real do argumento sorteado. Agora usa o
+    // campo `a.tema`, presente em cada item de ARGS_RECURSO_DEFESA/
+    // RECORRENTE (ver banco_juridico.js) — cobre os 7 temas reais já
+    // existentes em PESO_TEMA_POR_CLASSE (prova_documental,
+    // prova_pericial, jurisprudencia, precedente, materia_constitucional,
+    // aspecto_processual, prazo). Fallback defensivo para argumentos
+    // antigos/não migrados que ainda não tenham esse campo.
+    const temaDaRodada = a.tema || (rodada === 0 ? 'prova_documental' : 'prazo');
     const temaDoTipo = tipo === 'agressiva' ? 'agressivo' : tipo === 'passiva' ? 'passivo' : null;
 
     scores.forEach(jz => {

@@ -1380,63 +1380,151 @@ function fatoParaFrase(fatoId) {
 // improcedência. Quando meuLado='reu', a parte contrária é o AUTOR
 // pedindo procedência. O conteúdo do que a parte contrária defende muda.
 const TEMPLATES_ARGUMENTO_COMO_AUTOR = [
-  conflito => `A parte ré sustenta que não há fundamento para o pedido relativo a "${conflito.nome}", defendendo a improcedência total da ação.`,
-  conflito => `Em sua manifestação, a defesa contesta a ocorrência dos fatos narrados sobre "${conflito.nome}", pugnando pela improcedência total.`,
-  conflito => `A ré argumenta que eventual responsabilidade estaria afastada por circunstância excludente, defendendo a improcedência do pedido de "${conflito.nome}".`,
-  conflito => `A defesa sustenta ausência de nexo causal entre os fatos narrados em "${conflito.nome}" e a pretensão deduzida pelo autor.`,
-  conflito => `A parte ré impugna especificamente os documentos juntados, alegando que não comprovam o alegado em "${conflito.nome}".`,
-  conflito => `Em preliminar, a defesa argui a inadequação da via processual eleita para a pretensão de "${conflito.nome}".`,
-  conflito => `A ré sustenta que os fatos descritos em "${conflito.nome}" foram interpretados de forma equivocada pela parte autora.`,
-  conflito => `A defesa requer a total rejeição do pedido relativo a "${conflito.nome}", por ausência de amparo legal e probatório.`,
+  conflito => `A defesa nega que os fatos sobre "${conflito.nome}" tenham ocorrido como alegamos. Pedem a rejeição total.`,
+  conflito => `A defesa contesta a própria existência dos fatos narrados em "${conflito.nome}". Querem que isso desapareça do processo.`,
+  conflito => `A ré invoca uma excludente para se afastar de "${conflito.nome}" — alegam que não respondem por isso.`,
+  conflito => `A defesa sustenta que não há nexo entre os fatos de "${conflito.nome}" e o que estamos pedindo.`,
+  conflito => `A ré ataca os documentos que juntamos sobre "${conflito.nome}", alegando que não provam nada.`,
+  conflito => `Em preliminar, a defesa tenta encerrar "${conflito.nome}" por uma questão de forma, antes mesmo de discutir o mérito.`,
+  conflito => `A ré diz que interpretamos errado os fatos de "${conflito.nome}" — querem reescrever a história.`,
+  conflito => `A defesa pede a rejeição total de "${conflito.nome}" por falta de base legal e de prova.`,
+  conflito => `A ré sustenta que "${conflito.nome}" já estava prescrito antes mesmo de entrarmos com a ação.`,
+  conflito => `A defesa alega que cumpriu integralmente suas obrigações relativas a "${conflito.nome}" — não veem o que discutir.`,
+  conflito => `A ré tenta transferir a responsabilidade por "${conflito.nome}" para um terceiro que nem está no processo.`,
+  conflito => `A defesa diz que a culpa por "${conflito.nome}" é exclusivamente nossa — clássica jogada de inverter o jogo.`,
+  conflito => `A ré questiona nossa legitimidade para sequer discutir "${conflito.nome}" nesta ação.`,
+  conflito => `A defesa sustenta que "${conflito.nome}" já foi resolvido em outro processo — querem nos travar por coisa julgada.`,
+  conflito => `A ré alega que o valor que pedimos em "${conflito.nome}" é exagerado e sem fundamento técnico.`,
+  conflito => `A defesa diz que não houve qualquer dano relacionado a "${conflito.nome}" — querem provar que não aconteceu nada.`,
+  conflito => `A ré sustenta que agiu de boa-fé em "${conflito.nome}", o que afastaria toda a responsabilidade.`,
+  conflito => `A defesa aponta uma cláusula contratual que, segundo eles, já resolveu "${conflito.nome}" antes do litígio.`,
+  conflito => `A ré alega que fomos nós que mudamos de posição sobre "${conflito.nome}" no meio do processo — jogam a culpa de volta.`,
+  conflito => `A defesa sustenta que "${conflito.nome}" decorre de caso fortuito, fora do controle de qualquer parte.`,
+  conflito => `A ré contesta a perícia que produzimos sobre "${conflito.nome}", chamando-a de tendenciosa.`,
+  conflito => `A defesa alega que não fomos diligentes ao identificar "${conflito.nome}" a tempo — outra tentativa de nos responsabilizar.`,
+  conflito => `A ré sustenta que "${conflito.nome}" é mera consequência natural do negócio, sem nenhuma irregularidade.`,
+  conflito => `A defesa invoca jurisprudência — segundo eles, favorável — para encerrar "${conflito.nome}" sem instrução.`,
+  conflito => `A ré diz que jamais foi notificada formalmente sobre "${conflito.nome}", o que invalidaria nosso pedido.`,
+  conflito => `A defesa sustenta que "${conflito.nome}" foi superado por um acordo anterior entre as partes.`,
+  conflito => `A ré alega ausência de qualquer elemento subjetivo (dolo ou culpa) relacionado a "${conflito.nome}".`,
+  conflito => `A defesa contesta a competência deste juízo para julgar "${conflito.nome}".`,
+  conflito => `A ré sustenta que a nossa própria conduta convalidou "${conflito.nome}", afastando qualquer direito de reclamar agora.`,
+  conflito => `A defesa simplesmente nega tudo sobre "${conflito.nome}" — estratégia de queimar terra e discutir cada vírgula.`,
 ];
 
 const TEMPLATES_ARGUMENTO_COMO_REU = [
-  conflito => `A parte autora sustenta que os fatos relativos a "${conflito.nome}" estão plenamente comprovados, pugnando pela procedência integral do pedido.`,
-  conflito => `Em sua manifestação, o autor reafirma a ocorrência dos fatos narrados sobre "${conflito.nome}", requerendo a procedência total da ação.`,
-  conflito => `O autor argumenta que a responsabilidade da parte ré está configurada, defendendo a procedência do pedido de "${conflito.nome}".`,
-  conflito => `A parte autora sustenta que o conjunto probatório acostado aos autos confirma integralmente a tese de "${conflito.nome}".`,
-  conflito => `Em réplica, o autor reforça que nenhuma circunstância excludente foi comprovada quanto a "${conflito.nome}".`,
-  conflito => `O autor argumenta que a própria conduta da parte ré, já documentada, sustenta a procedência de "${conflito.nome}".`,
-  conflito => `A parte autora sustenta que a interpretação dada pela defesa aos fatos de "${conflito.nome}" não encontra amparo na prova dos autos.`,
-  conflito => `Em sua manifestação, o autor requer o integral acolhimento do pedido relativo a "${conflito.nome}", por ausência de impugnação específica.`,
+  conflito => `O autor sustenta que os fatos sobre "${conflito.nome}" estão plenamente comprovados. Pede a procedência total.`,
+  conflito => `O autor reafirma a ocorrência dos fatos narrados em "${conflito.nome}" e exige a procedência integral.`,
+  conflito => `O autor argumenta que nossa responsabilidade por "${conflito.nome}" já está configurada nos autos.`,
+  conflito => `O autor sustenta que o conjunto de provas confirma integralmente a tese sobre "${conflito.nome}".`,
+  conflito => `O autor reforça que nenhuma excludente foi comprovada em relação a "${conflito.nome}" — querem nos deixar sem saída.`,
+  conflito => `O autor diz que nossa própria conduta, já documentada, sustenta a procedência de "${conflito.nome}".`,
+  conflito => `O autor alega que nossa interpretação dos fatos de "${conflito.nome}" não encontra amparo em nenhuma prova dos autos.`,
+  conflito => `O autor pede o acolhimento total de "${conflito.nome}" por ausência de impugnação específica de nossa parte.`,
+  conflito => `O autor sustenta que "${conflito.nome}" gerou dano direto e mensurável, exigindo reparação integral.`,
+  conflito => `O autor alega que agimos de má-fé em "${conflito.nome}" — querem agravar nossa posição com isso.`,
+  conflito => `O autor invoca uma perícia que, segundo eles, comprova integralmente "${conflito.nome}".`,
+  conflito => `O autor sustenta que fomos notificados sobre "${conflito.nome}" e simplesmente ignoramos — alegam negligência.`,
+  conflito => `O autor diz que "${conflito.nome}" se repetiu mais de uma vez, o que agravaria nossa responsabilidade.`,
+  conflito => `O autor sustenta que a cláusula contratual que invocamos não se aplica a "${conflito.nome}".`,
+  conflito => `O autor alega que tentamos esconder informações relevantes sobre "${conflito.nome}" durante a instrução.`,
+  conflito => `O autor sustenta que "${conflito.nome}" decorre diretamente de uma falha que só nós poderíamos ter evitado.`,
+  conflito => `O autor invoca jurisprudência — segundo eles, consolidada — para garantir a procedência de "${conflito.nome}".`,
+  conflito => `O autor sustenta que jamais houve qualquer acordo anterior que resolvesse "${conflito.nome}".`,
+  conflito => `O autor alega que nossa conduta após "${conflito.nome}" só confirma a responsabilidade, não a afasta.`,
+  conflito => `O autor sustenta que "${conflito.nome}" não pode ser tratado como mero caso fortuito — havia como evitar.`,
+  conflito => `O autor diz que os documentos que apresentamos sobre "${conflito.nome}" foram produzidos depois do fato, sem valor probatório.`,
+  conflito => `O autor sustenta que fomos diligentes apenas na aparência — "${conflito.nome}" prova o contrário na prática.`,
+  conflito => `O autor alega que "${conflito.nome}" é parte de um padrão de conduta nosso, não um caso isolado.`,
+  conflito => `O autor sustenta que este juízo é plenamente competente para julgar "${conflito.nome}", rejeitando qualquer questão de forma.`,
+  conflito => `O autor diz que nossa própria defesa, ao tentar explicar "${conflito.nome}", acabou confirmando os fatos.`,
+  conflito => `O autor sustenta que não houve qualquer prescrição em "${conflito.nome}" — o prazo ainda corria quando agimos.`,
+  conflito => `O autor alega que terceiros não têm nada a ver com "${conflito.nome}" — a responsabilidade é só nossa.`,
+  conflito => `O autor sustenta que o valor pedido em "${conflito.nome}" é, na verdade, conservador frente ao dano real.`,
+  conflito => `O autor diz que mudamos de versão sobre "${conflito.nome}" durante o processo — chamam isso de contradição evidente.`,
+  conflito => `O autor sustenta cada ponto de "${conflito.nome}" com a mesma firmeza — não deixam nenhuma brecha aberta.`,
 ];
 
 const TEMPLATES_ARGUMENTO = TEMPLATES_ARGUMENTO_COMO_AUTOR; // mantém compat. com chamadas antigas
 
 const TEMPLATES_RESPOSTA_TECNICA = [
-  (tese) => tese ? (tese.argumentoForte || `Aplica-se ao caso a tese de "${tese.nome}" (${tese.fundamento}), que afasta integralmente a alegação contrária.`) : 'A fundamentação jurídica aplicável ao caso não favorece a tese da parte contrária.',
-  (tese) => tese ? `Nos termos de "${tese.fundamento}", a posição sustentada pela defesa não encontra amparo na legislação ou jurisprudência vigentes.` : 'A jurisprudência consolidada sobre a matéria contraria diretamente o argumento apresentado.',
-  (tese) => tese ? (tese.argumentoMedio || `O entendimento consagrado em "${tese.fundamento}" é direto: a tese de "${tese.nome}" sustenta integralmente a pretensão autoral.`) : 'O fundamento legal aplicável sustenta integralmente a pretensão autoral.',
+  (tese) => tese ? (tese.argumentoForte || `"${tese.nome}" — ${tese.fundamento}. Isso encerra a discussão a nosso favor.`) : 'A fundamentação aplicável ao caso não favorece a parte contrária. Os fatos falam por si.',
+  (tese) => tese ? `${tese.fundamento} resolve este ponto. A posição da defesa não tem amparo na lei nem na jurisprudência.` : 'A jurisprudência consolidada sobre este ponto contraria diretamente o que a defesa apresentou.',
+  (tese) => tese ? (tese.argumentoMedio || `"${tese.nome}", com base em ${tese.fundamento}, sustenta integralmente nossa posição.`) : 'O fundamento legal aplicável sustenta integralmente a nossa pretensão.',
 ];
 
 // Respostas TÉCNICAS quando o jogador é RÉU — defendem a IMPROCEDÊNCIA,
 // citando a mesma tese disponível mas com a conclusão invertida.
 const TEMPLATES_RESPOSTA_TECNICA_REU = [
-  (tese) => tese ? (tese.argumentoForte || `Aplica-se ao caso a tese de "${tese.nome}" (${tese.fundamento}), que afasta integralmente a pretensão do autor.`) : 'A fundamentação jurídica aplicável ao caso não favorece a pretensão da parte autora.',
-  (tese) => tese ? `Nos termos de "${tese.fundamento}", a posição sustentada pelo autor não encontra amparo na legislação ou jurisprudência vigentes.` : 'A jurisprudência consolidada sobre a matéria contraria diretamente o pedido formulado.',
-  (tese) => tese ? (tese.argumentoMedio || `O entendimento consagrado em "${tese.fundamento}" é direto: a tese de "${tese.nome}" sustenta integralmente a improcedência do pedido.`) : 'O fundamento legal aplicável sustenta integralmente a improcedência do pedido.',
+  (tese) => tese ? (tese.argumentoForte || `"${tese.nome}" — ${tese.fundamento}. Isso afasta integralmente o pedido do autor.`) : 'A fundamentação aplicável ao caso não favorece a pretensão do autor.',
+  (tese) => tese ? `${tese.fundamento} resolve este ponto a nosso favor. O pedido do autor não tem amparo na lei nem na jurisprudência.` : 'A jurisprudência consolidada sobre este ponto contraria diretamente o pedido formulado.',
+  (tese) => tese ? (tese.argumentoMedio || `"${tese.nome}", com base em ${tese.fundamento}, sustenta integralmente a improcedência.`) : 'O fundamento legal aplicável sustenta integralmente a improcedência do pedido.',
 ];
 
 const TEMPLATES_RESPOSTA_AGRESSIVA = [
-  () => 'Impugno veementemente a alegação contrária, por ausência completa de provas que a sustentem.',
-  () => 'Tal afirmação inverte indevidamente o ônus probatório, que recai sobre quem o alega.',
-  () => 'Os elementos dos autos demonstram exatamente o contrário do que pretende fazer crer a parte adversa.',
-  () => 'A alegação contrária é manifestamente contraditória com os próprios documentos juntados pela parte adversa.',
-  () => 'Não há um único elemento nos autos que sustente minimamente a tese contrária apresentada.',
-  () => 'A versão apresentada pela parte adversa carece de qualquer lastro probatório idôneo.',
-  () => 'Causa estranheza que a parte contrária sustente tal posição sem qualquer amparo documental.',
-  () => 'A tentativa de reescrever os fatos não encontra respaldo em nenhum elemento dos autos.',
+  () => 'A defesa não trouxe uma única prova. Pedem para vencer no vazio.',
+  () => 'Estão invertendo o ônus da prova — quem alega, prova. E eles não provaram nada.',
+  () => 'Os autos dizem exatamente o contrário do que a parte adversa quer fazer parecer.',
+  () => 'A versão apresentada contradiz os próprios documentos que eles mesmos juntaram.',
+  () => 'Não existe um único elemento nos autos que sustente essa tese. Nem um.',
+  () => 'Essa versão não tem lastro probatório nenhum — é discurso, não prova.',
+  () => 'Causa espanto que sustentem essa posição sem qualquer documento que a ampare.',
+  () => 'Reescrever os fatos não muda o que está nos autos. E os autos não mentem.',
+  () => 'Isto não é um argumento — é a repetição de algo que já foi refutado.',
+  () => 'A parte contrária não enfrenta o ponto central. Desvia, mas não responde.',
+  () => 'Se a posição deles fosse sólida, não precisariam de tanta retórica para sustentá-la.',
+  () => 'Não há prova, não há fundamento, e não há motivo para este Juízo acolher isso.',
+  () => 'A alegação é grave, mas não vem acompanhada de nada que a comprove.',
+  () => 'Eles pedem que se acredite na palavra, quando os autos exigem prova.',
+  () => 'Essa tese já caiu em casos análogos — não há motivo para ser diferente aqui.',
+  () => 'A parte contrária constrói um argumento sobre uma base que simplesmente não existe.',
+  () => 'Não é defesa, é tentativa de ganhar tempo. Os fatos já estão claros nos autos.',
+  () => 'Falta o mínimo: uma prova, um documento, qualquer coisa que sustente o que alegam.',
+  () => 'A inconsistência da posição deles está nos próprios autos — basta olhar com atenção.',
+  () => 'Não há controvérsia real aqui. Há apenas resistência sem fundamento.',
+  () => 'Eles sabem que não têm prova — por isso insistem no discurso, não no fato.',
+  () => 'A tese contrária se sustenta em suposição, não em elemento concreto dos autos.',
+  () => 'Qualquer argumento sem prova é só opinião. E opinião não decide processo.',
+  () => 'A parte adversa pede uma vitória que os próprios autos não permitem.',
+  () => 'Esse argumento não resiste a uma leitura atenta do que já está provado aqui.',
+  () => 'Não se trata de interpretação — trata-se de fato comprovado contra alegação vazia.',
+  () => 'A ausência de prova não é detalhe. É o motivo pelo qual essa tese não se sustenta.',
+  () => 'Eles tentam transformar dúvida em certeza, mas a dúvida é só deles.',
+  () => 'Essa linha de defesa já foi tentada antes — e não funcionou porque não tinha base.',
+  () => 'O que está nos autos fala mais alto que qualquer alegação sem prova.',
 ];
 
 const TEMPLATES_RESPOSTA_PASSIVA = [
-  () => 'Deixo a apreciação do ponto ao prudente critério do magistrado.',
-  () => 'Reconheço que a questão admite interpretações distintas e aguardo a manifestação do juízo.',
-  () => 'Não me oponho a que o tribunal avalie livremente esse aspecto específico da controvérsia.',
-  () => 'Submeto o ponto à livre apreciação do juízo, sem maiores ponderações neste momento.',
-  () => 'Entendo que a questão pode ser melhor esclarecida pela própria instrução processual.',
-  () => 'Não tenho objeção a que o magistrado pondere livremente esse aspecto da lide.',
-  () => 'Confio no exame técnico do juízo sobre essa questão específica.',
-  () => 'Deixo à apreciação do tribunal a definição do peso a ser dado a esse argumento.',
+  () => 'Tudo bem, concordo nesse ponto específico — mas isso não muda o resultado final.',
+  () => 'Aceito que esse aspecto seja visto com mais cuidado. Não compromete o restante do caso.',
+  () => 'Posso ceder aqui. O que realmente decide este processo está em outro lugar.',
+  () => 'Sem problema em conceder esse detalhe — o caso, no conjunto, continua a nosso favor.',
+  () => 'Reconheço esse ponto. Não é ele que vai definir o resultado.',
+  () => 'Não vou brigar por isso — escolho minhas batalhas, e essa não é a decisiva.',
+  () => 'Aceito a observação. O núcleo da nossa posição permanece intacto.',
+  () => 'Esse detalhe pode até ser válido — mas não muda quem tem razão no essencial.',
+  () => 'Concordo em parte. E mesmo essa concessão não altera o desfecho que buscamos.',
+  () => 'Tranquilo nesse ponto. Prefiro guardar energia para o que realmente importa aqui.',
+  () => 'Aceito essa leitura específica. O quadro geral continua claro a nosso favor.',
+  () => 'Não tenho problema em deixar esse aspecto em aberto — não é ele que decide o caso.',
+  () => 'Concedo esse ponto sem hesitar. Confiança no resultado não se mede por detalhe.',
+  () => 'Pode ser. Mas mesmo aceitando isso, a conclusão final não muda.',
+  () => 'Esse argumento até tem alguma razão — só não é suficiente para reverter o quadro.',
+  () => 'Aceito discutir esse aspecto com calma. O essencial do caso já está resolvido.',
+  () => 'Sem necessidade de embate aqui. Esse ponto não é o que sustenta nossa posição.',
+  () => 'Reconheço a observação. Ainda assim, o conjunto da prova continua a nosso favor.',
+  () => 'Não me incomoda ceder nesse detalhe — sei exatamente onde está a força do caso.',
+  () => 'Aceito a ressalva. Ela não toca no que realmente importa para o julgamento.',
+  () => 'Pode constar essa nuance. Não muda a direção para onde este caso está indo.',
+  () => 'Concordo que cabe um olhar mais atento aqui — sem prejuízo do que já está provado.',
+  () => 'Esse é um ponto secundário, e trato-o como tal. Sigo confiante no essencial.',
+  () => 'Aceito a colocação. Prefiro avançar para o que de fato decide esse processo.',
+  () => 'Não vejo motivo para discordar nesse detalhe específico — não altera o panorama.',
+  () => 'Cedo esse ponto com tranquilidade. Sei onde está construída a nossa vitória.',
+  () => 'Aceito essa parte do argumento. O restante continua sólido como sempre esteve.',
+  () => 'Reconheço a nuance levantada. Ela não desfaz o que já está demonstrado nos autos.',
+  () => 'Sem problema em concordar aqui — escolho não gastar energia onde não preciso.',
+  () => 'Esse detalhe pode ficar com eles. O caso, no todo, continua sendo nosso.',
 ];
 
 function gerarTextoLocal(PROC) {
@@ -2137,6 +2225,18 @@ window.responderAudiencia = async function(procId, tipo) {
   const novaRodada = rd + 1;
   const novoProgresso = Math.round((novaRodada / 3) * 100);
 
+  // ── Revelação pós-escolha (Precisão/Confronto/Jogo de Cintura) ──
+  // Decisão de design: a categoria NUNCA aparece nos botões antes da
+  // escolha (preserva a leitura/intuição do jogador sobre o tom da fala
+  // e o perfil do juiz). Só DEPOIS de escolher, um toast revela qual
+  // categoria foi essa e o resultado — isso ensina o padrão
+  // progressivamente, sem entregar a "etiqueta" de antemão e sem travar
+  // o ritmo com uma tela extra de confirmação.
+  const NOME_CATEGORIA = { tecnica: 'Precisão', agressiva: 'Confronto', passiva: 'Jogo de Cintura' };
+  const sinalGanho = d >= 0 ? '+' : '';
+  const corResultado = d >= 5 ? 'ok' : d <= -5 ? 'ko' : 'neutro';
+  toast(`${NOME_CATEGORIA[tipo]}: ${sinalGanho}${d} de convencimento`, corResultado, 2800);
+
   // Registra o HISTÓRICO de respostas (rodada + tipo escolhido), não só o
   // convencimento final — é esse histórico que a Cloud Function usa para
   // RECALCULAR o resultado do zero na hora da sentença, em vez de confiar
@@ -2562,22 +2662,104 @@ window.confirmarPreparacaoProducao = async function() {
 // das provas, rodada 1 = tema legislação/dispositivo legal — mesmo
 // alinhamento temático usado em respRecurso() (ver temaDaRodada).
 const ARGS_RECURSO_DEFESA = [
-  {txt:'A parte recorrente sustenta que a sentença não apreciou corretamente as provas dos autos.',ideal:'tecnica',neutro:'agressiva',fraco:'passiva'},
-  {txt:'A parte recorrente requer a reforma integral por violação a dispositivo legal.',ideal:'tecnica',neutro:'passiva',fraco:'agressiva'},
+  {txt:'O recorrente alega que o juízo não examinou bem as provas dos autos.',tema:'prova_documental',ideal:'tecnica',neutro:'agressiva',fraco:'passiva'},
+  {txt:'O recorrente pede a reforma total, alegando violação direta da lei.',tema:'aspecto_processual',ideal:'tecnica',neutro:'passiva',fraco:'agressiva'},
+  {txt:'O recorrente sustenta que a sentença ignorou um documento decisivo.',tema:'prova_documental',ideal:'tecnica',neutro:'agressiva',fraco:'passiva'},
+  {txt:'O recorrente alega que a fundamentação da sentença foi insuficiente.',tema:'aspecto_processual',ideal:'tecnica',neutro:'passiva',fraco:'agressiva'},
+  {txt:'O recorrente sustenta que houve clara contradição entre os fundamentos e a conclusão da sentença.',tema:'aspecto_processual',ideal:'agressiva',neutro:'tecnica',fraco:'passiva'},
+  {txt:'O recorrente alega que o juízo deu peso indevido a um laudo pericial frágil.',tema:'prova_pericial',ideal:'tecnica',neutro:'agressiva',fraco:'passiva'},
+  {txt:'O recorrente sustenta que precedente recente do tribunal favorece sua tese.',tema:'precedente',ideal:'tecnica',neutro:'passiva',fraco:'agressiva'},
+  {txt:'O recorrente alega violação a princípio constitucional aplicável ao caso.',tema:'materia_constitucional',ideal:'agressiva',neutro:'tecnica',fraco:'passiva'},
+  {txt:'O recorrente sustenta que o prazo prescricional foi contado de forma incorreta na sentença.',tema:'prazo',ideal:'tecnica',neutro:'agressiva',fraco:'passiva'},
+  {txt:'O recorrente invoca jurisprudência consolidada do próprio tribunal para sustentar a reforma.',tema:'jurisprudencia',ideal:'tecnica',neutro:'passiva',fraco:'agressiva'},
 ];
 const ARGS_RECURSO_RECORRENTE = [
-  {txt:'A parte recorrida sustenta que a sentença apreciou corretamente as provas dos autos, não havendo o que reformar.',ideal:'tecnica',neutro:'agressiva',fraco:'passiva'},
-  {txt:'A parte recorrida requer a manutenção integral da decisão, por ausência de violação a dispositivo legal.',ideal:'tecnica',neutro:'passiva',fraco:'agressiva'},
+  {txt:'A parte recorrida sustenta que as provas foram bem examinadas — não há nada a reformar.',tema:'prova_documental',ideal:'tecnica',neutro:'agressiva',fraco:'passiva'},
+  {txt:'A parte recorrida pede a manutenção integral, por ausência de qualquer violação à lei.',tema:'aspecto_processual',ideal:'tecnica',neutro:'passiva',fraco:'agressiva'},
+  {txt:'A parte recorrida sustenta que o documento citado pelo recorrente já foi devidamente analisado.',tema:'prova_documental',ideal:'tecnica',neutro:'agressiva',fraco:'passiva'},
+  {txt:'A parte recorrida sustenta que a fundamentação da sentença é completa e suficiente.',tema:'aspecto_processual',ideal:'tecnica',neutro:'passiva',fraco:'agressiva'},
+  {txt:'A parte recorrida nega qualquer contradição entre os fundamentos e a conclusão da sentença.',tema:'aspecto_processual',ideal:'agressiva',neutro:'tecnica',fraco:'passiva'},
+  {txt:'A parte recorrida sustenta que o laudo pericial foi corretamente valorado pelo juízo.',tema:'prova_pericial',ideal:'tecnica',neutro:'agressiva',fraco:'passiva'},
+  {txt:'A parte recorrida sustenta que o precedente citado pelo recorrente não se aplica a este caso.',tema:'precedente',ideal:'tecnica',neutro:'passiva',fraco:'agressiva'},
+  {txt:'A parte recorrida nega qualquer violação a princípio constitucional no caso.',tema:'materia_constitucional',ideal:'agressiva',neutro:'tecnica',fraco:'passiva'},
+  {txt:'A parte recorrida sustenta que o prazo foi contado corretamente, sem qualquer equívoco na sentença.',tema:'prazo',ideal:'tecnica',neutro:'agressiva',fraco:'passiva'},
+  {txt:'A parte recorrida invoca jurisprudência consolidada que sustenta a manutenção da sentença.',tema:'jurisprudencia',ideal:'tecnica',neutro:'passiva',fraco:'agressiva'},
 ];
 const RESPS_RECURSO_DEFESA = {
-  tecnica:['Mantenho que a valoração das provas na sentença recorrida foi correta e suficiente para o convencimento do juízo.','A aplicação da legislação na sentença recorrida foi correta, não havendo violação a dispositivo legal.'],
-  agressiva:['A insurgência recursal sobre as provas carece de qualquer fundamento jurídico novo.','O recurso é mera tentativa de rediscutir a aplicação da lei já corretamente decidida.'],
-  passiva:['Submeto a valoração das provas à elevada apreciação deste Tribunal.','Reconheço que a interpretação da norma é passível de reanálise.'],
+  tecnica: [
+    'As provas foram bem avaliadas. Não há motivo para reforma.',
+    'A sentença aplicou a lei corretamente — não houve violação alguma.',
+    'O documento citado já constava nos autos e foi devidamente considerado.',
+    'A fundamentação da sentença é completa. Cobre todos os pontos relevantes.',
+    'Não há contradição entre os fundamentos e a conclusão. A leitura é clara.',
+    'O laudo pericial foi avaliado com o rigor técnico que o caso exigia.',
+    'O precedente que citam não se aplica aqui — os fatos são diferentes.',
+    'Nenhum princípio constitucional foi violado nesta sentença.',
+    'O prazo foi contado exatamente como a lei determina. Não há erro.',
+    'A jurisprudência que sustenta esta sentença é sólida e atual.',
+  ],
+  agressiva: [
+    'Isto não é um recurso — é a repetição de um argumento que já perdeu.',
+    'Alegam violação da lei sem apontar qual dispositivo teria sido violado.',
+    'Esse "documento decisivo" já estava nos autos. Não ignoramos nada.',
+    'Dizer que a fundamentação é insuficiente não a torna insuficiente.',
+    'Não existe contradição — existe a tentativa de criar uma onde não há.',
+    'Questionam a perícia porque o resultado não foi o que esperavam.',
+    'Esse precedente foi escolhido a dedo e não tem nada a ver com este caso.',
+    'Invocar a Constituição não substitui a ausência de argumento de mérito.',
+    'O prazo está certo. Discordar da matemática não é fundamento jurídico.',
+    'Essa jurisprudência foi superada — quem está desatualizado é o recurso.',
+  ],
+  passiva: [
+    'Aceito que se reanalise esse ponto. Não muda quem prevalece.',
+    'Posso aceitar essa leitura sobre a aplicação da lei, sem prejuízo do resultado.',
+    'Tudo bem revisitar esse documento — ele só confirma o que já está provado.',
+    'Aceito que a fundamentação seja detalhada novamente, com o mesmo resultado.',
+    'Não vejo problema em esclarecer esse ponto. A conclusão segue firme.',
+    'Aceito reabrir a discussão sobre a perícia. O laudo resiste bem.',
+    'Pode-se discutir esse precedente — não creio que mude o desfecho.',
+    'Aceito examinar a questão constitucional. Confio no resultado de qualquer forma.',
+    'Sem problema em revisar a contagem do prazo. O resultado é o mesmo.',
+    'Aceito que se atualize a pesquisa de jurisprudência. Ela continua a nosso favor.',
+  ],
 };
 const RESPS_RECURSO_RECORRENTE = {
-  tecnica:['A sentença recorrida não valorou corretamente as provas dos autos, impondo-se sua reforma.','A sentença recorrida não aplicou corretamente a legislação ao caso, impondo-se sua reforma.'],
-  agressiva:['A defesa da valoração das provas carece de qualquer fundamento que afaste a reforma.','A resistência à reforma com base na legislação é mera tentativa de manter um erro já demonstrado.'],
-  passiva:['Submeto a valoração das provas à elevada apreciação deste Tribunal, confiante na reforma.','Submeto a aplicação da legislação à reanálise deste Tribunal, e peço que seja revista a meu favor.'],
+  tecnica: [
+    'A sentença não avaliou as provas como deveria. A reforma se impõe.',
+    'Houve, sim, violação da lei. E isso, por si só, já justifica a reforma.',
+    'Esse documento foi ignorado — e ele muda o resultado do caso.',
+    'A fundamentação é insuficiente. Faltou enfrentar pontos centrais.',
+    'Existe contradição clara entre os fundamentos e a conclusão da sentença.',
+    'O laudo pericial recebeu peso maior do que merecia. Isso pesa contra nós.',
+    'O precedente que trazemos é diretamente aplicável a este caso.',
+    'Há violação a princípio constitucional que não pode ser ignorada.',
+    'O prazo foi contado de forma equivocada — e isso muda tudo.',
+    'A jurisprudência mais recente do tribunal já aponta para outro lado.',
+  ],
+  agressiva: [
+    'A defesa da prova não resiste a uma leitura atenta dos autos.',
+    'Não há argumento sólido que sustente a ausência de violação legal.',
+    'Ignorar esse documento não foi escolha — foi erro.',
+    'Chamar a fundamentação de completa não a torna completa.',
+    'A contradição está lá. Negá-la não a faz desaparecer.',
+    'Defender esse laudo é defender uma conclusão que os próprios dados não sustentam.',
+    'Dizer que o precedente "não se aplica" é a única defesa que conseguiram montar.',
+    'A questão constitucional é real, e a resistência a ela só confirma seu peso.',
+    'O erro no prazo está nos autos. Não há como negar matemática.',
+    'A jurisprudência citada pela defesa já foi superada — e eles sabem disso.',
+  ],
+  passiva: [
+    'Posso aceitar a avaliação das provas como está — ainda assim, peço a reforma.',
+    'Tudo bem que considerem não haver violação. Mantenho o pedido de reforma.',
+    'Aceito que o documento já constasse nos autos. Ele continua sendo decisivo.',
+    'Aceito a fundamentação como está. Ainda assim, ela não responde ao essencial.',
+    'Posso não insistir na contradição. O pedido de reforma permanece o mesmo.',
+    'Aceito a defesa da perícia. O laudo, ainda assim, não resolve a questão de fundo.',
+    'Tudo bem discutir a aplicação do precedente. Acredito que ele ainda nos socorre.',
+    'Aceito ouvir a defesa sobre a Constituição. Mantenho que o princípio foi violado.',
+    'Posso aceitar a contagem como está. O resultado prático ainda nos prejudica.',
+    'Aceito a jurisprudência citada pela defesa. A nossa, ainda assim, é mais recente.',
+  ],
 };
 
 function _argsRecursoAtuais() {
@@ -2628,9 +2810,12 @@ window.responderRecursoProducao = async function(tipo) {
   const sinal = euSouDefesa ? -1 : 1;
   const baseD = (tipo === a.ideal ? 7 : tipo === a.neutro ? 1 : -10) * sinal;
 
-  const temaDaRodada = recursoRd === 0 ? 'prova_documental' : 'prazo';
+  // Tema real do argumento sorteado (ver mesma correção em
+  // processar_acordao.js) — antes hardcoded por posição de rodada.
+  const temaDaRodada = a.tema || (recursoRd === 0 ? 'prova_documental' : 'prazo');
   const temaDoTipo = tipo === 'agressiva' ? 'agressivo' : tipo === 'passiva' ? 'passivo' : null;
 
+  let somaDelta = 0;
   SCORES_JULGADOR.forEach(jz => {
     let d = baseD;
     if (tipo === 'tecnica') d += pesoTemaPorClasse(temaDaRodada, jz.classe) * 0.5 * sinal;
@@ -2640,8 +2825,17 @@ window.responderRecursoProducao = async function(tipo) {
       d += pesoTemaPorClasse(est.afeta, jz.classe) * 0.6 * sinal;
     });
     d *= (jz.sensibilidade || 1);
+    somaDelta += d;
     jz.score = Math.max(5, Math.min(95, jz.score + d)); // exibição otimista local
   });
+
+  // Mesma decisão de design da audiência: a categoria só é revelada
+  // DEPOIS da escolha, nunca nos botões — ver responderAudiencia.
+  const NOME_CATEGORIA = { tecnica: 'Precisão', agressiva: 'Confronto', passiva: 'Jogo de Cintura' };
+  const mediaDelta = Math.round(somaDelta / Math.max(1, SCORES_JULGADOR.length));
+  const sinalGanho = mediaDelta >= 0 ? '+' : '';
+  const corResultado = mediaDelta >= 5 ? 'ok' : mediaDelta <= -5 ? 'ko' : 'neutro';
+  toast(`${NOME_CATEGORIA[tipo]}: ${sinalGanho}${mediaDelta} (média do colegiado)`, corResultado, 2800);
 
   // Persiste o histórico bruto (rodada + tipo escolhido) — fonte de
   // verdade que a Cloud Function usa para recalcular o julgamento do
