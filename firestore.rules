@@ -37,10 +37,12 @@ service cloud.firestore {
     // (confirmado em functions/criar_escritorio.js: o array simples de
     // UIDs é 'socios_uids' — 'socios' é um array de OBJETOS
     // {uid, participacao_pct, cargo}, então 'in' contra ele nunca daria
-    // match.)
+    // match.) Protegida contra o campo não existir (schemas antigos/
+    // editados via admin sem esse array) — 'in' contra campo ausente
+    // lança erro de runtime em vez de retornar false.
     function isSocio(escritorioData) {
       return isAuth() &&
-        request.auth.uid in escritorioData.socios_uids;
+        ('socios_uids' in escritorioData && request.auth.uid in escritorioData.socios_uids);
     }
 
     // Verifica se o campo não está sendo alterado
@@ -173,8 +175,20 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/escritorios/$(escId))
         && (
           isDono(get(/databases/$(database)/documents/escritorios/$(escId)).data)
-          || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escId)).data.socios_uids
-          || exists(/databases/$(database)/documents/escritorios/$(escId)/funcionarios/$(request.auth.uid))
+          || isSocio(get(/databases/$(database)/documents/escritorios/$(escId)).data)
+          // Empregado jogador (não NPC): vagas.js mantém um array plano
+          // 'funcionarios_uids' no documento do escritório, paralelo à
+          // subcoleção funcionarios/{autoId} (cujo ID nunca é o UID do
+          // jogador — é gerado por addDoc). Checar exists() num path
+          // assumindo ID=UID nunca funcionava para esse caso; o array é
+          // a forma correta e já mantida pelo próprio código (arrayUnion
+          // ao entrar, arrayRemove ao sair). O campo só existe a partir
+          // da primeira contratação — 'in' contra campo ausente lança
+          // erro de runtime, por isso a checagem de existência primeiro.
+          || (
+            'funcionarios_uids' in get(/databases/$(database)/documents/escritorios/$(escId)).data
+            && request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escId)).data.funcionarios_uids
+          )
         );
     }
 
@@ -242,7 +256,7 @@ service cloud.firestore {
       // sem ser dono nem sócio — é só um empregado saindo).
       allow update: if isAuth()
         && (isDono(resource.data)
-            || request.auth.uid in resource.data.socios_uids
+            || isSocio(resource.data)
             || (
               // Empregado saindo: só pode alterar funcionarios_uids e
               // campos de contagem de vagas (vagas_ocupadas.*), nunca
@@ -273,16 +287,16 @@ service cloud.firestore {
       match /oportunidades/{opId} {
         allow read: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
-              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios_uids);
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
         allow create: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
-              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios_uids);
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
         allow update: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
-              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios_uids);
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
         allow delete: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
-              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios_uids);
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
       }
 
       // Subcoleção: carteira de clientes — mesmo padrão de acesso das
@@ -290,16 +304,16 @@ service cloud.firestore {
       match /clientes/{clienteId} {
         allow read: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
-              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios_uids);
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
         allow create: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
-              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios_uids);
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
         allow update: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
-              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios_uids);
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
         allow delete: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
-              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios_uids);
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
       }
 
       allow delete: if false;
