@@ -18,9 +18,10 @@ service cloud.firestore {
     }
 
     // Verifica se o usuário é sócio do escritório
+    // (campo real do documento é 'socios', não 'socios_uids')
     function isSocio(escritorioData) {
       return isAuth() &&
-        request.auth.uid in escritorioData.socios_uids;
+        request.auth.uid in escritorioData.socios;
     }
 
     // Verifica se o campo não está sendo alterado
@@ -137,30 +138,58 @@ service cloud.firestore {
 
     // ══════════════════════════════════════════════════════
     // PROCESSOS
+    // Dois tipos de documento: INDIVIDUAL (advogado_uid setado, dono
+    // exclusivo) e POOL DO ESCRITÓRIO (advogado_uid null por design,
+    // pool_escritorio_id setado — qualquer dono/sócio/funcionário do
+    // escritório pode ler e interagir). A regra original só reconhecia
+    // 'escritorio_id' (usado nos processos individuais) e nunca
+    // 'pool_escritorio_id' (usado nos processos de pool) — por isso
+    // processos de pool sempre caíam em "Missing or insufficient
+    // permissions" para qualquer um que não fosse o próprio advogado_uid
+    // (que para eles é sempre null, então NINGUÉM passava).
     // ══════════════════════════════════════════════════════
+    function vinculadoAoEscritorioDoProcesso(procData) {
+      let escId = procData.escritorio_id != null ? procData.escritorio_id : procData.pool_escritorio_id;
+      return escId != null
+        && exists(/databases/$(database)/documents/escritorios/$(escId))
+        && (
+          get(/databases/$(database)/documents/escritorios/$(escId)).data.dono_uid == request.auth.uid
+          || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escId)).data.socios
+          || exists(/databases/$(database)/documents/escritorios/$(escId)/funcionarios/$(request.auth.uid))
+        );
+    }
+
     match /processos/{processoId} {
-      // Leitura: advogado do caso ou sócio do escritório
+      // Leitura: advogado do caso (individual) ou qualquer dono/sócio/
+      // funcionário do escritório vinculado (individual com escritório,
+      // ou caso de pool).
       allow read: if isAuth() && (
         resource.data.advogado_uid == request.auth.uid ||
-        (resource.data.escritorio_id != null &&
-         exists(/databases/$(database)/documents/escritorios/$(resource.data.escritorio_id)) &&
-         request.auth.uid in get(/databases/$(database)/documents/escritorios/$(resource.data.escritorio_id)).data.socios_uids)
+        vinculadoAoEscritorioDoProcesso(resource.data)
       );
 
-      // Criação: apenas o advogado cria seu próprio processo
+      // Criação: o próprio advogado (caso individual) OU qualquer
+      // dono/sócio/funcionário do escritório (caso de pool, onde
+      // advogado_uid é null por design).
       allow create: if isAuth()
-        && request.resource.data.advogado_uid == request.auth.uid
         && request.resource.data.status == 'andamento'
-        && request.resource.data.progresso == 0;
+        && request.resource.data.progresso == 0
+        && (
+          request.resource.data.advogado_uid == request.auth.uid
+          || vinculadoAoEscritorioDoProcesso(request.resource.data)
+        );
 
-      // Update: apenas o advogado do caso pode atualizar
+      // Update: o próprio advogado (caso individual) OU qualquer
+      // dono/sócio/funcionário do escritório (caso de pool) pode jogar
+      // a audiência/recurso. Em ambos os casos, advogado_uid e valor da
+      // causa não podem ser alterados, e instância não pode retroagir.
       allow update: if isAuth()
-        && resource.data.advogado_uid == request.auth.uid
-        // Não pode mudar o advogado do caso
+        && (
+          resource.data.advogado_uid == request.auth.uid
+          || vinculadoAoEscritorioDoProcesso(resource.data)
+        )
         && notChanging('advogado_uid')
-        // Não pode inflar o valor da causa
         && notChanging('valor')
-        // Não pode retroagir instância
         && request.resource.data.instancia >= resource.data.instancia;
 
       // Deleção não permitida
