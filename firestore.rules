@@ -18,10 +18,14 @@ service cloud.firestore {
     }
 
     // Verifica se o usuário é sócio do escritório
-    // (campo real do documento é 'socios', não 'socios_uids')
+    // (confirmado em functions/criar_escritorio.js: o array simples de
+    // UIDs é 'socios_uids' — 'socios' é um array de OBJETOS
+    // {uid, participacao_pct, cargo}, então 'in' contra ele nunca daria
+    // match. O dono/fundador é gravado como 'fundador_uid', não
+    // 'dono_uid' — esse nome nunca existe nos documentos reais.)
     function isSocio(escritorioData) {
       return isAuth() &&
-        request.auth.uid in escritorioData.socios;
+        request.auth.uid in escritorioData.socios_uids;
     }
 
     // Verifica se o campo não está sendo alterado
@@ -153,8 +157,8 @@ service cloud.firestore {
       return escId != null
         && exists(/databases/$(database)/documents/escritorios/$(escId))
         && (
-          get(/databases/$(database)/documents/escritorios/$(escId)).data.dono_uid == request.auth.uid
-          || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escId)).data.socios
+          get(/databases/$(database)/documents/escritorios/$(escId)).data.fundador_uid == request.auth.uid
+          || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escId)).data.socios_uids
           || exists(/databases/$(database)/documents/escritorios/$(escId)/funcionarios/$(request.auth.uid))
         );
     }
@@ -205,22 +209,22 @@ service cloud.firestore {
 
       // Criação: advogado autenticado pode criar seu próprio escritório
       allow create: if isAuth()
-        && request.resource.data.dono_uid == request.auth.uid;
+        && request.resource.data.fundador_uid == request.auth.uid;
 
       // Update: apenas o dono ou sócios
       allow update: if isAuth()
-        && (resource.data.dono_uid == request.auth.uid
-            || request.auth.uid in resource.data.socios);
+        && (resource.data.fundador_uid == request.auth.uid
+            || request.auth.uid in resource.data.socios_uids);
 
       // Subcoleção: funcionários
       match /funcionarios/{funcId} {
         allow read:   if isAuth();
         allow create: if isAuth()
-          && get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid;
+          && get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.fundador_uid == request.auth.uid;
         allow update: if isAuth()
-          && get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid;
+          && get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.fundador_uid == request.auth.uid;
         allow delete: if isAuth()
-          && get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid;
+          && get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.fundador_uid == request.auth.uid;
       }
 
       // Subcoleção: oportunidades de serviço — apenas dono/sócios do
@@ -229,34 +233,34 @@ service cloud.firestore {
       // insufficient permissions" ao tentar listar oportunidades.
       match /oportunidades/{opId} {
         allow read: if isAuth()
-          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid
-              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios);
+          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.fundador_uid == request.auth.uid
+              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios_uids);
         allow create: if isAuth()
-          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid
-              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios);
+          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.fundador_uid == request.auth.uid
+              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios_uids);
         allow update: if isAuth()
-          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid
-              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios);
+          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.fundador_uid == request.auth.uid
+              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios_uids);
         allow delete: if isAuth()
-          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid
-              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios);
+          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.fundador_uid == request.auth.uid
+              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios_uids);
       }
 
       // Subcoleção: carteira de clientes — mesmo padrão de acesso das
       // oportunidades (apenas dono/sócios).
       match /clientes/{clienteId} {
         allow read: if isAuth()
-          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid
-              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios);
+          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.fundador_uid == request.auth.uid
+              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios_uids);
         allow create: if isAuth()
-          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid
-              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios);
+          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.fundador_uid == request.auth.uid
+              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios_uids);
         allow update: if isAuth()
-          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid
-              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios);
+          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.fundador_uid == request.auth.uid
+              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios_uids);
         allow delete: if isAuth()
-          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid
-              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios);
+          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.fundador_uid == request.auth.uid
+              || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios_uids);
       }
 
       allow delete: if false;
