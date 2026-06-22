@@ -17,12 +17,27 @@ service cloud.firestore {
       return isAuth() && request.auth.uid == uid;
     }
 
+    // Verifica se o usuário é o dono/fundador do escritório.
+    // IMPORTANTE: o banco real tem DOIS nomes de campo coexistindo —
+    // 'fundador_uid' (gravado por criar_escritorio.js no fluxo normal)
+    // e 'dono_uid' (visto em documentos editados por outro caminho,
+    // provavelmente a Cloud Function adminAction ou um schema mais
+    // antigo). O próprio código já trata essa duplicidade explicitamente
+    // em criar_escritorio.js: "donoFallback = escData.dono_uid ||
+    // escData.fundador_uid" — esta função replica o mesmo fallback nas
+    // regras de segurança, para não depender de qual dos dois nomes um
+    // escritório específico usa.
+    function isDono(escritorioData) {
+      return isAuth() &&
+        (escritorioData.dono_uid == request.auth.uid
+         || escritorioData.fundador_uid == request.auth.uid);
+    }
+
     // Verifica se o usuário é sócio do escritório
     // (confirmado em functions/criar_escritorio.js: o array simples de
     // UIDs é 'socios_uids' — 'socios' é um array de OBJETOS
     // {uid, participacao_pct, cargo}, então 'in' contra ele nunca daria
-    // match. O dono/fundador é gravado como 'fundador_uid', não
-    // 'dono_uid' — esse nome nunca existe nos documentos reais.)
+    // match.)
     function isSocio(escritorioData) {
       return isAuth() &&
         request.auth.uid in escritorioData.socios_uids;
@@ -157,7 +172,7 @@ service cloud.firestore {
       return escId != null
         && exists(/databases/$(database)/documents/escritorios/$(escId))
         && (
-          get(/databases/$(database)/documents/escritorios/$(escId)).data.fundador_uid == request.auth.uid
+          isDono(get(/databases/$(database)/documents/escritorios/$(escId)).data)
           || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escId)).data.socios_uids
           || exists(/databases/$(database)/documents/escritorios/$(escId)/funcionarios/$(request.auth.uid))
         );
@@ -219,22 +234,22 @@ service cloud.firestore {
 
       // Criação: advogado autenticado pode criar seu próprio escritório
       allow create: if isAuth()
-        && request.resource.data.fundador_uid == request.auth.uid;
+        && request.isDono(resource.data);
 
       // Update: apenas o dono ou sócios
       allow update: if isAuth()
-        && (resource.data.fundador_uid == request.auth.uid
+        && (isDono(resource.data)
             || request.auth.uid in resource.data.socios_uids);
 
       // Subcoleção: funcionários
       match /funcionarios/{funcId} {
         allow read:   if isAuth();
         allow create: if isAuth()
-          && get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.fundador_uid == request.auth.uid;
+          && isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data);
         allow update: if isAuth()
-          && get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.fundador_uid == request.auth.uid;
+          && isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data);
         allow delete: if isAuth()
-          && get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.fundador_uid == request.auth.uid;
+          && isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data);
       }
 
       // Subcoleção: oportunidades de serviço — apenas dono/sócios do
@@ -243,16 +258,16 @@ service cloud.firestore {
       // insufficient permissions" ao tentar listar oportunidades.
       match /oportunidades/{opId} {
         allow read: if isAuth()
-          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.fundador_uid == request.auth.uid
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
               || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios_uids);
         allow create: if isAuth()
-          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.fundador_uid == request.auth.uid
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
               || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios_uids);
         allow update: if isAuth()
-          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.fundador_uid == request.auth.uid
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
               || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios_uids);
         allow delete: if isAuth()
-          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.fundador_uid == request.auth.uid
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
               || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios_uids);
       }
 
@@ -260,16 +275,16 @@ service cloud.firestore {
       // oportunidades (apenas dono/sócios).
       match /clientes/{clienteId} {
         allow read: if isAuth()
-          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.fundador_uid == request.auth.uid
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
               || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios_uids);
         allow create: if isAuth()
-          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.fundador_uid == request.auth.uid
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
               || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios_uids);
         allow update: if isAuth()
-          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.fundador_uid == request.auth.uid
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
               || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios_uids);
         allow delete: if isAuth()
-          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.fundador_uid == request.auth.uid
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
               || request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.socios_uids);
       }
 
