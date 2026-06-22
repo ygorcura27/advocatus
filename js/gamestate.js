@@ -277,12 +277,52 @@ async function _carregarMiniRanking(meuUid) {
 }
 
 // ════════════════════════════════════════════════════════
-// BRASÃO SVG POR CARGO
+// BRASÃO POR CARGO — imagem PNG (img/brasoes/{sigla}.png) com
+// fallback automático pro SVG gerado, para cargos sem imagem ainda.
 // ════════════════════════════════════════════════════════
+
+// Cache de quais cargos já confirmaram ter (ou não ter) imagem,
+// para não tentar carregar a mesma imagem inexistente repetidas vezes.
+const _brasaoImgCache = {};
+
 function _renderBrasao(cargoId, rep) {
   const container = document.getElementById('brasao-container');
   if (!container) return;
 
+  // Se já sabemos que não existe imagem para esse cargo, vai direto pro SVG.
+  if (_brasaoImgCache[cargoId] === false) {
+    _renderBrasaoSVG(container, cargoId, rep);
+    return;
+  }
+
+  // Se já sabemos que a imagem existe, usa direto (sem re-testar).
+  if (_brasaoImgCache[cargoId] === true) {
+    _renderBrasaoImagem(container, cargoId);
+    return;
+  }
+
+  // Primeira vez vendo esse cargo: testa se a imagem existe.
+  const caminho = `img/brasoes/${cargoId}.png`;
+  const testeImg = new Image();
+  testeImg.onload = () => {
+    _brasaoImgCache[cargoId] = true;
+    _renderBrasaoImagem(container, cargoId);
+  };
+  testeImg.onerror = () => {
+    _brasaoImgCache[cargoId] = false;
+    _renderBrasaoSVG(container, cargoId, rep);
+  };
+  testeImg.src = caminho;
+}
+
+function _renderBrasaoImagem(container, cargoId) {
+  container.innerHTML = `<img class="brasao-svg" src="img/brasoes/${cargoId}.png" alt="Brasão" />`;
+}
+
+// ════════════════════════════════════════════════════════
+// BRASÃO SVG POR CARGO (fallback)
+// ════════════════════════════════════════════════════════
+function _renderBrasaoSVG(container, cargoId, rep) {
   // Número de estrelas por cargo
   const estrelas = {
     est:0, ass:0, jnr:1, pln:2, snr:3, asc:4, soc:5, snm:6,
@@ -294,11 +334,9 @@ function _renderBrasao(cargoId, rep) {
   const starsHtml   = numEstrelas > 0
     ? `<text x="${45 - numEstrelas * 4}" y="74" font-size="8" fill="#B8922A" font-family="sans-serif">${'★'.repeat(numEstrelas)}</text>`
     : '';
-
   // Cores por tier
   const corEscudo = cargoId === 'snm' ? '#4E3820' :
                     ['soc','asc'].includes(cargoId) ? '#3D2B18' : '#2A1C0E';
-
   container.innerHTML = `
     <svg class="brasao-svg" viewBox="0 0 90 90" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M45 6 L78 18 L78 50 C78 68 62 80 45 86 C28 80 12 68 12 50 L12 18 Z"
@@ -318,7 +356,6 @@ function _renderBrasao(cargoId, rep) {
       ${starsHtml}
     </svg>`;
 }
-
 // ════════════════════════════════════════════════════════
 // HELPERS
 // ════════════════════════════════════════════════════════
