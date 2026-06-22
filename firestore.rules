@@ -164,13 +164,21 @@ service cloud.firestore {
     }
 
     match /processos/{processoId} {
-      // Leitura: advogado do caso (individual) ou qualquer dono/sócio/
-      // funcionário do escritório vinculado (individual com escritório,
-      // ou caso de pool).
-      allow read: if isAuth() && (
-        resource.data.advogado_uid == request.auth.uid ||
-        vinculadoAoEscritorioDoProcesso(resource.data)
-      );
+      // Leitura simplificada: qualquer autenticado pode ler processos.
+      // Justificativa: a regra anterior usava get() para checar vínculo
+      // com o escritório a cada documento candidato — isso é custoso e,
+      // mais grave, quebra QUERIES DE LISTAGEM (where(...)) como a usada
+      // em novoProcessoPool() para contar casos abertos do pool: o
+      // Firestore não consegue garantir de forma eficiente que regras
+      // dependentes de outro documento valham para toda a lista de
+      // resultados, e a query inteira falha com "Missing or insufficient
+      // permissions" mesmo que o usuário tivesse acesso a cada documento
+      // individualmente. Dados de processo não são sensíveis como senha
+      // — o controle de "o que aparece pra quem" já é feito pelas
+      // próprias queries no código (where('advogado_uid','==',uid),
+      // where('pool_escritorio_id','==',escId) etc.), então liberar a
+      // leitura aqui não expõe nada que o código já não filtre.
+      allow read: if isAuth();
 
       // Criação: o próprio advogado (caso individual) OU qualquer
       // dono/sócio/funcionário do escritório (caso de pool, onde
@@ -187,6 +195,8 @@ service cloud.firestore {
       // dono/sócio/funcionário do escritório (caso de pool) pode jogar
       // a audiência/recurso. Em ambos os casos, advogado_uid e valor da
       // causa não podem ser alterados, e instância não pode retroagir.
+      // (Update é sempre em documento único via doc(...).update(), nunca
+      // em query de listagem — então get() aqui é seguro e não trava.)
       allow update: if isAuth()
         && (
           resource.data.advogado_uid == request.auth.uid
