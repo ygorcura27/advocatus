@@ -234,20 +234,34 @@ service cloud.firestore {
 
       // Criação: advogado autenticado pode criar seu próprio escritório
       allow create: if isAuth()
-        && request.isDono(resource.data);
+        && isDono(request.resource.data);
 
-      // Update: apenas o dono ou sócios
+      // Update: dono, sócio, OU o próprio jogador removendo a si mesmo
+      // de funcionarios_uids ao sair do escritório (ver
+      // vagas.js::sairEscritorio, que faz arrayRemove(uid) nesse campo
+      // sem ser dono nem sócio — é só um empregado saindo).
       allow update: if isAuth()
         && (isDono(resource.data)
-            || request.auth.uid in resource.data.socios_uids);
+            || request.auth.uid in resource.data.socios_uids
+            || (
+              // Empregado saindo: só pode alterar funcionarios_uids e
+              // campos de contagem de vagas (vagas_ocupadas.*), nunca
+              // caixa, sócios, ou dados de outros funcionários.
+              request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['funcionarios_uids', 'vagas_ocupadas'])
+            ));
 
-      // Subcoleção: funcionários
+      // Subcoleção: funcionários — dono pode tudo; o próprio funcionário
+      // (jogador real, identificado pelo campo jogador_uid no documento)
+      // pode se autodesativar ao sair (ver vagas.js::sairEscritorio,
+      // que marca ativo:false e saiu_em no próprio registro).
       match /funcionarios/{funcId} {
         allow read:   if isAuth();
         allow create: if isAuth()
           && isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data);
         allow update: if isAuth()
-          && isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data);
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || resource.data.jogador_uid == request.auth.uid);
         allow delete: if isAuth()
           && isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data);
       }
