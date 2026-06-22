@@ -194,7 +194,7 @@ exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (requ
       encerrado_mes: null,
       convencimento: score, // sincroniza o valor real recalculado de volta
     });
-    return { categoria, txt, repDelta, xpGanho, recorre: true, instanciaSeguinte: p.instancia_seguinte, demitido };
+    return { categoria, txt, repDelta, xpGanho, recorre: true, quemRecorre, instanciaSeguinte: p.instancia_seguinte, demitido };
   } else {
     // O destino dos honorários é o escritório DO CASO (p.pool_escritorio_id
     // ou j.escritorio_proprio_id quando é caso individual do próprio dono),

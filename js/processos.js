@@ -2347,7 +2347,7 @@ function _mostrarResultadoSentenca(r, procId) {
       <span class="gain">+${r.xpGanho} XP</span>
     </div>
     ${r.hon > 0 ? `<div style="font-size:.95rem;color:var(--verde2);font-weight:700;margin-top:.65rem">💰 +${fmt(r.hon)} honorários (trânsito em julgado imediato)</div>` : ''}
-    ${r.recorre ? `<div style="font-size:.75rem;color:var(--amber);margin-top:.65rem">📋 A parte contrária recorreu — caso entra na fila do ${r.instanciaSeguinte}. Acesse a carteira processual para sustentar.</div>` : ''}
+    ${r.recorre ? `<div style="font-size:.75rem;color:var(--amber);margin-top:.65rem">📋 ${r.quemRecorre === 'jogador' ? 'Você recorreu' : 'A parte contrária recorreu'} — caso entra na fila do ${r.instanciaSeguinte}. Acesse a carteira processual para sustentar.</div>` : ''}
     ${r.demitido ? `<div style="font-size:.8rem;color:var(--verm2);margin-top:.65rem;font-weight:600">⚠️ Demitido(a) — 5 derrotas consecutivas.</div>` : ''}
     ${botoesHtml}`
   );
