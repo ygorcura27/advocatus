@@ -44,6 +44,44 @@ const CARGO_IDX = {
 const CARGO_IDX_CONCLUSAO_MIN = 2; // jnr
 const PROGRESSO_MAX_SEM_ADVOGADO = 90;
 
+// ── XP PARCIAL DE INSTRUÇÃO — calibrado para bater com a progressão de
+// carreira realista (ver tabela CARGOS em carreira.js: Estagiário→
+// Assistente exige 120 XP, Assistente→OAB exige mais 140 XP). Premissa
+// de design: 1,5 ano (18 meses) para Estagiário virar Assistente, +1
+// ano (12 meses) até a OAB, processando em média 2 casos/mês (energia
+// realista descontando manutenção de relacionamento e academia).
+//   Estagiário: 120 XP ÷ (2 casos/mês × 18 meses) ≈ 3,3 → 3 XP/caso
+//   Assistente: 140 XP ÷ (2 casos/mês × 12 meses) ≈ 5,8 → 6 XP/caso
+// Sem cap mensal artificial — o limitador natural já é a energia
+// disponível, e o trade-off com vida pessoal (relacionamentos, academia)
+// é intencional, parte do tema central do jogo.
+//
+// Antes desta correção, o jogo já tinha a trava narrativa de cargo
+// (travadoPorCargo, ver _renderModalProcesso) — quando um caso do pool
+// chegava a progresso>=90% com Estagiário/Assistente, o botão de
+// processar sentença ficava simplesmente DESABILITADO, sem nenhum
+// crédito de XP nem caminho de saída. Como a ÚNICA fonte de XP do jogo
+// é a sentença, isso criava um beco sem saída de progressão de carreira
+// para esses dois cargos. xp_parcial_creditado evita conceder o XP mais
+// de uma vez se o jogador reabrir o modal do mesmo caso repetidamente.
+const XP_PARCIAL_INSTRUCAO = { est: 3, ass: 6 };
+
+window._creditarXpParcialInstrucao = async function(procId, p, j) {
+  if (p.xp_parcial_creditado) return; // já creditado — evita XP duplicado
+  const uid = j.uid || window.JOGADOR_UID;
+  const xpGanho = XP_PARCIAL_INSTRUCAO[j.cargo_id] || 0;
+  if (xpGanho === 0) return;
+
+  try {
+    await updateDoc(doc(db, 'processos', procId), { xp_parcial_creditado: true });
+    await updateDoc(doc(db, 'jogadores', uid), { xp: (j.xp||0) + xpGanho });
+    toast(`📋 Instrução concluída! +${xpGanho} XP por trabalhar neste caso.`, 'ok', 4000);
+  } catch (err) {
+    console.error('[XP PARCIAL]', err);
+  }
+};
+
+
 // ── Instância MÁXIMA que cada faixa de cargo pode sustentar EM RECURSO.
 // Est/Ass (idx 0-1): não recorrem. Júnior (idx 2): até 2º grau (TJ/TRF/TRT).
 // Pleno (idx 3): até Tribunal Superior (STJ/TST). Sênior+ (idx 4+): até STF.
@@ -1883,8 +1921,17 @@ function _renderModalProcesso(id, p) {
   const avisoCargo = travadoPorCargo
     ? `<div style="background:var(--amber-bg);border:1px solid var(--amber);border-radius:var(--r);padding:.55rem .75rem;margin-bottom:.7rem;font-size:.72rem;color:var(--amber);text-align:center">
         🔒 Caso pronto para sentença, mas requer um Advogado Júnior+ do escritório para assinar e concluir.
+        ${p.xp_parcial_creditado ? ' Você já recebeu o XP de instrução por este caso.' : ''}
        </div>`
     : '';
+
+  // Crédito de XP parcial: a trava de cargo (travadoPorCargo) antes não
+  // tinha nenhum caminho de saída para Estagiário/Assistente — ver
+  // comentário completo em XP_PARCIAL_INSTRUCAO. Credita uma única vez
+  // ao abrir o modal de um caso já travado por cargo.
+  if (travadoPorCargo && !p.xp_parcial_creditado) {
+    window._creditarXpParcialInstrucao(id, p, j);
+  }
 
   const ladoLabel = p.meu_lado === 'reu' ? '🛡️ Você está na DEFESA' : '⚖️ Você é o AUTOR da ação';
 
@@ -2368,10 +2415,13 @@ window.renderPoolEscritorio = async function(el) {
               <div style="font-family:var(--font-mono);font-size:.6rem;color:var(--txt4)">${p.numero}</div>
               <div style="font-weight:700;font-size:.85rem;color:var(--navy)">${p.autor} vs ${p.reu}</div>
               <div style="font-size:.68rem;color:var(--txt3)">${p.tipo} · progresso ${progresso}%${jaContribui ? ' · você já contribuiu' : ''}</div>
+              ${progresso >= PROGRESSO_MAX_SEM_ADVOGADO
+                ? `<div style="font-size:.68rem;color:var(--ouro2);font-weight:600;margin-top:.15rem">📋 Instrução concluída — pronto para sentença</div>`
+                : ''}
               ${restante !== null ? `<div style="font-size:.65rem;color:${restante<=1?'var(--verm2)':'var(--txt4)'}">Prazo: ${restante>0?restante+' mês(es) restante(s)':'PRAZO ESGOTADO'}</div>` : ''}
             </div>
           </div>
-          <button class="btn btn-sm btn-prim btn-block" style="margin-top:.5rem" onclick="window.abrirProcesso('${p.id}')">⚖️ ${jaContribui?'Continuar':'Assumir'} caso →</button>
+          <button class="btn btn-sm btn-prim btn-block" style="margin-top:.5rem" onclick="window.abrirProcesso('${p.id}')">⚖️ ${progresso >= PROGRESSO_MAX_SEM_ADVOGADO ? 'Assinar sentença' : (jaContribui?'Continuar':'Assumir')} caso →</button>
         </div>`;
       }).join('')}`;
 };
