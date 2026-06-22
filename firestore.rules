@@ -250,19 +250,24 @@ service cloud.firestore {
       allow create: if isAuth()
         && isDono(request.resource.data);
 
-      // Update: dono, sócio, OU o próprio jogador removendo a si mesmo
-      // de funcionarios_uids ao sair do escritório (ver
-      // vagas.js::sairEscritorio, que faz arrayRemove(uid) nesse campo
-      // sem ser dono nem sócio — é só um empregado saindo).
+      // Update: dono, sócio, OU o próprio jogador entrando/saindo de
+      // funcionarios_uids — cobre os dois lados do ciclo de vida de
+      // empregado-jogador (ver vagas.js): arrayUnion(uid) ao aceitar
+      // convite de vaga, arrayRemove(uid) ao sair. Restrito a alterar
+      // apenas funcionarios_uids/vagas_ocupadas, e o uid precisa
+      // realmente mudar de status no array (estava fora e passa a
+      // estar dentro, ou vice-versa) — ninguém entra/sai em nome de
+      // outro jogador, nem reenvia o mesmo estado sem necessidade.
       allow update: if isAuth()
         && (isDono(resource.data)
             || isSocio(resource.data)
             || (
-              // Empregado saindo: só pode alterar funcionarios_uids e
-              // campos de contagem de vagas (vagas_ocupadas.*), nunca
-              // caixa, sócios, ou dados de outros funcionários.
               request.resource.data.diff(resource.data).affectedKeys()
                 .hasOnly(['funcionarios_uids', 'vagas_ocupadas'])
+              && (
+                ('funcionarios_uids' in resource.data && request.auth.uid in resource.data.funcionarios_uids)
+                != (request.auth.uid in request.resource.data.funcionarios_uids)
+              )
             ));
 
       // Subcoleção: funcionários — dono pode tudo; o próprio funcionário
@@ -271,8 +276,17 @@ service cloud.firestore {
       // que marca ativo:false e saiu_em no próprio registro).
       match /funcionarios/{funcId} {
         allow read:   if isAuth();
+        // Criação: o dono contratando um NPC (ver equipe.js, tipo:'npc')
+        // OU o próprio jogador se autorregistrando ao aceitar um convite
+        // de vaga (ver vagas.js::responderConvite, tipo:'jogador',
+        // jogador_uid igual ao seu próprio uid — sem isso, aceitar
+        // convite falhava antes mesmo de chegar no updateDoc de
+        // funcionarios_uids no documento do escritório).
         allow create: if isAuth()
-          && isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data);
+          && (
+            isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+            || request.resource.data.jogador_uid == request.auth.uid
+          );
         allow update: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
               || resource.data.jogador_uid == request.auth.uid);
