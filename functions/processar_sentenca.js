@@ -211,7 +211,10 @@ exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (requ
       if (escritorioDoCaso) {
         const escRef = db.collection('escritorios').doc(escritorioDoCaso);
         const escSnap = await escRef.get();
-        if (escSnap.exists) await escRef.update({ caixa: (escSnap.data().caixa||0) + honPotencial });
+        if (escSnap.exists) await escRef.update({
+          caixa: (escSnap.data().caixa||0) + honPotencial,
+          faturamento_mes_atual: (escSnap.data().faturamento_mes_atual||0) + honPotencial,
+        });
       } else {
         await jogadorRef.update({
           dinheiro: (updatesJogador.dinheiro ?? j.dinheiro ?? 0) + honPotencial,

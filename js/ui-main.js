@@ -416,6 +416,10 @@ async function _carregarEscritorioProprio(escId, j) {
         </div>
         ${_escAcoesRapidas(j, esc)}
       `;
+      const elEquipe = document.getElementById('esc-equipe-embed');
+      if (elEquipe && window.renderEquipe) window.renderEquipe(j, elEquipe);
+      const elClientes = document.getElementById('esc-clientes-embed');
+      if (elClientes && window.renderClientes) window.renderClientes(j, elClientes);
     }
   } catch (e) {
     console.error('Erro ao carregar escritório próprio:', e);
@@ -577,7 +581,7 @@ function _escHero(j, esc) {
 
 function _escKpis(esc, j) {
   const caixa     = (esc && esc.caixa) || 0;
-  const rendaMes  = j.renda_calculada || 0;
+  const rendaMes  = esc ? (esc.faturamento_mes_atual || 0) : (j.honorarios_mes || 0);
   const despMes   = j.despesas_calculadas || 0;
   const lucroMes  = rendaMes - despMes;
   const socios    = esc ? _normalizarSociosUI(esc) : [{participacao_pct:100}];
@@ -591,7 +595,7 @@ function _escKpis(esc, j) {
     <div class="esc-kpi-card">
       <div class="esc-kpi-label">Receita do mês</div>
       <div class="esc-kpi-valor">${_fmtExt(rendaMes)}</div>
-      <div class="esc-kpi-delta flat">vs. honorários recebidos</div>
+      <div class="esc-kpi-delta flat">honorários recebidos até agora</div>
     </div>
     <div class="esc-kpi-card">
       <div class="esc-kpi-label">Lucro líquido</div>
@@ -601,7 +605,7 @@ function _escKpis(esc, j) {
     <div class="esc-kpi-card">
       <div class="esc-kpi-label">Despesas do mês</div>
       <div class="esc-kpi-valor" style="color:var(--verm2)">${_fmtExt(despMes)}</div>
-      <div class="esc-kpi-delta flat">folha + custos fixos</div>
+      <div class="esc-kpi-delta flat">folha + custos fixos (mês anterior)</div>
     </div>
     <div class="esc-kpi-card">
       <div class="esc-kpi-label">Caixa do escritório</div>
@@ -611,41 +615,15 @@ function _escKpis(esc, j) {
   </div>`;
 }
 
-// Dados ilustrativos — ainda não há sistema de funcionários/clientes nomeados no banco
-const ESC_EQUIPE_MOCK = [
-  { nome:'Dr. Gabriel Monteiro', cargo:'Advogado Sênior', esp:'Tributário',     prod:92, ini:'GM' },
-  { nome:'Dra. Larissa Mendes',  cargo:'Advogada Plena',  esp:'Contencioso',    prod:88, ini:'LM' },
-  { nome:'Dr. Pedro Almeida',    cargo:'Advogado Júnior', esp:'Tributário',     prod:74, ini:'PA' },
-  { nome:'Juliana Prado',        cargo:'Assistente Jurídica', esp:'Administrativo', prod:81, ini:'JP' },
-];
-const ESC_CLIENTES_MOCK = [
-  { nome:'Torre e Cia',     tipo:'Holding Empresarial',    proc:'23 processos', icone:'🏢' },
-  { nome:'GPA',             tipo:'Varejo e Alimentação',   proc:'18 processos', icone:'🛒' },
-  { nome:'Via Varejo',      tipo:'Varejo',                  proc:'15 processos', icone:'📦' },
-  { nome:'Grupo Solares',   tipo:'Energia Renovável',       proc:'12 processos', icone:'☀️' },
-];
-
 function _escEquipeCard() {
   return `
   <div class="esc-card-bloco">
     <div class="secao-header" style="margin-bottom:.8rem">
-      <div class="secao-titulo">Equipe do Escritório<span class="esc-mock-badge">Em breve</span></div>
+      <div class="secao-titulo">Equipe do Escritório</div>
     </div>
-    ${ESC_EQUIPE_MOCK.map(p => `
-      <div class="esc-equipe-linha">
-        <div class="esc-avatar">${p.ini}</div>
-        <div class="esc-equipe-info">
-          <div class="esc-equipe-nome">${p.nome}</div>
-          <div class="esc-equipe-cargo">${p.cargo}</div>
-        </div>
-        <div class="esc-equipe-direita">
-          <div class="esc-equipe-esp">${p.esp}</div>
-          <div class="esc-equipe-prod">${p.prod}%</div>
-        </div>
-      </div>`).join('')}
-    <button class="btn btn-ghost btn-sm btn-block" style="margin-top:.8rem" disabled title="Em breve">
-      Gerenciar Equipe
-    </button>
+    <div id="esc-equipe-embed">
+      <div style="font-size:.78rem;color:var(--txt3);padding:.5rem 0">Carregando equipe...</div>
+    </div>
   </div>`;
 }
 
@@ -653,21 +631,13 @@ function _escClientesCard() {
   return `
   <div class="esc-card-bloco">
     <div class="secao-header" style="margin-bottom:.8rem">
-      <div class="secao-titulo">Clientes Corporativos<span class="esc-mock-badge">Em breve</span></div>
+      <div class="secao-titulo">Clientes Corporativos</div>
     </div>
-    ${ESC_CLIENTES_MOCK.map(c => `
-      <div class="esc-cliente-linha">
-        <div class="esc-cliente-icone">${c.icone}</div>
-        <div class="esc-cliente-info">
-          <div class="esc-cliente-nome">${c.nome}</div>
-          <div class="esc-cliente-tipo">${c.tipo}</div>
-        </div>
-        <div class="esc-cliente-direita">${c.proc}</div>
-      </div>`).join('')}
-    <button class="btn btn-ghost btn-sm btn-block" style="margin-top:.8rem" disabled title="Em breve">
-      Ver todos os clientes
-    </button>
+    <div id="esc-clientes-embed">
+      <div style="font-size:.78rem;color:var(--txt3);padding:.5rem 0">Carregando clientes...</div>
+    </div>
   </div>`;
+}
 }
 
 // Normaliza sócios (mesma lógica de escritorio_financas.js, duplicada aqui

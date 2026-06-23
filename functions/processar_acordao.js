@@ -267,7 +267,10 @@ exports.processarAcordao = onCall({ region: 'southamerica-east1' }, async (reque
         const escRef = db.collection('escritorios').doc(escritorioDoCaso);
         const escSnap = await escRef.get();
         if (escSnap.exists) {
-          await escRef.update({ caixa: (escSnap.data().caixa||0) + honAcordao });
+          await escRef.update({
+            caixa: (escSnap.data().caixa||0) + honAcordao,
+            faturamento_mes_atual: (escSnap.data().faturamento_mes_atual||0) + honAcordao,
+          });
           resposta.honNoCaixa = true;
         }
       } else {

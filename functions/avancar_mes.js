@@ -249,9 +249,9 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
 
   if (j.escritorio_proprio_id) {
     try {
-      const funcSnap = await db
-        .collection('escritorios')
-        .doc(j.escritorio_proprio_id)
+      const escRefProprio = db.collection('escritorios').doc(j.escritorio_proprio_id);
+      await escRefProprio.update({ faturamento_mes_atual: 0 });
+      const funcSnap = await escRefProprio
         .collection('funcionarios')
         .get();
       const resets = funcSnap.docs.map(d =>
@@ -950,10 +950,17 @@ async function _processarServicosMensalCF(db, uid, j) {
   }
 
   if (receitaRecorrente > 0) {
-    await db.collection('jogadores').doc(uid).update({
-      dinheiro: (j.dinheiro||0) + receitaRecorrente,
-      honorarios_mes: (j.honorarios_mes||0) + receitaRecorrente,
-    });
+    if (j.escritorio_proprio_id) {
+      await escRef.update({
+        caixa: (esc.caixa||0) + receitaRecorrente,
+        faturamento_mes_atual: (esc.faturamento_mes_atual||0) + receitaRecorrente,
+      });
+    } else {
+      await db.collection('jogadores').doc(uid).update({
+        dinheiro: (j.dinheiro||0) + receitaRecorrente,
+        honorarios_mes: (j.honorarios_mes||0) + receitaRecorrente,
+      });
+    }
   }
 
   for (const cDoc of clRecSnap.docs) {
