@@ -3140,14 +3140,8 @@ window.novoProcessoPool = async function() {
   const esc = escSnap.data();
   const tier = esc.tier || 1;
 
-  // ── EQUIPE MÍNIMA POR CARGO — a partir de Sênior, captar causas desse
-  // porte exige advogados contratados mínimos, não só o dono sozinho.
-  const escSnap = await getDoc(doc(db, 'escritorios', j.escritorio_proprio_id));
-  if (!escSnap.exists()) { toast('Escritório não encontrado.', 'ko'); return; }
-  const esc = escSnap.data();
-  const tier = esc.tier || 1;
- 
-  // ── EQUIPE MÍNIMA POR TIER — o ESCRITÓRIO (não o cargo do dono que
+
+// ── EQUIPE MÍNIMA POR TIER — o ESCRITÓRIO (não o cargo do dono que
   // está logado) precisa ter advogados contratados mínimos para captar
   // causas desse porte. Mesma trava vale para qualquer sócio.
   const equipeMinimaExigida = (window.EQUIPE_MINIMA_POR_TIER || {})[tier] || 0;
@@ -3165,16 +3159,12 @@ window.novoProcessoPool = async function() {
   }
  
   const limiteMes = LIMITE_POOL_CASOS_MES_TIER[tier] || LIMITE_POOL_CASOS_MES_TIER[1];
-
-  const limiteMes = LIMITE_POOL_CASOS_MES_TIER[tier] || LIMITE_POOL_CASOS_MES_TIER[1];
   const limiteAbertos = LIMITE_POOL_CASOS_ABERTOS_TIER[tier] || LIMITE_POOL_CASOS_ABERTOS_TIER[1];
-
   const usadosMes = esc.pool_casos_criados_mes || 0;
   if (usadosMes >= limiteMes) {
     toast(`🔒 Limite mensal de captação atingido (${usadosMes}/${limiteMes} para Tier ${tier}).`, 'ko', 5000);
     return;
   }
-
   const abertosSnap = await getDocs(query(
     collection(db, 'processos'),
     where('pool_escritorio_id', '==', j.escritorio_proprio_id),
@@ -3184,7 +3174,6 @@ window.novoProcessoPool = async function() {
     toast(`🔒 Fila do escritório cheia (${abertosSnap.size}/${limiteAbertos} casos abertos). Conclua casos antes de captar novos.`, 'ko', 6000);
     return;
   }
-
   const proc = _gerarProcessoCompleto(j);
   proc.pool_escritorio_id = j.escritorio_proprio_id;
   proc.escritorio_nome_etiqueta = esc.nome || j.escritorio_nome || null;
@@ -3192,7 +3181,6 @@ window.novoProcessoPool = async function() {
   proc.prazo_limite_mes = mesTotalPessoalProc(j) + PRAZO_POOL_MESES;
   proc.contribuintes = [];
   proc.advogado_uid = null;
-
   try {
     await addDoc(collection(db, 'processos'), proc);
     await updateDoc(doc(db, 'escritorios', j.escritorio_proprio_id), { pool_casos_criados_mes: usadosMes + 1 });
@@ -3201,7 +3189,6 @@ window.novoProcessoPool = async function() {
     setTimeout(() => window.navTo && window.navTo('processos', null), 400);
   } catch (err) { toast('Erro ao captar caso para o escritório.', 'ko'); console.error(err); }
 };
-
 // ════════════════════════════════════════════════════════
 // LISTAGEM DO POOL
 // ════════════════════════════════════════════════════════
