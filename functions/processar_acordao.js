@@ -82,7 +82,9 @@ function recalcularVotos(p) {
   const colegiado = p.colegiado_recurso || [];
   const estrategiasEscolhidas = p.estrategias_recurso || [];
   const historico = p.historico_respostas_recurso || [];
-  const ARGS = banco.argsRecursoPara(quemRecorre);
+  const ARGS_COMPLETO = banco.argsRecursoPara(quemRecorre);
+  const idx = p.args_recurso_indices || [0, 1];
+  const ARGS = idx.map(i => ARGS_COMPLETO[i]);
   const ESTRATEGIAS = banco.estrategiasRecursoPara(quemRecorre);
 
   const scores = colegiado.map(jz => ({ ...jz, score: jz.score_inicial }));
@@ -144,8 +146,8 @@ exports.processarAcordao = onCall({ region: 'southamerica-east1' }, async (reque
   if (p.status !== 'recurso_pendente') throw new HttpsError('failed-precondition', 'Processo não está em fase de recurso.');
   if (!p.colegiado_recurso || !p.colegiado_recurso.length) throw new HttpsError('failed-precondition', 'Colegiado ainda não foi sorteado.');
 
-  const ARGS = banco.argsRecursoPara(p.quem_recorre);
-  if ((p.historico_respostas_recurso || []).length < ARGS.length) {
+  const idx = p.args_recurso_indices || [0, 1];
+  if ((p.historico_respostas_recurso || []).length < idx.length) {
     throw new HttpsError('failed-precondition', 'Sustentação recursal ainda não foi concluída.');
   }
 
@@ -189,28 +191,18 @@ exports.processarAcordao = onCall({ region: 'southamerica-east1' }, async (reque
   }
 
   const xpGanho = banco.xpPorDecisao(p.instancia_seguinte, novoScore);
-
-  const jogadorGanhouEsteJulgamento = (categoria === 'mantem' && p.quem_recorre === 'parte_contraria')
-    || (categoria !== 'mantem' && p.quem_recorre === 'jogador');
-
-  // ── ATALHO "PRODÍGIO DOS RECURSOS" ──
-  // Conta vitórias do JOGADOR em instâncias superiores (STJ/TST/STF) —
-  // usado como trava alternativa de promoção de cargo (ver _podePromover).
-  const ehInstanciaSuperior = ['STJ', 'TST', 'STF'].includes(p.instancia_seguinte);
-  const ganhouRecursoSuperior = ehInstanciaSuperior && jogadorGanhouEsteJulgamento;
-
   await jogadorRef.update({
     reputacao: Math.max(0, Math.min(cap, rep + repDelta)),
     xp: (j.xp||0) + xpGanho,
-    ...(ganhouRecursoSuperior
-      ? { recursos_vencidos_superiores: (j.recursos_vencidos_superiores||0) + 1 }
-      : {}),
   });
 
   const votosFavorQuemTentaSubir = categoria === 'mantem' ? votosReformar : votosManter;
   const travado = acessoProximaInstanciaTravado(votosFavorQuemTentaSubir, totalVotos);
   const ehTopo = p.instancia_seguinte === 'STF';
   const quemPerdeuAgora = categoria === 'mantem' ? p.quem_recorre : (p.quem_recorre === 'jogador' ? 'parte_contraria' : 'jogador');
+
+  const jogadorGanhouEsteJulgamento = (categoria === 'mantem' && p.quem_recorre === 'parte_contraria')
+    || (categoria !== 'mantem' && p.quem_recorre === 'jogador');
 
   const resposta = {
     placar, categoria, ico, cor, txt, repDelta, xpGanho,
@@ -257,26 +249,20 @@ exports.processarAcordao = onCall({ region: 'southamerica-east1' }, async (reque
       status: jogadorGanhouEsteJulgamento ? 'ganho' : 'perdido',
       encerrado_mes: mesTotalPessoal(j),
     });
-
-    const escritorioDoCaso = p.pool_escritorio_id || j.escritorio_proprio_id;
-
-    // ── REPUTAÇÃO DO ESCRITÓRIO ── mesma lógica da sentença de 1ª
-    // instância: +2 vitória / -1 derrota, nunca abaixo de 0.
-    if (escritorioDoCaso) {
-      try {
-        const escRef = db.collection('escritorios').doc(escritorioDoCaso);
-        const escSnap = await escRef.get();
-        if (escSnap.exists) {
-          const repAtual = escSnap.data().reputacao || 0;
-          const delta = jogadorGanhouEsteJulgamento ? 2 : -1;
-          await escRef.update({ reputacao: Math.max(0, repAtual + delta) });
-        }
-      } catch (e) { logger.warn('Atualização de reputação do escritório falhou:', e); }
-    }
-
     if (jogadorGanhouEsteJulgamento) {
+      // hon_pendente só existe quando o jogador tinha GANHO a sentença
+      // original e a parte contrária recorreu (a sentença já calculou o
+      // honorário potencial naquele momento). Quando é o jogador quem
+      // recorreu de uma DERROTA e venceu agora no tribunal, hon_pendente
+      // nunca foi definido — esta é a primeira vitória real do processo,
+      // então o honorário precisa ser calculado aqui, sobre o valor da
+      // causa, usando a mesma taxa de sucumbência recursal (10%) usada
+      // na sentença de 1ª instância (sem o componente de 30% de
+      // contingência, que é específico de honorário contratual da
+      // sentença original, não de recurso).
       const honAcordao = (p.hon_pendente > 0) ? p.hon_pendente : Math.floor((p.valor || 0) * 0.10);
 
+      const escritorioDoCaso = p.pool_escritorio_id || j.escritorio_proprio_id;
       if (escritorioDoCaso) {
         const escRef = db.collection('escritorios').doc(escritorioDoCaso);
         const escSnap = await escRef.get();

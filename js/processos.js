@@ -2648,11 +2648,16 @@ window.confirmarPreparacaoProducao = async function() {
     sensibilidade: 0.45 + Math.random()*1.25,
   }));
 
+  const argsDisponiveis = RECURSO_ATIVO.quem_recorre === 'jogador' ? ARGS_RECURSO_RECORRENTE : ARGS_RECURSO_DEFESA;
+  const indicesEscolhidos = [...argsDisponiveis.keys()].sort(() => Math.random() - 0.5).slice(0, 2);
+
   await updateDoc(doc(db, 'processos', RECURSO_ATIVO.id), {
     colegiado_recurso: SCORES_JULGADOR.map(jz => ({ cargo: jz.cargo, nome: jz.nome, classe: jz.classe, sensibilidade: jz.sensibilidade, score_inicial: jz.score })),
     estrategias_recurso: estrategiasEscolhidas,
     historico_respostas_recurso: [],
+    args_recurso_indices: indicesEscolhidos,
   });
+  RECURSO_ATIVO.args_recurso_indices = indicesEscolhidos;
 
   _renderRodadaRecurso();
 };
@@ -2763,10 +2768,18 @@ const RESPS_RECURSO_RECORRENTE = {
 };
 
 function _argsRecursoAtuais() {
-  return RECURSO_ATIVO.quem_recorre === 'jogador' ? ARGS_RECURSO_RECORRENTE : ARGS_RECURSO_DEFESA;
+  const todos = RECURSO_ATIVO.quem_recorre === 'jogador' ? ARGS_RECURSO_RECORRENTE : ARGS_RECURSO_DEFESA;
+  const idx = RECURSO_ATIVO.args_recurso_indices || [0, 1];
+  return idx.map(i => todos[i]);
 }
 function _respsRecursoAtuais() {
-  return RECURSO_ATIVO.quem_recorre === 'jogador' ? RESPS_RECURSO_RECORRENTE : RESPS_RECURSO_DEFESA;
+  const todasResps = RECURSO_ATIVO.quem_recorre === 'jogador' ? RESPS_RECURSO_RECORRENTE : RESPS_RECURSO_DEFESA;
+  const idx = RECURSO_ATIVO.args_recurso_indices || [0, 1];
+  return {
+    tecnica: idx.map(i => todasResps.tecnica[i]),
+    agressiva: idx.map(i => todasResps.agressiva[i]),
+    passiva: idx.map(i => todasResps.passiva[i]),
+  };
 }
 
 function _renderRodadaRecurso() {
