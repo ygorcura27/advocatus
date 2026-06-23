@@ -227,6 +227,7 @@ exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (requ
       encerrado_mes: mesAtual,
       hon_total_acumulado: favoravelAoJogador ? honPotencial : 0,
       convencimento: score,
+      delegado_revisao_pendente: false,
     });
     // ── REPUTAÇÃO DO ESCRITÓRIO ── +2 vitória / -1 derrota com trânsito
     // em julgado, nunca abaixo de 0.
