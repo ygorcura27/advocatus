@@ -3142,7 +3142,15 @@ window.novoProcessoPool = async function() {
 
   // ── EQUIPE MÍNIMA POR CARGO — a partir de Sênior, captar causas desse
   // porte exige advogados contratados mínimos, não só o dono sozinho.
-  const equipeMinimaExigida = (window.EQUIPE_MINIMA_POR_CARGO || {})[j.cargo_id] || 0;
+  const escSnap = await getDoc(doc(db, 'escritorios', j.escritorio_proprio_id));
+  if (!escSnap.exists()) { toast('Escritório não encontrado.', 'ko'); return; }
+  const esc = escSnap.data();
+  const tier = esc.tier || 1;
+ 
+  // ── EQUIPE MÍNIMA POR TIER — o ESCRITÓRIO (não o cargo do dono que
+  // está logado) precisa ter advogados contratados mínimos para captar
+  // causas desse porte. Mesma trava vale para qualquer sócio.
+  const equipeMinimaExigida = (window.EQUIPE_MINIMA_POR_TIER || {})[tier] || 0;
   if (equipeMinimaExigida > 0) {
     const funcSnap = await getDocs(collection(db, 'escritorios', j.escritorio_proprio_id, 'funcionarios'));
     const CARGO_RANK_ADV = { jnr:1, pln:1, snr:1, asc:1, soc:1, snm:1 };
@@ -3151,10 +3159,12 @@ window.novoProcessoPool = async function() {
       return f.ativo !== false && CARGO_RANK_ADV[f.cargo_id];
     }).length;
     if (nAdvogados < equipeMinimaExigida) {
-      toast(`🔒 Causas deste porte exigem equipe mínima de ${equipeMinimaExigida} advogado(s) contratado(s) (atual: ${nAdvogados}).`, 'ko', 6000);
+      toast(`🔒 Causas deste porte (Tier ${tier}) exigem equipe mínima de ${equipeMinimaExigida} advogado(s) contratado(s) (atual: ${nAdvogados}).`, 'ko', 6000);
       return;
     }
   }
+ 
+  const limiteMes = LIMITE_POOL_CASOS_MES_TIER[tier] || LIMITE_POOL_CASOS_MES_TIER[1];
 
   const limiteMes = LIMITE_POOL_CASOS_MES_TIER[tier] || LIMITE_POOL_CASOS_MES_TIER[1];
   const limiteAbertos = LIMITE_POOL_CASOS_ABERTOS_TIER[tier] || LIMITE_POOL_CASOS_ABERTOS_TIER[1];
