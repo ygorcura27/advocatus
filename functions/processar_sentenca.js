@@ -184,7 +184,7 @@ exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (requ
 
   const recorre = banco.decidirRecurso(favoravelAoJogador ? score : 100 - score);
 
-  if (recorre) {
+if (recorre) {
     const { dataDisponivel, prazoFinal } = banco.calcularPrazosRecurso(j.mes_pessoal||0, j.ano_pessoal||1);
     const quemRecorre = favoravelAoJogador ? 'parte_contraria' : 'jogador';
     await processoRef.update({
@@ -196,7 +196,8 @@ exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (requ
       data_disponivel_recurso: dataDisponivel,
       prazo_final_recurso: prazoFinal,
       encerrado_mes: null,
-      convencimento: score, // sincroniza o valor real recalculado de volta
+      convencimento: score,
+      delegado_revisao_pendente: false,
     });
     return { categoria, txt, repDelta, xpGanho, recorre: true, quemRecorre, instanciaSeguinte: p.instancia_seguinte, demitido };
   } else {
