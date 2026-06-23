@@ -287,25 +287,40 @@ async function _registrarCliente(escId, oportunidade) {
   }
 }
 
+// ════════════════════════════════════════════════════════
+// TRECHO PARA SUBSTITUIR em servicos.js — troca _gerarProcessoAutomatico
+// para reaproveitar _gerarProcessoCompleto (processos.js), que já monta
+// provas/teses/juiz/args_audiencia. Antes este processo "esqueleto" não
+// tinha esses campos e quebrava ao abrir a audiência (Cannot read
+// properties of undefined (reading 'map') em _renderSelecaoProvas).
+//
+// IMPORTANTE: _gerarProcessoCompleto precisa estar acessível aqui — se
+// estiver em processos.js como função não-exportada (sem `export`),
+// adicione `export` na declaração dela em processos.js e importe:
+//   import { _gerarProcessoCompleto } from './processos.js';
+// no topo de servicos.js.
+// ════════════════════════════════════════════════════════
+ 
 async function _gerarProcessoAutomatico(j, oportunidade) {
   const AREAS_SERVICO = {
     consulta:'civil', parecer:'tributario', contrato:'empresarial',
     notificacao:'civil', cobranca:'civil',
   };
-  const area = AREAS_SERVICO[oportunidade.tipo] || 'civil';
-  const valorCausa = oportunidade.valor * (3 + Math.random()*5);
-
-  await addDoc(collection(db,'processos'), {
-    numero: `${String(Math.floor(Math.random()*9999999)).padStart(7,'0')}-${String(Math.floor(Math.random()*99)).padStart(2,'0')}.${j.ano_pessoal||1}.8.19.0001`,
-    tipo: 'Ação decorrente de ' + oportunidade.tipo,
-    area, tipo_processo: 'judicial',
-    autor: j.nome_personagem || 'Advogado', reu: oportunidade.cliente_nome,
-    tribunal: 'TJRJ', advogado_uid: j.uid, escritorio_id: j.escritorio_proprio_id||null,
-    status:'andamento', instancia:1, progresso:0, chance_sucesso:55,
-    valor: Math.floor(valorCausa), nivel:5, hon_total_acumulado:0,
-    urgente:false, recurso_pendente:false,
-    criado_mes: j.mes_pessoal||0, encerrado_mes:null,
-  });
+  // Empresta a especialidade do tipo de serviço só para escolher a área
+  // do banco jurídico — não sobrescreve a especialidade do personagem.
+  const jComEspecialidadeServico = { ...j, especialidade: AREAS_SERVICO[oportunidade.tipo] || j.especialidade || 'civil' };
+ 
+  const distribuidoPeloEscritorio = !!j.escritorio_proprio_id;
+  const proc = _gerarProcessoCompleto(jComEspecialidadeServico, distribuidoPeloEscritorio);
+ 
+  // Ajusta só os campos que devem refletir a ORIGEM (Oportunidade), sem
+  // tocar nos campos do motor (provas/teses/juiz/args já vieram certos).
+  proc.tipo = 'Ação decorrente de ' + oportunidade.tipo;
+  proc.reu = oportunidade.cliente_nome;
+  proc.valor = Math.floor(oportunidade.valor * (3 + Math.random()*5));
+  proc.origem_oportunidade = true;
+ 
+  await addDoc(collection(db,'processos'), proc);
 }
 
 // ════════════════════════════════════════════════════════
