@@ -638,7 +638,6 @@ function _escClientesCard() {
     </div>
   </div>`;
 }
-}
 
 // Normaliza sócios (mesma lógica de escritorio_financas.js, duplicada aqui
 // para uso isolado no componente de hero/KPIs/donut)
