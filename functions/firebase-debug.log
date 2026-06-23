@@ -1,0 +1,143 @@
+[debug] [2026-06-23T22:50:04.255Z] ----------------------------------------------------------------------
+[debug] [2026-06-23T22:50:04.258Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy
+[debug] [2026-06-23T22:50:04.258Z] CLI Version:   15.22.1
+[debug] [2026-06-23T22:50:04.258Z] Platform:      win32
+[debug] [2026-06-23T22:50:04.258Z] Node Version:  v24.16.0
+[debug] [2026-06-23T22:50:04.259Z] Detected Agent: unknown
+[debug] [2026-06-23T22:50:04.259Z] Time:          Tue Jun 23 2026 19:50:04 GMT-0300 (Horário Padrão de Brasília)
+[debug] [2026-06-23T22:50:04.259Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-06-23T22:50:06.176Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-06-23T22:50:06.176Z] > authorizing via signed-in user (ygorcura27@gmail.com)
+[debug] [2026-06-23T22:50:06.176Z] [iam] checking project advocatus-simultor for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2026-06-23T22:50:06.177Z] Checked if tokens are valid: true, expires at: 1782258213432
+[debug] [2026-06-23T22:50:06.177Z] Checked if tokens are valid: true, expires at: 1782258213432
+[debug] [2026-06-23T22:50:06.178Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/advocatus-simultor:testIamPermissions [none]
+[debug] [2026-06-23T22:50:06.178Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/advocatus-simultor:testIamPermissions  x-goog-user-project=advocatus-simultor
+[debug] [2026-06-23T22:50:06.178Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/advocatus-simultor:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-06-23T22:50:07.048Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/advocatus-simultor:testIamPermissions 200
+[debug] [2026-06-23T22:50:07.048Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/advocatus-simultor:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-06-23T22:50:07.048Z] Checked if tokens are valid: true, expires at: 1782258213432
+[debug] [2026-06-23T22:50:07.048Z] Checked if tokens are valid: true, expires at: 1782258213432
+[debug] [2026-06-23T22:50:07.048Z] >>> [apiv2][query] POST https://iam.googleapis.com/v1/projects/advocatus-simultor/serviceAccounts/advocatus-simultor@appspot.gserviceaccount.com:testIamPermissions [none]
+[debug] [2026-06-23T22:50:07.048Z] >>> [apiv2][body] POST https://iam.googleapis.com/v1/projects/advocatus-simultor/serviceAccounts/advocatus-simultor@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[debug] [2026-06-23T22:50:07.964Z] <<< [apiv2][status] POST https://iam.googleapis.com/v1/projects/advocatus-simultor/serviceAccounts/advocatus-simultor@appspot.gserviceaccount.com:testIamPermissions 200
+[debug] [2026-06-23T22:50:07.964Z] <<< [apiv2][body] POST https://iam.googleapis.com/v1/projects/advocatus-simultor/serviceAccounts/advocatus-simultor@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[debug] [2026-06-23T22:50:07.964Z] Checked if tokens are valid: true, expires at: 1782258213432
+[debug] [2026-06-23T22:50:07.964Z] Checked if tokens are valid: true, expires at: 1782258213432
+[debug] [2026-06-23T22:50:07.965Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/advocatus-simultor [none]
+[debug] [2026-06-23T22:50:08.403Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/advocatus-simultor 200
+[debug] [2026-06-23T22:50:08.403Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/advocatus-simultor {"projectId":"advocatus-simultor","projectNumber":"527755299061","displayName":"advocatus-simultor","name":"projects/advocatus-simultor","resources":{"hostingSite":"advocatus-simultor"},"state":"ACTIVE","etag":"1_c30eb416-5e46-43c9-a244-4cdcc8738145"}
+[info] 
+[info] === Deploying to 'advocatus-simultor'...
+[info] 
+[info] i  deploying firestore, functions, hosting 
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[debug] [2026-06-23T22:50:08.409Z] Checked if tokens are valid: true, expires at: 1782258213432
+[debug] [2026-06-23T22:50:08.409Z] Checked if tokens are valid: true, expires at: 1782258213432
+[debug] [2026-06-23T22:50:08.409Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/advocatus-simultor/databases/(default) [none]
+[debug] [2026-06-23T22:50:08.657Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/advocatus-simultor/databases/(default) 200
+[debug] [2026-06-23T22:50:08.658Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/advocatus-simultor/databases/(default) {"name":"projects/advocatus-simultor/databases/(default)","uid":"2a16cb3d-4a9f-48fa-a0bb-b580b4c54e07","createTime":"2026-06-14T21:41:40.808809Z","updateTime":"2026-06-14T21:41:40.808809Z","locationId":"southamerica-east1","type":"FIRESTORE_NATIVE","concurrencyMode":"PESSIMISTIC","versionRetentionPeriod":"3600s","earliestVersionTime":"2026-06-23T21:50:14.525748Z","appEngineIntegrationMode":"DISABLED","keyPrefix":"i","pointInTimeRecoveryEnablement":"POINT_IN_TIME_RECOVERY_DISABLED","deleteProtectionState":"DELETE_PROTECTION_DISABLED","databaseEdition":"STANDARD","freeTier":true,"realtimeUpdatesMode":"REALTIME_UPDATES_MODE_ENABLED","etag":"IKTxqKi5npUDMPaY6YTdh5UD"}
+[info] i  firestore: reading indexes from firestore.indexes.json... 
+[info] i  cloud.firestore: checking firestore.rules for compilation errors... 
+[debug] [2026-06-23T22:50:08.661Z] Checked if tokens are valid: true, expires at: 1782258213432
+[debug] [2026-06-23T22:50:08.661Z] Checked if tokens are valid: true, expires at: 1782258213432
+[debug] [2026-06-23T22:50:08.661Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/advocatus-simultor:test [none]
+[debug] [2026-06-23T22:50:08.661Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/advocatus-simultor:test [omitted]
+[debug] [2026-06-23T22:50:09.224Z] <<< [apiv2][status] POST https://firebaserules.googleapis.com/v1/projects/advocatus-simultor:test 200
+[debug] [2026-06-23T22:50:09.224Z] <<< [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/advocatus-simultor:test {}
+[info] +  cloud.firestore: rules file firestore.rules compiled successfully 
+[debug] [2026-06-23T22:50:09.226Z] Checked if tokens are valid: true, expires at: 1782258213432
+[debug] [2026-06-23T22:50:09.226Z] Checked if tokens are valid: true, expires at: 1782258213432
+[debug] [2026-06-23T22:50:09.226Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/advocatus-simultor [none]
+[debug] [2026-06-23T22:50:09.458Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/advocatus-simultor 200
+[debug] [2026-06-23T22:50:09.459Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/advocatus-simultor {"projectNumber":"527755299061","projectId":"advocatus-simultor","lifecycleState":"ACTIVE","name":"advocatus-simultor","labels":{"firebase":"enabled","firebase-core":"disabled"},"createTime":"2026-06-14T21:39:04.604Z"}
+[info] i  functions: preparing codebase default for deployment 
+[info] i  functions: ensuring required API cloudfunctions.googleapis.com is enabled... 
+[info] i  functions: ensuring required API cloudbuild.googleapis.com is enabled... 
+[info] i  artifactregistry: ensuring required API artifactregistry.googleapis.com is enabled... 
+[debug] [2026-06-23T22:50:09.463Z] Checked if tokens are valid: true, expires at: 1782258213432
+[debug] [2026-06-23T22:50:09.463Z] Checked if tokens are valid: true, expires at: 1782258213432
+[debug] [2026-06-23T22:50:09.463Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/advocatus-simultor/adminSdkConfig [none]
+[debug] [2026-06-23T22:50:09.814Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/advocatus-simultor/adminSdkConfig 200
+[debug] [2026-06-23T22:50:09.814Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/advocatus-simultor/adminSdkConfig {"projectId":"advocatus-simultor","storageBucket":"advocatus-simultor.firebasestorage.app"}
+[debug] [2026-06-23T22:50:09.815Z] Checked if tokens are valid: true, expires at: 1782258213432
+[debug] [2026-06-23T22:50:09.815Z] Checked if tokens are valid: true, expires at: 1782258213432
+[debug] [2026-06-23T22:50:09.815Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/advocatus-simultor/configs [none]
+[debug] [2026-06-23T22:50:10.908Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/advocatus-simultor/configs 200
+[debug] [2026-06-23T22:50:10.908Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/advocatus-simultor/configs {}
+[debug] [2026-06-23T22:50:10.910Z] Validating nodejs source
+[warn] !  functions: Runtime Node.js 20 was deprecated on 2026-04-30 and will be decommissioned on 2026-10-30, after which you will not be able to deploy without upgrading. Consider upgrading now to avoid disruption. See https://cloud.google.com/functions/docs/runtime-support for full details on the lifecycle policy 
+[warn] !  functions: Couldn't find firebase-functions package in your source code. Have you run 'npm install'? 
+[debug] [2026-06-23T22:50:10.912Z] getFunctionsSDKVersion encountered error: Cannot find module 'firebase-functions'
+Require stack:
+- C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\deploy\functions\runtimes\node\versioning.js
+- C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\deploy\functions\runtimes\node\index.js
+- C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\deploy\functions\runtimes\index.js
+- C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\deploy\functions\prepare.js
+- C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\emulator\functionsEmulatorShared.js
+- C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\frameworks\index.js
+- C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\deploy\hosting\prepare.js
+- C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\deploy\hosting\index.js
+- C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\deploy\index.js
+- C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\commands\deploy.js
+- C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\commands\index.js
+- C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\index.js
+- C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\cli.js
+- C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js {"code":"MODULE_NOT_FOUND","requireStack":["C:\\Users\\ygorc\\AppData\\Roaming\\npm\\node_modules\\firebase-tools\\lib\\deploy\\functions\\runtimes\\node\\versioning.js","C:\\Users\\ygorc\\AppData\\Roaming\\npm\\node_modules\\firebase-tools\\lib\\deploy\\functions\\runtimes\\node\\index.js","C:\\Users\\ygorc\\AppData\\Roaming\\npm\\node_modules\\firebase-tools\\lib\\deploy\\functions\\runtimes\\index.js","C:\\Users\\ygorc\\AppData\\Roaming\\npm\\node_modules\\firebase-tools\\lib\\deploy\\functions\\prepare.js","C:\\Users\\ygorc\\AppData\\Roaming\\npm\\node_modules\\firebase-tools\\lib\\emulator\\functionsEmulatorShared.js","C:\\Users\\ygorc\\AppData\\Roaming\\npm\\node_modules\\firebase-tools\\lib\\frameworks\\index.js","C:\\Users\\ygorc\\AppData\\Roaming\\npm\\node_modules\\firebase-tools\\lib\\deploy\\hosting\\prepare.js","C:\\Users\\ygorc\\AppData\\Roaming\\npm\\node_modules\\firebase-tools\\lib\\deploy\\hosting\\index.js","C:\\Users\\ygorc\\AppData\\Roaming\\npm\\node_modules\\firebase-tools\\lib\\deploy\\index.js","C:\\Users\\ygorc\\AppData\\Roaming\\npm\\node_modules\\firebase-tools\\lib\\commands\\deploy.js","C:\\Users\\ygorc\\AppData\\Roaming\\npm\\node_modules\\firebase-tools\\lib\\commands\\index.js","C:\\Users\\ygorc\\AppData\\Roaming\\npm\\node_modules\\firebase-tools\\lib\\index.js","C:\\Users\\ygorc\\AppData\\Roaming\\npm\\node_modules\\firebase-tools\\lib\\bin\\cli.js","C:\\Users\\ygorc\\AppData\\Roaming\\npm\\node_modules\\firebase-tools\\lib\\bin\\firebase.js"]}
+[debug] [2026-06-23T22:50:10.912Z] checkFunctionsSDKVersion encountered error: Invalid Version:  {}
+[debug] [2026-06-23T22:50:10.913Z] > [functions] package.json contents: {
+  "name": "advocatus-online-functions",
+  "description": "Advocatus Online — Cloud Functions",
+  "scripts": {
+    "serve": "firebase emulators:start --only functions,firestore",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "engines": {
+    "node": "20"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "firebase-admin": "^12.0.0",
+    "firebase-functions": "^4.9.0"
+  },
+  "devDependencies": {
+    "firebase-functions-test": "^3.1.0"
+  },
+  "private": true
+}
+[debug] [2026-06-23T22:50:10.913Z] Building nodejs source
+[info] i  functions: Loading and analyzing source code for codebase default to determine what to deploy 
+[debug] [2026-06-23T22:50:10.913Z] Could not parse firebase-functions version '' into semver.
+[debug] [2026-06-23T22:50:10.914Z] Could not find functions.yaml. Must use http discovery
+[debug] [2026-06-23T22:50:11.056Z] Error: Cannot find module 'firebase-functions'
+Require stack:
+- C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\deploy\functions\runtimes\node\index.js
+- C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\deploy\functions\runtimes\index.js
+- C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\deploy\functions\prepare.js
+- C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\emulator\functionsEmulatorShared.js
+- C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\frameworks\index.js
+- C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\deploy\hosting\prepare.js
+- C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\deploy\hosting\index.js
+- C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\deploy\index.js
+- C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\commands\deploy.js
+- C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\commands\index.js
+- C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\index.js
+- C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\cli.js
+- C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1500:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1071:27)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1116:12)
+    at require.resolve (node:internal/modules/helpers:171:31)
+    at Delegate.findFunctionsBinary (C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\deploy\functions\runtimes\node\index.js:101:33)
+    at Delegate.spawnFunctionsProcess (C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\deploy\functions\runtimes\node\index.js:131:30)
+    at Delegate.serveAdmin (C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\deploy\functions\runtimes\node\index.js:152:35)
+    at Delegate.discoverBuild (C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\deploy\functions\runtimes\node\index.js:192:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async loadCodebases (C:\Users\ygorc\AppData\Roaming\npm\node_modules\firebase-tools\lib\deploy\functions\prepare.js:393:33)
+[error] 
+[error] Error: An unexpected error has occurred.
