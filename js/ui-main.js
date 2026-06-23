@@ -344,20 +344,35 @@ function _cardProcessoEnc(id, p) {
 // ════════════════════════════════════════════════════════
 function renderEscritorio(j, el) {
   const isSolo  = !j.escritorio_proprio_id && (!j.escritorio_empregado_id || j.escritorio_id === 'solo' || !j.escritorio_id);
-  const escNome = j.escritorio_nome || 'Advocacia Solo';
 
-  // Se está empregado num escritório NPC (não é o dono), mostrar detalhes de empregado
+  // Empregado num escritório NPC (não é o dono) → vista de empregado
   if (!isSolo && !j.escritorio_proprio_id && j.escritorio_id && j.escritorio_id !== 'solo') {
     _renderEscritorioNPC(j, el);
     return;
   }
 
+  // Dono de escritório próprio → dashboard executivo completo
+  if (j.escritorio_proprio_id) {
+    el.innerHTML = `
+      ${_escHero(j, null)}
+      ${_escKpis(null, j)}
+      <div class="esc-grid-3">
+        ${_escEquipeCard()}
+        ${_escClientesCard()}
+        ${_escSocietarioCard(null, j)}
+      </div>
+      <div id="esc-financas-upgrade"></div>
+      ${_escAcoesRapidas(j, null)}
+    `;
+    _carregarEscritorioProprio(j.escritorio_proprio_id, j);
+    return;
+  }
+
+  // Advocacia solo — sem escritório formal ainda
   el.innerHTML = `
     <div class="secao-header">
       <div class="secao-titulo">🏢 Escritório</div>
-      ${isSolo ? `<button class="btn btn-sm btn-sec" onclick="window.criarEscritorio && window.criarEscritorio()">+ Criar escritório</button>` : ''}
     </div>
-    ${isSolo ? `
     <div class="card" style="text-align:center;padding:2rem">
       <div style="font-size:2rem;margin-bottom:.6rem">⚖️</div>
       <div class="card-titulo">Advocacia Solo</div>
@@ -372,24 +387,7 @@ function renderEscritorio(j, el) {
       <div style="font-size:.75rem;color:var(--ardosia);margin-top:1rem">
         ${!j.oab ? 'Requer OAB aprovada' : 'Requer Advogado Júnior ou superior'}
       </div>`}
-    </div>` : j.escritorio_proprio_id ? `
-    <div class="card">
-      <div class="card-titulo">🏛️ ${escNome}</div>
-      <div class="card-sub">Seu escritório próprio.</div>
-    </div>
-    <div id="escritorio-proprio-detalhes">Carregando...</div>` : `
-    <div class="card">
-      <div class="card-titulo">${escNome}</div>
-      <div class="card-sub">Seu escritório atual. Detalhes carregando...</div>
-    </div>
-    <div id="escritorio-detalhes">Carregando...</div>`}`;
-
-  if (!isSolo && j.escritorio_empregado_id) {
-    _carregarEscritorio(j.escritorio_empregado_id);
-  }
-  if (j.escritorio_proprio_id) {
-    _carregarEscritorioProprio(j.escritorio_proprio_id, j);
-  }
+    </div>`;
 }
 
 async function _carregarEscritorioProprio(escId, j) {
@@ -399,11 +397,26 @@ async function _carregarEscritorioProprio(escId, j) {
     );
     const { db: fbDb } = await import('./firebase-init.js');
     const snap = await fbGetDoc(fbDoc(fbDb, 'escritorios', escId));
-    const el = document.getElementById('escritorio-proprio-detalhes');
-    if (!el) return;
-    if (!snap.exists()) { el.innerHTML = '<div class="card">Escritório não encontrado.</div>'; return; }
+    if (!snap.exists()) return;
     const esc = { id: escId, ...snap.data() };
-    el.innerHTML = (window.renderBlocoFinancas ? window.renderBlocoFinancas(esc, j) : '');
+
+    // Re-renderizar hero/KPIs/societário/ações agora com dados reais do escritório
+    const main = document.getElementById('main-content');
+    if (main) {
+      main.innerHTML = `
+        ${_escHero(j, esc)}
+        ${_escKpis(esc, j)}
+        <div class="esc-grid-3">
+          ${_escEquipeCard()}
+          ${_escClientesCard()}
+          ${_escSocietarioCard(esc, j)}
+        </div>
+        <div id="esc-financas-upgrade">
+          ${window.renderBlocoFinancas ? window.renderBlocoFinancas(esc, j) : ''}
+        </div>
+        ${_escAcoesRapidas(j, esc)}
+      `;
+    }
   } catch (e) {
     console.error('Erro ao carregar escritório próprio:', e);
   }
@@ -463,6 +476,8 @@ function _renderEscritorioNPC(j, el) {
   const fmtV = n => n>=1000000?`R$${(n/1000000).toFixed(0)}M`:n>=1000?`R$${(n/1000).toFixed(0)}k`:`R$${n}`;
 
   el.innerHTML = `
+    ${_escHero(j, null)}
+
     <div class="secao-header">
       <div class="secao-titulo">🏢 Meu Escritório</div>
       <span class="secao-badge" style="background:${TIER_COR[tier]}20;color:${TIER_COR[tier]}">Tier ${tier}</span>
@@ -521,6 +536,236 @@ function _espLabel2(esp) {
     ambiental:'Ambiental',previdenciario:'Previdenciário',
   };
   return MAP[esp]||esp||'—';
+}
+
+// ════════════════════════════════════════════════════════
+// ESCRITÓRIO — COMPONENTES DO REDESIGN (Hero / KPIs / Equipe /
+// Clientes / Societário / Ações Rápidas)
+// ════════════════════════════════════════════════════════
+
+function _escHero(j, esc) {
+  const escNome = (esc && esc.nome) || j.escritorio_nome || 'Advocacia Solo';
+  const esp     = _espLabel2((esc && (esc.especialidade_principal||esc.especialidade)) || j.escritorio_esp || j.especialidade);
+  const tier    = (esc && esc.tier) || j.escritorio_tier || 1;
+  const TIER_TAG = {1:'Boutique',2:'Boutique',3:'Regional',4:'Full Service',5:'Big Law'};
+  const numSocios = esc ? _normalizarSociosUI(esc).length : 1;
+  const totalCasos = (esc && (esc.total_casos || j._processos_count)) || j._processos_count || 0;
+  const rep = j.reputacao || 0;
+  const cap = (window.REP_CAP||{})[j.cargo_id] || 35;
+  const prestigio = esc ? (esc.prestigio||0) : Math.min(100, Math.round(rep/cap*100));
+  const local = (esc && esc.bairro_sede) || j.escritorio_bairro || 'Rio de Janeiro';
+
+  return `
+  <div class="esc-hero">
+    <div class="esc-hero-conteudo">
+      <div class="esc-hero-topo">
+        <div class="esc-hero-icone">🏛️</div>
+        <div>
+          <div class="esc-hero-nome">${escNome}</div>
+          <div class="esc-hero-sub">${TIER_TAG[tier]||'Boutique'} · ${esp}</div>
+        </div>
+      </div>
+      <div class="esc-hero-meta">
+        <span>📍 ${local}</span>
+        <span>👥 ${numSocios} sócio${numSocios>1?'s':''}</span>
+        <span>⚖️ ${totalCasos} processo${totalCasos===1?'':'s'} ativo${totalCasos===1?'':'s'}</span>
+      </div>
+      <div class="esc-hero-prestigio">⭐ Prestígio ${prestigio}</div>
+    </div>
+  </div>`;
+}
+
+function _escKpis(esc, j) {
+  const caixa     = (esc && esc.caixa) || 0;
+  const rendaMes  = j.renda_calculada || 0;
+  const despMes   = j.despesas_calculadas || 0;
+  const lucroMes  = rendaMes - despMes;
+  const socios    = esc ? _normalizarSociosUI(esc) : [{participacao_pct:100}];
+  const minhaUid  = j.uid || window.JOGADOR_UID;
+  const minhaCota = esc ? (socios.find(s=>s.uid===minhaUid)?.participacao_pct ?? 100) : 100;
+
+  const deltaIcon = v => v > 0 ? 'up' : v < 0 ? 'down' : 'flat';
+
+  return `
+  <div class="esc-kpis">
+    <div class="esc-kpi-card">
+      <div class="esc-kpi-label">Receita do mês</div>
+      <div class="esc-kpi-valor">${_fmtExt(rendaMes)}</div>
+      <div class="esc-kpi-delta flat">vs. honorários recebidos</div>
+    </div>
+    <div class="esc-kpi-card">
+      <div class="esc-kpi-label">Lucro líquido</div>
+      <div class="esc-kpi-valor" style="color:${lucroMes>=0?'var(--verde2)':'var(--verm2)'}">${_fmtExt(lucroMes)}</div>
+      <div class="esc-kpi-delta ${deltaIcon(lucroMes)}">${lucroMes>=0?'Receita acima das despesas':'Despesas acima da receita'}</div>
+    </div>
+    <div class="esc-kpi-card">
+      <div class="esc-kpi-label">Despesas do mês</div>
+      <div class="esc-kpi-valor" style="color:var(--verm2)">${_fmtExt(despMes)}</div>
+      <div class="esc-kpi-delta flat">folha + custos fixos</div>
+    </div>
+    <div class="esc-kpi-card">
+      <div class="esc-kpi-label">Caixa do escritório</div>
+      <div class="esc-kpi-valor" style="color:${caixa>=0?'var(--navy)':'var(--verm2)'}">${_fmtExt(caixa)}</div>
+      <div class="esc-kpi-delta flat">sua cota: ${minhaCota}%</div>
+    </div>
+  </div>`;
+}
+
+// Dados ilustrativos — ainda não há sistema de funcionários/clientes nomeados no banco
+const ESC_EQUIPE_MOCK = [
+  { nome:'Dr. Gabriel Monteiro', cargo:'Advogado Sênior', esp:'Tributário',     prod:92, ini:'GM' },
+  { nome:'Dra. Larissa Mendes',  cargo:'Advogada Plena',  esp:'Contencioso',    prod:88, ini:'LM' },
+  { nome:'Dr. Pedro Almeida',    cargo:'Advogado Júnior', esp:'Tributário',     prod:74, ini:'PA' },
+  { nome:'Juliana Prado',        cargo:'Assistente Jurídica', esp:'Administrativo', prod:81, ini:'JP' },
+];
+const ESC_CLIENTES_MOCK = [
+  { nome:'Torre e Cia',     tipo:'Holding Empresarial',    proc:'23 processos', icone:'🏢' },
+  { nome:'GPA',             tipo:'Varejo e Alimentação',   proc:'18 processos', icone:'🛒' },
+  { nome:'Via Varejo',      tipo:'Varejo',                  proc:'15 processos', icone:'📦' },
+  { nome:'Grupo Solares',   tipo:'Energia Renovável',       proc:'12 processos', icone:'☀️' },
+];
+
+function _escEquipeCard() {
+  return `
+  <div class="esc-card-bloco">
+    <div class="secao-header" style="margin-bottom:.8rem">
+      <div class="secao-titulo">Equipe do Escritório<span class="esc-mock-badge">Em breve</span></div>
+    </div>
+    ${ESC_EQUIPE_MOCK.map(p => `
+      <div class="esc-equipe-linha">
+        <div class="esc-avatar">${p.ini}</div>
+        <div class="esc-equipe-info">
+          <div class="esc-equipe-nome">${p.nome}</div>
+          <div class="esc-equipe-cargo">${p.cargo}</div>
+        </div>
+        <div class="esc-equipe-direita">
+          <div class="esc-equipe-esp">${p.esp}</div>
+          <div class="esc-equipe-prod">${p.prod}%</div>
+        </div>
+      </div>`).join('')}
+    <button class="btn btn-ghost btn-sm btn-block" style="margin-top:.8rem" disabled title="Em breve">
+      Gerenciar Equipe
+    </button>
+  </div>`;
+}
+
+function _escClientesCard() {
+  return `
+  <div class="esc-card-bloco">
+    <div class="secao-header" style="margin-bottom:.8rem">
+      <div class="secao-titulo">Clientes Corporativos<span class="esc-mock-badge">Em breve</span></div>
+    </div>
+    ${ESC_CLIENTES_MOCK.map(c => `
+      <div class="esc-cliente-linha">
+        <div class="esc-cliente-icone">${c.icone}</div>
+        <div class="esc-cliente-info">
+          <div class="esc-cliente-nome">${c.nome}</div>
+          <div class="esc-cliente-tipo">${c.tipo}</div>
+        </div>
+        <div class="esc-cliente-direita">${c.proc}</div>
+      </div>`).join('')}
+    <button class="btn btn-ghost btn-sm btn-block" style="margin-top:.8rem" disabled title="Em breve">
+      Ver todos os clientes
+    </button>
+  </div>`;
+}
+
+// Normaliza sócios (mesma lógica de escritorio_financas.js, duplicada aqui
+// para uso isolado no componente de hero/KPIs/donut)
+function _normalizarSociosUI(esc) {
+  const donoFallback = esc.dono_uid || esc.fundador_uid || window.JOGADOR?.uid || window.JOGADOR_UID;
+  if (Array.isArray(esc.socios) && esc.socios.length > 0) {
+    const primeiroValido = esc.socios[0] && typeof esc.socios[0] === 'object' && esc.socios[0].uid;
+    if (primeiroValido) {
+      return esc.socios.filter(s => s && typeof s === 'object' && s.uid)
+        .map(s => ({ uid: s.uid, participacao_pct: s.participacao_pct || 0 }));
+    }
+    return esc.socios.map((u,i) => ({ uid: typeof u==='string'?u:donoFallback, participacao_pct: i===0?100:0 }));
+  }
+  return [{ uid: donoFallback, participacao_pct: 100 }];
+}
+
+const _DONUT_CORES = ['#C9A227','#2E4270','#4AAB77','#3A5080','#B7791F','#9A7820'];
+
+function _escSocietarioCard(esc, j) {
+  const socios   = esc ? _normalizarSociosUI(esc) : [{ uid: j.uid, participacao_pct: 100 }];
+  const minhaUid = j.uid || window.JOGADOR_UID;
+
+  // Construir donut via conic-gradient
+  let acc = 0;
+  const stops = socios.map((s, i) => {
+    const cor = _DONUT_CORES[i % _DONUT_CORES.length];
+    const start = acc;
+    acc += s.participacao_pct;
+    return `${cor} ${start}% ${acc}%`;
+  }).join(', ');
+
+  const principal = socios[0]?.participacao_pct || 100;
+
+  return `
+  <div class="esc-card-bloco">
+    <div class="secao-header" style="margin-bottom:.6rem">
+      <div class="secao-titulo">Estrutura Societária</div>
+    </div>
+    <div class="esc-donut-wrap">
+      <div style="position:relative;width:130px;height:130px">
+        <div style="width:130px;height:130px;border-radius:50%;background:conic-gradient(${stops || 'var(--navy) 0% 100%'})"></div>
+        <div style="position:absolute;inset:18px;border-radius:50%;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center">
+          <div style="font-size:1.2rem;font-weight:700;color:var(--navy);font-family:var(--font-serif)">${principal}%</div>
+          <div style="font-size:.58rem;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em">Participação</div>
+        </div>
+      </div>
+      <div class="esc-donut-legenda">
+        ${socios.map((s,i) => `
+          <div class="esc-donut-leg-linha">
+            <span style="display:flex;align-items:center">
+              <span class="esc-donut-leg-cor" style="background:${_DONUT_CORES[i % _DONUT_CORES.length]}"></span>
+              <span class="esc-donut-leg-nome">${s.uid===minhaUid ? (j.nome_personagem||'Você') : 'Sócio '+(i+1)}</span>
+            </span>
+            <span class="esc-donut-leg-pct">${s.participacao_pct}%</span>
+          </div>`).join('')}
+      </div>
+    </div>
+    <button class="btn btn-sec btn-sm btn-block" style="margin-top:.6rem" onclick="window.navTo('equipe',null)">
+      Ver detalhes
+    </button>
+  </div>`;
+}
+
+function _escAcoesRapidas(j, esc) {
+  const temEscritorio = !!(esc);
+  const acoes = [
+    { icone:'📈', label:'Investir no Escritório', fn:'', habilitado: temEscritorio },
+    { icone:'🏛️', label:'Distribuir Pró-Labore',  fn:'', habilitado: temEscritorio },
+    { icone:'📊', label:'Expandir Operação',       fn:'', habilitado: temEscritorio },
+    { icone:'➕', label:'Contratar Advogado',      fn:"window.navTo('equipe',null)", habilitado: true },
+    { icone:'🏢', label:'Abrir Filial',            fn:'', habilitado: false },
+    { icone:'🎓', label:'Treinar Equipe',          fn:"window.navTo('habilidades',null)", habilitado: true },
+  ];
+
+  if (esc) {
+    acoes[0].fn = `window.abrirModalAportarCapital('${esc.id}')`;
+    acoes[1].fn = `window.abrirModalDistribuirLucros('${esc.id}')`;
+    acoes[2].fn = `window.navTo('escritorio',null)`;
+  } else {
+    acoes[0].fn = "window.criarEscritorio && window.criarEscritorio()";
+    acoes[0].label = 'Criar Escritório';
+    acoes[0].habilitado = true;
+  }
+
+  return `
+  <div class="esc-card-bloco">
+    <div class="secao-header" style="margin-bottom:.8rem">
+      <div class="secao-titulo">Ações Rápidas</div>
+    </div>
+    <div class="esc-acoes-grid">
+      ${acoes.map(a => `
+        <button class="esc-acao-btn" ${a.habilitado ? `onclick="${a.fn}"` : 'disabled title="Em breve"'}>
+          <span class="esc-acao-icone">${a.icone}</span>
+          <span>${a.label}</span>
+        </button>`).join('')}
+    </div>
+  </div>`;
 }
 
 // ════════════════════════════════════════════════════════

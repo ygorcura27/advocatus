@@ -1470,3 +1470,256 @@ a:hover { color: var(--navy); }
   color: var(--txt2);
   line-height: 1.4;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   PÁGINA ESCRITÓRIO — REDESIGN PREMIUM (Big Law / Suits)
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Hero Banner ── */
+.esc-hero {
+  position: relative;
+  height: 240px;
+  border-radius: var(--r2);
+  overflow: hidden;
+  margin-bottom: 1.2rem;
+  background:
+    linear-gradient(rgba(5,15,35,.50), rgba(5,15,35,.62)),
+    url("../img/escritorio/office-banner.jpg") center/cover no-repeat;
+  background-color: var(--navy);
+  display: flex;
+  align-items: flex-end;
+  padding: 1.4rem 1.6rem;
+  box-shadow: var(--sombra2);
+}
+.esc-hero-conteudo { position: relative; width: 100%; color: #fff; }
+.esc-hero-topo { display: flex; align-items: center; gap: .8rem; margin-bottom: .5rem; }
+.esc-hero-icone {
+  width: 46px; height: 46px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.5rem;
+  background: rgba(201,162,39,.18);
+  border: 1.5px solid var(--ouro);
+  border-radius: var(--r2);
+}
+.esc-hero-nome {
+  font-family: var(--font-serif); font-weight: 700;
+  font-size: 1.5rem; line-height: 1.15; color: #fff;
+}
+.esc-hero-sub {
+  font-family: var(--font-serif); font-style: italic;
+  font-size: .92rem; color: var(--ouro);
+}
+.esc-hero-meta {
+  display: flex; flex-wrap: wrap; gap: .5rem .9rem;
+  font-size: .76rem; color: rgba(255,255,255,.85);
+  margin-top: .6rem;
+}
+.esc-hero-meta span { display: inline-flex; align-items: center; gap: .3rem; }
+.esc-hero-prestigio {
+  display: inline-flex; align-items: center; gap: .35rem;
+  margin-top: .7rem;
+  background: rgba(255,255,255,.1);
+  border: 1px solid rgba(201,162,39,.5);
+  border-radius: 20px;
+  padding: .25rem .75rem;
+  font-size: .74rem; font-weight: 700; color: var(--ouro);
+}
+
+/* ── KPIs ── */
+.esc-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: .6rem;
+  margin-bottom: 1.1rem;
+}
+.esc-kpi-card {
+  background: var(--surface);
+  border: var(--borda);
+  border-radius: var(--r2);
+  padding: .85rem .9rem;
+  box-shadow: var(--sombra);
+}
+.esc-kpi-label {
+  font-size: .62rem; color: var(--txt3);
+  text-transform: uppercase; letter-spacing: .08em;
+  margin-bottom: .35rem;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.esc-kpi-valor { font-size: 1.18rem; font-weight: 700; color: var(--navy); font-family: var(--font-serif); }
+.esc-kpi-delta { font-size: .68rem; font-weight: 600; margin-top: .2rem; }
+.esc-kpi-delta.up   { color: var(--verde2); }
+.esc-kpi-delta.down { color: var(--verm2); }
+.esc-kpi-delta.flat { color: var(--txt4); }
+
+/* ── Grid principal (equipe / clientes / societário) ── */
+.esc-grid-3 {
+  display: grid;
+  grid-template-columns: 1.3fr 1.3fr 1fr;
+  gap: .7rem;
+  margin-bottom: 1.1rem;
+  align-items: start;
+}
+
+.esc-card-bloco {
+  background: var(--surface);
+  border: var(--borda);
+  border-radius: var(--r2);
+  padding: 1rem;
+  box-shadow: var(--sombra);
+}
+.esc-card-bloco .secao-header { margin-bottom: .8rem; padding-bottom: .5rem; }
+.esc-card-bloco .secao-titulo { font-size: .88rem; }
+
+.esc-mock-badge {
+  font-size: .56rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+  background: var(--ouro-light); color: var(--ouro3);
+  border-radius: 20px; padding: .12rem .5rem;
+  margin-left: .4rem;
+}
+
+/* Equipe */
+.esc-equipe-linha {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .55rem 0;
+  border-bottom: var(--borda-sub);
+}
+.esc-equipe-linha:last-child { border-bottom: none; }
+.esc-avatar {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--navy-light); color: var(--navy);
+  display: flex; align-items: center; justify-content: center;
+  font-size: .85rem; font-weight: 700; flex-shrink: 0;
+}
+.esc-equipe-info { flex: 1; min-width: 0; }
+.esc-equipe-nome { font-size: .8rem; font-weight: 600; color: var(--navy); }
+.esc-equipe-cargo { font-size: .66rem; color: var(--txt3); }
+.esc-equipe-direita { text-align: right; flex-shrink: 0; }
+.esc-equipe-esp { font-size: .64rem; color: var(--ouro2); margin-bottom: .15rem; }
+.esc-equipe-prod { font-size: .76rem; font-weight: 700; color: var(--verde2); }
+
+/* Clientes */
+.esc-cliente-linha {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .55rem 0;
+  border-bottom: var(--borda-sub);
+}
+.esc-cliente-linha:last-child { border-bottom: none; }
+.esc-cliente-icone {
+  width: 32px; height: 32px; border-radius: var(--r);
+  background: var(--bg2); display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; flex-shrink: 0;
+}
+.esc-cliente-info { flex: 1; min-width: 0; }
+.esc-cliente-nome { font-size: .8rem; font-weight: 600; color: var(--navy); }
+.esc-cliente-tipo { font-size: .66rem; color: var(--txt3); }
+.esc-cliente-direita { text-align: right; font-size: .7rem; color: var(--txt3); flex-shrink: 0; }
+
+/* Societário — donut */
+.esc-donut-wrap { display: flex; flex-direction: column; align-items: center; padding: .4rem 0 .2rem; }
+.esc-donut-legenda { width: 100%; margin-top: .8rem; }
+.esc-donut-leg-linha {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: .74rem; padding: .25rem 0;
+}
+.esc-donut-leg-cor { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: .4rem; }
+.esc-donut-leg-nome { color: var(--txt2); flex: 1; }
+.esc-donut-leg-pct { font-weight: 700; color: var(--navy); }
+
+/* ── Ações Rápidas ── */
+.esc-acoes-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: .55rem;
+}
+.esc-acao-btn {
+  display: flex; flex-direction: column; align-items: center; gap: .4rem;
+  background: var(--navy); color: #fff;
+  border: none; border-radius: var(--r2);
+  padding: .85rem .5rem;
+  font-family: var(--font-sans); font-size: .68rem; font-weight: 600;
+  text-align: center; line-height: 1.25;
+  cursor: pointer; transition: all .2s;
+}
+.esc-acao-btn:hover { background: var(--navy3); transform: translateY(-2px); box-shadow: var(--sombra-navy); }
+.esc-acao-icone { font-size: 1.15rem; }
+.esc-acao-btn:disabled { opacity: .35; cursor: not-allowed; transform: none; }
+
+/* ── Responsivo ── */
+@media (max-width: 1180px) {
+  .esc-grid-3 { grid-template-columns: 1fr 1fr; }
+  .esc-grid-3 > :nth-child(3) { grid-column: span 2; }
+}
+@media (max-width: 860px) {
+  .esc-kpis { grid-template-columns: 1fr 1fr; }
+  .esc-grid-3 { grid-template-columns: 1fr; }
+  .esc-grid-3 > :nth-child(3) { grid-column: span 1; }
+  .esc-acoes-grid { grid-template-columns: repeat(3, 1fr); }
+  .esc-hero { height: auto; padding: 1.1rem 1.1rem; }
+  .esc-hero-nome { font-size: 1.2rem; }
+}
+@media (max-width: 480px) {
+  .esc-acoes-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SIDEBAR DIREITA — CRONOLOGIA DO JOGO / PROGRESSO DO ANO
+   ═══════════════════════════════════════════════════════════ */
+.cronologia-bloco {
+  background: var(--navy);
+  border-radius: var(--r2);
+  padding: .9rem .9rem 1rem;
+  margin-bottom: 1rem;
+  box-shadow: var(--sombra-navy);
+}
+.cronologia-label {
+  font-size: .58rem; color: rgba(255,255,255,.5);
+  text-transform: uppercase; letter-spacing: .12em;
+  margin-bottom: .25rem;
+}
+.cronologia-data {
+  font-family: var(--font-serif); font-size: 1.05rem;
+  color: var(--ouro); font-weight: 700; margin-bottom: .7rem;
+}
+.cronologia-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: .3rem;
+  margin-bottom: .7rem;
+}
+.cron-mes {
+  text-align: center;
+  font-size: .6rem; font-weight: 600;
+  color: rgba(255,255,255,.55);
+  padding: .35rem .1rem;
+  border-radius: var(--r);
+  letter-spacing: .03em;
+}
+.cron-mes.passado { color: rgba(255,255,255,.3); }
+.cron-mes.atual {
+  background: var(--ouro);
+  color: var(--navy);
+  font-weight: 700;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.15);
+}
+.cronologia-sep { height: 1px; background: rgba(255,255,255,.1); margin: .5rem 0; }
+.cronologia-prox { font-size: .65rem; color: rgba(255,255,255,.6); text-align: center; }
+.cronologia-prox b { color: var(--ouro); }
+
+.progresso-ano-bloco {
+  background: var(--surface);
+  border: var(--borda);
+  border-radius: var(--r2);
+  padding: .9rem;
+  margin-bottom: 1rem;
+  box-shadow: var(--sombra);
+}
+.pa-titulo {
+  font-size: .58rem; color: var(--txt3);
+  text-transform: uppercase; letter-spacing: .12em;
+  margin-bottom: .4rem;
+}
+.pa-ano { font-family: var(--font-serif); font-size: 1.05rem; color: var(--navy); font-weight: 700; }
+.pa-mes { font-size: .7rem; color: var(--txt3); margin-bottom: .55rem; }
+.pa-bar-wrap { height: 7px; background: var(--bg2); border-radius: 4px; overflow: hidden; margin-bottom: .35rem; }
+.pa-bar-fill { height: 100%; background: linear-gradient(90deg, var(--ouro3), var(--ouro)); border-radius: 4px; transition: width .4s ease; }
+.pa-pct { font-size: .68rem; font-weight: 700; color: var(--ouro2); text-align: right; }

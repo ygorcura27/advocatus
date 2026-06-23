@@ -52,59 +52,18 @@ function _normalizarSocios(esc) {
 
 // ════════════════════════════════════════════════════════
 // RENDERIZAR BLOCO DE FINANÇAS (usado no painel Escritório)
+// Caixa/participação/aportar/distribuir já aparecem nos KPIs e nas
+// Ações Rápidas do novo dashboard — aqui ficam só alertas operacionais
+// (salário atrasado) e o progresso de upgrade de tier.
 // ════════════════════════════════════════════════════════
 export function renderBlocoFinancas(esc, j) {
-  const caixa = esc.caixa || 0;
-  const corCaixa = caixa >= 0 ? 'var(--verde2)' : 'var(--verm2)';
-  const socios = _normalizarSocios(esc);
-  const minhaUid = j.uid || window.JOGADOR_UID;
-  const meuSocio = socios.find(s => s.uid === minhaUid);
-  const minhaCota = meuSocio ? meuSocio.participacao_pct : 100;
+  const alertaSalario = (esc.meses_sem_pagar_salario||0) > 0 ? `
+    <div style="background:var(--verm-bg);border:1px solid var(--verm3);border-radius:var(--r);padding:.6rem .8rem;margin-bottom:.8rem;font-size:.74rem;color:var(--verm2)">
+      ⚠️ ${esc.meses_sem_pagar_salario} mês(es) sem pagar salário. Produtividade reduzida em ${Math.round(esc.meses_sem_pagar_salario*PERDA_PRODUTIVIDADE_SEM_SALARIO*100)}%.
+      ${esc.meses_sem_pagar_salario >= MESES_TOLERANCIA_SALARIO ? ' Funcionários podem pedir demissão!' : ''}
+    </div>` : '';
 
-  return `
-    <div class="secao-header" style="margin-top:1rem">
-      <div class="secao-titulo">💰 Caixa do Escritório</div>
-    </div>
-    <div class="card" style="background:var(--surface2)">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.8rem">
-        <div>
-          <div style="font-size:.65rem;color:var(--txt4);text-transform:uppercase">Saldo em caixa</div>
-          <div style="font-size:1.3rem;font-weight:700;color:${corCaixa}">R$ ${caixa.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-size:.65rem;color:var(--txt4)">Sua participação</div>
-          <div style="font-size:1rem;font-weight:700;color:var(--navy)">${minhaCota}%</div>
-        </div>
-      </div>
-      ${(esc.meses_sem_pagar_salario||0) > 0 ? `
-        <div style="background:var(--verm-bg);border:1px solid var(--verm3);border-radius:var(--r);padding:.5rem .7rem;margin-bottom:.7rem;font-size:.72rem;color:var(--verm2)">
-          ⚠️ ${esc.meses_sem_pagar_salario} mês(es) sem pagar salário. Produtividade reduzida em ${Math.round(esc.meses_sem_pagar_salario*PERDA_PRODUTIVIDADE_SEM_SALARIO*100)}%.
-          ${esc.meses_sem_pagar_salario >= MESES_TOLERANCIA_SALARIO ? ' Funcionários podem pedir demissão!' : ''}
-        </div>` : ''}
-      <div style="display:flex;gap:.5rem">
-        <button class="btn btn-sm btn-prim" style="flex:1" onclick="window.abrirModalAportarCapital('${esc.id}')">
-          💵 Aportar Capital
-        </button>
-        <button class="btn btn-sm btn-sec" style="flex:1" onclick="window.abrirModalDistribuirLucros('${esc.id}')">
-          📤 Distribuir Lucros
-        </button>
-      </div>
-    </div>
-
-    <!-- Sócios e cotas -->
-    ${socios.length > 1 ? `
-      <div style="margin-top:.6rem">
-        <div style="font-size:.68rem;color:var(--txt3);margin-bottom:.3rem">Sociedade:</div>
-        ${socios.map(s =>
-          `<div style="display:flex;justify-content:space-between;font-size:.7rem;padding:.2rem 0">
-            <span style="color:var(--txt2)">${s.uid === minhaUid ? 'Você' : s.uid.slice(0,8)}</span>
-            <span style="font-weight:600;color:var(--navy)">${s.participacao_pct}%</span>
-          </div>`
-        ).join('')}
-      </div>` : ''}
-
-    ${renderBlocoUpgradeTier(esc, j)}
-  `;
+  return `${alertaSalario}${renderBlocoUpgradeTier(esc, j)}`;
 }
 
 // ════════════════════════════════════════════════════════

@@ -182,15 +182,29 @@
   <!-- ══ SIDEBAR DIREITA ══ -->
   <aside class="sidebar-right">
 
-    <!-- Relógio global -->
-    <div class="global-clock">
-      <div class="clock-label">⏰ Calendário do Jogo</div>
-      <div class="clock-date" id="sr-data-jogo">—</div>
-      <div class="clock-sep"></div>
-      <div class="clock-prox">
-        Próximo mês em<br>
-        <b id="sr-countdown">—</b>
+    <!-- Cronologia do Jogo (substitui o calendário tradicional — o jogo trabalha por meses) -->
+    <div class="cronologia-bloco">
+      <div class="cronologia-label">Cronologia do Jogo</div>
+      <div class="cronologia-data" id="cron-data">—</div>
+      <div class="cronologia-grid" id="cron-grid">
+        <!-- 12 meses injetados por gamestate.js -->
       </div>
+      <div class="cronologia-sep"></div>
+      <div class="cronologia-prox">
+        Próximo mês em<br>
+        <b id="cron-countdown">—</b>
+      </div>
+    </div>
+
+    <!-- Progresso do Ano -->
+    <div class="progresso-ano-bloco">
+      <div class="pa-titulo">Progresso do Ano</div>
+      <div class="pa-ano" id="pa-ano">Ano —</div>
+      <div class="pa-mes" id="pa-mes">Mês — de 12</div>
+      <div class="pa-bar-wrap">
+        <div class="pa-bar-fill" id="pa-bar-fill" style="width:0%"></div>
+      </div>
+      <div class="pa-pct" id="pa-pct">0% concluído</div>
     </div>
 
     <!-- Energia + Botão Avançar Mês (injetado por avancar_mes.js) -->

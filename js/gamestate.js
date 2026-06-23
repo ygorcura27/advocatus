@@ -184,21 +184,58 @@ function _atualizarTopbar(j) {
 }
 
 // ════════════════════════════════════════════════════════
-// RELÓGIO GLOBAL
+// RELÓGIO GLOBAL / CRONOLOGIA DO JOGO / PROGRESSO DO ANO
+// O jogo trabalha por meses (sem dias da semana) — substituímos o
+// calendário tradicional por uma grade de 12 meses + barra de progresso.
 // ════════════════════════════════════════════════════════
+const MESES_ABREV = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
+
 function _atualizarRelógio(server, jogador) {
   // Prioridade: calendário pessoal do jogador > servidor global
   const j = jogador || window.JOGADOR;
-  let texto;
+  let texto, mesIdx, ano;
   if (j && j.mes_pessoal !== undefined && j.ano_pessoal !== undefined) {
     const MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                       'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-    texto = `${MESES_PT[j.mes_pessoal]}, Ano ${j.ano_pessoal}`;
+    mesIdx = j.mes_pessoal;
+    ano    = j.ano_pessoal;
+    texto  = `${MESES_PT[mesIdx]}, Ano ${ano}`;
   } else {
-    texto = `${server.mes_nome || 'Janeiro'}, Ano ${server.ano_jogo || 1}`;
+    mesIdx = (server.mes_global !== undefined ? (server.mes_global - 1) % 12 : 0);
+    ano    = server.ano_jogo || 1;
+    texto  = `${server.mes_nome || 'Janeiro'}, Ano ${ano}`;
   }
-  _set('server-data',  texto);
-  _set('sr-data-jogo', texto);
+  _set('server-data', texto);
+  _atualizarCronologia(mesIdx, ano, j);
+}
+
+function _atualizarCronologia(mesIdx, ano, j) {
+  // ── Cronologia do Jogo: data + grade de 12 meses ──
+  const MESES_PT_FULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                          'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  _set('cron-data', `${MESES_PT_FULL[mesIdx] || '—'}, Ano ${ano || 1}`);
+
+  const grid = document.getElementById('cron-grid');
+  if (grid) {
+    grid.innerHTML = MESES_ABREV.map((m, i) => {
+      const cls = i === mesIdx ? 'atual' : i < mesIdx ? 'passado' : '';
+      return `<div class="cron-mes ${cls}">${m}</div>`;
+    }).join('');
+  }
+
+  // Countdown = energia restante até poder avançar o mês
+  if (j) {
+    const usado = j.energia_usada_mes || 0;
+    const disp  = Math.max(0, (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - usado);
+    _set('cron-countdown', disp <= 5 ? 'Pronto ▶' : `${disp} ⚡ energia`);
+  }
+
+  // ── Progresso do Ano ──
+  _set('pa-ano', `Ano ${ano || 1}`);
+  _set('pa-mes', `Mês ${String(mesIdx + 1).padStart(2,'0')} de 12`);
+  const pct = Math.round(((mesIdx + 1) / 12) * 100);
+  _style('pa-bar-fill', 'width', `${pct}%`);
+  _set('pa-pct', `${pct}% concluído`);
 }
 
 // ════════════════════════════════════════════════════════
