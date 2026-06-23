@@ -18,13 +18,12 @@ const CARGOS = [
   {id:'ass', l:'Assistente Jurídico',xp:120,  sal_min:2500,  sal_max:3500,  anos:0, oab:false, desc:'Minutas e pesquisa.', rep_min:5,  rep_max:35},
   {id:'_oab',l:'→ Prova da OAB',    xp:260,  sal_min:2500,  sal_max:3500,  anos:0, oab:true,  desc:'Aprovação obrigatória.', rep_min:15, rep_max:35},
   {id:'jnr', l:'Advogado Júnior',   xp:260,  sal_min:3500,  sal_max:6650,  anos:0, oab:true,  desc:'Casos simples (nível 1-10).', rep_min:25, rep_max:45},
-  {id:'pln', l:'Advogado Pleno',    xp:580,  sal_min:5750,  sal_max:11100, anos:2, oab:true,  desc:'Casos complexos (nível 11-20).', rep_min:35, rep_max:55},
-  {id:'snr', l:'Advogado Sênior',   xp:1100, sal_min:10600, sal_max:20000, anos:4, oab:true,  desc:'Autonomia total (nível 21-50).', rep_min:45, rep_max:65},
-  {id:'asc', l:'Associado',         xp:1800, sal_min:20000, sal_max:35000, anos:6, oab:true,  desc:'Decisões estratégicas.', rep_min:60, rep_max:80},
-  {id:'soc', l:'Sócio',            xp:2800, sal_min:35000, sal_max:65000, anos:8, oab:true,  desc:'Cotista. Participa dos lucros.', rep_min:72, rep_max:100},
-  {id:'snm', l:'Sócio Nominal',    xp:4500, sal_min:65000, sal_max:120000,anos:12,oab:true,  desc:'O escritório leva seu nome.', rep_min:85, rep_max:100},
+  {id:'pln', l:'Advogado Pleno',    xp:580,  sal_min:5750,  sal_max:11100, anos:2, oab:true,  desc:'Casos complexos (nível 11-20).', rep_min:35, rep_max:55, recursos_min:2},
+  {id:'snr', l:'Advogado Sênior',   xp:1100, sal_min:10600, sal_max:20000, anos:4, oab:true,  desc:'Autonomia total (nível 21-50).', rep_min:45, rep_max:65, recursos_min:4},
+  {id:'asc', l:'Associado',         xp:1800, sal_min:20000, sal_max:35000, anos:6, oab:true,  desc:'Decisões estratégicas.', rep_min:60, rep_max:80, recursos_min:6},
+  {id:'soc', l:'Sócio',            xp:2800, sal_min:35000, sal_max:65000, anos:8, oab:true,  desc:'Cotista. Participa dos lucros.', rep_min:72, rep_max:100, recursos_min:8},
+  {id:'snm', l:'Sócio Nominal',    xp:4500, sal_min:65000, sal_max:120000,anos:12,oab:true,  desc:'O escritório leva seu nome.', rep_min:85, rep_max:100, recursos_min:12},
 ];
-
 const CARGO_IDX = Object.fromEntries(CARGOS.map((c,i)=>[c.id,i]));
 
 // ════════════════════════════════════════════════════════
@@ -145,10 +144,14 @@ window.renderCarreiraProgressao = function(j, el) {
           <span style="color:var(--ardosia2)">XP necessária</span>
           <span style="color:${xp>=proximo.xp?'var(--verde3)':'var(--perg)'}">${xp}/${proximo.xp} ${xp>=proximo.xp?'✅':''}</span>
         </div>` : ''}
-        ${proximo.anos ? `<div style="display:flex;justify-content:space-between">
+         ${proximo.anos ? `<div style="display:flex;justify-content:space-between">
           <span style="color:var(--ardosia2)">Anos de carreira</span>
           <span style="color:${(j.anos_carreira||0)>=proximo.anos?'var(--verde3)':'var(--perg)'}">${j.anos_carreira||0}/${proximo.anos} ${(j.anos_carreira||0)>=proximo.anos?'✅':''}</span>
-        </div>` : ''}
+        </div>
+        ${proximo.recursos_min ? `<div style="display:flex;justify-content:space-between;padding-left:.8rem">
+          <span style="color:var(--ardosia);font-size:.68rem">— ou recursos vencidos (STJ/STF)</span>
+          <span style="color:${(j.recursos_vencidos_superiores||0)>=proximo.recursos_min?'var(--verde3)':'var(--ardosia)'};font-size:.68rem">${j.recursos_vencidos_superiores||0}/${proximo.recursos_min} ${(j.recursos_vencidos_superiores||0)>=proximo.recursos_min?'✅':''}</span>
+        </div>` : ''}` : ''}
         ${proximo.rep_min ? `<div style="display:flex;justify-content:space-between">
           <span style="color:var(--ardosia2)">Reputação mínima</span>
           <span style="color:${(j.reputacao||0)>=proximo.rep_min?'var(--verde3)':'var(--perg)'}">${j.reputacao||0}/${proximo.rep_min} ${(j.reputacao||0)>=proximo.rep_min?'✅':''}</span>
@@ -178,10 +181,16 @@ window.renderCarreiraProgressao = function(j, el) {
 
 function _podePromover(j, prox) {
   if (!prox) return false;
-  if (prox.xp   && (j.xp||0)          < prox.xp)    return false;
-  if (prox.anos && (j.anos_carreira||0)< prox.anos)  return false;
+  if (prox.xp   && (j.xp||0) < prox.xp)    return false;
+
+  if (prox.anos) {
+    const bateuAnos   = (j.anos_carreira||0) >= prox.anos;
+    const bateuAtalho = prox.recursos_min && (j.recursos_vencidos_superiores||0) >= prox.recursos_min;
+    if (!bateuAnos && !bateuAtalho) return false;
+  }
+
   if (prox.rep_min && (j.reputacao||0) < prox.rep_min) return false;
-  if (prox.oab  && !j.oab)                            return false;
+  if (prox.oab  && !j.oab)                              return false;
   return true;
 }
 

@@ -13,6 +13,7 @@ import { collection, doc, getDoc, getDocs, updateDoc }
 import { httpsCallable }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
 import { db } from './firebase-init.js';
+import { rolarEventosDoMes } from './eventos_escritorio.js';
 
 export const MESES_TOLERANCIA_SALARIO = 3;
 export const PERDA_PRODUTIVIDADE_SEM_SALARIO = 0.25; // -25% de produtividade por mês sem pagar
@@ -100,8 +101,60 @@ export function renderBlocoFinancas(esc, j) {
           </div>`
         ).join('')}
       </div>` : ''}
+
+    ${renderBlocoUpgradeTier(esc, j)}
   `;
 }
+
+// ════════════════════════════════════════════════════════
+// UPGRADE DE TIER — exibe progresso das 3 travas e botão de ação
+// ════════════════════════════════════════════════════════
+function renderBlocoUpgradeTier(esc, j) {
+  const tierAtual = esc.tier || 1;
+  if (tierAtual >= 5) return '';
+
+  const check = window.verificarUpgradeEscritorio(esc, j);
+  const caixa = esc.caixa || 0;
+  const repEsc = esc.reputacao || 0;
+  const anos = j.anos_carreira || 0;
+
+  const linha = (label, atual, necessario, ok) => `
+    <div style="display:flex;justify-content:space-between;font-size:.72rem;padding:.15rem 0">
+      <span style="color:var(--txt3)">${label}</span>
+      <span style="color:${ok?'var(--verde2)':'var(--txt3)'}">${atual}/${necessario} ${ok?'✅':''}</span>
+    </div>`;
+
+  return `
+    <div class="secao-header" style="margin-top:1rem">
+      <div class="secao-titulo">⬆️ Upgrade — Tier ${tierAtual} → ${tierAtual+1}</div>
+    </div>
+    <div class="card" style="background:var(--surface2)">
+      ${linha('Capital', `R$ ${caixa.toLocaleString('pt-BR')}`, `R$ ${check.capitalNecessario.toLocaleString('pt-BR')}`, caixa>=check.capitalNecessario)}
+      ${linha('Reputação do escritório', repEsc, check.reputacaoMinima, repEsc>=check.reputacaoMinima)}
+      ${linha('Carreira (anos desde Júnior)', anos, check.anosMinimos, anos>=check.anosMinimos)}
+      <div style="display:flex;justify-content:space-between;font-size:.72rem;padding:.15rem 0">
+        <span style="color:var(--txt3)">Cargo mínimo</span>
+        <span style="color:${(window.CARGO_IDX?.[j.cargo_id]??0)>=(window.CARGO_IDX?.[check.cargoMinimo]??0)?'var(--verde2)':'var(--txt3)'}">${check.cargoMinimo.toUpperCase()}+</span>
+      </div>
+      <button class="btn btn-prim btn-block" style="margin-top:.7rem" ${check.liberado?'':'disabled'} onclick="window.confirmarUpgradeEscritorio('${esc.id}')">
+        ${check.liberado ? '🎉 Fazer Upgrade' : '🔒 Requisitos pendentes'}
+      </button>
+    </div>
+  `;
+}
+window.renderBlocoUpgradeTier = renderBlocoUpgradeTier;
+
+window.confirmarUpgradeEscritorio = async function(escId) {
+  try {
+    const j = window.JOGADOR;
+    const result = await window.fazerUpgradeEscritorio(escId, j);
+    toast(`🎉 Escritório promovido para Tier ${result.novoTier}!`, 'ok', 5000);
+    setTimeout(()=>window.navTo&&window.navTo('escritorio',null), 700);
+  } catch (err) {
+    toast('Erro: ' + (err.message||'falha no upgrade'), 'ko', 5000);
+    console.error('[UPGRADE ESCRITÓRIO]', err);
+  }
+};
 
 // Expor globalmente para ser usado pelo ui-main.js sem import direto
 window.renderBlocoFinancas = renderBlocoFinancas;
@@ -264,13 +317,23 @@ export async function processarFinancasEscritorioMensal(j) {
   }
 
   escUpdates.caixa = caixa;
+
+  // ── EVENTOS EXTRAS DO MÊS — multa, inadimplência, indenização,
+  // fiscalização. Escalam com o Tier, exclusivos de dono de escritório.
+  const { custoTotal: custoEventos, eventos } = rolarEventosDoMes(esc.tier || 1);
+  if (custoEventos > 0) {
+    escUpdates.caixa = (escUpdates.caixa || caixa) - custoEventos;
+  }
+
   await updateDoc(doc(db,'escritorios',escId), escUpdates);
 
   return {
     folha_paga: caixa >= 0 && mesesSemPagar === 0,
-    caixa_final: caixa,
+    caixa_final: escUpdates.caixa,
     meses_sem_pagar: mesesSemPagar,
     demissoes: demissoesPorFalta,
+    eventos_extras: eventos,
+    custo_eventos: custoEventos,
   };
 }
 

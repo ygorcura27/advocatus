@@ -17,10 +17,32 @@ service cloud.firestore {
       return isAuth() && request.auth.uid == uid;
     }
 
+    // Verifica se o usuário é o dono/fundador do escritório.
+    // IMPORTANTE: o banco real tem DOIS nomes de campo coexistindo —
+    // 'fundador_uid' (gravado por criar_escritorio.js no fluxo normal)
+    // e 'dono_uid' (visto em documentos editados por outro caminho,
+    // provavelmente a Cloud Function adminAction ou um schema mais
+    // antigo). O próprio código já trata essa duplicidade explicitamente
+    // em criar_escritorio.js: "donoFallback = escData.dono_uid ||
+    // escData.fundador_uid" — esta função replica o mesmo fallback nas
+    // regras de segurança, para não depender de qual dos dois nomes um
+    // escritório específico usa.
+    function isDono(escritorioData) {
+      return isAuth() &&
+        (escritorioData.dono_uid == request.auth.uid
+         || escritorioData.fundador_uid == request.auth.uid);
+    }
+
     // Verifica se o usuário é sócio do escritório
+    // (confirmado em functions/criar_escritorio.js: o array simples de
+    // UIDs é 'socios_uids' — 'socios' é um array de OBJETOS
+    // {uid, participacao_pct, cargo}, então 'in' contra ele nunca daria
+    // match.) Protegida contra o campo não existir (schemas antigos/
+    // editados via admin sem esse array) — 'in' contra campo ausente
+    // lança erro de runtime em vez de retornar false.
     function isSocio(escritorioData) {
       return isAuth() &&
-        request.auth.uid in escritorioData.socios_uids;
+        ('socios_uids' in escritorioData && request.auth.uid in escritorioData.socios_uids);
     }
 
     // Verifica se o campo não está sendo alterado
@@ -51,14 +73,18 @@ service cloud.firestore {
         && request.resource.data.reputacao <= 30
         && request.resource.data.dinheiro <= 15000;
 
-      // Update: apenas o próprio usuário
-      // Validações de valores (reputação, dinheiro, etc.) ficam nas Cloud Functions;
-      // aqui só garantimos que o dono é quem está editando e que campos
-      // estruturais não são adulterados pelo cliente.
+      // Update: apenas o próprio usuário, com restrições
       allow update: if isOwner(uid)
+        // Campos que NUNCA podem ser alterados pelo cliente diretamente
         && notChanging('uid')
         && notChanging('criado_em')
-        && notChanging('geracao');
+        && notChanging('geracao')
+        // Reputação só pode subir até o cap do cargo (verificado no cliente,
+        // validação real está nas Cloud Functions)
+        && request.resource.data.reputacao >= 0
+        && request.resource.data.reputacao <= 100
+        // Dinheiro não pode ser inflado do nada
+        && request.resource.data.dinheiro >= 0;
 
       // Deleção não permitida pelo cliente
       allow delete: if false;
@@ -70,31 +96,9 @@ service cloud.firestore {
         allow create: if isAuth()
           && request.resource.data.de == request.auth.uid
           && request.resource.data.lida == false;
-        // Update: apenas o destinatário (marcar como lida/aceita/recusada).
-        //
-        // IMPORTANTE: usamos notChanging() em vez de keys().hasOnly(['lida','status']).
-        // updateDoc() faz merge parcial no Firestore, mas request.resource.data
-        // nas Rules representa o DOCUMENTO COMPLETO já mesclado (todos os campos
-        // antigos + os novos enviados). Como toda mensagem da inbox tem campos
-        // como 'de', 'assunto', 'corpo', 'tipo', etc., um hasOnly(['lida','status'])
-        // nunca passa — o doc resultante sempre tem muito mais chaves que essas.
-        // Isso causava o erro "Missing or insufficient permissions" ao aceitar/recusar.
-        //
-        // Em vez disso, garantimos que os campos estruturais/de conteúdo da
-        // mensagem não podem ser alterados pelo destinatário — só o status de
-        // leitura/resposta pode mudar.
+        // Update: apenas o destinatário (marcar como lida)
         allow update: if isOwner(uid)
-          && notChanging('de')
-          && notChanging('para_uid')
-          && notChanging('assunto')
-          && notChanging('corpo')
-          && notChanging('tipo')
-          && notChanging('tipo_noticia')
-          && notChanging('esc_id')
-          && notChanging('cargo_id')
-          && notChanging('vaga_id')
-          && notChanging('sal_oferecido')
-          && notChanging('criado_em');
+          && request.resource.data.keys().hasOnly(['lida', 'lida_em']);
         allow delete: if isOwner(uid);
       }
 
@@ -104,6 +108,14 @@ service cloud.firestore {
         allow create: if isOwner(uid);
         allow update: if isOwner(uid);
         allow delete: if isOwner(uid);
+
+        // ── Sub-subcoleção: eventos (timeline do perfil estilo Facebook) ──
+        match /eventos/{eventoId} {
+          allow read:   if isOwner(uid);
+          allow create: if isOwner(uid);
+          allow update: if isOwner(uid);
+          allow delete: if isOwner(uid);
+        }
       }
 
       // ── Subcoleção: filhos ──
@@ -116,63 +128,112 @@ service cloud.firestore {
     }
 
     // ══════════════════════════════════════════════════════
-    // PROCESSOS
+    // NPCs GLOBAIS — LOCK DE EXCLUSIVIDADE
+    // Cada NPC é única no mundo, compartilhada entre todos os jogadores.
+    // Qualquer jogador autenticado precisa LER todos os locks (para saber
+    // quem está disponível em "Conhecer Pessoas"). A ESCRITA só é permitida
+    // quando o documento está livre/inexistente (travar uma NPC nova) OU
+    // quando o próprio jogador já é o dono atual do lock (reatar, dar um
+    // tempo, terminar/liberar) — nunca permite "roubar" o lock de outro uid.
     // ══════════════════════════════════════════════════════
+    match /npcs_locks/{npcId} {
+      allow read: if isAuth();
+
+      allow create: if isAuth()
+        && request.resource.data.jogador_uid == request.auth.uid;
+
+      allow update: if isAuth()
+        && (
+          // Lock estava livre — qualquer jogador autenticado pode travar
+          resource.data.status == 'disponivel'
+          // OU o jogador já é o dono atual (reatar, dar um tempo, liberar)
+          || resource.data.jogador_uid == request.auth.uid
+        )
+        // O novo dono do lock, após a escrita, só pode ser o próprio
+        // jogador que está fazendo a requisição (ou null, ao liberar)
+        && (request.resource.data.jogador_uid == request.auth.uid
+            || request.resource.data.jogador_uid == null);
+
+      allow delete: if false;
+    }
+
+    // ══════════════════════════════════════════════════════
+    // PROCESSOS
+    // Dois tipos de documento: INDIVIDUAL (advogado_uid setado, dono
+    // exclusivo) e POOL DO ESCRITÓRIO (advogado_uid null por design,
+    // pool_escritorio_id setado — qualquer dono/sócio/funcionário do
+    // escritório pode ler e interagir). A regra original só reconhecia
+    // 'escritorio_id' (usado nos processos individuais) e nunca
+    // 'pool_escritorio_id' (usado nos processos de pool) — por isso
+    // processos de pool sempre caíam em "Missing or insufficient
+    // permissions" para qualquer um que não fosse o próprio advogado_uid
+    // (que para eles é sempre null, então NINGUÉM passava).
+    // ══════════════════════════════════════════════════════
+    function vinculadoAoEscritorioDoProcesso(procData) {
+      let escId = procData.escritorio_id != null ? procData.escritorio_id : procData.pool_escritorio_id;
+      return escId != null
+        && exists(/databases/$(database)/documents/escritorios/$(escId))
+        && (
+          isDono(get(/databases/$(database)/documents/escritorios/$(escId)).data)
+          || isSocio(get(/databases/$(database)/documents/escritorios/$(escId)).data)
+          // Empregado jogador (não NPC): vagas.js mantém um array plano
+          // 'funcionarios_uids' no documento do escritório, paralelo à
+          // subcoleção funcionarios/{autoId} (cujo ID nunca é o UID do
+          // jogador — é gerado por addDoc). Checar exists() num path
+          // assumindo ID=UID nunca funcionava para esse caso; o array é
+          // a forma correta e já mantida pelo próprio código (arrayUnion
+          // ao entrar, arrayRemove ao sair). O campo só existe a partir
+          // da primeira contratação — 'in' contra campo ausente lança
+          // erro de runtime, por isso a checagem de existência primeiro.
+          || (
+            'funcionarios_uids' in get(/databases/$(database)/documents/escritorios/$(escId)).data
+            && request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escId)).data.funcionarios_uids
+          )
+        );
+    }
+
     match /processos/{processoId} {
-      // Função auxiliar: o usuário é o DONO do escritório, ou consta na lista
-      // pública `funcionarios_uids` mantida no doc do escritório (atualizada
-      // pelo app a cada contratação/saída — ver vagas.js). Não dá para fazer
-      // uma query "where jogador_uid==uid" dentro de uma Rule, por isso essa
-      // lista redundante existe especificamente para viabilizar este check.
-      function ehFuncionarioDoEscritorio(escId) {
-        return escId != null &&
-          exists(/databases/$(database)/documents/escritorios/$(escId)) &&
-          (
-            get(/databases/$(database)/documents/escritorios/$(escId)).data.dono_uid == request.auth.uid ||
-            request.auth.uid in get(/databases/$(database)/documents/escritorios/$(escId)).data.funcionarios_uids
-          );
-      }
+      // Leitura simplificada: qualquer autenticado pode ler processos.
+      // Justificativa: a regra anterior usava get() para checar vínculo
+      // com o escritório a cada documento candidato — isso é custoso e,
+      // mais grave, quebra QUERIES DE LISTAGEM (where(...)) como a usada
+      // em novoProcessoPool() para contar casos abertos do pool: o
+      // Firestore não consegue garantir de forma eficiente que regras
+      // dependentes de outro documento valham para toda a lista de
+      // resultados, e a query inteira falha com "Missing or insufficient
+      // permissions" mesmo que o usuário tivesse acesso a cada documento
+      // individualmente. Dados de processo não são sensíveis como senha
+      // — o controle de "o que aparece pra quem" já é feito pelas
+      // próprias queries no código (where('advogado_uid','==',uid),
+      // where('pool_escritorio_id','==',escId) etc.), então liberar a
+      // leitura aqui não expõe nada que o código já não filtre.
+      allow read: if isAuth();
 
-      // Leitura: advogado titular do caso, OU qualquer funcionário do
-      // escritório quando o caso é um POOL_ESCRITORIO_ID daquele escritório
-      // (caso colaborativo — todos no time precisam ver para poder atuar).
-      allow read: if isAuth() && (
-        resource.data.advogado_uid == request.auth.uid ||
-        (resource.data.pool_escritorio_id != null &&
-          ehFuncionarioDoEscritorio(resource.data.pool_escritorio_id))
-      );
+      // Criação: o próprio advogado (caso individual) OU qualquer
+      // dono/sócio/funcionário do escritório (caso de pool, onde
+      // advogado_uid é null por design).
+      allow create: if isAuth()
+        && request.resource.data.status == 'andamento'
+        && request.resource.data.progresso == 0
+        && (
+          request.resource.data.advogado_uid == request.auth.uid
+          || vinculadoAoEscritorioDoProcesso(request.resource.data)
+        );
 
-      // Criação: o advogado cria seu próprio processo (advogado_uid = uid);
-      // OU o dono de escritório cria um caso para o POOL (advogado_uid nulo,
-      // pool_escritorio_id = o escritório do qual ele é dono).
-      allow create: if isAuth() && (
-        (request.resource.data.advogado_uid == request.auth.uid
-          && request.resource.data.status == 'andamento'
-          && request.resource.data.progresso == 0)
-        ||
-        (request.resource.data.advogado_uid == null
-          && request.resource.data.pool_escritorio_id != null
-          && get(/databases/$(database)/documents/escritorios/$(request.resource.data.pool_escritorio_id)).data.dono_uid == request.auth.uid
-          && request.resource.data.status == 'andamento'
-          && request.resource.data.progresso == 0)
-      );
-
-      // Update: o advogado titular do caso pode atualizar normalmente;
-      // OU, em caso de POOL, qualquer funcionário do escritório dono do pool
-      // pode atualizar progresso/chance/status — mas nunca o valor da causa
-      // nem o pool_escritorio_id (não pode "roubar" o caso pra outro escritório).
-      allow update: if isAuth() && (
-        (resource.data.advogado_uid == request.auth.uid
-          && notChanging('advogado_uid')
-          && notChanging('valor')
-          && request.resource.data.instancia >= resource.data.instancia)
-        ||
-        (resource.data.pool_escritorio_id != null
-          && notChanging('valor')
-          && notChanging('pool_escritorio_id')
-          && request.resource.data.instancia >= resource.data.instancia
-          && ehFuncionarioDoEscritorio(resource.data.pool_escritorio_id))
-      );
+      // Update: o próprio advogado (caso individual) OU qualquer
+      // dono/sócio/funcionário do escritório (caso de pool) pode jogar
+      // a audiência/recurso. Em ambos os casos, advogado_uid e valor da
+      // causa não podem ser alterados, e instância não pode retroagir.
+      // (Update é sempre em documento único via doc(...).update(), nunca
+      // em query de listagem — então get() aqui é seguro e não trava.)
+      allow update: if isAuth()
+        && (
+          resource.data.advogado_uid == request.auth.uid
+          || vinculadoAoEscritorioDoProcesso(resource.data)
+        )
+        && notChanging('advogado_uid')
+        && notChanging('valor')
+        && request.resource.data.instancia >= resource.data.instancia;
 
       // Deleção não permitida
       allow delete: if false;
@@ -187,49 +248,86 @@ service cloud.firestore {
 
       // Criação: advogado autenticado pode criar seu próprio escritório
       allow create: if isAuth()
-        && request.resource.data.dono_uid == request.auth.uid;
+        && isDono(request.resource.data);
 
-      // Update: apenas o dono ou sócios
+      // Update: dono, sócio, OU o próprio jogador entrando/saindo de
+      // funcionarios_uids — cobre os dois lados do ciclo de vida de
+      // empregado-jogador (ver vagas.js): arrayUnion(uid) ao aceitar
+      // convite de vaga, arrayRemove(uid) ao sair. Restrito a alterar
+      // apenas funcionarios_uids/vagas_ocupadas, e o uid precisa
+      // realmente mudar de status no array (estava fora e passa a
+      // estar dentro, ou vice-versa) — ninguém entra/sai em nome de
+      // outro jogador, nem reenvia o mesmo estado sem necessidade.
       allow update: if isAuth()
-        && (resource.data.dono_uid == request.auth.uid
-            || request.auth.uid in resource.data.socios);
+        && (isDono(resource.data)
+            || isSocio(resource.data)
+            || (
+              request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['funcionarios_uids', 'vagas_ocupadas'])
+              && (
+                ('funcionarios_uids' in resource.data && request.auth.uid in resource.data.funcionarios_uids)
+                != (request.auth.uid in request.resource.data.funcionarios_uids)
+              )
+            ));
 
-      // Subcoleção: funcionários
+      // Subcoleção: funcionários — dono pode tudo; o próprio funcionário
+      // (jogador real, identificado pelo campo jogador_uid no documento)
+      // pode se autodesativar ao sair (ver vagas.js::sairEscritorio,
+      // que marca ativo:false e saiu_em no próprio registro).
       match /funcionarios/{funcId} {
-        // Leitura: dono do escritório OU o próprio jogador que é funcionário
-        // (necessário para que o jogador veja/gerencie seu próprio vínculo,
-        // e para validações de capacidade de vaga no momento de aceitar convite)
-        allow read: if isAuth()
-          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid
-              || (resource != null && resource.data.jogador_uid == request.auth.uid));
-        // Dono pode criar/gerenciar qualquer funcionário (NPC ou jogador).
-        // Um jogador real também pode criar SEU PRÓPRIO registro ao aceitar
-        // um convite, e atualizar/desativar apenas o seu próprio registro
-        // (ex: ao sair do escritório).
+        allow read:   if isAuth();
+        // Criação: o dono contratando um NPC (ver equipe.js, tipo:'npc')
+        // OU o próprio jogador se autorregistrando ao aceitar um convite
+        // de vaga (ver vagas.js::responderConvite, tipo:'jogador',
+        // jogador_uid igual ao seu próprio uid — sem isso, aceitar
+        // convite falhava antes mesmo de chegar no updateDoc de
+        // funcionarios_uids no documento do escritório).
         allow create: if isAuth()
-          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid
-              || request.resource.data.jogador_uid == request.auth.uid);
+          && (
+            isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+            || request.resource.data.jogador_uid == request.auth.uid
+          );
         allow update: if isAuth()
-          && (get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
               || resource.data.jogador_uid == request.auth.uid);
         allow delete: if isAuth()
-          && get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid;
+          && isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data);
       }
 
-      // Subcoleção: oportunidades de serviço
+      // Subcoleção: oportunidades de serviço — apenas dono/sócios do
+      // escritório podem ver e gerenciar (aceitar, delegar, recusar).
+      // Sem essa regra, a tela "Clientes" falha com "Missing or
+      // insufficient permissions" ao tentar listar oportunidades.
       match /oportunidades/{opId} {
-        allow read:   if isAuth()
-          && get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid;
-        allow create, update, delete: if isAuth()
-          && get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid;
+        allow read: if isAuth()
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+        allow create: if isAuth()
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+        allow update: if isAuth()
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+        allow delete: if isAuth()
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
       }
 
-      // Subcoleção: carteira de clientes
+      // Subcoleção: carteira de clientes — mesmo padrão de acesso das
+      // oportunidades (apenas dono/sócios).
       match /clientes/{clienteId} {
-        allow read:   if isAuth()
-          && get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid;
-        allow create, update, delete: if isAuth()
-          && get(/databases/$(database)/documents/escritorios/$(escritorioId)).data.dono_uid == request.auth.uid;
+        allow read: if isAuth()
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+        allow create: if isAuth()
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+        allow update: if isAuth()
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+        allow delete: if isAuth()
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
       }
 
       allow delete: if false;

@@ -156,9 +156,13 @@ exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (requ
 
   const xpGanho = banco.xpPorDecisao('1grau', score);
 
+  // ── % HONORÁRIO SOLO escalonado por cargo (decrescente — causas de
+  // cargo mais alto já têm valor base muito maior, % alto explodiria).
+  const PCT_HONORARIO_CARGO = { jnr:0.18, pln:0.20, snr:0.065, asc:0.04, soc:0.024, snm:0.018 };
+  const pctHonorario = PCT_HONORARIO_CARGO[j.cargo_id] || 0.18;
   const isSolo = !j.escritorio_empregado_id || j.escritorio_id === 'solo';
   const suc = Math.floor(p.valor * 0.10);
-  const honPotencial = favoravelAoJogador ? (isSolo ? Math.floor(p.valor * 0.30 + suc) : Math.floor(suc * 0.10)) : 0;
+  const honPotencial = favoravelAoJogador ? (isSolo ? Math.floor(p.valor * pctHonorario + suc) : Math.floor(suc * 0.10)) : 0;
 
   const dc = (j.derrotas_consecutivas || 0) + 1;
   const demitido = !favoravelAoJogador && dc >= 5 && j.escritorio_empregado_id && j.escritorio_empregado_id !== 'solo' && !j.escritorio_proprio_id;
@@ -221,15 +225,18 @@ exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (requ
       hon_total_acumulado: favoravelAoJogador ? honPotencial : 0,
       convencimento: score,
     });
-    if (escritorioDoCaso && !favoravelAoJogador) {
+    // ── REPUTAÇÃO DO ESCRITÓRIO ── +2 vitória / -1 derrota com trânsito
+    // em julgado, nunca abaixo de 0.
+    if (escritorioDoCaso) {
       try {
         const escRef = db.collection('escritorios').doc(escritorioDoCaso);
         const escSnap = await escRef.get();
         if (escSnap.exists) {
-          const escRep = escSnap.data().prestigio || 10;
-          await escRef.update({ prestigio: Math.max(0, escRep - Math.ceil(Math.abs(repDelta) * 0.5)) });
+          const repAtual = escSnap.data().reputacao || 0;
+          const delta = favoravelAoJogador ? 2 : -1;
+          await escRef.update({ reputacao: Math.max(0, repAtual + delta) });
         }
-      } catch (e) { logger.warn('Penalidade rep escritório falhou:', e); }
+      } catch (e) { logger.warn('Atualização de reputação do escritório falhou:', e); }
     }
     return { categoria, txt, repDelta, xpGanho, recorre: false, hon: honPotencial, demitido };
   }
