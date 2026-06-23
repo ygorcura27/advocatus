@@ -380,7 +380,7 @@ export async function processarServicosMensal(j) {
   const qtd = Math.round(qtdBase * (1+modNet));
 
   for (let i=0; i<qtd; i++) {
-    const op = gerarOportunidade(tier, prestigioPct);
+    const op = gerarOportunidade(tier, prestigioPct, j.cargo_id);
     await addDoc(collection(db,'escritorios',escId,'oportunidades'), { ...op, status:'disponivel' });
   }
 

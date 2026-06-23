@@ -28,6 +28,7 @@ import { collection, addDoc, doc, updateDoc, getDoc, getDocs, query, where }
 import { httpsCallable }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
 import { db } from './firebase-init.js';
+import './equipe_minima.js';
 
 // ════════════════════════════════════════════════════════
 // CONSTANTES DE PRODUÇÃO (mantidas do processos.js original)
@@ -3135,6 +3136,23 @@ window.novoProcessoPool = async function() {
   if (!escSnap.exists()) { toast('Escritório não encontrado.', 'ko'); return; }
   const esc = escSnap.data();
   const tier = esc.tier || 1;
+
+  // ── EQUIPE MÍNIMA POR CARGO — a partir de Sênior, captar causas desse
+  // porte exige advogados contratados mínimos, não só o dono sozinho.
+  const equipeMinimaExigida = (window.EQUIPE_MINIMA_POR_CARGO || {})[j.cargo_id] || 0;
+  if (equipeMinimaExigida > 0) {
+    const funcSnap = await getDocs(collection(db, 'escritorios', j.escritorio_proprio_id, 'funcionarios'));
+    const CARGO_RANK_ADV = { jnr:1, pln:1, snr:1, asc:1, soc:1, snm:1 };
+    const nAdvogados = funcSnap.docs.filter(d => {
+      const f = d.data();
+      return f.ativo !== false && CARGO_RANK_ADV[f.cargo_id];
+    }).length;
+    if (nAdvogados < equipeMinimaExigida) {
+      toast(`🔒 Causas deste porte exigem equipe mínima de ${equipeMinimaExigida} advogado(s) contratado(s) (atual: ${nAdvogados}).`, 'ko', 6000);
+      return;
+    }
+  }
+
   const limiteMes = LIMITE_POOL_CASOS_MES_TIER[tier] || LIMITE_POOL_CASOS_MES_TIER[1];
   const limiteAbertos = LIMITE_POOL_CASOS_ABERTOS_TIER[tier] || LIMITE_POOL_CASOS_ABERTOS_TIER[1];
 

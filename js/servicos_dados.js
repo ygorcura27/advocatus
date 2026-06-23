@@ -70,6 +70,29 @@ export function multiplicadorPrestigio(prestigioPct) {
   return 1.0;
 }
 
+// ── Tipos de serviço acessíveis por cargo (Júnior/Pleno só os mais
+// simples; Parecer e Cobrança liberados a partir de Sênior) ──
+export const TIPOS_SERVICO_POR_CARGO = {
+  jnr: ['consulta', 'notificacao'],
+  pln: ['consulta', 'notificacao', 'contrato'],
+  snr: ['consulta', 'notificacao', 'contrato', 'parecer'],
+  asc: ['consulta', 'notificacao', 'contrato', 'parecer', 'cobranca'],
+  soc: ['consulta', 'notificacao', 'contrato', 'parecer', 'cobranca'],
+  snm: ['consulta', 'notificacao', 'contrato', 'parecer', 'cobranca'],
+};
+
+// ── Multiplicador de prestígio escalonado por cargo — calibrado para
+// a curva de renda autônomo/contratado da especificação econômica ──
+const MULT_PRESTIGIO_BASE_CARGO = { jnr:0.23, pln:0.55, snr:0.55, asc:0.83, soc:1.15, snm:1.25 };
+
+export function multiplicadorPrestigioCargo(prestigioPct, cargoId) {
+  const base = MULT_PRESTIGIO_BASE_CARGO[cargoId] || 0.5;
+  if (prestigioPct >= 90) return base;
+  if (prestigioPct >= 70) return base * 0.85;
+  if (prestigioPct >= 40) return base * 0.7;
+  return base * 0.6;
+}
+
 // ════════════════════════════════════════════════════════
 // NOMES DE CLIENTES (PF e PJ)
 // ════════════════════════════════════════════════════════
@@ -143,9 +166,9 @@ export const PRODUTIVIDADE_CARGO = {
 // HELPERS
 // ════════════════════════════════════════════════════════
 
-/** Gera uma oportunidade de serviço aleatória */
-export function gerarOportunidade(tier, prestigioPct) {
-  const tiposKeys = Object.keys(TIPOS_SERVICO);
+/** Gera uma oportunidade de serviço aleatória, restrita aos tipos do cargo */
+export function gerarOportunidade(tier, prestigioPct, cargoId) {
+  const tiposKeys = TIPOS_SERVICO_POR_CARGO[cargoId] || ['consulta'];
   const tipoKey   = tiposKeys[Math.floor(Math.random()*tiposKeys.length)];
   const tipo      = TIPOS_SERVICO[tipoKey];
 
@@ -155,7 +178,7 @@ export function gerarOportunidade(tier, prestigioPct) {
     ? NOMES_CLIENTE_PJ[porte][Math.floor(Math.random()*NOMES_CLIENTE_PJ[porte].length)]
     : NOMES_CLIENTE_PF[Math.floor(Math.random()*NOMES_CLIENTE_PF.length)];
 
-  const mult = multiplicadorPrestigio(prestigioPct);
+  const mult = multiplicadorPrestigioCargo(prestigioPct, cargoId);
   let valor;
   if (tipoKey === 'cobranca') {
     const valorRecuperar = 5000 + Math.floor(Math.random()*95000);

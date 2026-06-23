@@ -32,3 +32,5 @@ export function verificarEquipeMinima(cargoDono, nAdvogadosContratados) {
     faltam: Math.max(0, exigido - nAdvogadosContratados),
   };
 }
+
+window.EQUIPE_MINIMA_POR_CARGO = EQUIPE_MINIMA_POR_CARGO;
