@@ -394,44 +394,47 @@ window._confirmarDesignar = async function(funcId, procId, escId) {
   const skills  = f.skills || {};
   const skMed   = Object.values(skills).reduce((a,b)=>a+b,0) / Math.max(1,Object.values(skills).length);
   const bonus   = ci.bonus_chance + Math.floor(skMed * 0.3);
-  const chance  = Math.min(85, 35 + bonus); // nunca > 85% de acerto total
+  const chance  = Math.min(85, 35 + bonus);
   const sucesso = Math.random() * 100 < chance;
-
-  // Progresso por cargo — escalonado para ser relevante
+ 
   const PROG_SUCESSO = { est:35, ass:45, jnr:55, pln:65, snr:75 };
   const PROG_FALHA   = { est:15, ass:20, jnr:25, pln:30, snr:35 };
   const ganhoP = sucesso
     ? (PROG_SUCESSO[f.cargo_id] || 35)
     : (PROG_FALHA[f.cargo_id]   || 15);
-
+ 
   const progressoAtual = p.progresso || 0;
-  const progressoAlvo  = Math.min(90, progressoAtual + ganhoP);
-  const chegou90       = progressoAlvo >= 90;
-
-  // Atualizar processo
-  await updateDoc(doc(db, 'processos', procId), {
+  // Antes: capado em 90 (nunca destravava sentença). Agora: capado em
+  // 100 -- equivalente a concluir a 3ª rodada de audiência.
+  const progressoAlvo  = Math.min(100, progressoAtual + ganhoP);
+  const chegou100       = progressoAlvo >= 100;
+ 
+  const updatesProcesso = {
     progresso:                  progressoAlvo,
     delegado_func_id:           funcId,
-    delegado_revisao_pendente:  chegou90,
+    delegado_revisao_pendente:  chegou100,
     chance_sucesso: Math.min(90, (p.chance_sucesso||50) + (sucesso ? bonus * 0.3 : -3)),
-  });
-
-  // Atualizar funcionário
+  };
+  // Quando atinge 100%, marca as 3 rodadas como concluídas para o
+  // modal de processo liberar "Processar sentença" corretamente.
+  if (chegou100) {
+    updatesProcesso.rodada_audiencia = 3;
+  }
+  await updateDoc(doc(db, 'processos', procId), updatesProcesso);
+ 
   await updateDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId), {
     acoes_mes_usadas: (f.acoes_mes_usadas || 0) + 1,
-    acao_atual: chegou90 ? null : { procId, progresso_delegado: progressoAlvo },
+    acao_atual: chegou100 ? null : { procId, progresso_delegado: progressoAlvo },
   });
 
   fecharModal();
-
-  if (chegou90) {
-    toast(`✅ ${f.nome} chegou a 90%! Processo pronto para sua revisão e sentença.`, 'ok', 6000);
+  if (chegou100) {
+    toast(`✅ ${f.nome} concluiu a instrução! Processo pronto para sua sentença.`, 'ok', 6000);
   } else if (sucesso) {
     toast(`📈 ${f.nome} avançou o processo para ${progressoAlvo}%.`, 'ok', 4000);
   } else {
     toast(`⚠️ ${f.nome} teve dificuldades — processo avançou apenas para ${progressoAlvo}%.`, 'neutro', 4000);
   }
-
   setTimeout(() => window.navTo && window.navTo('equipe', null), 600);
 };
 
