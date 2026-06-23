@@ -14,6 +14,7 @@ import { httpsCallable }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
 import { db } from './firebase-init.js';
 import { rolarEventosDoMes } from './eventos_escritorio.js';
+import './upgrade_escritorio.js';
 
 export const MESES_TOLERANCIA_SALARIO = 3;
 export const PERDA_PRODUTIVIDADE_SEM_SALARIO = 0.25; // -25% de produtividade por mês sem pagar
