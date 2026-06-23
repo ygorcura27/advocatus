@@ -1,16 +1,12 @@
 /**
- * EQUIPE MÍNIMA POR FAIXA DE CAUSA — a partir de Sênior, causas de
- * maior valor exigem advogados contratados mínimos no escritório,
- * não só o dono sozinho. Usado para travar o pool antes de gerar/
- * aceitar um caso de determinado valor.
+ * EQUIPE MÍNIMA POR TIER — a partir do Tier 3, o ESCRITÓRIO (não o
+ * cargo do dono) exige advogados contratados mínimos para captar
+ * causas daquele porte. Compatível por escritório: dois sócios
+ * diferentes no mesmo escritório enfrentam a mesma trava.
  */
 
-export const EQUIPE_MINIMA_POR_CARGO = { jnr:0, pln:0, snr:1, asc:2, soc:3, snm:4 };
+export const EQUIPE_MINIMA_POR_TIER = { 1:0, 2:0, 3:1, 4:2, 5:3 };
 
-/**
- * Conta quantos advogados (cargo jnr+) ativos e contratados existem
- * no escritório, via snapshot já carregado da subcoleção funcionarios.
- */
 export function contarAdvogadosContratados(funcionariosSnap) {
   const CARGO_RANK_ADV = { jnr:1, pln:1, snr:1, asc:1, soc:1, snm:1 };
   return funcionariosSnap.docs.filter(d => {
@@ -19,12 +15,8 @@ export function contarAdvogadosContratados(funcionariosSnap) {
   }).length;
 }
 
-/**
- * Verifica se o escritório tem equipe suficiente para o cargo do dono
- * acessar o pool de causas correspondente. Retorna { liberado, faltam }.
- */
-export function verificarEquipeMinima(cargoDono, nAdvogadosContratados) {
-  const exigido = EQUIPE_MINIMA_POR_CARGO[cargoDono] || 0;
+export function verificarEquipeMinima(tierEscritorio, nAdvogadosContratados) {
+  const exigido = EQUIPE_MINIMA_POR_TIER[tierEscritorio] || 0;
   return {
     liberado: nAdvogadosContratados >= exigido,
     exigido,
@@ -33,4 +25,4 @@ export function verificarEquipeMinima(cargoDono, nAdvogadosContratados) {
   };
 }
 
-window.EQUIPE_MINIMA_POR_CARGO = EQUIPE_MINIMA_POR_CARGO;
+window.EQUIPE_MINIMA_POR_TIER = EQUIPE_MINIMA_POR_TIER;
