@@ -103,6 +103,38 @@ function recalcularConvencimento(p) {
   return cv;
 }
 
+async function _finalizarProcessoDefinitivo(db, processoRef, jogadorRef, p, j, score, favoravelAoJogador, honPotencial, mesAtual, repDelta, logger) {
+  const escritorioDoCaso = p.pool_escritorio_id || j.escritorio_proprio_id;
+  if (favoravelAoJogador && honPotencial > 0) {
+    if (escritorioDoCaso) {
+      const escRef = db.collection('escritorios').doc(escritorioDoCaso);
+      const escSnap = await escRef.get();
+      if (escSnap.exists) await escRef.update({ caixa: (escSnap.data().caixa||0) + honPotencial });
+    } else {
+      await jogadorRef.update({
+        dinheiro: (j.dinheiro || 0) + honPotencial,
+        honorarios_mes: (j.honorarios_mes||0) + honPotencial,
+      });
+    }
+  }
+  await processoRef.update({
+    status: favoravelAoJogador ? 'ganho' : 'perdido',
+    encerrado_mes: mesAtual,
+    hon_total_acumulado: favoravelAoJogador ? honPotencial : 0,
+    convencimento: score,
+  });
+  if (escritorioDoCaso && !favoravelAoJogador) {
+    try {
+      const escRef = db.collection('escritorios').doc(escritorioDoCaso);
+      const escSnap = await escRef.get();
+      if (escSnap.exists) {
+        const escRep = escSnap.data().prestigio || 10;
+        await escRef.update({ prestigio: Math.max(0, escRep - Math.ceil(Math.abs(repDelta) * 0.5)) });
+      }
+    } catch (e) { logger.warn('Penalidade rep escritório falhou:', e); }
+  }
+}
+
 exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
 
@@ -156,13 +188,9 @@ exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (requ
 
   const xpGanho = banco.xpPorDecisao('1grau', score);
 
-  // ── % HONORÁRIO SOLO escalonado por cargo (decrescente — causas de
-  // cargo mais alto já têm valor base muito maior, % alto explodiria).
-  const PCT_HONORARIO_CARGO = { jnr:0.18, pln:0.20, snr:0.065, asc:0.04, soc:0.024, snm:0.018 };
-  const pctHonorario = PCT_HONORARIO_CARGO[j.cargo_id] || 0.18;
   const isSolo = !j.escritorio_empregado_id || j.escritorio_id === 'solo';
   const suc = Math.floor(p.valor * 0.10);
-  const honPotencial = favoravelAoJogador ? (isSolo ? Math.floor(p.valor * pctHonorario + suc) : Math.floor(suc * 0.10)) : 0;
+  const honPotencial = favoravelAoJogador ? (isSolo ? Math.floor(p.valor * 0.30 + suc) : Math.floor(suc * 0.10)) : 0;
 
   const dc = (j.derrotas_consecutivas || 0) + 1;
   const demitido = !favoravelAoJogador && dc >= 5 && j.escritorio_empregado_id && j.escritorio_empregado_id !== 'solo' && !j.escritorio_proprio_id;
@@ -182,67 +210,40 @@ exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (requ
   }
   await jogadorRef.update(updatesJogador);
 
-  const recorre = banco.decidirRecurso(favoravelAoJogador ? score : 100 - score);
+  // Quando o JOGADOR perde, recorrer é sempre opção dele, não sorteio —
+  // a parte contrária (NPC) é quem tem chance probabilística de recorrer.
+  const recorre = favoravelAoJogador
+    ? banco.decidirRecurso(100 - score)
+    : true;
 
-if (recorre) {
+  if (recorre && favoravelAoJogador) {
+    // Parte contrária (NPC) recorreu pelo sorteio — fluxo automático, igual antes.
     const { dataDisponivel, prazoFinal } = banco.calcularPrazosRecurso(j.mes_pessoal||0, j.ano_pessoal||1);
-    const quemRecorre = favoravelAoJogador ? 'parte_contraria' : 'jogador';
     await processoRef.update({
       status: 'recurso_pendente',
       instancia_atual: '1grau',
-      quem_recorre: quemRecorre,
+      quem_recorre: 'parte_contraria',
       score_anterior: score,
       hon_pendente: honPotencial,
       data_disponivel_recurso: dataDisponivel,
       prazo_final_recurso: prazoFinal,
       encerrado_mes: null,
       convencimento: score,
-      delegado_revisao_pendente: false,
     });
-    return { categoria, txt, repDelta, xpGanho, recorre: true, quemRecorre, instanciaSeguinte: p.instancia_seguinte, demitido };
-  } else {
-    // O destino dos honorários é o escritório DO CASO (p.pool_escritorio_id
-    // ou j.escritorio_proprio_id quando é caso individual do próprio dono),
-    // não o escritório pessoal de quem processou — relevante quando um
-    // colega Júnior+ processa um caso do pool de outra pessoa: os
-    // honorários vão para o caixa do escritório do caso, nunca para o
-    // bolso pessoal de quem clicou em "processar sentença".
-    const escritorioDoCaso = p.pool_escritorio_id || j.escritorio_proprio_id;
-    if (favoravelAoJogador && honPotencial > 0) {
-      if (escritorioDoCaso) {
-        const escRef = db.collection('escritorios').doc(escritorioDoCaso);
-        const escSnap = await escRef.get();
-        if (escSnap.exists) await escRef.update({
-          caixa: (escSnap.data().caixa||0) + honPotencial,
-          faturamento_mes_atual: (escSnap.data().faturamento_mes_atual||0) + honPotencial,
-        });
-      } else {
-        await jogadorRef.update({
-          dinheiro: (updatesJogador.dinheiro ?? j.dinheiro ?? 0) + honPotencial,
-          honorarios_mes: (j.honorarios_mes||0) + honPotencial,
-        });
-      }
-    }
+    return { categoria, txt, repDelta, xpGanho, recorre: true, quemRecorre: 'parte_contraria', instanciaSeguinte: p.instancia_seguinte, demitido };
+  } else if (recorre && !favoravelAoJogador) {
+    // Jogador perdeu — recurso é DECISÃO dele, não sorteio. Fica aguardando
+    // ele decidir (window.decidirRecorrerPropria, callable separada),
+    // sem entrar em recurso_pendente automaticamente.
     await processoRef.update({
-      status: favoravelAoJogador ? 'ganho' : 'perdido',
-      encerrado_mes: mesAtual,
-      hon_total_acumulado: favoravelAoJogador ? honPotencial : 0,
+      status: 'aguardando_decisao_sentenca',
+      score_anterior: score,
+      hon_pendente: honPotencial,
       convencimento: score,
-      delegado_revisao_pendente: false,
     });
-    // ── REPUTAÇÃO DO ESCRITÓRIO ── +2 vitória / -1 derrota com trânsito
-    // em julgado, nunca abaixo de 0.
-    if (escritorioDoCaso) {
-      try {
-        const escRef = db.collection('escritorios').doc(escritorioDoCaso);
-        const escSnap = await escRef.get();
-        if (escSnap.exists) {
-          const repAtual = escSnap.data().reputacao || 0;
-          const delta = favoravelAoJogador ? 2 : -1;
-          await escRef.update({ reputacao: Math.max(0, repAtual + delta) });
-        }
-      } catch (e) { logger.warn('Atualização de reputação do escritório falhou:', e); }
-    }
+    return { categoria, txt, repDelta, xpGanho, recorre: false, aguardandoDecisaoDoJogador: true, score, instanciaSeguinte: p.instancia_seguinte, demitido };
+  } else {
+    await _finalizarProcessoDefinitivo(db, processoRef, jogadorRef, p, j, score, favoravelAoJogador, honPotencial, mesAtual, repDelta, logger);
     return { categoria, txt, repDelta, xpGanho, recorre: false, hon: honPotencial, demitido };
   }
 });
