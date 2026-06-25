@@ -2086,14 +2086,14 @@ window.iniciarRodadaAudiencia = async function(procId) {
 
   _estado = { procId, proc: p, fase: 'instrucao' };
 
-   // Se um funcionário já escolheu provas/teses antes (auto-seleção),
+  // Se um funcionário já escolheu provas/teses antes (auto-seleção),
   // pula a tela de escolha manual e vai direto pra audiência.
-
   if (p.provas_selecionadas && p.teses_selecionadas) {
     _renderRodadaAudiencia(procId, p);
   } else {
     _renderSelecaoProvas(procId, p);
   }
+};
 
 function _renderSelecaoProvas(procId, p) {
 
