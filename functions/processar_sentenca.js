@@ -247,3 +247,61 @@ exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (requ
     return { categoria, txt, repDelta, xpGanho, recorre: false, hon: honPotencial, demitido };
   }
 });
+
+// ════════════════════════════════════════════════════════
+// DECIDIR RECURSO DA SENTENÇA — callable chamada pelo client
+// (window.decidirRecursoSentencaProducao) quando o JOGADOR decide se
+// recorre de uma sentença desfavorável (processo em
+// 'aguardando_decisao_sentenca'). Esta função estava referenciada no
+// client desde a correção que tornou o recurso uma decisão do jogador
+// em vez de sorteio automático, mas nunca tinha sido implementada aqui
+// — toda tentativa de chamar 'decidirRecursoSentenca' falhava com erro
+// de função inexistente (404/CORS), porque o nome nunca correspondia a
+// nenhum exports.* real neste arquivo. Espelha a mesma estrutura de
+// exports.decidirProximaInstancia em processar_acordao.js, adaptada
+// para o ponto de entrada do recurso (1ª instância → instanciaSeguinte),
+// não para uma instância recursal já em andamento.
+// ════════════════════════════════════════════════════════
+exports.decidirRecursoSentenca = onCall({ region: 'southamerica-east1' }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
+  const uid = request.auth.uid;
+  const { processo_id, recorrer } = request.data;
+  if (!processo_id) throw new HttpsError('invalid-argument', 'processo_id obrigatório.');
+
+  const db = getFirestore();
+  const processoRef = db.collection('processos').doc(processo_id);
+  const jogadorRef = db.collection('jogadores').doc(uid);
+  const [processoSnap, jogadorSnap] = await Promise.all([processoRef.get(), jogadorRef.get()]);
+  if (!processoSnap.exists) throw new HttpsError('not-found', 'Processo não encontrado.');
+  if (!jogadorSnap.exists) throw new HttpsError('not-found', 'Jogador não encontrado.');
+
+  const p = processoSnap.data();
+  const j = jogadorSnap.data();
+  if (!(await autorizadoParaProcessar(db, p, uid, j))) {
+    throw new HttpsError('permission-denied', 'Você não tem permissão para decidir sobre este processo (cargo insuficiente ou não pertence ao escritório do caso).');
+  }
+  if (p.status !== 'aguardando_decisao_sentenca') {
+    throw new HttpsError('failed-precondition', 'Este processo não está aguardando decisão de recurso.');
+  }
+
+  if (!recorrer) {
+    // Aceita a derrota — encerra definitivamente, igual ao caminho
+    // "não favorável e sem recurso" da sentença original.
+    const score = p.score_anterior;
+    await _finalizarProcessoDefinitivo(db, processoRef, jogadorRef, p, j, score, false, 0, mesTotalPessoal(j), 0, logger);
+    return { msg: 'Decisão aceita. Processo encerrado — trânsito em julgado.' };
+  }
+
+  // Recorrer: abre a fase de recurso, com o JOGADOR como quem recorre —
+  // mesmo formato já usado no caminho automático (parte contrária).
+  const { dataDisponivel, prazoFinal } = banco.calcularPrazosRecurso(j.mes_pessoal || 0, j.ano_pessoal || 1);
+  await processoRef.update({
+    status: 'recurso_pendente',
+    instancia_atual: '1grau',
+    quem_recorre: 'jogador',
+    data_disponivel_recurso: dataDisponivel,
+    prazo_final_recurso: prazoFinal,
+    encerrado_mes: null,
+  });
+  return { msg: `Recurso protocolado. Acesse a carteira processual para sustentar no ${p.instancia_seguinte}.` };
+});

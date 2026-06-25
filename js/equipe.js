@@ -6,6 +6,8 @@
 import { collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where, orderBy }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { db } from './firebase-init.js';
+import { SKILL_CAP } from './escritorios_npc.js';
+
 
 // ════════════════════════════════════════════════════════
 // CONSTANTES
@@ -60,7 +62,7 @@ window.renderEquipe = async function(j, el) {
   }
 
   // ── Caso 2: nenhum vínculo com nenhum escritório (solo) ──
-  const escId = j.escritorio_proprio_id;
+  const escId = j.escritorio_proprio_id || j.escritorio_empregado_id;
   if (!escId) {
     el.innerHTML = `
       <div class="secao-header"><div class="secao-titulo">👥 Equipe</div></div>
@@ -208,11 +210,17 @@ function _cardFuncionario(f, escId, energiaDisp) {
 
 async function _renderProcessosPendentesRevisao(j, escId) {
   try {
-    const qSnap = await getDocs(query(
-      collection(db, 'processos'),
-      where('escritorio_id', '==', escId),
-      where('delegado_revisao_pendente', '==', true)
-    ));
+    const qSnap1 = await getDocs(query(
+  collection(db, 'processos'),
+  where('escritorio_id', '==', escId),
+  where('delegado_revisao_pendente', '==', true)
+));
+const qSnap2 = await getDocs(query(
+  collection(db, 'processos'),
+  where('pool_escritorio_id', '==', escId),
+  where('delegado_revisao_pendente', '==', true)
+));
+const qSnap = { docs: [...qSnap1.docs, ...qSnap2.docs], empty: qSnap1.empty && qSnap2.empty };
     if (qSnap.empty) return '';
     const procs = qSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     return `
@@ -318,6 +326,9 @@ window._contratarNPC = async function(cargo_min, escId) {
   }
 };
 
+
+
+
 // ════════════════════════════════════════════════════════
 // DESIGNAR PROCESSO PARA FUNCIONÁRIO
 // ════════════════════════════════════════════════════════
@@ -325,46 +336,150 @@ window.abrirModalDesignar = async function(funcId, escId) {
   const j   = window.JOGADOR;
   const uid = j?.uid || window.JOGADOR_UID;
 
-  // Buscar processos ativos do escritório que podem ser delegados
   const qSnap = await getDocs(query(
     collection(db, 'processos'),
-    where('advogado_uid', '==', uid),
     where('status', '==', 'andamento')
   ));
+
+  // Apenas processos válidos do jogador
   const processos = qSnap.docs
     .map(d => ({ id: d.id, ...d.data() }))
-    .filter(p => !p.delegado_revisao_pendente && (p.progresso||0) < 90);
+    .filter(p =>
+      !p.delegado_revisao_pendente &&
+      p.advogado_uid === uid &&
+      Array.isArray(p.provas) &&
+      p.provas.length > 0 &&
+      Array.isArray(p.teses) &&
+      p.teses.length > 0 &&
+      Array.isArray(p.args_audiencia) &&
+      p.args_audiencia.length > 0
+    );
 
   if (processos.length === 0) {
-    toast('Nenhum processo disponível para delegar (sem processos ativos abaixo de 90%).', 'ko');
+    toast('Nenhum processo válido disponível para delegar.', 'ko');
     return;
   }
 
-  const fSnap = await getDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId));
+  const fSnap = await getDoc(
+    doc(db, 'escritorios', escId, 'funcionarios', funcId)
+  );
+
   if (!fSnap.exists()) return;
+
   const f  = fSnap.data();
   const ci = CARGO_INFO[f.cargo_id] || CARGO_INFO.est;
 
   if ((f.acoes_mes_usadas || 0) >= ci.acoes_mes) {
-    toast(`${f.nome} já usou todas as ${ci.acoes_mes} ação(ões) deste mês.`, 'ko');
+    toast(
+      `${f.nome} já usou todas as ${ci.acoes_mes} ação(ões) deste mês.`,
+      'ko'
+    );
     return;
   }
 
-  abrirModal(`📋 Designar Processo — ${f.nome}`,
+  abrirModal(
+    `📋 Designar Processo — ${f.nome}`,
     `<div style="font-size:.75rem;color:var(--txt3);margin-bottom:.8rem">
-      ${f.nome} pode realizar <b>${ci.acoes_mes - (f.acoes_mes_usadas||0)}</b> ação(ões) ainda neste mês.
-      O funcionário avançará o processo até <b>90%</b> — os últimos 10% e a sentença ficam com você.
+      ${f.nome} pode realizar
+      <b>${ci.acoes_mes - (f.acoes_mes_usadas || 0)}</b>
+      ação(ões) ainda neste mês.
+      O funcionário avançará o processo até <b>100%</b>.
     </div>
+
     <div style="display:flex;flex-direction:column;gap:.4rem">
       ${processos.map(p => `
-        <button class="btn btn-ghost btn-block" style="text-align:left;padding:.65rem .85rem"
+        <button
+          class="btn btn-ghost btn-block"
+          style="text-align:left;padding:.65rem .85rem"
           onclick="window._confirmarDesignar('${funcId}','${p.id}','${escId}')">
-          <div style="font-weight:600;font-size:.82rem;color:var(--navy)">${p.autor||'—'} vs ${p.reu||'—'}</div>
-          <div style="font-size:.67rem;color:var(--txt3)">${p.tipo||'—'} · ${p.progresso||0}% concluído · ${_fmtK(p.valor||0)}</div>
-        </button>`).join('')}
+
+          <div style="font-weight:600;font-size:.82rem;color:var(--navy)">
+            ${p.autor || '—'} vs ${p.reu || '—'}
+          </div>
+
+          <div style="font-size:.67rem;color:var(--txt3)">
+            ${p.tipo || '—'} ·
+            ${p.progresso || 0}% concluído ·
+            ${_fmtK(p.valor || 0)}
+          </div>
+        </button>
+      `).join('')}
     </div>`
   );
 };
+
+// ════════════════════════════════════════════════════════
+// AUTO-SELEÇÃO DE PROVAS E TESES — usada quando um FUNCIONÁRIO é o
+// primeiro a tocar um processo (nunca foi tocado pelo jogador antes).
+// Escolhe item por item: cada prova/tese candidata tem uma chance
+// independente de ser "bem escolhida" (ranking real) ou "mal escolhida"
+// (sorteio entre as restantes), proporcional à skill jurídica do
+// funcionário em relação ao cap do cargo dele.
+// ════════════════════════════════════════════════════════
+function _chanceAcertoSelecao(funcionario) {
+  const skills = funcionario.skills || {};
+  const relevantes = ['pesquisa', 'argumentacao', 'escrita'];
+  const soma = relevantes.reduce((s, k) => s + (skills[k] || 0), 0);
+  const media = soma / relevantes.length;
+  const cap = SKILL_CAP[funcionario.cargo_id] || 20;
+  return Math.min(1, media / cap);
+}
+
+function _autoSelecionarProvasTeses(p, funcionario) {
+  const chance = _chanceAcertoSelecao(funcionario);
+
+  // ── PROVAS (até 3, ranqueadas por força) ──
+  const provasOrdenadas = (p.provas || [])
+    .map((prova, i) => ({ i, forca: prova.forca || 0 }))
+    .sort((a, b) => b.forca - a.forca);
+
+  const provasSelecionadas = [];
+  const provasUsadas = new Set();
+  for (let slot = 0; slot < Math.min(3, provasOrdenadas.length); slot++) {
+    const acertou = Math.random() < chance;
+    let escolhida;
+    if (acertou) {
+      // pega a melhor disponível ainda não usada
+      escolhida = provasOrdenadas.find(pr => !provasUsadas.has(pr.i));
+    } else {
+      // erra: sorteia qualquer uma ainda não usada (pode ser fraca)
+      const disponiveis = provasOrdenadas.filter(pr => !provasUsadas.has(pr.i));
+      escolhida = disponiveis[Math.floor(Math.random() * disponiveis.length)];
+    }
+    if (!escolhida) break;
+    provasUsadas.add(escolhida.i);
+    provasSelecionadas.push(escolhida.i);
+  }
+
+  // ── TESES (até 2, ranqueadas por nº de fatos do caso que confirmam) ──
+  const fatosAtivos = new Set(p.fatos_ativos || []);
+  const tesesOrdenadas = (p.teses || [])
+    .map((tese, i) => {
+      const reqs = tese.requer_fatos || [];
+      const bateram = reqs.filter(f => fatosAtivos.has(f)).length;
+      return { i, forca: bateram };
+    })
+    .sort((a, b) => b.forca - a.forca);
+
+  const tesesSelecionadas = [];
+  const tesesUsadas = new Set();
+  for (let slot = 0; slot < Math.min(2, tesesOrdenadas.length); slot++) {
+    const acertou = Math.random() < chance;
+    let escolhida;
+    if (acertou) {
+      escolhida = tesesOrdenadas.find(t => !tesesUsadas.has(t.i));
+    } else {
+      const disponiveis = tesesOrdenadas.filter(t => !tesesUsadas.has(t.i));
+      escolhida = disponiveis[Math.floor(Math.random() * disponiveis.length)];
+    }
+    if (!escolhida) break;
+    tesesUsadas.add(escolhida.i);
+    tesesSelecionadas.push(escolhida.i);
+  }
+
+  return { provasSelecionadas, tesesSelecionadas };
+}
+
 
 window._confirmarDesignar = async function(funcId, procId, escId) {
   const j   = window.JOGADOR;
@@ -377,6 +492,19 @@ window._confirmarDesignar = async function(funcId, procId, escId) {
   const f    = fSnap.data();
   const p    = pSnap.data();
   const ci   = CARGO_INFO[f.cargo_id] || CARGO_INFO.est;
+
+ // ── AUTO-SELEÇÃO DE PROVAS/TESES — só na primeira vez que alguém
+ // toca este processo (nem jogador nem outro funcionário escolheu antes)
+  if (!p.provas_selecionadas && !p.teses_selecionadas) {
+    const { provasSelecionadas, tesesSelecionadas } = _autoSelecionarProvasTeses(p, f);
+    await updateDoc(doc(db, 'processos', procId), {
+      provas_selecionadas: provasSelecionadas,
+      teses_selecionadas: tesesSelecionadas,
+    });
+    p.provas_selecionadas = provasSelecionadas;
+    p.teses_selecionadas = tesesSelecionadas;
+  }
+
 
   // Gastar energia do dono
   const usado = j.energia_usada_mes || 0;

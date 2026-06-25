@@ -13,6 +13,15 @@
       "collectionGroup": "processos",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "advogado_uid",  "order": "ASCENDING" },
+        { "fieldPath": "status",        "order": "ASCENDING" },
+        { "fieldPath": "encerrado_mes", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "processos",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "escritorio_id", "order": "ASCENDING" },
         { "fieldPath": "status",        "order": "ASCENDING" }
       ]

@@ -583,7 +583,7 @@ function _processarFinanceiro(j, novoDinheiro, saldoMes) {
   let msg       = null;
   const rep     = j.reputacao || 30;
 
-  if (novoDinheiro < 0 || saldoMes < 0) {
+  if (saldoMes < 0) {
     const mesesNeg = (j.meses_negativo || 0) + 1;
     updates.meses_negativo        = mesesNeg;
     updates.meses_positivo_streak = 0;

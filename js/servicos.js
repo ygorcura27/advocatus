@@ -12,6 +12,103 @@ import {
   gerarOportunidade, valorContratoRecorrente,
 } from './servicos_dados.js';
 
+
+const CARTEIRA_PAGINA_TAMANHO = 10;
+let _carteiraEstado = { filtroTipo: 'todos', filtroPorte: 'todos', ordenarPor: 'confianca', paginaAtual: 1 };
+ 
+function _renderCarteiraClientes(clientesOriginal, escId) {
+  window._carteiraClientesCache = clientesOriginal;
+  window._carteiraEscId = escId;
+  _carteiraEstado.paginaAtual = 1;
+  _aplicarFiltroEDesenharCarteira();
+}
+ 
+const _ESTILO_SELECT = 'font-size:.7rem;padding:.3rem .5rem;border-radius:6px;border:1px solid var(--borda-cor,#ccc);background:var(--surface,#fff);color:var(--txt2,#333);max-width:100%;';
+ 
+function _aplicarFiltroEDesenharCarteira() {
+  const container = document.getElementById('carteira-clientes-container');
+  if (!container) {
+    console.warn('[CARTEIRA] container #carteira-clientes-container não encontrado no DOM.');
+    return;
+  }
+  const escId = window._carteiraEscId;
+  let lista = [...(window._carteiraClientesCache || [])];
+ 
+  if (_carteiraEstado.filtroTipo !== 'todos') {
+    lista = lista.filter(c => c.tipo === _carteiraEstado.filtroTipo);
+  }
+  if (_carteiraEstado.filtroTipo === 'PJ' && _carteiraEstado.filtroPorte !== 'todos') {
+    lista = lista.filter(c => c.porte === _carteiraEstado.filtroPorte);
+  }
+ 
+  if (_carteiraEstado.ordenarPor === 'confianca') {
+    lista.sort((a,b) => (b.confianca||0) - (a.confianca||0));
+  } else {
+    lista.sort((a,b) => (b.valor_mensal||0) - (a.valor_mensal||0));
+  }
+ 
+  const totalFiltrado = lista.length;
+  const qtdExibir = Math.min(totalFiltrado, CARTEIRA_PAGINA_TAMANHO * _carteiraEstado.paginaAtual);
+  const listaExibida = lista.slice(0, qtdExibir);
+  const temMais = qtdExibir < totalFiltrado;
+  const portesDisponiveis = ['micro','pequena','media','grande'];
+ 
+  container.innerHTML = `
+    <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.6rem;align-items:center;width:100%">
+      <select id="carteira-filtro-tipo" style="${_ESTILO_SELECT}" onchange="window._carteiraMudarFiltroTipo(this.value)">
+        <option value="todos" ${_carteiraEstado.filtroTipo==='todos'?'selected':''}>Todos</option>
+        <option value="PF" ${_carteiraEstado.filtroTipo==='PF'?'selected':''}>PF</option>
+        <option value="PJ" ${_carteiraEstado.filtroTipo==='PJ'?'selected':''}>PJ</option>
+      </select>
+ 
+      ${_carteiraEstado.filtroTipo === 'PJ' ? `
+        <select id="carteira-filtro-porte" style="${_ESTILO_SELECT}" onchange="window._carteiraMudarFiltroPorte(this.value)">
+          <option value="todos" ${_carteiraEstado.filtroPorte==='todos'?'selected':''}>Todos portes</option>
+          ${portesDisponiveis.map(p => `<option value="${p}" ${_carteiraEstado.filtroPorte===p?'selected':''}>${p[0].toUpperCase()+p.slice(1)}</option>`).join('')}
+        </select>
+      ` : ''}
+ 
+      <select id="carteira-ordenar" style="${_ESTILO_SELECT}" onchange="window._carteiraMudarOrdenacao(this.value)">
+        <option value="confianca" ${_carteiraEstado.ordenarPor==='confianca'?'selected':''}>Confiança ↓</option>
+        <option value="valor_mensal" ${_carteiraEstado.ordenarPor==='valor_mensal'?'selected':''}>Pagamento ↓</option>
+      </select>
+ 
+      <span style="font-size:.65rem;color:var(--txt4,#888);margin-left:auto;white-space:nowrap">${totalFiltrado} cliente(s)</span>
+    </div>
+ 
+    ${listaExibida.length === 0
+      ? `<div class="card" style="text-align:center;padding:1rem;color:var(--txt3);font-size:.75rem">
+           Nenhum cliente encontrado com esse filtro.
+         </div>`
+      : listaExibida.map(c => _cardCliente(c, escId)).join('')}
+ 
+    ${temMais ? `
+      <button class="btn btn-sm btn-ghost btn-block" style="margin-top:.5rem;width:100%" onclick="window._carteiraMostrarMais()">
+        Mostrar mais (${totalFiltrado - qtdExibir} restante(s)) ▾
+      </button>` : ''}
+  `;
+}
+ 
+window._carteiraMudarFiltroTipo = function(valor) {
+  _carteiraEstado.filtroTipo = valor;
+  _carteiraEstado.filtroPorte = 'todos';
+  _carteiraEstado.paginaAtual = 1;
+  _aplicarFiltroEDesenharCarteira();
+};
+window._carteiraMudarFiltroPorte = function(valor) {
+  _carteiraEstado.filtroPorte = valor;
+  _carteiraEstado.paginaAtual = 1;
+  _aplicarFiltroEDesenharCarteira();
+};
+window._carteiraMudarOrdenacao = function(valor) {
+  _carteiraEstado.ordenarPor = valor;
+  _aplicarFiltroEDesenharCarteira();
+};
+window._carteiraMostrarMais = function() {
+  _carteiraEstado.paginaAtual += 1;
+  _aplicarFiltroEDesenharCarteira();
+};
+
 // ════════════════════════════════════════════════════════
 // PAINEL PRINCIPAL — CLIENTES
 // ════════════════════════════════════════════════════════
@@ -27,31 +124,29 @@ window.renderClientes = async function(j, el) {
       </div>`;
     return;
   }
-
+ 
   const escSnap = await getDoc(doc(db, 'escritorios', escId));
   if (!escSnap.exists()) { el.innerHTML = '<div class="card">Escritório não encontrado.</div>'; return; }
   const esc  = escSnap.data();
   const tier = esc.tier || 1;
-
-  // Buscar oportunidades disponíveis (não aceitas/recusadas ainda)
+ 
   const opSnap = await getDocs(query(
     collection(db, 'escritorios', escId, 'oportunidades'),
     where('status', '==', 'disponivel')
   ));
   const oportunidades = opSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-  // Buscar carteira de clientes
+ 
   const clSnap = await getDocs(collection(db, 'escritorios', escId, 'clientes'));
   const clientes = clSnap.docs.map(d => ({ id: d.id, ...d.data() }));
   const recorrentes = clientes.filter(c => c.recorrente);
   const receitaRecorrenteMes = recorrentes.reduce((s,c) => s + (c.valor_mensal||0), 0);
-
+ 
   el.innerHTML = `
     <div class="secao-header">
       <div class="secao-titulo">📁 Clientes — ${esc.nome}</div>
       <span class="secao-badge">Tier ${tier}</span>
     </div>
-
+ 
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-bottom:1.2rem">
       <div class="stat-mini">
         <div class="v" style="color:var(--navy)">${clientes.length}</div>
@@ -66,7 +161,7 @@ window.renderClientes = async function(j, el) {
         <div class="l">💰 Receita fixa/mês</div>
       </div>
     </div>
-
+ 
     <!-- Oportunidades do mês -->
     <div class="secao-header" style="margin-top:1rem">
       <div class="secao-titulo">✨ Oportunidades do Mês</div>
@@ -77,17 +172,15 @@ window.renderClientes = async function(j, el) {
            Nenhuma oportunidade disponível agora. Novas surgem ao avançar o mês.
          </div>`
       : oportunidades.map(o => _cardOportunidade(o, j, tier)).join('')}
-
+ 
     <!-- Carteira de clientes -->
     <div class="secao-header" style="margin-top:1.2rem">
       <div class="secao-titulo">📒 Carteira de Clientes</div>
     </div>
-    ${clientes.length === 0
-      ? `<div class="card" style="text-align:center;padding:1.2rem;color:var(--txt3);font-size:.78rem">
-           Você ainda não tem clientes. Aceite oportunidades para começar sua carteira.
-         </div>`
-      : clientes.map(c => _cardCliente(c, escId)).join('')}
+    <div id="carteira-clientes-container"></div>
   `;
+ 
+  _renderCarteiraClientes(clientes, escId);
 };
 
 function _cardOportunidade(o, j, tier) {

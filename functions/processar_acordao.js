@@ -17,6 +17,8 @@
  * navegador — esses só existem para exibição otimista da UI.
  */
 
+
+
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getFirestore }       = require('firebase-admin/firestore');
 const { logger }             = require('firebase-functions');
@@ -122,7 +124,11 @@ function recalcularVotos(p) {
   return scores;
 }
 
-exports.processarAcordao = onCall({ region: 'southamerica-east1' }, async (request) => {
+exports.processarAcordao = onCall(
+  { region: 'southamerica-east1' },
+  async (request) => {
+
+    console.log("### VERSAO NOVA 24/06/2026 ###");
   if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
 
   const uid = request.auth.uid;
@@ -151,11 +157,19 @@ exports.processarAcordao = onCall({ region: 'southamerica-east1' }, async (reque
     throw new HttpsError('failed-precondition', 'Sustentação recursal ainda não foi concluída.');
   }
 
-  // ── RECALCULA o placar — única fonte de verdade do resultado.
-  const scores = recalcularVotos(p);
+  // ── Usa os scores já calculados na sustentação (visual === resultado).
+  // Fallback para recalcularVotos() só se o documento for antigo e não
+  // tiver esse campo (nunca deveria acontecer em processos novos).
+  let scores;
+  if (p.scores_apos_sustentacao && p.scores_apos_sustentacao.length) {
+    scores = p.scores_apos_sustentacao;
+  } else {
+  scores = recalcularVotos(p);  }
+  console.log("SCORES", scores);
   const totalVotos = scores.length;
   const votosReformar = scores.filter(s => s.score >= 50).length;
   const votosManter = totalVotos - votosReformar;
+  console.log({  votosReformar,  votosManter,  totalVotos});
   const placar = votosManter > votosReformar ? `${votosManter} x ${votosReformar}` : `${votosReformar} x ${votosManter}`;
   const categoria = categoriaPorPlacar(votosReformar, votosManter, totalVotos);
   const vencedoresSaoReforma = votosReformar >= votosManter;
@@ -172,29 +186,40 @@ exports.processarAcordao = onCall({ region: 'southamerica-east1' }, async (reque
     txt = recorrenteEhJogador
       ? 'O tribunal negou provimento ao recurso — a sentença que te era desfavorável permanece de pé.'
       : 'O tribunal manteve a decisão recorrida — sua vitória na origem foi confirmada.';
-    repDelta = recorrenteEhJogador ? -Math.round((100-novoScore)*0.15) : 0;
+    repDelta = recorrenteEhJogador ? -Math.round((100-novoScore)*0.15) : 2;
   } else if (categoria === 'reforma_parcial') {
     ico = '⚖️'; cor = '#ef9f27';
     txt = recorrenteEhJogador
       ? 'O tribunal deu parcial provimento ao seu recurso — parte da sentença desfavorável foi revertida a seu favor.'
       : 'O tribunal reformou parcialmente a decisão — parte da sua vitória na origem foi reduzida.';
-    repDelta = recorrenteEhJogador ? Math.round(novoScore*0.18) : -Math.floor(rep*0.03);
+    repDelta = recorrenteEhJogador ? 1 : -1;
   } else {
     ico = recorrenteEhJogador ? '🏆' : '❌'; cor = recorrenteEhJogador ? '#3aaa6a' : '#e57373';
     txt = recorrenteEhJogador
       ? 'O tribunal acolheu integralmente seu recurso — a sentença de origem foi revertida a seu favor.'
       : 'O tribunal reverteu integralmente a decisão de origem — sua vitória foi cassada.';
-    // Penalidade de cassação proporcional ao CAP DO CARGO, não ao score
-    // anterior — uma cassação não pode tirar quase toda a reputação
-    // possível de um cargo de uma vez.
-    repDelta = recorrenteEhJogador ? Math.round(novoScore*0.3) : -Math.round(cap*0.15);
+    repDelta = recorrenteEhJogador ? 2 : -2;
   }
 
   const xpGanho = banco.xpPorDecisao(p.instancia_seguinte, novoScore);
-  await jogadorRef.update({
-    reputacao: Math.max(0, Math.min(cap, rep + repDelta)),
-    xp: (j.xp||0) + xpGanho,
-  });
+await jogadorRef.update({
+  reputacao: Math.max(0, Math.min(cap, rep + repDelta)),
+  xp: (j.xp||0) + xpGanho,
+});
+
+// ── ATUALIZA REPUTAÇÃO DO ESCRITÓRIO
+const escritorioDoCaso = p.pool_escritorio_id || j.escritorio_proprio_id;
+if (escritorioDoCaso) {
+  const escRef = db.collection('escritorios').doc(escritorioDoCaso);
+  const escSnap = await escRef.get();
+  if (escSnap.exists) {
+    const escCap = repCapDoCargo('escritorio'); // qual cap?
+    const escRep = escSnap.data().reputacao || 0;
+    await escRef.update({
+      reputacao: Math.max(0, Math.min(escCap, escRep + repDelta)),
+    });
+  }
+}
 
   const votosFavorQuemTentaSubir = categoria === 'mantem' ? votosReformar : votosManter;
   const travado = acessoProximaInstanciaTravado(votosFavorQuemTentaSubir, totalVotos);
@@ -279,13 +304,18 @@ exports.processarAcordao = onCall({ region: 'southamerica-east1' }, async (reque
           honorarios_mes: (j.honorarios_mes||0) + honAcordao,
         });
       }
-      resposta.honCreditado = honAcordao;
+	resposta.honCreditado = honAcordao;
+    }
+    
+    // ── INCREMENTA CONTADOR DE RECURSOS VENCIDOS
+    if (jogadorGanhouEsteJulgamento && p.quem_recorre === 'jogador') {
+      await jogadorRef.update({
+        recursos_vencidos: (j.recursos_vencidos || 0) + 1,
+      });
     }
   }
-
   return resposta;
 });
-
 // ════════════════════════════════════════════════════════
 // DECIDIR PRÓXIMA INSTÂNCIA — callable leve, chamada quando é O JOGADOR
 // quem decide se recorre (categoria='reforma' e ele perdeu este

@@ -2086,31 +2086,53 @@ window.iniciarRodadaAudiencia = async function(procId) {
 
   _estado = { procId, proc: p, fase: 'instrucao' };
 
-  // Instrução probatória só na 1ª rodada (provas + teses ainda não escolhidas)
-  if (!p.provas_selecionadas || p.provas_selecionadas.length === 0) {
+   // Se um funcionário já escolheu provas/teses antes (auto-seleção),
+  // pula a tela de escolha manual e vai direto pra audiência.
+
+  if (p.provas_selecionadas && p.teses_selecionadas) {
+    _renderRodadaAudiencia(procId, p);
+  } else {
     _renderSelecaoProvas(procId, p);
+  }
+
+function _renderSelecaoProvas(procId, p) {
+
+  if (!Array.isArray(p.provas) || p.provas.length === 0) {
+    toast(
+      'Este processo foi criado sem provas e não pode seguir para a audiência.',
+      'ko',
+      6000
+    );
+    console.error('[PROCESSO SEM PROVAS]', procId, p);
     return;
   }
 
-  _renderRodadaAudiencia(procId, p);
-};
-
-function _renderSelecaoProvas(procId, p) {
-  document.getElementById('modal-body') && null; // no-op, abrirModal cuida do container
-  abrirModal('📋 Fase 1 de 3 — Instrução Probatória',
+  abrirModal(
+    '📋 Fase 1 de 3 — Instrução Probatória',
     `${_painelContextoProcesso(p)}
     <div class="stitle">Selecione as provas</div>
-    <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.75rem">Escolha até 3 provas. Todas aqui são juridicamente coerentes com os fatos deste processo.</div>
+    <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.75rem">
+      Escolha até 3 provas.
+    </div>
+
     <div class="pgrid" id="provas-sel" style="margin-bottom:1rem">
       ${p.provas.map((prova, i) => `
         <div class="pcard" id="prova-${i}" onclick="window.togProvaAudiencia(${i})">
-          <div class="pico">📄</div><div class="pnm">${prova.nome}</div><div class="ptyp">${prova.tipo.toUpperCase()}</div>
-        </div>`).join('')}
+          <div class="pico">📄</div>
+          <div class="pnm">${prova.nome}</div>
+          <div class="ptyp">${(prova.tipo || '').toUpperCase()}</div>
+        </div>
+      `).join('')}
     </div>
-    <button class="btn-avancar-fase" id="btn-teses-aud" onclick="window.irParaSelecaoTeses('${procId}')">
-      <span>Definir teses jurídicas</span><span class="baf-seta">→</span>
+
+    <button class="btn-avancar-fase"
+      id="btn-teses-aud"
+      onclick="window.irParaSelecaoTeses('${procId}')">
+      <span>Definir teses jurídicas</span>
+      <span class="baf-seta">→</span>
     </button>`
   );
+
   window._provasEscolhidasAud = [];
 }
 
@@ -2640,7 +2662,7 @@ window.confirmarPreparacaoProducao = async function() {
   const ok = await _gastarEnergia(ENERGIA_PREPARACAO_RECURSO, 'Preparação do recurso');
   if (!ok) return;
   recursoRd = 0;
-  const base = Math.round(RECURSO_ATIVO.score_anterior * 0.6 + 40 * 0.4);
+  const base = Math.round(RECURSO_ATIVO.score_anterior * 0.8 + 40 * 0.2); // 80/20 em vez de 60/40
   // Sensibilidade individual sorteada AQUI e PERSISTIDA — junto com o
   // colegiado (nomes/classes), passa a viver no Firestore, não só na
   // memória do cliente. Isso é o que permite a Cloud Function recalcular
@@ -2655,12 +2677,16 @@ window.confirmarPreparacaoProducao = async function() {
   const argsDisponiveis = RECURSO_ATIVO.quem_recorre === 'jogador' ? ARGS_RECURSO_RECORRENTE : ARGS_RECURSO_DEFESA;
   const indicesEscolhidos = [...argsDisponiveis.keys()].sort(() => Math.random() - 0.5).slice(0, 2);
 
-  await updateDoc(doc(db, 'processos', RECURSO_ATIVO.id), {
-    colegiado_recurso: SCORES_JULGADOR.map(jz => ({ cargo: jz.cargo, nome: jz.nome, classe: jz.classe, sensibilidade: jz.sensibilidade, score_inicial: jz.score })),
-    estrategias_recurso: estrategiasEscolhidas,
-    historico_respostas_recurso: [],
-    args_recurso_indices: indicesEscolhidos,
-  });
+await updateDoc(doc(db, 'processos', RECURSO_ATIVO.id), {
+  colegiado_recurso: SCORES_JULGADOR.map(jz => ({ 
+    cargo: jz.cargo, nome: jz.nome, classe: jz.classe, 
+    sensibilidade: jz.sensibilidade, 
+    score_inicial: jz.score
+  })),
+  scores_apos_sustentacao: SCORES_JULGADOR,
+  estrategias_recurso: estrategiasEscolhidas,
+  historico_respostas_recurso: [],
+});
   RECURSO_ATIVO.args_recurso_indices = indicesEscolhidos;
 
   _renderRodadaRecurso();
@@ -2827,8 +2853,6 @@ window.responderRecursoProducao = async function(tipo) {
   const sinal = euSouDefesa ? -1 : 1;
   const baseD = (tipo === a.ideal ? 7 : tipo === a.neutro ? 1 : -10) * sinal;
 
-  // Tema real do argumento sorteado (ver mesma correção em
-  // processar_acordao.js) — antes hardcoded por posição de rodada.
   const temaDaRodada = a.tema || (recursoRd === 0 ? 'prova_documental' : 'prazo');
   const temaDoTipo = tipo === 'agressiva' ? 'agressivo' : tipo === 'passiva' ? 'passivo' : null;
 
@@ -2843,28 +2867,26 @@ window.responderRecursoProducao = async function(tipo) {
     });
     d *= (jz.sensibilidade || 1);
     somaDelta += d;
-    jz.score = Math.max(5, Math.min(95, jz.score + d)); // exibição otimista local
+    jz.score = Math.max(5, Math.min(95, jz.score + d));
   });
 
-  // Mesma decisão de design da audiência: a categoria só é revelada
-  // DEPOIS da escolha, nunca nos botões — ver responderAudiencia.
   const NOME_CATEGORIA = { tecnica: 'Precisão', agressiva: 'Confronto', passiva: 'Jogo de Cintura' };
   const mediaDelta = Math.round(somaDelta / Math.max(1, SCORES_JULGADOR.length));
   const sinalGanho = mediaDelta >= 0 ? '+' : '';
   const corResultado = mediaDelta >= 5 ? 'ok' : mediaDelta <= -5 ? 'ko' : 'neutro';
   toast(`${NOME_CATEGORIA[tipo]}: ${sinalGanho}${mediaDelta} (média do colegiado)`, corResultado, 2800);
 
-  // Persiste o histórico bruto (rodada + tipo escolhido) — fonte de
-  // verdade que a Cloud Function usa para recalcular o julgamento do
-  // zero, em vez de confiar no SCORES_JULGADOR calculado no navegador
-  // (que pode ser adulterado via console/DevTools).
   const snap = await getDoc(doc(db, 'processos', RECURSO_ATIVO.id));
   const historicoAnterior = snap.exists() ? (snap.data().historico_respostas_recurso || []) : [];
+  
+  recursoRd++;
+
+  // SALVA SCORES DEPOIS DE CADA RODADA
   await updateDoc(doc(db, 'processos', RECURSO_ATIVO.id), {
-    historico_respostas_recurso: [...historicoAnterior, { rodada: recursoRd, tipo }],
+    historico_respostas_recurso: [...historicoAnterior, { rodada: recursoRd-1, tipo }],
+    scores_apos_sustentacao: SCORES_JULGADOR.map(jz => ({ ...jz, score: Math.round(jz.score) }))
   });
 
-  recursoRd++;
   _renderRodadaRecurso();
 };
 

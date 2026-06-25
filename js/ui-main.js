@@ -251,7 +251,6 @@ function renderProcessos(j, el) {
 
 async function _carregarProcessos(uid) {
   try {
-    // Ativos
     const qA = query(
       collection(db, 'processos'),
       where('advogado_uid', '==', uid),
@@ -259,7 +258,7 @@ async function _carregarProcessos(uid) {
       orderBy('criado_mes', 'desc'),
       limit(20)
     );
-    // Encerrados
+
     const qE = query(
       collection(db, 'processos'),
       where('advogado_uid', '==', uid),
@@ -268,26 +267,28 @@ async function _carregarProcessos(uid) {
       limit(10)
     );
 
-    const [snapA, snapE] = await Promise.all([getDocs(qA), getDocs(qE)]);
+    let snapA, snapE;
 
-    const listaA = document.getElementById('lista-processos');
-    const listaE = document.getElementById('lista-processos-enc');
+    try {
+      snapA = await getDocs(qA);
+      console.log('ATIVOS OK');
+    } catch (e) {
+      console.error('ERRO ATIVOS', e);
+    }
 
-    if (listaA) listaA.innerHTML = snapA.empty
-      ? '<div style="font-size:.78rem;color:var(--ardosia);padding:.5rem 0">Nenhum processo ativo. Aceite um novo caso.</div>'
-      : snapA.docs.map(d => _cardProcesso(d.id, d.data())).join('');
+    try {
+      snapE = await getDocs(qE);
+      console.log('ENCERRADOS OK');
+    } catch (e) {
+      console.error('ERRO ENCERRADOS', e);
+    }
 
-    if (listaE) listaE.innerHTML = snapE.empty
-      ? '<div style="font-size:.78rem;color:var(--ardosia);padding:.5rem 0">Nenhum processo encerrado.</div>'
-      : snapE.docs.map(d => _cardProcessoEnc(d.id, d.data())).join('');
+    console.log('snapA', snapA?.size);
+    console.log('snapE', snapE?.size);
 
-    // Atualizar badge
-    const count = snapA.size;
-    ['badge-proc'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) { el.style.display = count>0?'':'none'; el.textContent=String(count); }
-    });
-  } catch (err) { console.error('[UI] Processos:', err); }
+  } catch (err) {
+    console.error('[UI] Processos:', err);
+  }
 }
 
 function _cardProcesso(id, p) {
