@@ -576,17 +576,23 @@ async function _processarDistribuicaoProcessosMensal(db, uid, j, novoCalendario,
 }
 
 // ════════════════════════════════════════════════════════
-// SISTEMA FINANCEIRO
+// SISTEMA FINANCEIRO (CORRIGIDO: FOCO NO SALDO ACUMULADO)
 // ════════════════════════════════════════════════════════
 function _processarFinanceiro(j, novoDinheiro, saldoMes) {
   const updates = {};
   let msg       = null;
   const rep     = j.reputacao || 30;
 
-  if (saldoMes < 0) {
+  // IMPORTANTE: O Serasa e a contagem de meses negativos devem olhar para o 
+  // Saldo Acumulado Real (o dinheiro atual do jogador após o processamento do mês)
+  const saldoRealAcumulado = novoDinheiro; 
+
+  if (saldoRealAcumulado < 0) {
+    // Só entra aqui se o jogador REALMENTE estiver devendo (sem dinheiro em conta)
     const mesesNeg = (j.meses_negativo || 0) + 1;
     updates.meses_negativo        = mesesNeg;
     updates.meses_positivo_streak = 0;
+    
     const repPerda = j.no_serasa
       ? Math.max(3, Math.floor(rep * 0.06))
       : Math.max(2, Math.floor(rep * 0.03));
@@ -603,9 +609,12 @@ function _processarFinanceiro(j, novoDinheiro, saldoMes) {
       msg = { assunto:'🚨 Ainda no Serasa', corpo:`${mesesNeg}º mês negativo. -${repPerda} rep.`, tipo:'urgente' };
     }
   } else {
+    // Se o saldo real acumulado for positivo (mesmo que o mês isolado tenha sido negativo),
+    // o jogador está seguro, pois possui reservas financeiras para cobrir o custo.
     updates.meses_negativo = 0;
     const streak = (j.meses_positivo_streak || 0) + 1;
     updates.meses_positivo_streak = streak;
+    
     if (j.no_serasa && streak >= 3) {
       updates.no_serasa             = false;
       updates.meses_positivo_streak = 0;
