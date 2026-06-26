@@ -309,35 +309,55 @@ async function processarJogador(j, mesAtual, anoAtual, mesGlobal, isJaneiro, db)
   updates.custo_vida_calculado = custoVida;
   updates.saldo_mes_calculado = saldoMes;
 
-  // ── Sistema financeiro: serasa ──
-  const resultadoFinanceiro = processarFinanceiro(j, novoDinheiro, saldoMes);
-  Object.assign(updates, resultadoFinanceiro.updates);
-  if (resultadoFinanceiro.mensagem) {
-    await enviarMensagem(db, j.uid, 'sistema', resultadoFinanceiro.mensagem);
-  }
+ // ════════════════════════════════════════════════════════
+// SISTEMA FINANCEIRO (CORRIGIDO: FOCO NO SALDO ACUMULADO)
+// ════════════════════════════════════════════════════════
+function _processarFinanceiro(j, novoDinheiro, saldoMes) {
+  const updates = {};
+  let msg       = null;
+  const rep     = j.reputacao || 30;
 
-  // ── Prazo para sair da casa dos pais ──
-  if (morId === 'pais' && j.oab && ['jnr','pln','snr','asc','soc','snm'].includes(j.cargo_id)) {
-    const prazo = (j.prazo_sair_pais || 0) + 1;
-    updates.prazo_sair_pais = prazo;
-    if (prazo === 1) {
-      await enviarMensagem(db, j.uid, 'sistema', {
-        assunto: '⚠️ Moradia — prazo de 3 meses',
-        corpo:   'Você é Advogado(a) Júnior ou superior. Precisa sair da casa dos pais em até 3 meses. Acesse Patrimônio para escolher uma moradia.',
-        tipo:    'sistema',
-      });
-    } else if (prazo >= 3) {
-      const novaRep = Math.max(0, (updates.reputacao || j.reputacao || 30) - 5);
-      updates.reputacao = novaRep;
-      await enviarMensagem(db, j.uid, 'sistema', {
-        assunto: '❌ Prazo de moradia esgotado',
-        corpo:   `Prazo esgotado! Você ainda mora com os pais sendo ${j.cargo_id === 'jnr' ? 'Advogado Júnior' : 'Advogado'}. -5 rep. Escolha uma moradia urgentemente.`,
-        tipo:    'sistema',
-      });
+  // IMPORTANTE: O Serasa e a contagem de meses negativos devem olhar para o 
+  // Saldo Acumulado Real (o dinheiro atual do jogador após o processamento do mês)
+  const saldoRealAcumulado = novoDinheiro; 
+
+  if (saldoRealAcumulado < 0) {
+    // Só entra aqui se o jogador REALMENTE estiver devendo (sem dinheiro em conta)
+    const mesesNeg = (j.meses_negativo || 0) + 1;
+    updates.meses_negativo        = mesesNeg;
+    updates.meses_positivo_streak = 0;
+    
+    const repPerda = j.no_serasa
+      ? Math.max(3, Math.floor(rep * 0.06))
+      : Math.max(2, Math.floor(rep * 0.03));
+    updates.reputacao = Math.max(0, rep - repPerda);
+
+    if (mesesNeg === 1) msg = { assunto:'⚠️ Saldo negativo', corpo:`-${repPerda} rep. Regularize suas finanças.`, tipo:'urgente' };
+    else if (mesesNeg === 2) msg = { assunto:'⚠️ 2º mês negativo', corpo:`-${repPerda} rep. Mais 1 mês → Serasa.`, tipo:'urgente' };
+    else if (mesesNeg === 3 && !j.no_serasa) {
+      updates.no_serasa = true;
+      const extra = Math.max(4, Math.floor(rep * 0.06));
+      updates.reputacao = Math.max(0, (updates.reputacao ?? rep) - extra);
+      msg = { assunto:'🚨 Serasa', corpo:`Seu nome foi ao Serasa. -${extra} rep extra.`, tipo:'urgente' };
+    } else if (mesesNeg > 3) {
+      msg = { assunto:'🚨 Ainda no Serasa', corpo:`${mesesNeg}º mês negativo. -${repPerda} rep.`, tipo:'urgente' };
     }
-  } else if (morId !== 'pais') {
-    updates.prazo_sair_pais = 0;
+  } else {
+    // Se o saldo real acumulado for positivo (mesmo que o mês isolado tenha sido negativo),
+    // o jogador está seguro, pois possui reservas financeiras para cobrir o custo.
+    updates.meses_negativo = 0;
+    const streak = (j.meses_positivo_streak || 0) + 1;
+    updates.meses_positivo_streak = streak;
+    
+    if (j.no_serasa && streak >= 3) {
+      updates.no_serasa             = false;
+      updates.meses_positivo_streak = 0;
+      updates.reputacao             = Math.min(REP_CAP[j.cargo_id] || 55, rep + 5);
+      msg = { assunto:'✅ Nome limpo', corpo:'3 meses positivos — seu nome saiu do Serasa. +5 rep.', tipo:'positivo' };
+    }
   }
+  return { updates, msg };
+}
 
   // ── Decaimento natural de atributos ──
   const energiaGasta = j.energia_usada_mes || 0;
