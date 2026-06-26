@@ -309,7 +309,7 @@ a:hover { color: var(--navy); }
   background: linear-gradient(180deg, var(--navy) 0%, var(--navy2) 100%);
 }
 .brasao-wrap { margin-bottom: .5rem; }
-.brasao-svg { width: 104px; height: 104px; margin: 0 auto; filter: drop-shadow(0 2px 6px rgba(201,162,39,.3)); }
+.brasao-svg { width: 124px; height: 124px; margin: 0 auto; filter: drop-shadow(0 2px 6px rgba(201,162,39,.3)); }
 .perfil-nome  { font-family: var(--font-serif); font-size: .95rem; font-weight: 700; color: #fff; margin-bottom: .15rem; }
 .perfil-cargo { font-size: .62rem; color: var(--ouro); text-transform: uppercase; letter-spacing: .1em; margin-bottom: .5rem; }
 .perfil-rep-bar { height: 5px; background: rgba(255,255,255,.15); border-radius: 2px; overflow: hidden; margin-bottom: .2rem; }
