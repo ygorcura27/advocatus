@@ -308,7 +308,7 @@ a:hover { color: var(--navy); }
   border-bottom: var(--borda);
   background: linear-gradient(180deg, var(--navy) 0%, var(--navy2) 100%);
 }
-.brasao-wrap { margin-bottom: .4rem; }
+.brasao-wrap { margin-bottom: .25rem; }
 .brasao-svg { width: 124px; height: 124px; margin: 0 auto; filter: drop-shadow(0 2px 6px rgba(201,162,39,.3)); }
 .perfil-nome  { font-family: var(--font-serif); font-size: .95rem; font-weight: 700; color: #fff; margin-bottom: .15rem; }
 .perfil-cargo { font-size: .62rem; color: var(--ouro); text-transform: uppercase; letter-spacing: .1em; margin-bottom: .5rem; }
