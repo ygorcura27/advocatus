@@ -36,6 +36,21 @@ function _logoEmpresa(nome) {
   return `<div class="esc-cliente-logo">${ini}</div>`;
 }
 
+// Produtividade dinâmica: skills média / cap do cargo (70%) + bônus senioridade (20%) + base (10%)
+const _SKILL_CAP  = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
+const _CARGO_BON  = { est:0,  ass:5,  jnr:10, pln:15, snr:20, asc:25, soc:30  };
+
+function calcProdutividade(func) {
+  const skills = func.skills || {};
+  const vals   = Object.values(skills).filter(v => typeof v === 'number');
+  const media  = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 15;
+  const cap    = _SKILL_CAP[func.cargo_id] || 35;
+  const bon    = _CARGO_BON[func.cargo_id] || 0;
+  // Penalidade leve se sobrecarregado (ação em andamento com < 20% progresso)
+  const pen    = (func.acao_atual && (func.acao_atual.progresso_delegado || 0) < 20) ? -5 : 0;
+  return Math.min(98, Math.max(20, Math.round((media / cap) * 70 + bon + pen + 10)));
+}
+
 function _fmt(n) {
   if (!n && n!==0) return '—';
   if (n>=1000000) return `R$ ${(n/1000000).toFixed(1)}M`;
@@ -71,7 +86,7 @@ window.renderEquipePainel = async function(j, escId, el) {
       const cargo     = CARGO_INFO[func.cargo_id]?.l || func.cargo_id;
       const nome      = func.nome || func.name || `${cargo} #${func.id.slice(0,4)}`;
       const esp       = ESP_LABEL[func.especialidade] || func.especialidade || '—';
-      const prod      = func.produtividade ?? func.desemp ?? 70;
+      const prod      = calcProdutividade(func);
       const prodColor = prod >= 80 ? 'var(--verde2)' : prod >= 60 ? 'var(--amber)' : 'var(--verm2)';
       const dots      = [1,2,3].map(i =>
         `<span style="width:6px;height:6px;border-radius:50%;background:${i<=Math.ceil(prod/34)?prodColor:'var(--bg3)'}"></span>`

@@ -169,10 +169,24 @@ function _renderGrupo(titulo, membros, vagas, cargo_min, escId, energiaDisp) {
     </div>`;
 }
 
+const _SKILL_CAP_EQ = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
+const _CARGO_BON_EQ = { est:0,  ass:5,  jnr:10, pln:15, snr:20, asc:25, soc:30  };
+
+function _calcProd(func) {
+  const skills = func.skills || {};
+  const vals   = Object.values(skills).filter(v => typeof v === 'number');
+  const media  = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 15;
+  const cap    = _SKILL_CAP_EQ[func.cargo_id] || 35;
+  const bon    = _CARGO_BON_EQ[func.cargo_id] || 0;
+  const pen    = (func.acao_atual && (func.acao_atual.progresso_delegado || 0) < 20) ? -5 : 0;
+  return Math.min(98, Math.max(20, Math.round((media / cap) * 70 + bon + pen + 10)));
+}
+
 function _cardFuncionario(f, escId, energiaDisp) {
   const ci    = CARGO_INFO[f.cargo_id] || CARGO_INFO.est;
   const skills = f.skills || {};
-  const skMed  = Math.round(Object.values(skills).reduce((a,b)=>a+b,0) / Math.max(1,Object.values(skills).length));
+  const prod   = _calcProd(f);
+  const prodColor = prod >= 80 ? '#2E8B57' : prod >= 60 ? '#B7791F' : '#C0392B';
   const podeCoordenar = energiaDisp >= ci.custo_coord;
 
   return `
@@ -180,7 +194,7 @@ function _cardFuncionario(f, escId, energiaDisp) {
       <div style="display:flex;align-items:start;justify-content:space-between;gap:.8rem">
         <div style="flex:1">
           <div style="font-weight:700;font-size:.88rem;color:var(--navy)">${f.nome}</div>
-          <div style="font-size:.68rem;color:var(--ouro2);margin-bottom:.3rem">${ci.l} · Skills média: ${skMed}</div>
+          <div style="font-size:.68rem;color:var(--ouro2);margin-bottom:.3rem">${ci.l} · Produtividade: <b style="color:${prodColor}">${prod}%</b></div>
           <div style="display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.4rem">
             ${Object.entries(skills).map(([k,v])=>
               `<span style="font-size:.6rem;padding:.1rem .35rem;background:var(--navy-light);border-radius:20px;color:var(--navy3)">${_skillLabel(k)}: ${v}</span>`
