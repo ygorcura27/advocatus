@@ -36,6 +36,11 @@ function _logoEmpresa(nome) {
   return `<div class="esc-cliente-logo">${ini}</div>`;
 }
 
+// Constantes para aceitar/delegar oportunidades
+const ACEITAR_ENERGIA = 25;
+const DELEGAR_ENERGIA = { est:5, ass:5, jnr:6, pln:7, snr:8, asc:10, soc:5 };
+const DELEGAR_PCT     = { est:.20, ass:.20, jnr:.30, pln:.40, snr:.50, asc:.70, soc:1.00 };
+
 // Produtividade dinâmica: skills média / cap do cargo (70%) + bônus senioridade (20%) + base (10%)
 const _SKILL_CAP  = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
 const _CARGO_BON  = { est:0,  ass:5,  jnr:10, pln:15, snr:20, asc:25, soc:30  };
@@ -196,7 +201,7 @@ window.renderClientesPainel = async function(j, escId, el) {
 };
 
 // ════════════════════════════════════════════════════════
-// OPORTUNIDADES DO MÊS — da subcoleção real do escritório
+// OPORTUNIDADES DO MÊS — com aceitar/delegar
 // ════════════════════════════════════════════════════════
 window.renderOportunidadesPainel = async function(j, escId, el) {
   try {
@@ -206,44 +211,207 @@ window.renderOportunidadesPainel = async function(j, escId, el) {
       limit(20)
     ));
 
-    const todas = opSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const top5  = todas.slice(0, 5);
+    const todas   = opSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const top5    = todas.slice(0, 5);
     const temMais = todas.length > 5;
 
-    if (top5.length === 0) {
-      el.innerHTML = '';
-      return;
-    }
+    if (top5.length === 0) { el.innerHTML = ''; return; }
 
     const tipoIcon = { PF:'👤', PJ:'🏢', consulta:'📋', contrato:'📄', causa:'⚖️' };
+    const ESP_L    = { tributario:'Tributário', contencioso:'Contencioso', trabalhista:'Trabalhista', criminal:'Criminal', societario:'Societário', civil:'Civil', consumidor:'Consumidor', ambiental:'Ambiental', administrativo:'Administrativo', familia:'Família', imobiliario:'Imobiliário', empresarial:'Empresarial' };
+
+    const energiaUsada = j.energia_usada_mes || 0;
+    const energiaTotal = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
+    const energiaDisp  = Math.max(0, energiaTotal - energiaUsada);
 
     const rows = top5.map(op => {
-      const icone = op.icone || tipoIcon[op.tipo_cliente] || tipoIcon[op.tipo] || '🌟';
-      const valor = op.valor_estimado || op.valor || 0;
+      const icone    = op.icone || tipoIcon[op.tipo_cliente] || tipoIcon[op.tipo] || '🌟';
+      const valor    = op.valor_estimado || op.valor || 0;
+      const area     = ESP_L[op.area || op.especialidade] || op.area || '';
+      const cliente  = op.nome_cliente || op.cliente || '';
+      const podAceit = energiaDisp >= ACEITAR_ENERGIA;
+
       return `
-      <div class="esc-opport">
+      <div class="esc-opport" id="opport-${op.id}">
         <div class="esc-opport-icone">${icone}</div>
         <div style="flex:1;min-width:0">
           <div class="esc-opport-titulo">${op.titulo || op.nome || 'Oportunidade'}</div>
+          ${cliente ? `<div style="font-size:.68rem;color:var(--txt3);margin-top:.1rem">${cliente}</div>` : ''}
+          ${area    ? `<div style="font-size:.63rem;color:var(--txt4)">${area}</div>` : ''}
           ${op.descricao ? `<div class="esc-opport-desc">${op.descricao}</div>` : ''}
         </div>
-        ${valor ? `<div style="font-size:.72rem;font-weight:700;color:var(--verde2);flex-shrink:0;font-variant-numeric:tabular-nums">${_fmt(valor)}</div>` : ''}
+        ${valor ? `<div style="font-size:.78rem;font-weight:700;color:var(--verde2);flex-shrink:0;font-variant-numeric:tabular-nums;margin-right:.4rem">${_fmt(valor)}</div>` : ''}
+        <div class="esc-opport-acoes">
+          <button class="btn btn-sm btn-prim esc-opbtn"
+            title="Aceitar pessoalmente — 25⚡ — 100% do valor"
+            onclick="${podAceit ? `window._aceitarOpPessoalmente('${escId}','${op.id}',${valor})` : `toast('⚡ Energia insuficiente (${energiaDisp}/${ACEITAR_ENERGIA}).','ko')`}"
+            style="${!podAceit?'opacity:.45;cursor:not-allowed':''}">
+            ⚡25 Aceitar
+          </button>
+          <button class="btn btn-sm btn-sec esc-opbtn"
+            onclick="window._mostrarDelegacaoPicker('${escId}','${op.id}',${valor},'opport-${op.id}')">
+            Delegar ↓
+          </button>
+        </div>
       </div>`;
     }).join('');
 
     el.innerHTML = `
       <div class="esc-card-bloco" style="margin-bottom:1.1rem">
-        <div class="secao-header" style="margin-bottom:.8rem;border-bottom:1px solid var(--borda-sub);padding-bottom:.5rem">
+        <div class="secao-header" style="margin-bottom:.6rem;border-bottom:1px solid var(--borda-sub);padding-bottom:.5rem">
           <div class="secao-titulo" style="font-size:.88rem;font-weight:700">Oportunidades do Mês</div>
           ${temMais
             ? `<a href="#" class="esc-ver-todos" onclick="window.navTo('clientes',null);return false">Ver todas (${todas.length})</a>`
             : `<a href="#" class="esc-ver-todos" onclick="window.navTo('clientes',null);return false">Ver todas</a>`}
         </div>
+        <div style="font-size:.64rem;color:var(--txt4);margin-bottom:.5rem">⚡ Energia disponível: <b style="color:${energiaDisp>50?'var(--verde2)':energiaDisp>20?'var(--amber)':'var(--verm2)'}">${energiaDisp}/${energiaTotal}</b></div>
         ${rows}
       </div>`;
 
   } catch (err) {
     console.error('[OPORTUNIDADES PAINEL]', err);
     el.innerHTML = '';
+  }
+};
+
+// ─── Aceitar pessoalmente: 25⚡, 100% do valor pro caixa ──────────────────
+window._aceitarOpPessoalmente = async function(escId, opId, valor) {
+  const j   = window.JOGADOR;
+  const uid = j.uid || window.JOGADOR_UID;
+
+  const energiaUsada = j.energia_usada_mes || 0;
+  const energiaTotal = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
+  if (Math.max(0, energiaTotal - energiaUsada) < ACEITAR_ENERGIA) {
+    toast(`⚡ Energia insuficiente (requer ${ACEITAR_ENERGIA}).`, 'ko');
+    return;
+  }
+
+  try {
+    const { doc: fDoc, updateDoc: fUpd, increment: fInc } = await import(
+      'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js'
+    );
+    const { db: fDb } = await import('./firebase-init.js');
+
+    await Promise.all([
+      fUpd(fDoc(fDb, 'jogadores', uid),
+        { energia_usada_mes: energiaUsada + ACEITAR_ENERGIA }),
+      fUpd(fDoc(fDb, 'escritorios', escId),
+        { caixa: fInc(valor), faturamento_mes_atual: fInc(valor) }),
+      fUpd(fDoc(fDb, 'escritorios', escId, 'oportunidades', opId),
+        { status: 'aceita', aceito_por: 'dono', valor_recebido: valor, aceito_em: new Date().toISOString() }),
+    ]);
+
+    j.energia_usada_mes = energiaUsada + ACEITAR_ENERGIA;
+    window.JOGADOR = j;
+    toast(`✅ +${_fmt(valor)} no caixa do escritório!`, 'ok');
+
+    const elOp = document.getElementById('esc-oportunidades-bloco');
+    if (elOp) window.renderOportunidadesPainel(j, escId, elOp);
+  } catch (e) {
+    console.error('[ACEITAR OP]', e);
+    toast('Erro ao aceitar oportunidade.', 'ko');
+  }
+};
+
+// ─── Mostrar picker de funcionários para delegar ──────────────────────────
+window._mostrarDelegacaoPicker = async function(escId, opId, valor, containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  // Toggle: fechar se já aberto
+  const existente = container.querySelector('.delegar-picker');
+  if (existente) { existente.remove(); return; }
+
+  const j = window.JOGADOR;
+  const energiaDisp = Math.max(0,
+    (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - (j.energia_usada_mes || 0));
+
+  let funcs = [];
+  try {
+    const fSnap = await getDocs(collection(db, 'escritorios', escId, 'funcionarios'));
+    funcs = fSnap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(f => f.ativo !== false)
+      .sort((a, b) => (CARGO_INFO[b.cargo_id]?.ordem ?? 0) - (CARGO_INFO[a.cargo_id]?.ordem ?? 0));
+  } catch (e) { console.error('[PICKER]', e); }
+
+  const picker = document.createElement('div');
+  picker.className = 'delegar-picker';
+
+  if (!funcs.length) {
+    picker.innerHTML = `<div style="font-size:.75rem;color:var(--txt3)">Nenhum funcionário ativo para delegar.</div>`;
+  } else {
+    const linhas = funcs.map(f => {
+      const cargo  = CARGO_INFO[f.cargo_id]?.l || f.cargo_id;
+      const nome   = f.nome || f.name || cargo;
+      const eng    = DELEGAR_ENERGIA[f.cargo_id] || 5;
+      const pct    = DELEGAR_PCT[f.cargo_id] || .20;
+      const recebe = Math.round(valor * pct);
+      const ok     = energiaDisp >= eng;
+      return `
+      <div class="delegar-picker-linha">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.75rem;font-weight:600;color:var(--txt1)">${nome}</div>
+          <div style="font-size:.63rem;color:var(--txt4)">${cargo}</div>
+        </div>
+        <div style="font-size:.67rem;text-align:right;margin-right:.5rem">
+          <div style="color:${ok?'var(--amber)':'var(--verm2)'}">⚡${eng}</div>
+          <div style="color:var(--verde2);font-variant-numeric:tabular-nums">${_fmt(recebe)}</div>
+          <div style="color:var(--txt4)">${Math.round(pct*100)}%</div>
+        </div>
+        <button class="btn btn-sm btn-sec" style="font-size:.62rem;padding:.2rem .4rem;${!ok?'opacity:.4;cursor:not-allowed':''}"
+          onclick="${ok ? `window._confirmarDelegacao('${escId}','${opId}',${valor},'${f.id}','${f.cargo_id}',${eng},${recebe})` : `toast('⚡ Energia insuficiente.','ko')`}">
+          Delegar
+        </button>
+      </div>`;
+    }).join('');
+
+    picker.innerHTML = `
+      <div style="font-size:.68rem;font-weight:600;color:var(--txt2);margin-bottom:.4rem">Escolher funcionário:</div>
+      ${linhas}`;
+  }
+
+  container.appendChild(picker);
+};
+
+// ─── Confirmar delegação ──────────────────────────────────────────────────
+window._confirmarDelegacao = async function(escId, opId, valor, funcId, cargoId, eng, recebe) {
+  const j   = window.JOGADOR;
+  const uid = j.uid || window.JOGADOR_UID;
+
+  const energiaUsada = j.energia_usada_mes || 0;
+  const energiaTotal = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
+  if (Math.max(0, energiaTotal - energiaUsada) < eng) {
+    toast(`⚡ Energia insuficiente (requer ${eng}).`, 'ko');
+    return;
+  }
+
+  try {
+    const { doc: fDoc, updateDoc: fUpd, increment: fInc } = await import(
+      'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js'
+    );
+    const { db: fDb } = await import('./firebase-init.js');
+
+    await Promise.all([
+      fUpd(fDoc(fDb, 'jogadores', uid),
+        { energia_usada_mes: energiaUsada + eng }),
+      fUpd(fDoc(fDb, 'escritorios', escId),
+        { caixa: fInc(recebe), faturamento_mes_atual: fInc(recebe) }),
+      fUpd(fDoc(fDb, 'escritorios', escId, 'oportunidades', opId),
+        { status: 'delegada', delegado_func_id: funcId, delegado_cargo: cargoId,
+          valor_recebido: recebe, valor_total: valor, aceito_em: new Date().toISOString() }),
+    ]);
+
+    j.energia_usada_mes = energiaUsada + eng;
+    window.JOGADOR = j;
+
+    const pctLabel = Math.round((DELEGAR_PCT[cargoId] || .20) * 100);
+    toast(`✅ Delegado! +${_fmt(recebe)} no caixa (${pctLabel}% de ${_fmt(valor)}).`, 'ok');
+
+    const elOp = document.getElementById('esc-oportunidades-bloco');
+    if (elOp) window.renderOportunidadesPainel(j, escId, elOp);
+  } catch (e) {
+    console.error('[DELEGAR OP]', e);
+    toast('Erro ao delegar oportunidade.', 'ko');
   }
 };

@@ -1646,7 +1646,7 @@ a:hover { color: var(--navy); }
 /* ── Oportunidades do mês ── */
 .esc-opport-bloco { margin-bottom: 1.1rem; }
 .esc-opport {
-  display: flex; align-items: flex-start; gap: .6rem;
+  display: flex; align-items: center; gap: .6rem;
   padding: .6rem; background: var(--surface);
   border: var(--borda); border-left: 3px solid var(--ouro2);
   border-radius: var(--r); margin-bottom: .4rem;
@@ -1655,6 +1655,23 @@ a:hover { color: var(--navy); }
 .esc-opport-icone { font-size: 1rem; flex-shrink: 0; margin-top: .1rem; }
 .esc-opport-titulo { font-size: .78rem; font-weight: 600; color: var(--navy); }
 .esc-opport-desc   { font-size: .64rem; color: var(--txt3); margin-top: 2px; }
+.esc-opport-acoes  { display: flex; flex-direction: column; gap: .28rem; flex-shrink: 0; }
+.esc-opbtn         { font-size: .63rem !important; padding: .22rem .5rem !important; white-space: nowrap; }
+
+/* Picker de delegação */
+.delegar-picker {
+  margin-top: .5rem;
+  padding: .55rem .65rem;
+  background: var(--bg2);
+  border-radius: var(--r);
+  border: 1px solid var(--bg3);
+}
+.delegar-picker-linha {
+  display: flex; align-items: center; gap: .4rem;
+  padding: .3rem 0;
+  border-bottom: 1px solid var(--bg3);
+}
+.delegar-picker-linha:last-child { border-bottom: none; }
 
 .esc-mock-badge {
   font-size: .56rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
