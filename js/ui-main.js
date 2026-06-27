@@ -439,6 +439,7 @@ async function _carregarEscritorioProprio(escId, j) {
         </div>
         <div id="esc-oportunidades-bloco"></div>
         <div id="esc-workspace-bloco"></div>
+        <div id="esc-processos-bloco"></div>
         <div id="esc-financas-upgrade">
           ${window.renderBlocoFinancas ? window.renderBlocoFinancas(esc, j) : ''}
         </div>
@@ -458,6 +459,8 @@ async function _carregarEscritorioProprio(escId, j) {
       if (elOportunidades && window.renderOportunidadesPainel) window.renderOportunidadesPainel(j, escId, elOportunidades);
       const elWorkspace = document.getElementById('esc-workspace-bloco');
       if (elWorkspace) _renderWorkspacePainel(j, elWorkspace);
+      const elProcessos = document.getElementById('esc-processos-bloco');
+      if (elProcessos && window.renderProcessosPool) window.renderProcessosPool(j, escId, elProcessos);
     }
   } catch (e) {
     console.error('Erro ao carregar escritório próprio:', e);

@@ -1764,6 +1764,29 @@ a:hover { color: var(--navy); }
   .esc-acoes-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
+/* ── Pool de processos do escritório ── */
+.proc-pool-row {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .5rem .4rem; border-bottom: 1px solid var(--bg2);
+}
+.proc-pool-row:last-child { border-bottom: none; }
+.proc-pool-area  { font-size: 1rem; flex-shrink: 0; }
+.proc-pool-titulo { font-size: .78rem; font-weight: 600; color: var(--navy); }
+.proc-pool-meta   { font-size: .63rem; color: var(--txt3); margin-top: 1px; }
+.proc-pool-grupo  { margin-bottom: .6rem; }
+.proc-pool-grupo-titulo {
+  font-size: .66rem; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--txt4);
+  margin-bottom: .3rem; padding-bottom: .2rem;
+  border-bottom: 1px solid var(--bg2);
+}
+.designar-picker, .proc-func-picker {
+  margin-top: .5rem; padding: .55rem .65rem;
+  background: var(--bg2); border-radius: var(--r);
+  border: 1px solid var(--bg3);
+}
+.esc-membro-btn.em-proc { opacity: .45; cursor: not-allowed; }
+
 /* ── Botão Ver Balancete ── */
 .btn-balancete {
   background: none;

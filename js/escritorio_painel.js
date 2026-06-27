@@ -97,8 +97,9 @@ window.renderEquipePainel = async function(j, escId, el) {
         `<span style="width:6px;height:6px;border-radius:50%;background:${i<=Math.ceil(prod/34)?prodColor:'var(--bg3)'}"></span>`
       ).join('');
 
+      const temProc = !!func.processo_id;
       return `
-      <div class="esc-membro">
+      <div class="esc-membro" id="membro-${func.id}">
         <img class="esc-membro-avatar" src="${_avatar(nome)}" alt="${nome}">
         <div class="esc-membro-info">
           <div class="esc-membro-nome">${nome}</div>
@@ -111,7 +112,10 @@ window.renderEquipePainel = async function(j, escId, el) {
           <div style="display:flex;gap:3px;margin-top:2px">${dots}</div>
         </div>
         <div class="esc-membro-acoes">
-          <button class="esc-membro-btn" title="Designar processo" onclick="window.navTo('processos',null)">📋</button>
+          <button class="esc-membro-btn${temProc?' em-proc':''}" title="${temProc?'Já tem processo':'Designar processo'}"
+            onclick="${temProc ? `toast('${nome} já está em um processo.','ko')` : `window._abrirDesignarParaFunc('${escId}','${func.id}','${func.cargo_id}','membro-${func.id}')`}">
+            📋
+          </button>
           <button class="esc-membro-btn demitir" title="Demitir" onclick="window._demitirFuncionario('${escId}','${func.id}','${nome.replace(/'/g,"\\'")}')">✕</button>
         </div>
       </div>`;
