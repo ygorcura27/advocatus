@@ -1,6 +1,6 @@
 /**
- * PATRIMÔNIO — Advocatus Online
- * Moradia, transporte, escritório e loja.
+ * PATRIMÔNIO — Advocatus Online v2
+ * Moradia, transporte, escritório e loja — com imagens.
  */
 
 import { doc, updateDoc }
@@ -8,7 +8,7 @@ import { doc, updateDoc }
 import { db } from './firebase-init.js';
 
 // ════════════════════════════════════════════════════════
-// DADOS DE IMÓVEIS
+// ZONAS
 // ════════════════════════════════════════════════════════
 const ZONAS = {
   sul:      {l:'Zona Sul',         adj:['centro','sudoeste']},
@@ -20,95 +20,71 @@ const ZONAS = {
   baixada:  {l:'Baixada',          adj:['norte','oeste']},
 };
 
+// ════════════════════════════════════════════════════════
+// DADOS — MORADIAS  (apenas bairros com imagem)
+// ════════════════════════════════════════════════════════
 const MORADIAS = [
-  {id:'pais',         l:'Casa dos pais',            bairro:'—',                zona:'norte',    i:'👨‍👩‍👦', v:0,       rep_al:0,   rep_cp:0,   perigo:0, pais:true},
-  // Zona Sul
-  {id:'ipanema',      l:'Apto em Ipanema',           bairro:'Ipanema',          zona:'sul',      i:'🏖️', v:2500000, rep_al:14,  rep_cp:38,  perigo:0},
-  {id:'leblon',       l:'Apto em Leblon',            bairro:'Leblon',           zona:'sul',      i:'🏖️', v:3000000, rep_al:15,  rep_cp:40,  perigo:0},
-  {id:'lagoa',        l:'Apto na Lagoa',             bairro:'Lagoa',            zona:'sul',      i:'🏊', v:2200000, rep_al:13,  rep_cp:35,  perigo:0},
-  {id:'copacabana',   l:'Apto em Copacabana',        bairro:'Copacabana',       zona:'sul',      i:'🏨', v:1500000, rep_al:11,  rep_cp:28,  perigo:0},
-  {id:'botafogo',     l:'Apto em Botafogo',          bairro:'Botafogo',         zona:'sul',      i:'🏙️', v:1200000, rep_al:10,  rep_cp:26,  perigo:0},
-  {id:'flamengo',     l:'Apto no Flamengo',          bairro:'Flamengo',         zona:'sul',      i:'🌳', v:1000000, rep_al:9,   rep_cp:23,  perigo:0},
-  {id:'catete',       l:'Apto no Catete',            bairro:'Catete',           zona:'sul',      i:'🏠', v:700000,  rep_al:7,   rep_cp:18,  perigo:0},
-  {id:'laranjeiras',  l:'Apto nas Laranjeiras',      bairro:'Laranjeiras',      zona:'sul',      i:'🌿', v:1100000, rep_al:9,   rep_cp:24,  perigo:0},
-  {id:'santa_teresa', l:'Casa em Santa Teresa',      bairro:'Santa Teresa',     zona:'sul',      i:'🏡', v:900000,  rep_al:8,   rep_cp:20,  perigo:1},
-  // Zona Sudoeste
-  {id:'barra_lux',    l:'Apto de Luxo na Barra',     bairro:'Barra da Tijuca',  zona:'sudoeste', i:'🏖️', v:3500000, rep_al:15,  rep_cp:42,  perigo:0},
-  {id:'barra_med',    l:'Apto Médio na Barra',       bairro:'Barra da Tijuca',  zona:'sudoeste', i:'🏢', v:1800000, rep_al:12,  rep_cp:30,  perigo:0},
-  {id:'recreio',      l:'Apto no Recreio',           bairro:'Recreio',          zona:'sudoeste', i:'🌊', v:1000000, rep_al:8,   rep_cp:21,  perigo:0},
-  {id:'jacarepagua',  l:'Casa em Jacarepaguá',       bairro:'Jacarepaguá',      zona:'sudoeste', i:'🏡', v:600000,  rep_al:5,   rep_cp:13,  perigo:0},
-  {id:'pechincha',    l:'Apto em Pechincha',         bairro:'Pechincha',        zona:'sudoeste', i:'🏠', v:400000,  rep_al:3,   rep_cp:8,   perigo:0},
-  // Centro
-  {id:'centro_apto',  l:'Apto no Centro',            bairro:'Centro',           zona:'centro',   i:'🏙️', v:500000,  rep_al:4,   rep_cp:10,  perigo:1},
-  {id:'lapa',         l:'Apto na Lapa',              bairro:'Lapa',             zona:'centro',   i:'🎭', v:400000,  rep_al:3,   rep_cp:8,   perigo:1},
-  {id:'cinelandia',   l:'Apto na Cinelândia',        bairro:'Cinelândia',       zona:'centro',   i:'🎬', v:450000,  rep_al:4,   rep_cp:9,   perigo:1},
-  {id:'tijuca',       l:'Apto na Tijuca',            bairro:'Tijuca',           zona:'centro',   i:'🏢', v:700000,  rep_al:6,   rep_cp:16,  perigo:0},
-  // Zona Norte
-  {id:'meier',        l:'Apto no Méier',             bairro:'Méier',            zona:'norte',    i:'🏠', v:450000,  rep_al:3,   rep_cp:9,   perigo:1},
-  {id:'iraja',        l:'Casa em Irajá',             bairro:'Irajá',            zona:'norte',    i:'🏡', v:350000,  rep_al:2,   rep_cp:6,   perigo:1},
-  {id:'madureira',    l:'Apto em Madureira',         bairro:'Madureira',        zona:'norte',    i:'🏠', v:300000,  rep_al:1,   rep_cp:4,   perigo:2},
-  {id:'sao_cristov',  l:'Apto em São Cristóvão',     bairro:'São Cristóvão',    zona:'norte',    i:'🏠', v:380000,  rep_al:2,   rep_cp:7,   perigo:1},
-  {id:'penha',        l:'Casa na Penha',             bairro:'Penha',            zona:'norte',    i:'🏡', v:250000,  rep_al:0,   rep_cp:3,   perigo:2},
-  // Zona Oeste
-  {id:'campo_grande', l:'Casa em Campo Grande',      bairro:'Campo Grande',     zona:'oeste',    i:'🏡', v:280000,  rep_al:1,   rep_cp:4,   perigo:1},
-  {id:'santa_cruz',   l:'Casa em Santa Cruz',        bairro:'Santa Cruz',       zona:'oeste',    i:'🏠', v:200000,  rep_al:0,   rep_cp:2,   perigo:1},
-  {id:'bangu',        l:'Apto em Bangu',             bairro:'Bangu',            zona:'oeste',    i:'🏠', v:220000,  rep_al:0,   rep_cp:2,   perigo:2},
-  {id:'realengo',     l:'Casa em Realengo',          bairro:'Realengo',         zona:'oeste',    i:'🏡', v:180000,  rep_al:-1,  rep_cp:1,   perigo:2},
-  // Niterói
-  {id:'icarai',       l:'Apto em Icaraí',            bairro:'Icaraí (Niterói)', zona:'niteroi',  i:'🌅', v:1400000, rep_al:11,  rep_cp:29,  perigo:0},
-  {id:'sao_fco_nit',  l:'Apto em São Francisco',     bairro:'S. Francisco/NIT', zona:'niteroi',  i:'🏢', v:1000000, rep_al:8,   rep_cp:22,  perigo:0},
-  {id:'centro_nit',   l:'Apto Centro de Niterói',    bairro:'Centro (Niterói)', zona:'niteroi',  i:'🏙️', v:600000,  rep_al:5,   rep_cp:13,  perigo:1},
-  // Baixada
-  {id:'caxias_apto',  l:'Apto em Duque de Caxias',   bairro:'D. de Caxias',     zona:'baixada',  i:'🏠', v:200000,  rep_al:-1,  rep_cp:1,   perigo:2},
-  {id:'nova_iguacu',  l:'Casa em Nova Iguaçu',       bairro:'Nova Iguaçu',      zona:'baixada',  i:'🏡', v:220000,  rep_al:-1,  rep_cp:2,   perigo:2},
-  {id:'belford',      l:'Casa em Belford Roxo',      bairro:'Belford Roxo',     zona:'baixada',  i:'🏠', v:150000,  rep_al:-2,  rep_cp:0,   perigo:2},
-  {id:'sao_joao',     l:'Apto em S.J. de Meriti',    bairro:'S.J. de Meriti',   zona:'baixada',  i:'🏠', v:160000,  rep_al:-2,  rep_cp:0,   perigo:2},
-  {id:'nilop',        l:'Casa em Nilópolis',         bairro:'Nilópolis',        zona:'baixada',  i:'🏡', v:170000,  rep_al:-1,  rep_cp:1,   perigo:2},
+  {id:'pais',        l:'Casa dos pais',         bairro:'—',                zona:'norte',   img:null,                               v:0,        rep_al:0,   rep_cp:0,  perigo:0, pais:true},
+  {id:'belford',     l:'Casa em Belford Roxo',  bairro:'Belford Roxo',     zona:'baixada', img:'img/imoveis/belford-roxo.jpeg',    v:150000,   rep_al:-2,  rep_cp:0,  perigo:2},
+  {id:'penha',       l:'Casa na Penha',         bairro:'Penha',            zona:'norte',   img:'img/imoveis/penha.jpeg',           v:250000,   rep_al:0,   rep_cp:3,  perigo:2},
+  {id:'catete',      l:'Apto no Catete',        bairro:'Catete',           zona:'sul',     img:'img/imoveis/catete.jpeg',          v:700000,   rep_al:7,   rep_cp:18, perigo:0},
+  {id:'centro_apto', l:'Apto no Centro',        bairro:'Centro',           zona:'centro',  img:'img/imoveis/centro.jpeg',          v:500000,   rep_al:4,   rep_cp:10, perigo:1},
+  {id:'laranjeiras', l:'Apto nas Laranjeiras',  bairro:'Laranjeiras',      zona:'sul',     img:'img/imoveis/laranjeiras.jpeg',     v:1100000,  rep_al:9,   rep_cp:24, perigo:0},
+  {id:'icarai',      l:'Apto em Icaraí',        bairro:'Icaraí (Niterói)', zona:'niteroi', img:'img/imoveis/icarai.jpeg',          v:1400000,  rep_al:11,  rep_cp:29, perigo:0},
+  {id:'ipanema',     l:'Apto em Ipanema',       bairro:'Ipanema',          zona:'sul',     img:'img/imoveis/ipanema.jpeg',         v:2500000,  rep_al:14,  rep_cp:38, perigo:0},
+  {id:'leblon',      l:'Apto em Leblon',        bairro:'Leblon',           zona:'sul',     img:'img/imoveis/leblon.jpeg',          v:3000000,  rep_al:15,  rep_cp:40, perigo:0},
 ];
 
+// ════════════════════════════════════════════════════════
+// DADOS — TRANSPORTES  (um por imagem disponível)
+// ════════════════════════════════════════════════════════
 const CARROS = [
-  {id:'onibus',   l:'Ônibus / Metrô',        i:'🚌', v:0,       cm:176,  rep:-1, desc:'R$8/dia × 22 dias'},
-  {id:'kwid',     l:'Renault Kwid',          i:'🚗', v:65000,   cm:900,  rep:1,  desc:'Econômico urbano'},
-  {id:'mobi',     l:'Fiat Mobi',             i:'🚗', v:60000,   cm:850,  rep:1,  desc:'Compacto popular'},
-  {id:'hb20',     l:'Hyundai HB20',          i:'🚗', v:78000,   cm:1000, rep:2,  desc:'Popular e confiável'},
-  {id:'gol',      l:'VW Gol',               i:'🚗', v:68000,   cm:950,  rep:2,  desc:'Clássico brasileiro'},
-  {id:'onix',     l:'Chevrolet Onix',        i:'🚗', v:82000,   cm:1050, rep:2,  desc:'Mais vendido do Brasil'},
-  {id:'polo',     l:'VW Polo',              i:'🚙', v:95000,   cm:1200, rep:3,  desc:'Compacto premium'},
-  {id:'cronos',   l:'Fiat Cronos',          i:'🚙', v:88000,   cm:1100, rep:3,  desc:'Sedã espaçoso'},
-  {id:'tracker',  l:'Chevrolet Tracker',    i:'🚙', v:130000,  cm:1700, rep:5,  desc:'SUV compacto popular'},
-  {id:'t_cross',  l:'VW T-Cross',           i:'🚙', v:145000,  cm:1800, rep:5,  desc:'SUV compacto premium'},
-  {id:'compass',  l:'Jeep Compass',         i:'🚙', v:195000,  cm:2500, rep:8,  desc:'SUV médio de status'},
-  {id:'corolla',  l:'Toyota Corolla',       i:'🚙', v:165000,  cm:2200, rep:7,  desc:'Sedã executivo clássico'},
-  {id:'civic',    l:'Honda Civic',          i:'🚙', v:155000,  cm:2100, rep:7,  desc:'Esportivo e confiável'},
-  {id:'tiguan',   l:'VW Tiguan',            i:'🛻', v:250000,  cm:3200, rep:10, desc:'SUV executivo europeu'},
-  {id:'hr_v',     l:'Honda HR-V',           i:'🛻', v:175000,  cm:2300, rep:7,  desc:'SUV urbano equipado'},
-  {id:'hilux',    l:'Toyota Hilux',         i:'🛻', v:280000,  cm:3500, rep:9,  desc:'Robustez e status'},
-  {id:'bmw3',     l:'BMW Série 3',          i:'🚖', v:350000,  cm:4500, rep:13, desc:'Luxo alemão premium'},
-  {id:'class_c',  l:'Mercedes-Benz C 200',  i:'🚖', v:390000,  cm:5000, rep:15, desc:'Status executivo máximo'},
-  {id:'audi_a4',  l:'Audi A4',              i:'🚖', v:340000,  cm:4400, rep:13, desc:'Luxo e tecnologia alemã'},
-  {id:'range_v',  l:'Range Rover Velar',    i:'🏎️', v:490000,  cm:7000, rep:18, desc:'SUV de ultraprestígio'},
+  {id:'onibus',     l:'Ônibus / Metrô',             img:'img/transportes/onibus.png',       v:0,       cm:176,   rep:-1, desc:'R$8/dia × 22 dias'},
+  {id:'hatch',      l:'Hatchback',                  img:'img/transportes/hatch.png',        v:75000,   cm:950,   rep:2,  desc:'Compacto popular urbano'},
+  {id:'sedan',      l:'Sedã Executivo',             img:'img/transportes/sedan.png',        v:160000,  cm:2200,  rep:7,  desc:'Sedã espaçoso e confiável'},
+  {id:'suv',        l:'SUV',                        img:'img/transportes/suv.png',          v:200000,  cm:2600,  rep:9,  desc:'Espaço e conforto urbano'},
+  {id:'esp_alemao', l:'Esportivo Alemão',           img:'img/transportes/esp-alemao.png',   v:380000,  cm:5000,  rep:14, desc:'Luxo e performance alemã'},
+  {id:'esp_ital',   l:'Esportivo Italiano Premium', img:'img/transportes/esp-italiano.png', v:850000,  cm:12000, rep:20, desc:'O topo do prestígio executivo'},
 ];
 
+// ════════════════════════════════════════════════════════
+// DADOS — ESPAÇO DE TRABALHO
+// ════════════════════════════════════════════════════════
 const ESC_PAT = [
-  {id:'home', l:'Home Office',         i:'🏠', cm:0,     rep:-2, desc:'Gratuito. -2 rep/mês (imagem menos profissional).'},
-  {id:'cw',   l:'Coworking jurídico',  i:'💼', cm:600,   rep:0,  desc:'Para advogados solo. Endereço profissional.'},
-  {id:'sal',  l:'Sala própria',        i:'🏛️', cm:3000,  rep:3,  desc:'Escritório individual. +3 rep/mês.'},
-  {id:'esm',  l:'Escritório médio',    i:'🏢', cm:7500,  rep:6,  desc:'Espaço para equipe. +6 rep/mês.'},
-  {id:'esp',  l:'Escritório premium',  i:'⚖️', cm:18000, rep:12, desc:'Big Law. +12 rep/mês.'},
+  {id:'home', l:'Home Office',         img:'img/escritorios/home-office.png',         cm:0,     rep:-2, desc:'Gratuito. -2 rep/mês.'},
+  {id:'cw',   l:'Coworking Jurídico',  img:'img/escritorios/cowork.png',              cm:600,   rep:0,  desc:'Para advogados solo. Endereço profissional.'},
+  {id:'sal',  l:'Sala Própria',        img:'img/escritorios/sala-propria.png',        cm:3000,  rep:3,  desc:'Escritório individual. +3 rep/mês.'},
+  {id:'esm',  l:'Escritório Médio',    img:'img/escritorios/escritorio-medio.png',    cm:7500,  rep:6,  desc:'Espaço para equipe. +6 rep/mês.'},
+  {id:'esp',  l:'Escritório Premium',  img:'img/escritorios/escritorio-premium.png',  cm:18000, rep:12, desc:'Big Law. +12 rep/mês.'},
 ];
+
+// ════════════════════════════════════════════════════════
+// DADOS — LOJA
+// ════════════════════════════════════════════════════════
+const MESES_NOME = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
 const SHOP = [
-  {id:'terno_basic', i:'👔', n:'Terno de Alfaiataria',      p:4500,  cat:'status', rep:2,  d:'+2 rep permanente'},
-  {id:'terno_ital',  i:'🧥', n:'Terno Italiano (Brioni)',    p:18000, cat:'status', rep:4,  d:'+4 rep permanente'},
-  {id:'sapato',      i:'👞', n:'Sapatos de Couro Premium',   p:3200,  cat:'status', rep:1,  d:'+1 rep permanente'},
-  {id:'relogio_med', i:'⌚', n:'Relógio Suíço (Médio)',      p:22000, cat:'status', rep:3,  d:'+3 rep permanente'},
-  {id:'relogio_lux', i:'🕰️', n:'Relógio de Luxo (Rolex)',   p:85000, cat:'status', rep:6,  d:'+6 rep permanente'},
-  {id:'bolsa',       i:'👜', n:'Pasta Executiva Hermès',     p:12000, cat:'status', rep:2,  d:'+2 rep permanente'},
-  {id:'bj',          i:'📚', n:'Biblioteca Jurídica',        p:12000, cat:'prof',   rep:0,  d:'+8 Pesquisa'},
-  {id:'nb',          i:'💻', n:'Notebook Pro',               p:8500,  cat:'prof',   rep:0,  d:'+6 Escrita · +6 Pesquisa'},
-  {id:'ai',          i:'🤖', n:'Assistente IA Jurídico',     p:35000, cat:'prof',   rep:1,  d:'+8 em todas as skills'},
-  {id:'cg',          i:'✈️', n:'Congresso em Lisboa',        p:15000, cat:'exp',    rep:3,  d:'+3 rep · +6 Networking'},
-  {id:'ac',          i:'🏋️', n:'Academia Premium (1 ano)',   p:3600,  cat:'exp',    rep:0,  d:'+6 Persuasão · +4 Oratória'},
+  // Status
+  {id:'terno_basic', img:'img/loja/terno-alfaiataria.jpeg', n:'Terno de Alfaiataria',    p:4500,  cat:'status', rep:2, d:'+2 rep permanente'},
+  {id:'terno_ital',  img:'img/loja/terno-italiano.jpeg',    n:'Terno Italiano (Brioni)',  p:18000, cat:'status', rep:4, d:'+4 rep permanente'},
+  {id:'sapato',      img:'img/loja/sapato-couro.jpeg',      n:'Sapatos de Couro',        p:3200,  cat:'status', rep:1, d:'+1 rep permanente'},
+  {id:'cinto',       img:'img/loja/cinto-couro.jpeg',       n:'Cinto de Couro',          p:1800,  cat:'status', rep:1, d:'+1 rep permanente'},
+  {id:'carteira',    img:'img/loja/carteira-couro.jpeg',    n:'Carteira de Couro',       p:2200,  cat:'status', rep:1, d:'+1 rep permanente'},
+  {id:'relogio_med', img:'img/loja/relogio-tissot.jpeg',    n:'Relógio Tissot',          p:22000, cat:'status', rep:3, d:'+3 rep permanente'},
+  {id:'rel_prem',    img:'img/loja/relogio-premium.jpeg',   n:'Relógio Premium',         p:45000, cat:'status', rep:4, d:'+4 rep permanente'},
+  {id:'relogio_lux', img:'img/loja/relogio-rolex.jpeg',     n:'Relógio Rolex',           p:85000, cat:'status', rep:6, d:'+6 rep permanente'},
+  {id:'bolsa',       img:'img/loja/pasta-hermes.jpeg',      n:'Pasta Hermès',            p:12000, cat:'status', rep:2, d:'+2 rep permanente'},
+  // Profissional
+  {id:'bj',  img:'img/loja/biblioteca-juridica.jpeg', n:'Biblioteca Jurídica',      p:12000, cat:'prof', rep:0, d:'+8 Pesquisa'},
+  {id:'nb',  img:'img/loja/notebook-premium.jpeg',    n:'Notebook Premium',         p:8500,  cat:'prof', rep:0, d:'+6 Escrita · +6 Pesquisa'},
+  {id:'ai',  img:'img/loja/assistente-ia.jpeg',       n:'Assistente IA Jurídico',   p:35000, cat:'prof', rep:1, d:'+8 em todas as skills'},
+  {id:'ac',  img:'img/loja/academia-premium.jpeg',    n:'Academia Premium (1 ano)', p:3600,  cat:'exp',  rep:0, d:'+6 Persuasão · +4 Oratória'},
+  // Congressos — uma participação por ano, mês fixo
+  {id:'cong_sp',  img:'img/loja/congresso-sp.jpeg',      n:'Congresso em São Paulo',   p:8000,  cat:'cong', rep:2, d:'+2 rep · +5 Networking', mes:2},
+  {id:'cong_rio', img:'img/loja/congresso-rio.jpeg',     n:'Congresso Rio de Janeiro', p:6000,  cat:'cong', rep:2, d:'+2 rep · +5 Networking', mes:4},
+  {id:'cong_lis', img:'img/loja/congresso-lisboa.jpeg',  n:'Congresso em Lisboa',      p:15000, cat:'cong', rep:3, d:'+3 rep · +6 Networking', mes:6},
+  {id:'cong_par', img:'img/loja/congresso-paris.jpeg',   n:'Congresso em Paris',       p:22000, cat:'cong', rep:4, d:'+4 rep · +8 Networking', mes:8},
+  {id:'cong_ber', img:'img/loja/congresso-berlim.jpeg',  n:'Congresso em Berlim',      p:18000, cat:'cong', rep:3, d:'+3 rep · +7 Networking', mes:10},
 ];
 
 // ════════════════════════════════════════════════════════
@@ -127,23 +103,40 @@ function calcDeslocamento(morId, escZona) {
   const zonaM = mor.zona;
   if (zonaM === escZona) return 0;
   const z = ZONAS[escZona];
-  if (z?.adj?.includes(zonaM)) return 4 * 22; // adjacente
-  return 8 * 22; // distante
+  if (z?.adj?.includes(zonaM)) return 4 * 22;
+  return 8 * 22;
+}
+
+function _mesAtual() {
+  const mg = window.SERVER?.mes_global || 1;
+  return (mg - 1) % 12 + 1; // 1–12
+}
+
+function _anoAtual() {
+  return Math.ceil((window.SERVER?.mes_global || 1) / 12);
+}
+
+function _carroEhProprío(j, id) {
+  if (id === 'onibus') return true;
+  if (j.carros_comprados?.[id]) return true;
+  // retrocompat: se era o transporte ativo e não tem financiamento ativo
+  if (j.pat?.transporte === id && !(j.financiamentos?.[id]?.parcelas_restantes > 0)) return true;
+  return false;
 }
 
 // ════════════════════════════════════════════════════════
 // RENDERIZAÇÃO — PATRIMÔNIO
 // ════════════════════════════════════════════════════════
 window.renderPatrimonio = function(j, el) {
-  const morId   = j.pat?.moradia   || 'pais';
-  const carId   = j.pat?.transporte|| 'onibus';
-  const escId   = j.pat?.escritorio|| 'home';
-  const mor     = MORADIAS.find(m=>m.id===morId) || MORADIAS[0];
-  const car     = CARROS.find(c=>c.id===carId);
-  const esc     = ESC_PAT.find(e=>e.id===escId);
-  const comprada = j.moradias_compradas?.[morId];
-  const fins    = j.financiamentos || {};
-  const deslocamento = calcDeslocamento(morId, 'centro'); // usa centro como referência
+  const morId  = j.pat?.moradia    || 'pais';
+  const carId  = j.pat?.transporte || 'onibus';
+  const escId  = j.pat?.escritorio || 'home';
+  const mor    = MORADIAS.find(m=>m.id===morId) || MORADIAS[0];
+  const car    = CARROS.find(c=>c.id===carId);
+  const esc    = ESC_PAT.find(e=>e.id===escId);
+  const compradaMor = j.moradias_compradas?.[morId];
+  const fins   = j.financiamentos || {};
+  const deslocamento = calcDeslocamento(morId, 'centro');
   const CUSTO_BASE_PAT = {
     est:600, ass:700, jnr:900, pln:1400, snr:2200,
     asc:3000, soc:4500, snm:6000,
@@ -152,17 +145,17 @@ window.renderPatrimonio = function(j, el) {
     dadj:1800, def:2400, dch:3200, dge:4500,
   };
   const custoVida = CUSTO_BASE_PAT[j.cargo_id] || 700;
-  // Coworking só cobra se for solo
   const despEsc  = (!j.escritorio_empregado_id || j.escritorio_id === 'solo') ? (esc?.cm || 0) : 0;
   const despCar  = car?.cm || 0;
-  const despAlug = (morId === 'pais' || comprada) ? 0 : calcAluguel(mor?.v||0);
+  const despAlug = (morId === 'pais' || compradaMor) ? 0 : calcAluguel(mor?.v||0);
   const despFin  = Object.values(fins).reduce((s,f)=>s+(f.parcelas_restantes>0?f.parcela_mensal:0),0);
   const despEst  = (j.estagiarios||[]).length * 1700;
   const despTotal = despEsc+despCar+despAlug+despFin+despEst+deslocamento;
   const saldoLiq = (j.renda_calculada||0) - despTotal - custoVida;
 
   el.innerHTML = `
-    <div class="secao-header"><div class="secao-titulo">🏠 Patrimônio</div>
+    <div class="secao-header">
+      <div class="secao-titulo">🏠 Patrimônio</div>
       <span class="secao-badge">Rep de patrimônio: +${_calcRepPat(j)}</span>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-bottom:1.2rem">
@@ -177,18 +170,43 @@ window.renderPatrimonio = function(j, el) {
     <!-- MORADIA -->
     <div class="secao-header" style="margin-top:.5rem">
       <div class="secao-titulo">🏠 Moradia</div>
-      <span class="secao-badge">${comprada?'Casa própria':morId==='pais'?'Com os pais':'Aluguel'}</span>
+      <span class="secao-badge">${compradaMor?'Casa própria':morId==='pais'?'Com os pais':'Aluguel'}</span>
     </div>
     ${j.prazo_sair_pais > 0 ? `<div style="background:rgba(139,38,53,.12);border:1px solid rgba(200,80,80,.35);border-radius:2px;padding:.6rem;margin-bottom:.6rem;font-size:.75rem;color:var(--verm3)">⚠️ Advogado(a) precisa de moradia própria! Prazo: ${Math.max(0,3-j.prazo_sair_pais)} mês(es) restante(s).</div>`:''}
     <div class="grid-cards" style="margin-bottom:1.2rem">
-      ${MORADIAS.filter(m=> m.pais ? (j.ci<=2||!j.oab) : true).map(m => {
+      ${MORADIAS.filter(m => m.pais ? (j.ci<=2||!j.oab) : true).map(m => {
         const isAt = m.id === morId;
         const alug = m.pais ? 0 : calcAluguel(m.v);
         const propria = j.moradias_compradas?.[m.id];
+        const imgHtml = m.img
+          ? `<img class="pc-img" src="${m.img}" alt="${m.l}" loading="lazy">`
+          : `<div class="pc-icon">🏠</div>`;
+
+        let actionHtml;
+        if (isAt) {
+          actionHtml = `<div class="pc-ativo">✓ ${propria?'Sua casa':'Alugando'}</div>`;
+          if (propria && !m.pais) {
+            const vVenda = Math.floor(m.v * 0.6);
+            actionHtml += `<button class="btn-vender" onclick="window.venderImovel('${m.id}')">Vender ${fmt(vVenda)}</button>`;
+          }
+        } else if (propria) {
+          const vVenda = Math.floor(m.v * 0.6);
+          actionHtml = `
+            <button class="btn btn-sm btn-ghost" style="width:100%;margin-top:.3rem;font-size:.6rem" onclick="window.alternarMoradia('${m.id}')">🏠 Morar aqui</button>
+            <button class="btn-vender" onclick="window.venderImovel('${m.id}')">Vender ${fmt(vVenda)}</button>`;
+        } else if (m.pais) {
+          actionHtml = `<button class="btn btn-sm btn-ghost" style="width:100%;margin-top:.3rem" onclick="window.escolherMoradia('${m.id}','aluguel')">Morar aqui</button>`;
+        } else {
+          actionHtml = `<div style="display:flex;flex-direction:column;gap:.2rem;margin-top:.3rem">
+            <button class="btn btn-sm btn-ghost" style="width:100%;font-size:.6rem" onclick="window.escolherMoradia('${m.id}','aluguel')">Alugar ${fmt(alug)}/mês</button>
+            ${(j.dinheiro||0)>=m.v?`<button class="btn btn-sm btn-sec" style="width:100%;font-size:.6rem" onclick="window.escolherMoradia('${m.id}','compra')">Comprar ${fmt(m.v)}</button>`:''}
+          </div>`;
+        }
+
         return `<div class="pat-card ${isAt?'ativo':''}">
-          <div class="pc-icon">${m.i}</div>
+          ${imgHtml}
           <div class="pc-nome">${m.l}</div>
-          <div class="pc-det">${m.bairro}<br>${ZONAS[m.zona]?.l||m.zona}</div>
+          <div class="pc-det">${m.bairro} · ${ZONAS[m.zona]?.l||m.zona}</div>
           ${m.v>0?`<div class="pc-det">${fmt(m.v)}</div>`:''}
           ${!m.pais?`<div class="pc-det" style="color:var(--amber)">Aluguel: ${fmt(alug)}/mês</div>`:''}
           <div class="pc-rep" style="color:${m.pais?'var(--verm2)':m.rep_al<0?'var(--verm2)':'var(--ouro2)'}">
@@ -196,12 +214,7 @@ window.renderPatrimonio = function(j, el) {
           </div>
           ${m.perigo===2?`<div style="font-size:.6rem;color:var(--verm3)">⚠️ Bairro perigoso</div>`:
             m.perigo===1?`<div style="font-size:.6rem;color:#ffa726">⚡ Risco médio</div>`:''}
-          ${isAt ? `<div class="pc-ativo">✓ ${propria?'Sua casa':'Alugando'}</div>` :
-            m.pais ? `<button class="btn btn-sm btn-ghost" style="width:100%;margin-top:.3rem" onclick="window.escolherMoradia('${m.id}','aluguel')">Morar aqui</button>` :
-            `<div style="display:flex;flex-direction:column;gap:.2rem;margin-top:.3rem">
-              <button class="btn btn-sm btn-ghost" style="width:100%;font-size:.6rem" onclick="window.escolherMoradia('${m.id}','aluguel')">Alugar ${fmt(alug)}/mês</button>
-              ${(j.dinheiro||0)>=m.v?`<button class="btn btn-sm btn-sec" style="width:100%;font-size:.6rem" onclick="window.escolherMoradia('${m.id}','compra')">Comprar ${fmt(m.v)}</button>`:''}
-            </div>`}
+          ${actionHtml}
         </div>`;
       }).join('')}
     </div>
@@ -210,24 +223,48 @@ window.renderPatrimonio = function(j, el) {
     <div class="secao-header"><div class="secao-titulo">🚗 Transporte</div></div>
     <div class="grid-cards" style="margin-bottom:1.2rem">
       ${CARROS.map(cr => {
-        const isAt = cr.id === carId;
-        const fin  = fins[cr.id];
-        const p36  = cr.v>0 ? Math.ceil(cr.v/36*1.35) : 0;
-        const p48  = cr.v>0 ? Math.ceil(cr.v/48*1.35) : 0;
+        const isAt  = cr.id === carId;
+        const proprio = _carroEhProprío(j, cr.id);
+        const fin   = fins[cr.id];
+        const p36   = cr.v>0 ? Math.ceil(cr.v/36*1.35) : 0;
+        const p48   = cr.v>0 ? Math.ceil(cr.v/48*1.35) : 0;
+        const vVenda = Math.floor(cr.v * 0.5);
+
+        let actionHtml;
+        if (isAt) {
+          actionHtml = `<div class="pc-ativo">✓ Seu veículo${fin&&fin.parcelas_restantes>0?`<br><span style="font-size:.6rem;color:var(--amber)">${fin.parcelas_restantes}× restantes</span>`:''}</div>`;
+          if (cr.id !== 'onibus') {
+            if (fin && fin.parcelas_restantes > 0) {
+              actionHtml += `<button class="btn-vender" onclick="window.devolverCarro('${cr.id}')">↩ Devolver (50% pago)</button>`;
+            } else {
+              actionHtml += `<button class="btn-vender" onclick="window.venderCarro('${cr.id}')">Vender ${fmt(vVenda)}</button>`;
+            }
+          }
+        } else if (proprio && cr.id !== 'onibus') {
+          actionHtml = `
+            <div class="pc-ativo" style="color:var(--ouro2)">✓ Possuído</div>
+            <button class="btn btn-sm btn-ghost" style="width:100%;margin-top:.3rem;font-size:.6rem" onclick="window.alternarCarro('${cr.id}')">🚗 Usar este</button>
+            <button class="btn-vender" onclick="window.venderCarro('${cr.id}')">Vender ${fmt(vVenda)}</button>`;
+        } else if (cr.id === 'onibus') {
+          actionHtml = isAt
+            ? `<div class="pc-ativo">✓ Usando</div>`
+            : `<button class="btn btn-sm btn-ghost" style="width:100%;margin-top:.3rem" onclick="window.escolherCarro('onibus','vista')">Usar</button>`;
+        } else {
+          actionHtml = `<div style="display:flex;flex-direction:column;gap:.2rem;margin-top:.3rem">
+            ${(j.dinheiro||0)>=cr.v?`<button class="btn btn-sm btn-sec" style="width:100%;font-size:.6rem" onclick="window.escolherCarro('${cr.id}','vista')">À vista ${fmt(cr.v)}</button>`:''}
+            ${!(j.no_serasa)?`<button class="btn btn-sm btn-ghost" style="width:100%;font-size:.6rem" onclick="window.escolherCarro('${cr.id}','fin36')">36× ${fmt(p36)}/mês</button>
+            <button class="btn btn-sm btn-ghost" style="width:100%;font-size:.6rem" onclick="window.escolherCarro('${cr.id}','fin48')">48× ${fmt(p48)}/mês</button>`:'<div style="font-size:.6rem;color:var(--verm3)">Financiamento bloqueado (Serasa)</div>'}
+          </div>`;
+        }
+
         return `<div class="pat-card ${isAt?'ativo':''}">
-          <div class="pc-icon">${cr.i}</div>
+          <img class="pc-img" src="${cr.img}" alt="${cr.l}" loading="lazy">
           <div class="pc-nome">${cr.l}</div>
           <div class="pc-det">${cr.desc}</div>
           ${cr.v>0?`<div class="pc-det">${fmt(cr.v)}</div>`:''}
           <div class="pc-det" style="color:#ffa726">${fmt(cr.cm)}/mês</div>
           <div class="pc-rep">Rep: ${cr.rep>=0?'+':''}${cr.rep}</div>
-          ${isAt ? `<div class="pc-ativo">✓ Seu veículo${fin&&fin.parcelas_restantes>0?`<br><span style="font-size:.6rem;color:var(--amber)">${fin.parcelas_restantes}× restantes</span>`:''}</div>${fin&&fin.parcelas_restantes>0?`<button style="font-size:.58rem;margin-top:.3rem;background:var(--verm-bg);border:1px solid var(--verm3);color:var(--verm2);padding:.25rem .5rem;border-radius:3px;cursor:pointer;width:100%" onclick="window.devolverCarro('${cr.id}')">↩ Devolver (50%)</button>`:''}` :
-          cr.id === 'onibus' ? `<button class="btn btn-sm btn-ghost" style="width:100%;margin-top:.3rem" onclick="window.escolherCarro('onibus','vista')">Usar</button>` :
-          `<div style="display:flex;flex-direction:column;gap:.2rem;margin-top:.3rem">
-            ${(j.dinheiro||0)>=cr.v?`<button class="btn btn-sm btn-sec" style="width:100%;font-size:.6rem" onclick="window.escolherCarro('${cr.id}','vista')">À vista ${fmt(cr.v)}</button>`:''}
-            ${!(j.no_serasa)?`<button class="btn btn-sm btn-ghost" style="width:100%;font-size:.6rem" onclick="window.escolherCarro('${cr.id}','fin36')">36× ${fmt(p36)}/mês</button>
-            <button class="btn btn-sm btn-ghost" style="width:100%;font-size:.6rem" onclick="window.escolherCarro('${cr.id}','fin48')">48× ${fmt(p48)}/mês</button>`:'<div style="font-size:.6rem;color:var(--verm3)">Financiamento bloqueado (Serasa)</div>'}
-          </div>`}
+          ${actionHtml}
         </div>`;
       }).join('')}
     </div>
@@ -241,14 +278,14 @@ window.renderPatrimonio = function(j, el) {
          </div>`
       : ('<div class="grid-cards">' +
            ESC_PAT.filter(e => e.id !== 'cw' || j.escritorio_id === 'solo' || !j.escritorio_empregado_id).map(e=>{
-             const isAt = e.id === escId;
-             const repTxt = e.rep > 0 ? ('+' + e.rep + ' rep/mês') : e.rep < 0 ? (e.rep + ' rep/mês') : 'Neutro';
+             const isAt  = e.id === escId;
+             const repTxt = e.rep > 0 ? '+' + e.rep + ' rep/mês' : e.rep < 0 ? e.rep + ' rep/mês' : 'Neutro';
              const repCor = e.rep > 0 ? 'var(--verde2)' : e.rep < 0 ? 'var(--verm2)' : 'var(--txt4)';
              const btnHtml = isAt
                ? '<div class="pc-ativo">✓ Atual</div>'
                : '<button class="btn btn-sm btn-ghost" style="width:100%;margin-top:.3rem" onclick="window.escolherEscritorioPat(\'' + e.id + '\')">Escolher</button>';
              return '<div class="pat-card ' + (isAt?'ativo':'') + '">' +
-               '<div class="pc-icon">' + e.i + '</div>' +
+               '<img class="pc-img" src="' + e.img + '" alt="' + e.l + '" loading="lazy">' +
                '<div class="pc-nome">' + e.l + '</div>' +
                '<div class="pc-det" style="color:var(--amber)">' + (e.cm > 0 ? fmt(e.cm)+'/mês' : 'Gratuito') + '</div>' +
                '<div class="pc-rep" style="color:' + repCor + '">' + repTxt + '</div>' +
@@ -259,7 +296,7 @@ window.renderPatrimonio = function(j, el) {
 };
 
 // ════════════════════════════════════════════════════════
-// AÇÕES
+// AÇÕES — MORADIA
 // ════════════════════════════════════════════════════════
 window.escolherMoradia = async function(id, tipo) {
   const j   = window.JOGADOR;
@@ -284,36 +321,157 @@ window.escolherMoradia = async function(id, tipo) {
     if (m.rep_al > 0) updates.reputacao = Math.min(100,(j.reputacao||30)+m.rep_al);
     toast(`🏠 Mudou para ${m.l} · Aluguel: ${fmt(calcAluguel(m.v))}/mês`,'ok');
   }
-
   await _salvar(uid, updates);
 };
 
+window.alternarMoradia = async function(id) {
+  const j   = window.JOGADOR;
+  const uid = j.uid || window.JOGADOR_UID;
+  if (!j.moradias_compradas?.[id] && id !== 'pais') {
+    toast('Você não possui este imóvel.','ko'); return;
+  }
+  await _salvar(uid, { 'pat.moradia': id });
+  const m = MORADIAS.find(x=>x.id===id);
+  toast(`🏠 Moradia alternada para ${m?.l||id}.`,'ok');
+};
+
+window.venderImovel = async function(id) {
+  const j   = window.JOGADOR;
+  const uid = j.uid || window.JOGADOR_UID;
+  const m   = MORADIAS.find(x=>x.id===id);
+  if (!m || m.pais || !j.moradias_compradas?.[id]) {
+    toast('Imóvel não encontrado.','ko'); return;
+  }
+  const vVenda = Math.floor(m.v * 0.6);
+  if (!confirm(
+    `Vender ${m.l}?\n\nValor de venda (60%): ${fmt(vVenda)}\n` +
+    (j.pat?.moradia === id ? `Você voltará para outra propriedade ou casa dos pais.` : '')
+  )) return;
+
+  const novasComp = {...(j.moradias_compradas||{})};
+  delete novasComp[id];
+
+  const updates = {
+    moradias_compradas: novasComp,
+    dinheiro: (j.dinheiro||0) + vVenda,
+  };
+
+  if (j.pat?.moradia === id) {
+    const outras = Object.keys(novasComp).filter(k=>novasComp[k]);
+    updates['pat.moradia'] = outras.length > 0 ? outras[0] : 'pais';
+    if ((m.rep_cp||0) > 0) updates.reputacao = Math.max(0,(j.reputacao||30)-(m.rep_cp||0));
+  }
+
+  await _salvar(uid, updates);
+  toast(`🏠 ${m.l} vendida por ${fmt(vVenda)}.`,'ok');
+};
+
+// ════════════════════════════════════════════════════════
+// AÇÕES — TRANSPORTE
+// ════════════════════════════════════════════════════════
 window.escolherCarro = async function(id, mod) {
   const j   = window.JOGADOR;
   const uid = j.uid || window.JOGADOR_UID;
   if (j.no_serasa && mod !== 'vista' && id !== 'onibus') {
     toast('Financiamento bloqueado — nome no Serasa.','ko'); return;
   }
-  const cr  = CARROS.find(x=>x.id===id);
+  const cr = CARROS.find(x=>x.id===id);
   const updates = {};
 
   if (id === 'onibus' || mod === 'vista') {
-    if (cr?.v && (j.dinheiro||0) < cr.v) { toast(`Saldo insuficiente.`,'ko'); return; }
+    if (cr?.v && (j.dinheiro||0) < cr.v) { toast('Saldo insuficiente.','ko'); return; }
     if (cr?.v) updates.dinheiro = (j.dinheiro||0) - cr.v;
+    if (cr?.v) updates[`carros_comprados.${id}`] = true;
     updates['pat.transporte'] = id;
     updates.reputacao = Math.min(100,(j.reputacao||30)+(cr?.rep||0));
-    toast(`${cr?.i||'🚌'} ${cr?.l||'Transporte'} selecionado!`,'ok');
+    toast(`${cr?.l||'Transporte'} selecionado!`,'ok');
   } else {
     const parcelas = mod === 'fin36' ? 36 : 48;
     const parcela  = Math.ceil((cr?.v||0)/parcelas*1.35);
     updates[`financiamentos.${id}`] = { nome:cr?.l, parcela_mensal:parcela, parcelas_restantes:parcelas, valor_total:parcela*parcelas };
+    updates[`carros_comprados.${id}`] = true;
     updates['pat.transporte'] = id;
     updates.reputacao = Math.min(100,(j.reputacao||30)+Math.floor((cr?.rep||0)*0.6));
-    toast(`${cr?.i} ${cr?.l} financiado! ${parcelas}× ${fmt(parcela)}/mês`,'ok');
+    toast(`${cr?.l} financiado! ${parcelas}× ${fmt(parcela)}/mês`,'ok');
   }
   await _salvar(uid, updates);
 };
 
+window.alternarCarro = async function(id) {
+  const j   = window.JOGADOR;
+  const uid = j.uid || window.JOGADOR_UID;
+  if (!_carroEhProprío(j, id)) { toast('Você não possui este veículo.','ko'); return; }
+  await _salvar(uid, { 'pat.transporte': id });
+  const cr = CARROS.find(x=>x.id===id);
+  toast(`🚗 Veículo alternado para ${cr?.l||id}.`,'ok');
+};
+
+window.venderCarro = async function(id) {
+  const j   = window.JOGADOR;
+  const uid = j.uid || window.JOGADOR_UID;
+  const cr  = CARROS.find(x=>x.id===id);
+  if (!cr || id === 'onibus') { toast('Operação inválida.','ko'); return; }
+  const vVenda = Math.floor(cr.v * 0.5);
+  if (!confirm(`Vender ${cr.l}?\n\nValor de venda (50%): ${fmt(vVenda)}\n${j.pat?.transporte===id?'Você passará a usar transporte público ou outro veículo.':''}`)) return;
+
+  const novosCom = {...(j.carros_comprados||{})};
+  delete novosCom[id];
+
+  const updates = {
+    carros_comprados: novosCom,
+    dinheiro: (j.dinheiro||0) + vVenda,
+  };
+
+  if (j.pat?.transporte === id) {
+    const outros = Object.keys(novosCom).filter(k=>novosCom[k] && k!=='onibus');
+    updates['pat.transporte'] = outros.length > 0 ? outros[0] : 'onibus';
+    if ((cr.rep||0) > 0) updates.reputacao = Math.max(0,(j.reputacao||30)-(cr.rep||0));
+  }
+
+  // Limpar financiamento se houver
+  if (j.financiamentos?.[id]) {
+    const novosFins = {...(j.financiamentos||{})};
+    delete novosFins[id];
+    updates.financiamentos = novosFins;
+  }
+
+  await _salvar(uid, updates);
+  toast(`🚗 ${cr.l} vendido por ${fmt(vVenda)}!`,'ok',5000);
+};
+
+window.devolverCarro = async function(carroId) {
+  const j   = window.JOGADOR;
+  const uid = j.uid || window.JOGADOR_UID;
+  const fin = (j.financiamentos || {})[carroId];
+  if (!fin || fin.parcelas_restantes <= 0) {
+    toast('Nenhum financiamento ativo para este veículo.','ko'); return;
+  }
+  const totalParcelas = Math.round(fin.valor_total / fin.parcela_mensal) || 1;
+  const pagas         = totalParcelas - fin.parcelas_restantes;
+  const valorPago     = pagas * fin.parcela_mensal;
+  const reembolso     = Math.floor(valorPago * 0.5);
+
+  if (!confirm(
+    `Devolver ${fin.nome}?\n\nParcelas pagas: ${pagas}/${totalParcelas}\nValor pago: ${fmt(valorPago)}\nReembolso (50%): ${fmt(reembolso)}\n\nVocê voltará para o ônibus.`
+  )) return;
+
+  const novosFins = {...(j.financiamentos||{})};
+  delete novosFins[carroId];
+  const novosCom  = {...(j.carros_comprados||{})};
+  delete novosCom[carroId];
+
+  await _salvar(uid, {
+    financiamentos:  novosFins,
+    carros_comprados: novosCom,
+    'pat.transporte': 'onibus',
+    dinheiro:         (j.dinheiro||0) + reembolso,
+  });
+  toast(`🚗 Carro devolvido. +${fmt(reembolso)} de reembolso.`,'ok',5000);
+};
+
+// ════════════════════════════════════════════════════════
+// AÇÃO — ESCRITÓRIO PESSOAL
+// ════════════════════════════════════════════════════════
 window.escolherEscritorioPat = async function(id) {
   const j   = window.JOGADOR;
   const uid = j.uid || window.JOGADOR_UID;
@@ -322,75 +480,163 @@ window.escolherEscritorioPat = async function(id) {
 };
 
 // ════════════════════════════════════════════════════════
-// LOJA
+// RENDERIZAÇÃO — LOJA
 // ════════════════════════════════════════════════════════
 window.renderLoja = function(j, el) {
   const comprados = (j.compras||[]).map(c=>c.id);
+  const congUsados = j.congressos_usados || {};
+  const mesAtual   = _mesAtual();
+  const anoAtual   = _anoAtual();
+
+  const porCategoria = {status:[], prof:[], exp:[], cong:[]};
+  SHOP.forEach(it => (porCategoria[it.cat]||porCategoria.status).push(it));
+
+  function renderCard(it) {
+    const jatem      = comprados.includes(it.id);
+    const isCong     = it.cat === 'cong';
+    const usadoAno   = congUsados[it.id] === anoAtual;
+    const mesCorreto = isCong ? mesAtual === it.mes : true;
+
+    let actionHtml;
+    if (isCong) {
+      if (usadoAno) {
+        actionHtml = `<div class="pc-ativo" style="color:var(--txt3)">✓ Participado (ano ${anoAtual})</div>`;
+      } else if (!mesCorreto) {
+        actionHtml = `<div style="font-size:.6rem;color:var(--txt3);margin-top:.3rem">📅 Disponível em ${MESES_NOME[it.mes-1]}</div>`;
+      } else if ((j.dinheiro||0) >= it.p) {
+        actionHtml = `<button class="btn btn-sm btn-sec" style="width:100%;margin-top:.3rem" onclick="window.comprarItem('${it.id}')">Participar ${fmt(it.p)}</button>`;
+      } else {
+        actionHtml = `<div style="font-size:.65rem;color:var(--ardosia);margin-top:.3rem">Saldo insuficiente</div>`;
+      }
+    } else if (jatem) {
+      const vVenda = Math.floor(it.p * 0.5);
+      actionHtml = `
+        <div class="pc-ativo">✓ Adquirido</div>
+        <button class="btn-vender" onclick="window.venderItem('${it.id}')">Vender ${fmt(vVenda)}</button>`;
+    } else if ((j.dinheiro||0) >= it.p) {
+      actionHtml = `<button class="btn btn-sm btn-sec" style="width:100%;margin-top:.3rem" onclick="window.comprarItem('${it.id}')">Comprar ${fmt(it.p)}</button>`;
+    } else {
+      actionHtml = `<div style="font-size:.65rem;color:var(--ardosia);margin-top:.3rem">Saldo insuficiente</div>`;
+    }
+
+    return `<div class="pat-card ${jatem&&!isCong?'ativo':usadoAno?'ativo':''}">
+      <img class="pc-img" src="${it.img}" alt="${it.n}" loading="lazy">
+      <div class="pc-nome">${it.n}</div>
+      <div class="pc-det">${it.d}</div>
+      ${isCong?`<div class="pc-det" style="color:var(--navy3);font-size:.58rem">📅 ${MESES_NOME[it.mes-1]}</div>`:''}
+      <div class="pc-rep">${fmt(it.p)}</div>
+      ${actionHtml}
+    </div>`;
+  }
+
   el.innerHTML = `
     <div class="secao-header">
       <div class="secao-titulo">🛍️ Loja</div>
       <span class="secao-badge">Saldo: ${fmt(j.dinheiro||0)}</span>
     </div>
-    <div style="font-size:.75rem;color:var(--ardosia2);margin-bottom:1rem">
-      Itens de status aumentam sua reputação permanentemente. Ferramentas profissionais melhoram suas skills.
+
+    <div class="secao-header" style="margin-top:.8rem"><div class="secao-titulo" style="font-size:.82rem">👔 Status</div></div>
+    <div class="grid-cards" style="margin-bottom:1rem">
+      ${porCategoria.status.map(renderCard).join('')}
     </div>
-    <div class="grid-cards">
-      ${SHOP.map(it => {
-        const jatem = comprados.includes(it.id);
-        return `<div class="pat-card ${jatem?'ativo':''}">
-          <div class="pc-icon">${it.i}</div>
-          <div class="pc-nome">${it.n}</div>
-          <div class="pc-det">${it.d}</div>
-          <div class="pc-rep">${fmt(it.p)}</div>
-          ${jatem ? `<div class="pc-ativo">✓ Adquirido</div>` :
-          (j.dinheiro||0)>=it.p ? `<button class="btn btn-sm btn-sec" style="width:100%;margin-top:.3rem" onclick="window.comprarItem('${it.id}')">Comprar</button>` :
-          `<div style="font-size:.65rem;color:var(--ardosia);margin-top:.3rem">Saldo insuficiente</div>`}
-        </div>`;
-      }).join('')}
+
+    <div class="secao-header"><div class="secao-titulo" style="font-size:.82rem">💼 Profissional</div></div>
+    <div class="grid-cards" style="margin-bottom:1rem">
+      ${[...porCategoria.prof,...porCategoria.exp].map(renderCard).join('')}
     </div>
-    ${comprados.length > 0 ? `
-    <div class="secao-header" style="margin-top:1.5rem"><div class="secao-titulo">🛒 Seus Bens</div></div>
-    <div class="grid-cards">
-      ${(j.compras||[]).map(cc=>`<div class="pat-card ativo">
-        <div class="pc-icon">${cc.i||'📦'}</div>
-        <div class="pc-nome">${cc.n}</div>
-        ${cc.rep?`<div class="pc-rep">+${cc.rep} rep</div>`:''}
-      </div>`).join('')}
-    </div>`:'' }`;
+
+    <div class="secao-header"><div class="secao-titulo" style="font-size:.82rem">✈️ Congressos</div>
+      <span class="secao-badge" style="font-size:.62rem">1× por ano · mês fixo</span>
+    </div>
+    <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.5rem">
+      Cada congresso pode ser frequentado uma vez por ano no mês indicado.
+    </div>
+    <div class="grid-cards" style="margin-bottom:1.2rem">
+      ${porCategoria.cong.map(renderCard).join('')}
+    </div>`;
 };
 
+// ════════════════════════════════════════════════════════
+// COMPRAR ITEM
+// ════════════════════════════════════════════════════════
 window.comprarItem = async function(id) {
   const j   = window.JOGADOR;
   const uid = j.uid || window.JOGADOR_UID;
   const it  = SHOP.find(x=>x.id===id);
   if (!it) return;
   if ((j.dinheiro||0) < it.p) { toast('Saldo insuficiente.','ko'); return; }
+
+  // Congress — lógica especial
+  if (it.cat === 'cong') {
+    const mesAtual  = _mesAtual();
+    const anoAtual  = _anoAtual();
+    if (mesAtual !== it.mes) {
+      toast(`Congresso disponível apenas em ${MESES_NOME[it.mes-1]}.`,'ko'); return;
+    }
+    const congUsados = j.congressos_usados || {};
+    if (congUsados[it.id] === anoAtual) {
+      toast('Você já participou deste congresso este ano.','ko'); return;
+    }
+    const netBonus = {cong_par:8, cong_ber:7, cong_lis:6, cong_sp:5, cong_rio:5}[it.id] || 5;
+    const updates = {
+      dinheiro: (j.dinheiro||0) - it.p,
+      [`congressos_usados.${it.id}`]: anoAtual,
+    };
+    if (it.rep > 0) updates.reputacao = Math.min(100,(j.reputacao||30)+it.rep);
+    updates['skills.networking'] = Math.min(window.REP_CAP?.[j.cargo_id]||55, ((j.skills||{}).networking||10)+netBonus);
+    await _salvar(uid, updates);
+    toast(`✈️ ${it.n} — participação confirmada!${it.rep>0?` +${it.rep} rep`:''}`, 'ok');
+    return;
+  }
+
   if ((j.compras||[]).some(c=>c.id===id)) { toast('Você já possui este item.',''); return; }
 
-  const novasCompras = [...(j.compras||[]), {id:it.id,i:it.i,n:it.n,rep:it.rep||0}];
+  const novasCompras = [...(j.compras||[]), {id:it.id,i:'📦',n:it.n,rep:it.rep||0,p:it.p,img:it.img}];
   const updates = {
     dinheiro: (j.dinheiro||0) - it.p,
     compras:  novasCompras,
   };
   if (it.rep > 0) updates.reputacao = Math.min(100,(j.reputacao||30)+it.rep);
 
-  // Efeitos de skill
-  if (it.id==='bj') updates['skills.pesquisa'] = Math.min(window.REP_CAP[j.cargo_id]||55, ((j.skills||{}).pesquisa||18)+8);
+  if (it.id==='bj') updates['skills.pesquisa'] = Math.min(window.REP_CAP?.[j.cargo_id]||55, ((j.skills||{}).pesquisa||18)+8);
   if (it.id==='nb') {
-    updates['skills.escrita']  = Math.min(window.REP_CAP[j.cargo_id]||55, ((j.skills||{}).escrita||15)+6);
-    updates['skills.pesquisa'] = Math.min(window.REP_CAP[j.cargo_id]||55, ((j.skills||{}).pesquisa||18)+6);
+    updates['skills.escrita']  = Math.min(window.REP_CAP?.[j.cargo_id]||55, ((j.skills||{}).escrita||15)+6);
+    updates['skills.pesquisa'] = Math.min(window.REP_CAP?.[j.cargo_id]||55, ((j.skills||{}).pesquisa||18)+6);
   }
   if (it.id==='ai') Object.keys(j.skills||{}).forEach(k=>{
-    updates[`skills.${k}`] = Math.min(window.REP_CAP[j.cargo_id]||55, ((j.skills||{})[k]||15)+8);
+    updates[`skills.${k}`] = Math.min(window.REP_CAP?.[j.cargo_id]||55, ((j.skills||{})[k]||15)+8);
   });
-  if (it.id==='cg') updates['skills.networking'] = Math.min(window.REP_CAP[j.cargo_id]||55, ((j.skills||{}).networking||10)+6);
   if (it.id==='ac') {
-    updates['skills.persuasao'] = Math.min(window.REP_CAP[j.cargo_id]||55, ((j.skills||{}).persuasao||12)+6);
-    updates['skills.oratoria']  = Math.min(window.REP_CAP[j.cargo_id]||55, ((j.skills||{}).oratoria||15)+4);
+    updates['skills.persuasao'] = Math.min(window.REP_CAP?.[j.cargo_id]||55, ((j.skills||{}).persuasao||12)+6);
+    updates['skills.oratoria']  = Math.min(window.REP_CAP?.[j.cargo_id]||55, ((j.skills||{}).oratoria||15)+4);
   }
 
   await _salvar(uid, updates);
-  toast(`${it.i} ${it.n} adquirido!${it.rep>0?` +${it.rep} rep`:''}`, 'ok');
+  toast(`${it.n} adquirido!${it.rep>0?` +${it.rep} rep`:''}`, 'ok');
+};
+
+// ════════════════════════════════════════════════════════
+// VENDER ITEM DA LOJA
+// ════════════════════════════════════════════════════════
+window.venderItem = async function(id) {
+  const j   = window.JOGADOR;
+  const uid = j.uid || window.JOGADOR_UID;
+  const it  = SHOP.find(x=>x.id===id);
+  if (!it) return;
+  if (!(j.compras||[]).some(c=>c.id===id)) { toast('Item não encontrado.','ko'); return; }
+
+  const vVenda = Math.floor(it.p * 0.5);
+  if (!confirm(`Vender ${it.n}?\n\nValor de venda (50%): ${fmt(vVenda)}${it.rep>0?`\nPerda de reputação: -${it.rep} rep`:''}`)) return;
+
+  const novasCompras = (j.compras||[]).filter(c=>c.id!==id);
+  const updates = {
+    dinheiro: (j.dinheiro||0) + vVenda,
+    compras:  novasCompras,
+  };
+  if ((it.rep||0) > 0) updates.reputacao = Math.max(0,(j.reputacao||30)-(it.rep||0));
+
+  await _salvar(uid, updates);
+  toast(`${it.n} vendido por ${fmt(vVenda)}.${it.rep>0?` -${it.rep} rep`:''}`, 'ok');
 };
 
 // ════════════════════════════════════════════════════════
@@ -416,42 +662,6 @@ window.estudarSkill = async function(sk, skLabel) {
 // ════════════════════════════════════════════════════════
 // HELPERS
 // ════════════════════════════════════════════════════════
-window.devolverCarro = async function(carroId) {
-  const j   = window.JOGADOR;
-  const uid = j.uid || window.JOGADOR_UID;
-  const fin = (j.financiamentos || {})[carroId];
-  if (!fin || fin.parcelas_restantes <= 0) {
-    toast('Nenhum financiamento ativo para este veículo.', 'ko');
-    return;
-  }
-
-  // Calcular valor pago até agora
-  const totalContrato  = fin.valor_total || 0;
-  const totalParcelas  = Math.round(totalContrato / fin.parcela_mensal) || 1;
-  const pagas          = totalParcelas - fin.parcelas_restantes;
-  const valorPago      = pagas * fin.parcela_mensal;
-  const reembolso      = Math.floor(valorPago * 0.5);
-
-  if (!confirm(
-    `Devolver ${fin.nome}?\n\n` +
-    `Parcelas pagas: ${pagas}/${totalParcelas}\n` +
-    `Valor pago até agora: R$ ${valorPago.toLocaleString('pt-BR')}\n` +
-    `Reembolso (50%): R$ ${reembolso.toLocaleString('pt-BR')}\n\n` +
-    `Você voltará para o ônibus.`
-  )) return;
-
-  const novosFins = { ...(j.financiamentos || {}) };
-  delete novosFins[carroId];
-
-  await _salvar(uid, {
-    financiamentos:  novosFins,
-    'pat.transporte': 'onibus',
-    dinheiro:        (j.dinheiro || 0) + reembolso,
-  });
-
-  toast(`🚗 Carro devolvido. +R$ ${reembolso.toLocaleString('pt-BR')} de reembolso.`, 'ok', 5000);
-};
-
 async function _salvar(uid, updates) {
   try {
     await updateDoc(doc(db, 'jogadores', uid), updates);
@@ -462,20 +672,19 @@ async function _salvar(uid, updates) {
 }
 
 function _calcRepPat(j) {
-  const morId  = j.pat?.moradia||'pais';
-  const carId  = j.pat?.transporte||'onibus';
-  const escId  = j.pat?.escritorio||'home';
+  const morId  = j.pat?.moradia    || 'pais';
+  const carId  = j.pat?.transporte || 'onibus';
+  const escId  = j.pat?.escritorio || 'home';
   const mor    = MORADIAS.find(m=>m.id===morId);
   const car    = CARROS.find(c=>c.id===carId);
   const esc    = ESC_PAT.find(e=>e.id===escId);
-  const propria= j.moradias_compradas?.[morId];
+  const propria = j.moradias_compradas?.[morId];
   let rep = 0;
   if (mor) rep += propria ? mor.rep_cp : Math.max(0, mor.rep_al);
-  if (car) rep += car.rep;
-  // Escritório: só aplica se for solo (NPC não tem custo/bônus pat)
+  if (car) rep += (car.rep || 0);
   const isSoloPat = !j.escritorio_empregado_id || j.escritorio_id === 'solo';
   if (esc && isSoloPat) rep += esc.rep;
-  (j.compras||[]).forEach(c=>{ if (c.rep>0) rep+=c.rep; });
+  (j.compras||[]).forEach(c=>{ if ((c.rep||0)>0) rep+=c.rep; });
   return Math.min(30, rep);
 }
 
