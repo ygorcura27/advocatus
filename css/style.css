@@ -673,21 +673,21 @@ a:hover { color: var(--navy); }
 /* ═══════════════════════════════════════════════════════════
    PATRIMÔNIO
    ═══════════════════════════════════════════════════════════ */
-.grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: .5rem; }
+.grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: .75rem; }
 .pat-card {
-  border: var(--borda); border-radius: var(--r2); padding: .5rem .6rem .7rem;
+  border: var(--borda); border-radius: var(--r2); padding: .6rem .75rem .9rem;
   text-align: center; background: var(--surface);
   transition: all .15s; box-shadow: var(--sombra);
   display: flex; flex-direction: column;
 }
 .pat-card.ativo { border-color: var(--navy3); background: var(--navy-light); box-shadow: 0 0 0 2px var(--navy3); }
 .pat-card:not(.ativo):hover { border-color: var(--navy3); transform: translateY(-1px); box-shadow: var(--sombra2); }
-.pat-card .pc-img  { width: 100%; height: 85px; object-fit: cover; border-radius: var(--r); margin-bottom: .35rem; }
-.pat-card .pc-icon { font-size: 1.4rem; margin-bottom: .35rem; }
-.pat-card .pc-nome { font-size: .76rem; font-weight: 600; color: var(--navy); margin-bottom: .2rem; }
-.pat-card .pc-det  { font-size: .62rem; color: var(--txt3); line-height: 1.5; }
-.pat-card .pc-rep  { font-size: .62rem; color: var(--ouro2); margin-top: .2rem; font-weight: 600; }
-.pat-card .pc-ativo{ font-size: .62rem; color: var(--verde2); margin-top: .3rem; font-weight: 600; }
+.pat-card .pc-img  { width: 100%; height: auto; display: block; border-radius: var(--r); margin-bottom: .5rem; }
+.pat-card .pc-icon { font-size: 2rem; margin-bottom: .45rem; }
+.pat-card .pc-nome { font-size: .88rem; font-weight: 600; color: var(--navy); margin-bottom: .25rem; }
+.pat-card .pc-det  { font-size: .72rem; color: var(--txt3); line-height: 1.55; }
+.pat-card .pc-rep  { font-size: .72rem; color: var(--ouro2); margin-top: .25rem; font-weight: 600; }
+.pat-card .pc-ativo{ font-size: .72rem; color: var(--verde2); margin-top: .35rem; font-weight: 600; }
 .btn-vender {
   font-size: .58rem; margin-top: .3rem; width: 100%;
   background: var(--verm-bg); border: 1px solid var(--verm3);
@@ -887,7 +887,7 @@ a:hover { color: var(--navy); }
   .profile-hero .hero-badges { display: none; }
 
   /* Grid cards menor */
-  .grid-cards { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+  .grid-cards { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 
   /* Barra de energia mobile — compacta */
   .bloco-energia-mobile {
