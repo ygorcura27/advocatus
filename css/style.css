@@ -56,8 +56,8 @@
   --sombra-navy:0 2px 12px rgba(27,42,74,.2);
 
   /* Tipografia */
-  --font-serif: 'Playfair Display', Georgia, serif;
-  --font-sans:  'Inter', system-ui, sans-serif;
+  --font-serif: 'DM Sans', system-ui, sans-serif;
+  --font-sans:  'DM Sans', system-ui, sans-serif;
   --font-mono:  'Courier Prime', 'Courier New', monospace;
 
   --r:  4px;
@@ -69,7 +69,7 @@
 
 html { font-size: 16px; }
 body {
-  font-family: 'Playfair Display', Georgia, serif;
+  font-family: var(--font-sans);
   background: var(--bg);
   color: var(--txt);
   line-height: 1.5;
@@ -87,10 +87,11 @@ input, select, textarea, button, code, pre {
   font-family: var(--font-sans);
 }
 
-/* Números e valores monetários usam Playfair Display */
+/* Números e valores monetários — DM Sans com alinhamento tabular */
 .v, .valor, .money, .price, .esc-kpi-valor, .proc-valor {
-  font-family: 'Playfair Display', Georgia, serif;
-  font-weight: 600;
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
 }
 
 a { color: var(--navy3); text-decoration: none; }
@@ -114,7 +115,7 @@ a:hover { color: var(--navy); }
 }
 
 .logo {
-  font-family: var(--font-serif);
+  font-family: 'Playfair Display', Georgia, serif;
   font-size: 1.1rem;
   color: #FFFFFF;
   letter-spacing: .04em;
@@ -1523,11 +1524,11 @@ a:hover { color: var(--navy); }
   border-radius: var(--r2);
 }
 .esc-hero-nome {
-  font-family: var(--font-serif); font-weight: 700;
+  font-family: var(--font-sans); font-weight: 700;
   font-size: 1.5rem; line-height: 1.15; color: #fff;
 }
 .esc-hero-sub {
-  font-family: var(--font-serif); font-style: italic;
+  font-family: var(--font-sans); font-style: italic;
   font-size: .92rem; color: var(--ouro);
 }
 .esc-hero-meta {
@@ -1566,7 +1567,7 @@ a:hover { color: var(--navy); }
   margin-bottom: .35rem;
   display: flex; justify-content: space-between; align-items: center;
 }
-.esc-kpi-valor { font-size: 1.18rem; font-weight: 700; color: var(--navy); font-family: var(--font-serif); }
+.esc-kpi-valor { font-size: 1.18rem; font-weight: 700; color: var(--navy); font-family: var(--font-sans); font-variant-numeric: tabular-nums; }
 .esc-kpi-delta { font-size: .68rem; font-weight: 600; margin-top: .2rem; }
 .esc-kpi-delta.up   { color: var(--verde2); }
 .esc-kpi-delta.down { color: var(--verm2); }
@@ -1588,8 +1589,72 @@ a:hover { color: var(--navy); }
   padding: 1rem;
   box-shadow: var(--sombra);
 }
-.esc-card-bloco .secao-header { margin-bottom: .8rem; padding-bottom: .5rem; }
-.esc-card-bloco .secao-titulo { font-size: .88rem; }
+.esc-card-bloco .secao-header { margin-bottom: .8rem; padding-bottom: .5rem; border-bottom: 1px solid var(--borda-sub); }
+.esc-card-bloco .secao-titulo { font-size: .88rem; font-weight: 700; }
+.esc-ver-todos { font-size: .72rem; color: var(--navy3); font-weight: 500; text-decoration: none; white-space: nowrap; }
+.esc-ver-todos:hover { color: var(--navy); text-decoration: underline; }
+
+/* ── Membro da equipe no painel ── */
+.esc-membro {
+  display: flex; align-items: center; gap: .65rem;
+  padding: .55rem 0; border-bottom: 1px solid var(--borda-sub);
+}
+.esc-membro:last-of-type { border-bottom: none; }
+.esc-membro-avatar {
+  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+  object-fit: cover; border: 1.5px solid var(--navy-light);
+}
+.esc-membro-info { flex: 1; min-width: 0; }
+.esc-membro-nome { font-size: .8rem; font-weight: 600; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.esc-membro-cargo { font-size: .62rem; color: var(--txt3); margin-top: 1px; }
+.esc-membro-esp { font-size: .62rem; color: var(--txt4); }
+.esc-membro-prod {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0;
+}
+.esc-membro-prod-label { font-size: .6rem; color: var(--txt4); }
+.esc-membro-prod-val { font-size: .75rem; font-weight: 700; color: var(--verde2); font-variant-numeric: tabular-nums; }
+.esc-membro-acoes { display: flex; gap: .25rem; flex-shrink: 0; }
+.esc-membro-btn {
+  width: 26px; height: 26px; border-radius: var(--r);
+  border: 1px solid var(--borda2); background: var(--surface2);
+  font-size: .7rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all .15s; color: var(--txt3);
+}
+.esc-membro-btn:hover { background: var(--navy-light); color: var(--navy); border-color: var(--navy3); }
+.esc-membro-btn.demitir:hover { background: var(--verm-bg); color: var(--verm2); border-color: var(--verm3); }
+
+/* ── Cliente corporativo no painel ── */
+.esc-cliente {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .5rem 0; border-bottom: 1px solid var(--borda-sub);
+}
+.esc-cliente:last-of-type { border-bottom: none; }
+.esc-cliente-logo {
+  width: 34px; height: 34px; border-radius: var(--r);
+  background: var(--navy); display: flex; align-items: center; justify-content: center;
+  font-size: .75rem; font-weight: 700; color: var(--ouro); flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.esc-cliente-info { flex: 1; min-width: 0; }
+.esc-cliente-nome { font-size: .8rem; font-weight: 600; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.esc-cliente-tipo { font-size: .62rem; color: var(--txt3); margin-top: 1px; }
+.esc-cliente-stats { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+.esc-cliente-procs { font-size: .72rem; font-weight: 600; color: var(--navy); font-variant-numeric: tabular-nums; }
+.esc-cliente-area  { font-size: .6rem; color: var(--txt3); }
+.esc-cliente-pag   { font-size: .72rem; font-weight: 700; color: var(--verde2); font-variant-numeric: tabular-nums; }
+
+/* ── Oportunidades do mês ── */
+.esc-opport-bloco { margin-bottom: 1.1rem; }
+.esc-opport {
+  display: flex; align-items: flex-start; gap: .6rem;
+  padding: .6rem; background: var(--surface);
+  border: var(--borda); border-left: 3px solid var(--ouro2);
+  border-radius: var(--r); margin-bottom: .4rem;
+  box-shadow: var(--sombra);
+}
+.esc-opport-icone { font-size: 1rem; flex-shrink: 0; margin-top: .1rem; }
+.esc-opport-titulo { font-size: .78rem; font-weight: 600; color: var(--navy); }
+.esc-opport-desc   { font-size: .64rem; color: var(--txt3); margin-top: 2px; }
 
 .esc-mock-badge {
   font-size: .56rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
