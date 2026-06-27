@@ -51,6 +51,7 @@ window.renderEquipe = async function(j, el) {
   // (escritorio_empregado_id existe, mas escritorio_proprio_id não)
   if (!j.escritorio_proprio_id && j.escritorio_empregado_id) {
     el.innerHTML = `
+      <div style="margin-bottom:.8rem"><button class="btn btn-ghost btn-sm" onclick="window.navTo('escritorio',null)">← Escritório</button></div>
       <div class="secao-header"><div class="secao-titulo">👥 Equipe — ${j.escritorio_nome||'Escritório'}</div></div>
       <div class="card" style="text-align:center;padding:1.6rem;color:var(--txt3)">
         🏢 Este escritório é <b>autogerenciado</b> pela própria estrutura (NPC).<br><br>
@@ -118,6 +119,7 @@ window.renderEquipe = async function(j, el) {
   const energiaDisp   = Math.max(0, 100 - (j.energia_usada_mes || 0));
 
   el.innerHTML = `
+    <div style="margin-bottom:.8rem"><button class="btn btn-ghost btn-sm" onclick="window.navTo('escritorio',null)">← Escritório</button></div>
     <div class="secao-header">
       <div class="secao-titulo">👥 Equipe — ${esc.nome}</div>
       <span class="secao-badge">Tier ${tier} · ${funcs.length} membro(s)</span>

@@ -387,7 +387,7 @@ window.avancarMes = async function(forcar) {
   }
 };
 
-// ── Navegação entre painéis ──
+// ── Navegação entre painéis (com hash URL) ──
 window.navTo = function(painel, el) {
   // Atualizar nav top
   document.querySelectorAll('.nav-top a').forEach(a => a.classList.remove('ativo'));
@@ -396,16 +396,43 @@ window.navTo = function(painel, el) {
 
   if (el) {
     el.classList.add('ativo');
-    // Sincronizar ambas as navs
+    const match = document.querySelector(`.nav-item[onclick*="${painel}"]`);
+    if (match) match.classList.add('ativo');
+    const matchTop = document.querySelector(`.nav-top a[onclick*="${painel}"]`);
+    if (matchTop) matchTop.classList.add('ativo');
+  } else {
     const match = document.querySelector(`.nav-item[onclick*="${painel}"]`);
     if (match) match.classList.add('ativo');
     const matchTop = document.querySelector(`.nav-top a[onclick*="${painel}"]`);
     if (matchTop) matchTop.classList.add('ativo');
   }
 
+  // Atualizar hash sem disparar hashchange novamente
+  if (location.hash !== '#' + painel) {
+    history.pushState({ painel }, '', '#' + painel);
+  }
+
   // Disparar evento para ui-main.js renderizar o painel
   window.dispatchEvent(new CustomEvent('nav:painel', { detail: painel }));
 };
+
+// ── Restaurar painel ao navegar com botão voltar/avançar ──
+window.addEventListener('popstate', (e) => {
+  const painel = (e.state && e.state.painel) || location.hash.replace('#','') || 'perfil';
+  window.navTo(painel, null);
+});
+
+// ── Restaurar painel ao carregar/dar F5 ──
+window.addEventListener('DOMContentLoaded', () => {
+  const painelInicial = location.hash.replace('#','') || 'perfil';
+  if (painelInicial !== 'perfil') {
+    // Espera o gamestate estar pronto antes de navegar
+    window.addEventListener('gamestate:ready', function _onReady() {
+      window.removeEventListener('gamestate:ready', _onReady);
+      window.navTo(painelInicial, null);
+    }, { once: true });
+  }
+});
 
 // ── Modal ──
 window.abrirModal = function(titulo, corpo, footer) {

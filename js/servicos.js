@@ -142,6 +142,7 @@ window.renderClientes = async function(j, el) {
   const receitaRecorrenteMes = recorrentes.reduce((s,c) => s + (c.valor_mensal||0), 0);
  
   el.innerHTML = `
+    <div style="margin-bottom:.8rem"><button class="btn btn-ghost btn-sm" onclick="window.navTo('escritorio',null)">← Escritório</button></div>
     <div class="secao-header">
       <div class="secao-titulo">📁 Clientes — ${esc.nome}</div>
       <span class="secao-badge">Tier ${tier}</span>
