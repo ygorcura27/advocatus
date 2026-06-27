@@ -407,7 +407,30 @@ async function _carregarEscritorioProprio(escId, j) {
     if (main) {
       main.innerHTML = `
         ${_escHero(j, esc)}
-        ${_escKpis(esc, j)}
+        <div id="esc-kpis-placeholder">
+          <div class="esc-kpis">
+            <div class="esc-kpi-card">
+              <div class="esc-kpi-label">Receita do mês</div>
+              <div class="esc-kpi-valor">—</div>
+              <div class="esc-kpi-delta flat">carregando...</div>
+            </div>
+            <div class="esc-kpi-card">
+              <div class="esc-kpi-label">Despesas do mês</div>
+              <div class="esc-kpi-valor">—</div>
+              <div class="esc-kpi-delta flat">carregando...</div>
+            </div>
+            <div class="esc-kpi-card">
+              <div class="esc-kpi-label">Lucro líquido</div>
+              <div class="esc-kpi-valor">—</div>
+              <div class="esc-kpi-delta flat">carregando...</div>
+            </div>
+            <div class="esc-kpi-card">
+              <div class="esc-kpi-label">Caixa disponível</div>
+              <div class="esc-kpi-valor">—</div>
+              <div class="esc-kpi-delta flat">carregando...</div>
+            </div>
+          </div>
+        </div>
         <div class="esc-grid-3">
           ${_escEquipeCard()}
           ${_escClientesCard()}
@@ -419,6 +442,12 @@ async function _carregarEscritorioProprio(escId, j) {
         </div>
         ${_escAcoesRapidas(j, esc)}
       `;
+      
+      // Carregar KPIs de forma assíncrona
+      const kpisHtml = await _escKpis(esc, j);
+      const kpisEl = document.getElementById('esc-kpis-placeholder');
+      if (kpisEl) kpisEl.innerHTML = kpisHtml;
+      
       const elEquipe = document.getElementById('esc-equipe-embed');
       if (elEquipe && window.renderEquipePainel) window.renderEquipePainel(j, escId, elEquipe);
       const elClientes = document.getElementById('esc-clientes-embed');
@@ -584,10 +613,39 @@ function _escHero(j, esc) {
   </div>`;
 }
 
-function _escKpis(esc, j) {
+async function _escKpis(esc, j) {
   const caixa     = (esc && esc.caixa) || 0;
   const rendaMes  = esc ? (esc.faturamento_mes_atual || 0) : (j.honorarios_mes || 0);
-  const despMes   = j.despesas_calculadas || 0;
+  
+  // Calcular despesas do mês vigente: custos fixos + salários dos funcionários ativos
+  let despMes = 0;
+  if (esc && esc.id) {
+    try {
+      const { collection, getDocs } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+      const { db: fbDb } = await import('./firebase-init.js');
+      
+      // Custos fixos por tier
+      const TIER_CUSTO_FIXO = { 1:3500, 2:8000, 3:18000, 4:35000, 5:70000 };
+      const CARGO_SAL = { est:1700, ass:2500, jnr:3500, pln:5500, snr:9000, asc:12000, soc:15000 };
+      
+      despMes = TIER_CUSTO_FIXO[esc.tier || 1] || 3500;
+      
+      // Adicionar salários dos funcionários ativos
+      const fSnap = await getDocs(collection(fbDb,'escritorios', esc.id, 'funcionarios'));
+      fSnap.docs.forEach(doc => {
+        const f = doc.data();
+        if (f.ativo !== false) {  // Funcionários ativos
+          despMes += CARGO_SAL[f.cargo_id] || 0;
+        }
+      });
+    } catch (e) {
+      console.warn('[KPI DESPESAS]', e);
+      despMes = j.despesas_calculadas || 0;
+    }
+  } else {
+    despMes = j.despesas_calculadas || 0;
+  }
+  
   const lucroMes  = rendaMes - despMes;
   const socios    = esc ? _normalizarSociosUI(esc) : [{participacao_pct:100}];
   const minhaUid  = j.uid || window.JOGADOR_UID;
@@ -603,17 +661,17 @@ function _escKpis(esc, j) {
       <div class="esc-kpi-delta flat">honorários recebidos até agora</div>
     </div>
     <div class="esc-kpi-card">
+      <div class="esc-kpi-label">Despesas do mês</div>
+      <div class="esc-kpi-valor" style="color:var(--verm2)">${_fmtExt(despMes)}</div>
+      <div class="esc-kpi-delta flat">folha + custos fixos vigentes</div>
+    </div>
+    <div class="esc-kpi-card">
       <div class="esc-kpi-label">Lucro líquido</div>
       <div class="esc-kpi-valor" style="color:${lucroMes>=0?'var(--verde2)':'var(--verm2)'}">${_fmtExt(lucroMes)}</div>
       <div class="esc-kpi-delta ${deltaIcon(lucroMes)}">${lucroMes>=0?'Receita acima das despesas':'Despesas acima da receita'}</div>
     </div>
     <div class="esc-kpi-card">
-      <div class="esc-kpi-label">Despesas do mês</div>
-      <div class="esc-kpi-valor" style="color:var(--verm2)">${_fmtExt(despMes)}</div>
-      <div class="esc-kpi-delta flat">folha + custos fixos (mês anterior)</div>
-    </div>
-    <div class="esc-kpi-card">
-      <div class="esc-kpi-label">Caixa do escritório</div>
+      <div class="esc-kpi-label">Caixa disponível</div>
       <div class="esc-kpi-valor" style="color:${caixa>=0?'var(--navy)':'var(--verm2)'}">${_fmtExt(caixa)}</div>
       <div class="esc-kpi-delta flat">sua cota: ${minhaCota}%</div>
     </div>

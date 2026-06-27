@@ -17,6 +17,19 @@ const CARGO_INFO = {
   est: { l: 'Estagiário', ordem: 0 },
 };
 
+// Gerar placeholder redondo SVG com iniciais
+function _getPlaceholder(nome) {
+  const iniciais = (nome || '?')
+    .split(' ')
+    .slice(0, 2)
+    .map(n => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+  const bgColor = '#2E4270';
+  return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Ccircle cx='20' cy='20' r='20' fill='${encodeURIComponent(bgColor)}'/%3E%3Ctext x='20' y='27' font-size='14' font-weight='bold' fill='%23fff' text-anchor='middle' font-family='Arial'%3E${iniciais}%3C/text%3E%3C/svg%3E`;
+}
+
 // Renderizar equipe do escritório (máx 5) no painel
 window.renderEquipePainel = async function(j, escId, el) {
   try {
@@ -41,19 +54,24 @@ window.renderEquipePainel = async function(j, escId, el) {
     if (top5.length === 0) {
       html = '<div style="font-size:.78rem;color:var(--txt3);padding:.5rem 0;text-align:center">Nenhum membro na equipe</div>';
     } else {
-      html = '<div style="display:flex;flex-direction:column;gap:.4rem">';
+      html = '<div style="display:flex;flex-direction:column;gap:.6rem">';
       
       for (const func of top5) {
         const cargoLabel = CARGO_INFO[func.cargo_id]?.l || func.cargo_id;
         const nome = func.nome || func.name || `${cargoLabel} #${func.id.slice(0, 4)}`;
         const esp = func.especialidade || '—';
+        const placeholder = _getPlaceholder(nome);
         
         html += `
-        <div style="display:flex;align-items:center;gap:.5rem;padding:.5rem;background:var(--surface2);border-radius:var(--r);border:1px solid var(--borda-sub)">
-          <span style="font-size:1rem;flex-shrink:0">${_getCargoIcon(func.cargo_id)}</span>
+        <div style="display:flex;align-items:center;gap:.6rem;padding:.6rem;background:var(--surface2);border-radius:var(--r);border:1px solid var(--borda-sub)">
+          <img src="${placeholder}" alt="${nome}" style="width:40px;height:40px;border-radius:50%;flex-shrink:0;object-fit:cover" />
           <div style="flex:1;min-width:0">
-            <div style="font-size:.78rem;font-weight:600;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nome}</div>
+            <div style="font-size:.80rem;font-weight:700;color:#1a3a52;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nome}</div>
             <div style="font-size:.65rem;color:var(--txt4)">${cargoLabel} · ${esp}</div>
+          </div>
+          <div style="display:flex;gap:.3rem;flex-shrink:0">
+            <button class="btn btn-icon btn-sm" title="Designar Processo" onclick="window.navTo('processos',null)" style="padding:.3rem .4rem;font-size:.7rem">📋</button>
+            <button class="btn btn-icon btn-sm" title="Demitir" onclick="if(confirm('Desligar ${nome}?')) console.log('demitir:${func.id}')" style="padding:.3rem .4rem;font-size:.7rem">✕</button>
           </div>
         </div>`;
       }
@@ -61,9 +79,9 @@ window.renderEquipePainel = async function(j, escId, el) {
       html += '</div>';
       
       if (temMais) {
-        html += `<div style="text-align:center;margin-top:.6rem"><button class="btn btn-sec btn-sm" onclick="window.navTo('equipe',null)">Ver todos (${funcs.length})</button></div>`;
+        html += `<div style="text-align:center;margin-top:.8rem"><button class="btn btn-sec btn-sm" onclick="window.navTo('equipe',null)">Ver todos (${funcs.length})</button></div>`;
       } else {
-        html += `<div style="text-align:center;margin-top:.6rem"><button class="btn btn-prim btn-sm" onclick="window.navTo('equipe',null)">Gerenciar Equipe</button></div>`;
+        html += `<div style="text-align:center;margin-top:.8rem"><button class="btn btn-prim btn-sm" onclick="window.navTo('equipe',null)">Gerenciar Equipe</button></div>`;
       }
     }
     
@@ -77,14 +95,11 @@ window.renderEquipePainel = async function(j, escId, el) {
 // Renderizar clientes corporativos (máx 5) no painel
 window.renderClientesPainel = async function(j, escId, el) {
   try {
-    // Para este MVP, vamos simular clientes com base nos processos do escritório
-    // Em uma versão futura, haveria uma coleção de "clientes_corporativos"
+    // Buscar processos sem usar orderBy no 'valor' para evitar erro de índice
     const procsSnap = await getDocs(
       query(
         collection(db, 'processos'),
-        where('escritorio_id', '==', escId),
-        orderBy('valor', 'desc'),
-        limit(50)
+        where('escritorio_id', '==', escId)
       )
     );
     
@@ -99,11 +114,10 @@ window.renderClientesPainel = async function(j, escId, el) {
       }
       clienteMap[cliente].processos += 1;
       clienteMap[cliente].faturamento += p.valor || 0;
-      // Estimar pagamento mensal como 10% do faturamento total / 12 meses
       clienteMap[cliente].pagamentoMensal = Math.round((clienteMap[cliente].faturamento / 12) * 0.1);
     });
     
-    // Converter para array e ordenar por faturamento
+    // Converter para array, ordenar por faturamento (client-side), pegar top 5
     const clientes = Object.values(clienteMap)
       .sort((a, b) => b.faturamento - a.faturamento)
       .slice(0, 5);
@@ -134,7 +148,7 @@ window.renderClientesPainel = async function(j, escId, el) {
           </div>
           <div style="text-align:right">
             <div style="font-size:.78rem;font-weight:600;color:var(--verde2)">${fmtPag}/mês</div>
-            <div style="font-size:.65rem;color:var(--txt4)">Faturamento: ${fmtFat}</div>
+            <div style="font-size:.65rem;color:var(--txt4)">${fmtFat}</div>
           </div>
         </div>`;
       }
@@ -155,47 +169,47 @@ window.renderClientesPainel = async function(j, escId, el) {
   }
 };
 
-// Renderizar oportunidades do mês (máx 5)
+// Renderizar oportunidades do mês (máx 5) - carrega da coleção 'eventos'
 window.renderOportunidadesPainel = async function(j, escId, el) {
   try {
-    // Para este MVP, simulamos oportunidades com base em eventos do escritório
-    // Em uma versão futura, haveria uma coleção de "oportunidades"
-    const oportunidades = [
-      { titulo: 'Expansão para área ambiental', descricao: 'Mercado crescente, alta demanda', icone: '🌱' },
-      { titulo: 'Parcerias com bancos', descricao: 'Projetos de financiamento', icone: '🏦' },
-      { titulo: 'Consultoria tributária', descricao: 'Clientes corporativos buscando assessoria', icone: '💰' },
-      { titulo: 'Certificação ISO', descricao: 'Aumentar credibilidade', icone: '✅' },
-      { titulo: 'Programa de mentorado', descricao: 'Treinar próxima geração', icone: '🎓' },
-    ];
+    // Carregar eventos do mês vigente
+    const eventsSnap = await getDocs(
+      query(
+        collection(db, 'eventos'),
+        where('ativo', '==', true),
+        limit(50)
+      )
+    );
     
-    const top5 = oportunidades.slice(0, 5);
-    const temMais = oportunidades.length > 5;
+    const oportunidades = eventsSnap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .slice(0, 5);
     
-    let html = `
-    <div class="esc-card-bloco">
-      <div class="secao-header" style="margin-bottom:.8rem">
-        <div class="secao-titulo">Oportunidades do Mês</div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:.4rem">`;
+    let html = '';
     
-    for (const op of top5) {
-      html += `
-      <div style="padding:.5rem;background:var(--surface2);border-radius:var(--r);border-left:3px solid var(--ouro2)">
-        <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.3rem">
-          <span style="font-size:.9rem">${op.icone}</span>
-          <div style="font-size:.78rem;font-weight:600;color:var(--navy);flex:1">${op.titulo}</div>
-        </div>
-        <div style="font-size:.65rem;color:var(--txt4);margin-left:1.3rem">${op.descricao}</div>
-      </div>`;
+    if (oportunidades.length === 0) {
+      html = '<div style="font-size:.78rem;color:var(--txt3);padding:.5rem 0;text-align:center">Nenhuma oportunidade disponível</div>';
+    } else {
+      html = '<div style="display:flex;flex-direction:column;gap:.4rem">';
+      
+      for (const op of oportunidades) {
+        const titulo = op.titulo || 'Oportunidade';
+        const desc = op.descricao || '';
+        // Usar ícone customizado ou emoji padrão
+        const icone = op.icone || '🌟';
+        
+        html += `
+        <div style="padding:.5rem;background:var(--surface2);border-radius:var(--r);border-left:3px solid var(--ouro2)">
+          <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.3rem">
+            <span style="font-size:.9rem">${icone}</span>
+            <div style="font-size:.78rem;font-weight:600;color:var(--navy);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${titulo}</div>
+          </div>
+          ${desc ? `<div style="font-size:.65rem;color:var(--txt4);margin-left:1.3rem">${desc}</div>` : ''}
+        </div>`;
+      }
+      
+      html += '</div>';
     }
-    
-    html += '</div>';
-    
-    if (temMais) {
-      html += `<div style="text-align:center;margin-top:.6rem"><button class="btn btn-sec btn-sm" onclick="window.navTo('escritorio',null)">Ver todas as oportunidades</button></div>`;
-    }
-    
-    html += '</div>';
     
     el.innerHTML = html;
   } catch (err) {
@@ -203,17 +217,3 @@ window.renderOportunidadesPainel = async function(j, escId, el) {
     el.innerHTML = '<div style="color:var(--txt3);font-size:.75rem">Erro ao carregar oportunidades</div>';
   }
 };
-
-// Ícones por cargo
-function _getCargoIcon(cargoId) {
-  const iconMap = {
-    soc: '👔',
-    asc: '⚖️',
-    snr: '📌',
-    pln: '📋',
-    jnr: '📝',
-    ass: '📄',
-    est: '🎓',
-  };
-  return iconMap[cargoId] || '👤';
-}
