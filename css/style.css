@@ -673,7 +673,7 @@ a:hover { color: var(--navy); }
 /* ═══════════════════════════════════════════════════════════
    PATRIMÔNIO
    ═══════════════════════════════════════════════════════════ */
-.grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: .75rem; }
+.grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: .75rem; }
 .pat-card {
   border: var(--borda); border-radius: var(--r2); padding: .6rem .75rem .9rem;
   text-align: center; background: var(--surface);
