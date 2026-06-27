@@ -362,6 +362,7 @@ function renderEscritorio(j, el) {
         ${_escClientesCard()}
         ${_escSocietarioCard(null, j)}
       </div>
+      <div id="esc-oportunidades-bloco"></div>
       <div id="esc-financas-upgrade"></div>
       ${_escAcoesRapidas(j, null)}
     `;
@@ -412,15 +413,18 @@ async function _carregarEscritorioProprio(escId, j) {
           ${_escClientesCard()}
           ${_escSocietarioCard(esc, j)}
         </div>
+        <div id="esc-oportunidades-bloco"></div>
         <div id="esc-financas-upgrade">
           ${window.renderBlocoFinancas ? window.renderBlocoFinancas(esc, j) : ''}
         </div>
         ${_escAcoesRapidas(j, esc)}
       `;
       const elEquipe = document.getElementById('esc-equipe-embed');
-      if (elEquipe && window.renderEquipe) window.renderEquipe(j, elEquipe);
+      if (elEquipe && window.renderEquipePainel) window.renderEquipePainel(j, escId, elEquipe);
       const elClientes = document.getElementById('esc-clientes-embed');
-      if (elClientes && window.renderClientes) window.renderClientes(j, elClientes);
+      if (elClientes && window.renderClientesPainel) window.renderClientesPainel(j, escId, elClientes);
+      const elOportunidades = document.getElementById('esc-oportunidades-bloco');
+      if (elOportunidades && window.renderOportunidadesPainel) window.renderOportunidadesPainel(j, escId, elOportunidades);
     }
   } catch (e) {
     console.error('Erro ao carregar escritório próprio:', e);
