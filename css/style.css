@@ -661,24 +661,23 @@ a:hover { color: var(--navy); }
 /* ═══════════════════════════════════════════════════════════
    PATRIMÔNIO
    ═══════════════════════════════════════════════════════════ */
-.grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: .6rem; }
+.grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .6rem; }
 .pat-card {
-  border: var(--borda); border-radius: var(--r2); padding: 0 0 .7rem;
+  border: var(--borda); border-radius: var(--r2); padding: 0;
   text-align: center; background: var(--surface);
   transition: all .15s; box-shadow: var(--sombra);
   display: flex; flex-direction: column; overflow: hidden;
 }
 .pat-card.ativo { border-color: var(--navy3); background: var(--navy-light); box-shadow: 0 0 0 2px var(--navy3); }
 .pat-card:not(.ativo):hover { border-color: var(--navy3); transform: translateY(-1px); box-shadow: var(--sombra2); }
-.pat-card .pc-img  { width: 100%; height: 150px; object-fit: cover; display: block; margin-bottom: .45rem; }
-.pat-card .pc-icon { font-size: 3rem; padding: 1.2rem 0 .6rem; }
-.pat-card .pc-nome { font-size: .78rem; font-weight: 600; color: var(--navy); margin: 0 .6rem .25rem; }
-.pat-card .pc-det  { font-size: .62rem; color: var(--txt3); line-height: 1.5; margin: 0 .6rem; }
-.pat-card .pc-rep  { font-size: .62rem; color: var(--ouro2); margin: .2rem .6rem 0; font-weight: 600; }
-.pat-card .pc-ativo{ font-size: .65rem; color: var(--verde2); margin: .3rem .6rem 0; font-weight: 600; }
-.pat-card .btn     { margin: .2rem .6rem 0; width: calc(100% - 1.2rem); }
+.pat-card .pc-img  { width: 100%; height: 225px; object-fit: cover; display: block; flex-shrink: 0; }
+.pat-card .pc-icon { font-size: 3rem; padding: 1.5rem 0 .6rem; }
+.pat-card-body     { padding: .5rem .65rem .65rem; display: flex; flex-direction: column; gap: .25rem; flex: 1; }
+.pat-card-body .pc-nome  { font-size: .78rem; font-weight: 600; color: var(--navy); }
+.pat-card-body .pc-ativo { font-size: .65rem; color: var(--verde2); font-weight: 600; }
+.pat-card-body .btn      { width: 100%; }
 .btn-vender {
-  font-size: .62rem; margin: .3rem .6rem 0; width: calc(100% - 1.2rem);
+  font-size: .62rem; width: 100%;
   background: var(--verm-bg); border: 1px solid var(--verm3);
   color: var(--verm2); padding: .3rem .5rem;
   border-radius: 3px; cursor: pointer;
