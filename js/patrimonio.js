@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PATRIMÔNIO — Advocatus Online v2
  * Moradia, transporte, escritório e loja — com imagens.
  */
@@ -234,24 +234,7 @@ window.renderPatrimonio = function(j, el) {
         }
         return _card(cr.img, cr.l, cr.l, body, isAt);
       }).join('')}
-    </div>
-
-    <!-- ESCRITÓRIO PESSOAL -->
-    <div class="secao-header"><div class="secao-titulo">💼 Espaço de Trabalho</div></div>
-    ${j.escritorio_empregado_id && j.escritorio_id !== 'solo'
-      ? `<div class="card" style="background:var(--verde-bg);border:1px solid var(--verde3)">
-           <div style="font-size:.8rem;color:var(--verde);font-weight:600">✅ Você trabalha em ${j.escritorio_nome||'escritório'}</div>
-           <div style="font-size:.72rem;color:var(--txt3);margin-top:.2rem">Sem custo de espaço — o escritório cobre sua estrutura.</div>
-         </div>`
-      : `<div class="grid-cards">${
-           ESC_PAT.filter(e => e.id !== 'cw' || j.escritorio_id === 'solo' || !j.escritorio_empregado_id).map(e => {
-             const isAt = e.id === escId;
-             const btn  = isAt
-               ? `<div class="pc-ativo">✓ Atual</div>`
-               : `<button class="btn btn-sm btn-ghost" onclick="window.escolherEscritorioPat('${e.id}')">Escolher</button>`;
-             return _card(e.img, e.l, e.l, btn, isAt);
-           }).join('')
-         }</div>`}`;
+    </div>`;
 };
 
 // ════════════════════════════════════════════════════════

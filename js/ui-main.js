@@ -71,6 +71,7 @@ function _renderizar() {
       if (window.renderVagas) window.renderVagas(j, main);
       else main.innerHTML = '<div class="card" style="color:var(--txt3)">Carregando vagas...</div>';
       break;
+    case 'balancete':    renderBalancete(j, main);      break;
     case 'inbox':        renderInbox(j, main);         break;
     default:             renderPerfil(j, main);
   }
@@ -437,6 +438,7 @@ async function _carregarEscritorioProprio(escId, j) {
           ${_escSocietarioCard(esc, j)}
         </div>
         <div id="esc-oportunidades-bloco"></div>
+        <div id="esc-workspace-bloco"></div>
         <div id="esc-financas-upgrade">
           ${window.renderBlocoFinancas ? window.renderBlocoFinancas(esc, j) : ''}
         </div>
@@ -454,10 +456,166 @@ async function _carregarEscritorioProprio(escId, j) {
       if (elClientes && window.renderClientesPainel) window.renderClientesPainel(j, escId, elClientes);
       const elOportunidades = document.getElementById('esc-oportunidades-bloco');
       if (elOportunidades && window.renderOportunidadesPainel) window.renderOportunidadesPainel(j, escId, elOportunidades);
+      const elWorkspace = document.getElementById('esc-workspace-bloco');
+      if (elWorkspace) _renderWorkspacePainel(j, elWorkspace);
     }
   } catch (e) {
     console.error('Erro ao carregar escritório próprio:', e);
   }
+}
+
+// ════════════════════════════════════════════════════════
+// BALANCETE
+// ════════════════════════════════════════════════════════
+async function renderBalancete(j, el) {
+  const data = window._escBalanceteData;
+
+  const MESES_NOME = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const s     = window.SERVER || {};
+  const mes   = s.mes_global || 1;
+  const mNome = MESES_NOME[(mes - 1) % 12];
+  const ano   = Math.ceil(mes / 12);
+
+  if (!data) {
+    el.innerHTML = `
+      <div style="margin-bottom:.8rem">
+        <button class="btn btn-ghost btn-sm" onclick="window.navTo('escritorio',null)">← Escritório</button>
+      </div>
+      <div class="card" style="color:var(--txt3);font-size:.82rem;padding:1.2rem">
+        Acesse o painel do escritório primeiro para carregar os dados financeiros.
+      </div>`;
+    return;
+  }
+
+  const fmt = n => `R$ ${Math.abs(Math.round(n)).toLocaleString('pt-BR')}`;
+  const CARGO_L = { est:'Estagiário', ass:'Assistente Jurídico', jnr:'Adv. Júnior', pln:'Adv. Pleno', snr:'Adv. Sênior', asc:'Associado', soc:'Sócio' };
+  const TIER_L  = { 1:'Boutique', 2:'Boutique', 3:'Regional', 4:'Full Service', 5:'Big Law' };
+
+  const honorarios = data.rendaMes - data.receitaRecorrente;
+
+  el.innerHTML = `
+    <div style="margin-bottom:.8rem">
+      <button class="btn btn-ghost btn-sm" onclick="window.navTo('escritorio',null)">← Escritório</button>
+    </div>
+    <div class="secao-header" style="margin-bottom:1rem">
+      <div class="secao-titulo" style="font-size:1rem">📊 Balancete — ${mNome}, Ano ${ano}</div>
+      <span style="font-size:.72rem;color:var(--txt3);font-style:italic">${data.escNome}</span>
+    </div>
+
+    <div class="card blcte-card" style="margin-bottom:.7rem">
+      <div class="blcte-secao-titulo receita">RECEITAS</div>
+      <div class="blcte-linha">
+        <span>Honorários e processos</span>
+        <span class="blcte-val receita">${fmt(honorarios)}</span>
+      </div>
+      ${data.receitaRecorrente > 0 ? `
+      <div class="blcte-linha">
+        <span>Contratos recorrentes</span>
+        <span class="blcte-val receita">${fmt(data.receitaRecorrente)}</span>
+      </div>` : ''}
+      <div class="blcte-linha blcte-total">
+        <span>TOTAL RECEITAS</span>
+        <span class="blcte-val receita">${fmt(data.rendaMes)}</span>
+      </div>
+    </div>
+
+    <div class="card blcte-card" style="margin-bottom:.7rem">
+      <div class="blcte-secao-titulo despesa">DESPESAS</div>
+
+      <div class="blcte-grupo">Salários</div>
+      ${data.funcionarios.length
+        ? data.funcionarios.map(f => `
+          <div class="blcte-linha sub">
+            <span>${f.nome || f.name || 'Funcionário'} <span style="color:var(--txt4);font-size:.85em">(${CARGO_L[f.cargo_id]||f.cargo_id})</span></span>
+            <span class="blcte-val despesa">−${fmt(f.sal)}</span>
+          </div>`).join('')
+        : `<div class="blcte-linha sub"><span style="color:var(--txt3)">Sem funcionários ativos</span><span style="color:var(--txt3)">—</span></div>`}
+      <div class="blcte-linha blcte-subtotal">
+        <span>Subtotal Salários</span>
+        <span class="blcte-val despesa">−${fmt(data.salariosTotais)}</span>
+      </div>
+
+      <div class="blcte-grupo">Infraestrutura</div>
+      <div class="blcte-linha sub">
+        <span>Custo fixo ${TIER_L[data.tier]||''}</span>
+        <span class="blcte-val despesa">−${fmt(data.custoFixo)}</span>
+      </div>
+      ${data.workspaceCm > 0
+        ? `<div class="blcte-linha sub">
+            <span>${data.workspaceLabel}</span>
+            <span class="blcte-val despesa">−${fmt(data.workspaceCm)}</span>
+           </div>`
+        : `<div class="blcte-linha sub">
+            <span>${data.workspaceLabel} <span style="color:var(--txt4);font-size:.85em">(gratuito)</span></span>
+            <span style="color:var(--txt4)">—</span>
+           </div>`}
+
+      <div class="blcte-linha blcte-total">
+        <span>TOTAL DESPESAS</span>
+        <span class="blcte-val despesa">−${fmt(data.despMes)}</span>
+      </div>
+    </div>
+
+    <div class="card blcte-card">
+      <div class="blcte-secao-titulo resultado">RESULTADO DO MÊS</div>
+      <div class="blcte-linha" style="padding:.5rem 0">
+        <span style="font-weight:700">Lucro Líquido</span>
+        <span style="color:${data.lucroMes>=0?'var(--verde2)':'var(--verm2)'};font-size:1.15rem;font-weight:700;font-variant-numeric:tabular-nums">
+          ${data.lucroMes < 0 ? '−' : ''}${fmt(data.lucroMes)}
+        </span>
+      </div>
+      <div class="blcte-linha" style="border-top:1px solid var(--borda-sub);padding-top:.45rem;margin-top:.25rem">
+        <span style="color:var(--txt3)">Sua cota (${data.minhaCota}%)</span>
+        <span style="color:${data.lucroMes>=0?'var(--verde2)':'var(--verm2)'};font-weight:600;font-variant-numeric:tabular-nums">
+          ${data.lucroMes < 0 ? '−' : ''}${fmt(Math.round(data.lucroMes * data.minhaCota / 100))}
+        </span>
+      </div>
+    </div>`;
+}
+
+// ════════════════════════════════════════════════════════
+// ESPAÇO DE TRABALHO — seção no painel do escritório
+// ════════════════════════════════════════════════════════
+function _renderWorkspacePainel(j, el) {
+  const ESC_PAT = [
+    { id:'home', l:'Home Office',         img:'img/escritorios/home-office.png',        cm:0,     rep:-2 },
+    { id:'cw',   l:'Coworking Jurídico',  img:'img/escritorios/cowork.png',             cm:600,   rep:0  },
+    { id:'sal',  l:'Sala Própria',        img:'img/escritorios/sala-propria.png',       cm:3000,  rep:3  },
+    { id:'esm',  l:'Escritório Médio',    img:'img/escritorios/escritorio-medio.png',   cm:7500,  rep:6  },
+    { id:'esp',  l:'Escritório Premium',  img:'img/escritorios/escritorio-premium.png', cm:18000, rep:12 },
+  ];
+
+  const escId  = j.pat?.escritorio || 'home';
+  const isSolo = !j.escritorio_empregado_id || j.escritorio_id === 'solo';
+
+  el.innerHTML = `
+    <div class="esc-card-bloco" style="margin-bottom:1.1rem">
+      <div class="secao-header" style="margin-bottom:.8rem;border-bottom:1px solid var(--borda-sub);padding-bottom:.5rem">
+        <div class="secao-titulo" style="font-size:.88rem;font-weight:700">💼 Espaço de Trabalho</div>
+      </div>
+      ${!isSolo
+        ? `<div style="font-size:.8rem;color:var(--verde);font-weight:600;padding:.5rem 0">
+             ✅ Você trabalha em ${j.escritorio_nome||'escritório'} — sem custo de espaço pessoal.
+           </div>`
+        : `<div class="grid-cards">
+             ${ESC_PAT.map(e => {
+               const isAt = e.id === escId;
+               const btn  = isAt
+                 ? `<div class="pc-ativo">✓ Atual</div>`
+                 : `<button class="btn btn-sm btn-ghost" onclick="window.escolherEscritorioPat('${e.id}')">Escolher</button>`;
+               return `<div class="pat-card${isAt?' ativo':''}">
+                 <img class="pc-img" src="${e.img}" alt="${e.l}" loading="lazy">
+                 <div class="pat-card-body">
+                   <div class="pc-nome">${e.l}</div>
+                   ${e.cm > 0
+                     ? `<div style="font-size:.65rem;color:var(--txt3)">R$ ${e.cm.toLocaleString('pt-BR')}/mês</div>`
+                     : '<div style="font-size:.65rem;color:var(--verde2)">Gratuito</div>'}
+                   ${btn}
+                 </div>
+               </div>`;
+             }).join('')}
+           </div>`}
+    </div>`;
 }
 
 async function _carregarEscritorio(escId) {
@@ -608,48 +766,66 @@ function _escHero(j, esc) {
         <span>👥 ${numSocios} sócio${numSocios>1?'s':''}</span>
         <span>⚖️ ${totalCasos} processo${totalCasos===1?'':'s'} ativo${totalCasos===1?'':'s'}</span>
       </div>
-      <div class="esc-hero-prestigio">⭐ Prestígio ${prestigio}</div>
+      <div class="esc-hero-prestigio">Prestígio ${prestigio}</div>
     </div>
   </div>`;
 }
 
 async function _escKpis(esc, j) {
-  const caixa     = (esc && esc.caixa) || 0;
-  const rendaMes  = esc ? (esc.faturamento_mes_atual || 0) : (j.honorarios_mes || 0);
-  
-  // Calcular despesas do mês vigente: custos fixos + salários dos funcionários ativos
-  let despMes = 0;
+  const caixa    = (esc && esc.caixa) || 0;
+  const rendaMes = esc ? (esc.faturamento_mes_atual || 0) : (j.honorarios_mes || 0);
+
+  const TIER_CUSTO_FIXO = { 1:3500, 2:8000, 3:18000, 4:35000, 5:70000 };
+  const CARGO_SAL       = { est:1700, ass:2500, jnr:3500, pln:5500, snr:9000, asc:12000, soc:15000 };
+  const ESC_PAT_CM      = { home:0, cw:600, sal:3000, esm:7500, esp:18000 };
+  const ESC_PAT_L       = { home:'Home Office', cw:'Coworking Jurídico', sal:'Sala Própria', esm:'Escritório Médio', esp:'Escritório Premium' };
+
+  const tier        = esc?.tier || 1;
+  const custoFixo   = TIER_CUSTO_FIXO[tier] || 3500;
+  const workspaceCm = ESC_PAT_CM[j.pat?.escritorio || 'home'] || 0;
+  const wLabel      = ESC_PAT_L[j.pat?.escritorio || 'home'] || 'Home Office';
+
+  let salariosTotais    = 0;
+  let listaFuncionarios = [];
+  let receitaRecorrente = 0;
+
   if (esc && esc.id) {
     try {
       const { collection, getDocs } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
       const { db: fbDb } = await import('./firebase-init.js');
-      
-      // Custos fixos por tier
-      const TIER_CUSTO_FIXO = { 1:3500, 2:8000, 3:18000, 4:35000, 5:70000 };
-      const CARGO_SAL = { est:1700, ass:2500, jnr:3500, pln:5500, snr:9000, asc:12000, soc:15000 };
-      
-      despMes = TIER_CUSTO_FIXO[esc.tier || 1] || 3500;
-      
-      // Adicionar salários dos funcionários ativos
-      const fSnap = await getDocs(collection(fbDb,'escritorios', esc.id, 'funcionarios'));
-      fSnap.docs.forEach(doc => {
-        const f = doc.data();
-        if (f.ativo !== false) {  // Funcionários ativos
-          despMes += CARGO_SAL[f.cargo_id] || 0;
+
+      const fSnap = await getDocs(collection(fbDb, 'escritorios', esc.id, 'funcionarios'));
+      fSnap.docs.forEach(d => {
+        const f = { id: d.id, ...d.data() };
+        if (f.ativo !== false) {
+          const sal = CARGO_SAL[f.cargo_id] || 0;
+          salariosTotais += sal;
+          listaFuncionarios.push({ ...f, sal });
         }
+      });
+
+      const clSnap = await getDocs(collection(fbDb, 'escritorios', esc.id, 'clientes'));
+      clSnap.docs.forEach(d => {
+        const c = d.data();
+        if (c.recorrente) receitaRecorrente += c.valor_mensal || 0;
       });
     } catch (e) {
       console.warn('[KPI DESPESAS]', e);
-      despMes = j.despesas_calculadas || 0;
     }
-  } else {
-    despMes = j.despesas_calculadas || 0;
   }
-  
+
+  const despMes   = custoFixo + salariosTotais + workspaceCm;
   const lucroMes  = rendaMes - despMes;
-  const socios    = esc ? _normalizarSociosUI(esc) : [{participacao_pct:100}];
+  const socios    = esc ? _normalizarSociosUI(esc) : [{ participacao_pct: 100 }];
   const minhaUid  = j.uid || window.JOGADOR_UID;
-  const minhaCota = esc ? (socios.find(s=>s.uid===minhaUid)?.participacao_pct ?? 100) : 100;
+  const minhaCota = esc ? (socios.find(s => s.uid === minhaUid)?.participacao_pct ?? 100) : 100;
+
+  window._escBalanceteData = {
+    escNome: (esc && esc.nome) || j.escritorio_nome || 'Escritório',
+    rendaMes, receitaRecorrente, custoFixo, salariosTotais, workspaceCm,
+    workspaceLabel: wLabel, despMes, lucroMes, minhaCota,
+    tier, funcionarios: listaFuncionarios, escId: esc?.id,
+  };
 
   const deltaIcon = v => v > 0 ? 'up' : v < 0 ? 'down' : 'flat';
 
@@ -668,7 +844,10 @@ async function _escKpis(esc, j) {
     <div class="esc-kpi-card">
       <div class="esc-kpi-label">Lucro líquido</div>
       <div class="esc-kpi-valor" style="color:${lucroMes>=0?'var(--verde2)':'var(--verm2)'}">${_fmtExt(lucroMes)}</div>
-      <div class="esc-kpi-delta ${deltaIcon(lucroMes)}">${lucroMes>=0?'Receita acima das despesas':'Despesas acima da receita'}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:.35rem">
+        <div class="esc-kpi-delta ${deltaIcon(lucroMes)}">${lucroMes>=0?'Acima das despesas':'Abaixo das despesas'}</div>
+        <button class="btn-balancete" onclick="window.navTo('balancete',null)">Ver balancete</button>
+      </div>
     </div>
     <div class="esc-kpi-card">
       <div class="esc-kpi-label">Caixa disponível</div>

@@ -1747,6 +1747,77 @@ a:hover { color: var(--navy); }
   .esc-acoes-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
+/* ── Botão Ver Balancete ── */
+.btn-balancete {
+  background: none;
+  border: 1px solid var(--ouro);
+  color: var(--ouro);
+  border-radius: 10px;
+  padding: .18rem .55rem;
+  font-size: .63rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s;
+  font-family: var(--font-sans);
+  white-space: nowrap;
+}
+.btn-balancete:hover { background: rgba(201,162,39,.12); }
+
+/* ── Balancete ── */
+.blcte-card { padding: 1rem 1.2rem; }
+.blcte-secao-titulo {
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  padding-bottom: .5rem;
+  margin-bottom: .5rem;
+  border-bottom: 2px solid;
+}
+.blcte-secao-titulo.receita { color: var(--verde2); border-color: var(--verde3); }
+.blcte-secao-titulo.despesa { color: var(--verm2); border-color: #f8d7da; }
+.blcte-secao-titulo.resultado { color: var(--navy); border-color: #E8ECF5; }
+.blcte-linha {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: .8rem;
+  color: var(--txt2);
+  padding: .22rem 0;
+  border-bottom: 1px solid var(--bg2);
+}
+.blcte-linha:last-child { border-bottom: none; }
+.blcte-linha.sub { padding-left: .85rem; font-size: .76rem; color: var(--txt3); }
+.blcte-linha.blcte-subtotal {
+  font-size: .76rem;
+  font-weight: 700;
+  padding-left: .85rem;
+  color: var(--txt2);
+  border-top: 1px solid #E8ECF5;
+  margin-top: .15rem;
+  padding-top: .3rem;
+}
+.blcte-linha.blcte-total {
+  font-size: .82rem;
+  font-weight: 700;
+  color: var(--txt1);
+  border-top: 2px solid #E8ECF5;
+  margin-top: .3rem;
+  padding-top: .4rem;
+}
+.blcte-val { font-variant-numeric: tabular-nums; font-weight: 600; }
+.blcte-val.receita { color: var(--verde2); }
+.blcte-val.despesa { color: var(--verm2); }
+.blcte-grupo {
+  font-size: .65rem;
+  font-weight: 700;
+  color: var(--txt4);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin-top: .65rem;
+  margin-bottom: .15rem;
+}
+
 /* ═══════════════════════════════════════════════════════════
    SIDEBAR DIREITA — CRONOLOGIA DO JOGO / PROGRESSO DO ANO
    ═══════════════════════════════════════════════════════════ */
