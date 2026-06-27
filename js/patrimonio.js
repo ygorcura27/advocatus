@@ -21,7 +21,7 @@ const ZONAS = {
 };
 
 // ════════════════════════════════════════════════════════
-// DADOS — MORADIAS  (apenas bairros com imagem)
+// DADOS — MORADIAS
 // ════════════════════════════════════════════════════════
 const MORADIAS = [
   {id:'pais',        l:'Casa dos pais',         bairro:'—',                zona:'norte',   img:null,                               v:0,        rep_al:0,   rep_cp:0,  perigo:0, pais:true},
@@ -36,7 +36,7 @@ const MORADIAS = [
 ];
 
 // ════════════════════════════════════════════════════════
-// DADOS — TRANSPORTES  (um por imagem disponível)
+// DADOS — TRANSPORTES
 // ════════════════════════════════════════════════════════
 const CARROS = [
   {id:'onibus',     l:'Ônibus / Metrô',             img:'img/transportes/onibus.png',       v:0,       cm:176,   rep:-1, desc:'R$8/dia × 22 dias'},
@@ -109,7 +109,7 @@ function calcDeslocamento(morId, escZona) {
 
 function _mesAtual() {
   const mg = window.SERVER?.mes_global || 1;
-  return (mg - 1) % 12 + 1; // 1–12
+  return (mg - 1) % 12 + 1;
 }
 
 function _anoAtual() {
@@ -119,7 +119,6 @@ function _anoAtual() {
 function _carroEhProprío(j, id) {
   if (id === 'onibus') return true;
   if (j.carros_comprados?.[id]) return true;
-  // retrocompat: se era o transporte ativo e não tem financiamento ativo
   if (j.pat?.transporte === id && !(j.financiamentos?.[id]?.parcelas_restantes > 0)) return true;
   return false;
 }
@@ -128,14 +127,14 @@ function _carroEhProprío(j, id) {
 // RENDERIZAÇÃO — PATRIMÔNIO
 // ════════════════════════════════════════════════════════
 window.renderPatrimonio = function(j, el) {
-  const morId  = j.pat?.moradia    || 'pais';
-  const carId  = j.pat?.transporte || 'onibus';
-  const escId  = j.pat?.escritorio || 'home';
-  const mor    = MORADIAS.find(m=>m.id===morId) || MORADIAS[0];
-  const car    = CARROS.find(c=>c.id===carId);
-  const esc    = ESC_PAT.find(e=>e.id===escId);
+  const morId       = j.pat?.moradia    || 'pais';
+  const carId       = j.pat?.transporte || 'onibus';
+  const escId       = j.pat?.escritorio || 'home';
+  const mor         = MORADIAS.find(m=>m.id===morId) || MORADIAS[0];
+  const car         = CARROS.find(c=>c.id===carId);
+  const esc         = ESC_PAT.find(e=>e.id===escId);
   const compradaMor = j.moradias_compradas?.[morId];
-  const fins   = j.financiamentos || {};
+  const fins        = j.financiamentos || {};
   const deslocamento = calcDeslocamento(morId, 'centro');
   const CUSTO_BASE_PAT = {
     est:600, ass:700, jnr:900, pln:1400, snr:2200,
@@ -144,14 +143,14 @@ window.renderPatrimonio = function(j, el) {
     padj:2000, prom:2800, pjus:3800, pgj:5000,
     dadj:1800, def:2400, dch:3200, dge:4500,
   };
-  const custoVida = CUSTO_BASE_PAT[j.cargo_id] || 700;
-  const despEsc  = (!j.escritorio_empregado_id || j.escritorio_id === 'solo') ? (esc?.cm || 0) : 0;
-  const despCar  = car?.cm || 0;
-  const despAlug = (morId === 'pais' || compradaMor) ? 0 : calcAluguel(mor?.v||0);
-  const despFin  = Object.values(fins).reduce((s,f)=>s+(f.parcelas_restantes>0?f.parcela_mensal:0),0);
-  const despEst  = (j.estagiarios||[]).length * 1700;
-  const despTotal = despEsc+despCar+despAlug+despFin+despEst+deslocamento;
-  const saldoLiq = (j.renda_calculada||0) - despTotal - custoVida;
+  const custoVida  = CUSTO_BASE_PAT[j.cargo_id] || 700;
+  const despEsc    = (!j.escritorio_empregado_id || j.escritorio_id === 'solo') ? (esc?.cm || 0) : 0;
+  const despCar    = car?.cm || 0;
+  const despAlug   = (morId === 'pais' || compradaMor) ? 0 : calcAluguel(mor?.v||0);
+  const despFin    = Object.values(fins).reduce((s,f)=>s+(f.parcelas_restantes>0?f.parcela_mensal:0),0);
+  const despEst    = (j.estagiarios||[]).length * 1700;
+  const despTotal  = despEsc+despCar+despAlug+despFin+despEst+deslocamento;
+  const saldoLiq   = (j.renda_calculada||0) - despTotal - custoVida;
 
   el.innerHTML = `
     <div class="secao-header">
@@ -175,45 +174,35 @@ window.renderPatrimonio = function(j, el) {
     ${j.prazo_sair_pais > 0 ? `<div style="background:rgba(139,38,53,.12);border:1px solid rgba(200,80,80,.35);border-radius:2px;padding:.6rem;margin-bottom:.6rem;font-size:.75rem;color:var(--verm3)">⚠️ Advogado(a) precisa de moradia própria! Prazo: ${Math.max(0,3-j.prazo_sair_pais)} mês(es) restante(s).</div>`:''}
     <div class="grid-cards" style="margin-bottom:1.2rem">
       ${MORADIAS.filter(m => m.pais ? (j.ci<=2||!j.oab) : true).map(m => {
-        const isAt = m.id === morId;
-        const alug = m.pais ? 0 : calcAluguel(m.v);
+        const isAt    = m.id === morId;
+        const alug    = m.pais ? 0 : calcAluguel(m.v);
         const propria = j.moradias_compradas?.[m.id];
         const imgHtml = m.img
           ? `<img class="pc-img" src="${m.img}" alt="${m.l}" loading="lazy">`
-          : `<div class="pc-icon">🏠</div>`;
+          : `<div class="pc-icon" style="font-size:3rem;padding:1rem 0">🏠</div>`;
 
         let actionHtml;
         if (isAt) {
           actionHtml = `<div class="pc-ativo">✓ ${propria?'Sua casa':'Alugando'}</div>`;
           if (propria && !m.pais) {
-            const vVenda = Math.floor(m.v * 0.6);
-            actionHtml += `<button class="btn-vender" onclick="window.venderImovel('${m.id}')">Vender ${fmt(vVenda)}</button>`;
+            actionHtml += `<button class="btn-vender" onclick="window.venderImovel('${m.id}')">Vender ${fmt(Math.floor(m.v*.6))}</button>`;
           }
         } else if (propria) {
-          const vVenda = Math.floor(m.v * 0.6);
           actionHtml = `
-            <button class="btn btn-sm btn-ghost" style="width:100%;margin-top:.3rem;font-size:.6rem" onclick="window.alternarMoradia('${m.id}')">🏠 Morar aqui</button>
-            <button class="btn-vender" onclick="window.venderImovel('${m.id}')">Vender ${fmt(vVenda)}</button>`;
+            <button class="btn btn-sm btn-ghost" style="width:100%;margin-top:.3rem;font-size:.65rem" onclick="window.alternarMoradia('${m.id}')">🏠 Morar aqui</button>
+            <button class="btn-vender" onclick="window.venderImovel('${m.id}')">Vender ${fmt(Math.floor(m.v*.6))}</button>`;
         } else if (m.pais) {
           actionHtml = `<button class="btn btn-sm btn-ghost" style="width:100%;margin-top:.3rem" onclick="window.escolherMoradia('${m.id}','aluguel')">Morar aqui</button>`;
         } else {
-          actionHtml = `<div style="display:flex;flex-direction:column;gap:.2rem;margin-top:.3rem">
-            <button class="btn btn-sm btn-ghost" style="width:100%;font-size:.6rem" onclick="window.escolherMoradia('${m.id}','aluguel')">Alugar ${fmt(alug)}/mês</button>
-            ${(j.dinheiro||0)>=m.v?`<button class="btn btn-sm btn-sec" style="width:100%;font-size:.6rem" onclick="window.escolherMoradia('${m.id}','compra')">Comprar ${fmt(m.v)}</button>`:''}
+          actionHtml = `<div style="display:flex;flex-direction:column;gap:.25rem;margin-top:.3rem">
+            <button class="btn btn-sm btn-ghost" style="width:100%;font-size:.65rem" onclick="window.escolherMoradia('${m.id}','aluguel')">Alugar ${fmt(alug)}/mês</button>
+            ${(j.dinheiro||0)>=m.v?`<button class="btn btn-sm btn-sec" style="width:100%;font-size:.65rem" onclick="window.escolherMoradia('${m.id}','compra')">Comprar ${fmt(m.v)}</button>`:''}
           </div>`;
         }
 
         return `<div class="pat-card ${isAt?'ativo':''}">
           ${imgHtml}
           <div class="pc-nome">${m.l}</div>
-          <div class="pc-det">${m.bairro} · ${ZONAS[m.zona]?.l||m.zona}</div>
-          ${m.v>0?`<div class="pc-det">${fmt(m.v)}</div>`:''}
-          ${!m.pais?`<div class="pc-det" style="color:var(--amber)">Aluguel: ${fmt(alug)}/mês</div>`:''}
-          <div class="pc-rep" style="color:${m.pais?'var(--verm2)':m.rep_al<0?'var(--verm2)':'var(--ouro2)'}">
-            ${m.pais?'⚠️ -2 rep/mês se Júnior+':'Rep: '+(m.rep_al>=0?'+':'')+m.rep_al+' alug · +'+m.rep_cp+' próprio'}
-          </div>
-          ${m.perigo===2?`<div style="font-size:.6rem;color:var(--verm3)">⚠️ Bairro perigoso</div>`:
-            m.perigo===1?`<div style="font-size:.6rem;color:#ffa726">⚡ Risco médio</div>`:''}
           ${actionHtml}
         </div>`;
       }).join('')}
@@ -223,12 +212,11 @@ window.renderPatrimonio = function(j, el) {
     <div class="secao-header"><div class="secao-titulo">🚗 Transporte</div></div>
     <div class="grid-cards" style="margin-bottom:1.2rem">
       ${CARROS.map(cr => {
-        const isAt  = cr.id === carId;
+        const isAt   = cr.id === carId;
         const proprio = _carroEhProprío(j, cr.id);
-        const fin   = fins[cr.id];
-        const p36   = cr.v>0 ? Math.ceil(cr.v/36*1.35) : 0;
-        const p48   = cr.v>0 ? Math.ceil(cr.v/48*1.35) : 0;
-        const vVenda = Math.floor(cr.v * 0.5);
+        const fin    = fins[cr.id];
+        const p36    = cr.v>0 ? Math.ceil(cr.v/36*1.35) : 0;
+        const p48    = cr.v>0 ? Math.ceil(cr.v/48*1.35) : 0;
 
         let actionHtml;
         if (isAt) {
@@ -237,33 +225,29 @@ window.renderPatrimonio = function(j, el) {
             if (fin && fin.parcelas_restantes > 0) {
               actionHtml += `<button class="btn-vender" onclick="window.devolverCarro('${cr.id}')">↩ Devolver (50% pago)</button>`;
             } else {
-              actionHtml += `<button class="btn-vender" onclick="window.venderCarro('${cr.id}')">Vender ${fmt(vVenda)}</button>`;
+              actionHtml += `<button class="btn-vender" onclick="window.venderCarro('${cr.id}')">Vender ${fmt(Math.floor(cr.v*.5))}</button>`;
             }
           }
         } else if (proprio && cr.id !== 'onibus') {
           actionHtml = `
             <div class="pc-ativo" style="color:var(--ouro2)">✓ Possuído</div>
-            <button class="btn btn-sm btn-ghost" style="width:100%;margin-top:.3rem;font-size:.6rem" onclick="window.alternarCarro('${cr.id}')">🚗 Usar este</button>
-            <button class="btn-vender" onclick="window.venderCarro('${cr.id}')">Vender ${fmt(vVenda)}</button>`;
+            <button class="btn btn-sm btn-ghost" style="width:100%;margin-top:.3rem;font-size:.65rem" onclick="window.alternarCarro('${cr.id}')">🚗 Usar este</button>
+            <button class="btn-vender" onclick="window.venderCarro('${cr.id}')">Vender ${fmt(Math.floor(cr.v*.5))}</button>`;
         } else if (cr.id === 'onibus') {
           actionHtml = isAt
             ? `<div class="pc-ativo">✓ Usando</div>`
             : `<button class="btn btn-sm btn-ghost" style="width:100%;margin-top:.3rem" onclick="window.escolherCarro('onibus','vista')">Usar</button>`;
         } else {
-          actionHtml = `<div style="display:flex;flex-direction:column;gap:.2rem;margin-top:.3rem">
-            ${(j.dinheiro||0)>=cr.v?`<button class="btn btn-sm btn-sec" style="width:100%;font-size:.6rem" onclick="window.escolherCarro('${cr.id}','vista')">À vista ${fmt(cr.v)}</button>`:''}
-            ${!(j.no_serasa)?`<button class="btn btn-sm btn-ghost" style="width:100%;font-size:.6rem" onclick="window.escolherCarro('${cr.id}','fin36')">36× ${fmt(p36)}/mês</button>
-            <button class="btn btn-sm btn-ghost" style="width:100%;font-size:.6rem" onclick="window.escolherCarro('${cr.id}','fin48')">48× ${fmt(p48)}/mês</button>`:'<div style="font-size:.6rem;color:var(--verm3)">Financiamento bloqueado (Serasa)</div>'}
+          actionHtml = `<div style="display:flex;flex-direction:column;gap:.25rem;margin-top:.3rem">
+            ${(j.dinheiro||0)>=cr.v?`<button class="btn btn-sm btn-sec" style="width:100%;font-size:.65rem" onclick="window.escolherCarro('${cr.id}','vista')">À vista ${fmt(cr.v)}</button>`:''}
+            ${!(j.no_serasa)?`<button class="btn btn-sm btn-ghost" style="width:100%;font-size:.65rem" onclick="window.escolherCarro('${cr.id}','fin36')">36× ${fmt(p36)}/mês</button>
+            <button class="btn btn-sm btn-ghost" style="width:100%;font-size:.65rem" onclick="window.escolherCarro('${cr.id}','fin48')">48× ${fmt(p48)}/mês</button>`:'<div style="font-size:.6rem;color:var(--verm3)">Financiamento bloqueado (Serasa)</div>'}
           </div>`;
         }
 
         return `<div class="pat-card ${isAt?'ativo':''}">
           <img class="pc-img" src="${cr.img}" alt="${cr.l}" loading="lazy">
           <div class="pc-nome">${cr.l}</div>
-          <div class="pc-det">${cr.desc}</div>
-          ${cr.v>0?`<div class="pc-det">${fmt(cr.v)}</div>`:''}
-          <div class="pc-det" style="color:#ffa726">${fmt(cr.cm)}/mês</div>
-          <div class="pc-rep">Rep: ${cr.rep>=0?'+':''}${cr.rep}</div>
           ${actionHtml}
         </div>`;
       }).join('')}
@@ -277,19 +261,14 @@ window.renderPatrimonio = function(j, el) {
            <div style="font-size:.72rem;color:var(--txt3);margin-top:.2rem">Sem custo de espaço — o escritório cobre sua estrutura.</div>
          </div>`
       : ('<div class="grid-cards">' +
-           ESC_PAT.filter(e => e.id !== 'cw' || j.escritorio_id === 'solo' || !j.escritorio_empregado_id).map(e=>{
+           ESC_PAT.filter(e => e.id !== 'cw' || j.escritorio_id === 'solo' || !j.escritorio_empregado_id).map(e => {
              const isAt  = e.id === escId;
-             const repTxt = e.rep > 0 ? '+' + e.rep + ' rep/mês' : e.rep < 0 ? e.rep + ' rep/mês' : 'Neutro';
-             const repCor = e.rep > 0 ? 'var(--verde2)' : e.rep < 0 ? 'var(--verm2)' : 'var(--txt4)';
              const btnHtml = isAt
                ? '<div class="pc-ativo">✓ Atual</div>'
                : '<button class="btn btn-sm btn-ghost" style="width:100%;margin-top:.3rem" onclick="window.escolherEscritorioPat(\'' + e.id + '\')">Escolher</button>';
              return '<div class="pat-card ' + (isAt?'ativo':'') + '">' +
                '<img class="pc-img" src="' + e.img + '" alt="' + e.l + '" loading="lazy">' +
                '<div class="pc-nome">' + e.l + '</div>' +
-               '<div class="pc-det" style="color:var(--amber)">' + (e.cm > 0 ? fmt(e.cm)+'/mês' : 'Gratuito') + '</div>' +
-               '<div class="pc-rep" style="color:' + repCor + '">' + repTxt + '</div>' +
-               '<div class="pc-det" style="font-size:.6rem">' + (e.desc||'') + '</div>' +
                btnHtml + '</div>';
            }).join('') + '</div>'
         )}`;
@@ -327,9 +306,7 @@ window.escolherMoradia = async function(id, tipo) {
 window.alternarMoradia = async function(id) {
   const j   = window.JOGADOR;
   const uid = j.uid || window.JOGADOR_UID;
-  if (!j.moradias_compradas?.[id] && id !== 'pais') {
-    toast('Você não possui este imóvel.','ko'); return;
-  }
+  if (!j.moradias_compradas?.[id] && id !== 'pais') { toast('Você não possui este imóvel.','ko'); return; }
   await _salvar(uid, { 'pat.moradia': id });
   const m = MORADIAS.find(x=>x.id===id);
   toast(`🏠 Moradia alternada para ${m?.l||id}.`,'ok');
@@ -339,29 +316,18 @@ window.venderImovel = async function(id) {
   const j   = window.JOGADOR;
   const uid = j.uid || window.JOGADOR_UID;
   const m   = MORADIAS.find(x=>x.id===id);
-  if (!m || m.pais || !j.moradias_compradas?.[id]) {
-    toast('Imóvel não encontrado.','ko'); return;
-  }
+  if (!m || m.pais || !j.moradias_compradas?.[id]) { toast('Imóvel não encontrado.','ko'); return; }
   const vVenda = Math.floor(m.v * 0.6);
-  if (!confirm(
-    `Vender ${m.l}?\n\nValor de venda (60%): ${fmt(vVenda)}\n` +
-    (j.pat?.moradia === id ? `Você voltará para outra propriedade ou casa dos pais.` : '')
-  )) return;
+  if (!confirm(`Vender ${m.l}?\n\nValor de venda (60%): ${fmt(vVenda)}${j.pat?.moradia===id?'\nVocê voltará para outra propriedade ou casa dos pais.':''}`)) return;
 
   const novasComp = {...(j.moradias_compradas||{})};
   delete novasComp[id];
-
-  const updates = {
-    moradias_compradas: novasComp,
-    dinheiro: (j.dinheiro||0) + vVenda,
-  };
-
+  const updates = { moradias_compradas: novasComp, dinheiro: (j.dinheiro||0) + vVenda };
   if (j.pat?.moradia === id) {
     const outras = Object.keys(novasComp).filter(k=>novasComp[k]);
     updates['pat.moradia'] = outras.length > 0 ? outras[0] : 'pais';
     if ((m.rep_cp||0) > 0) updates.reputacao = Math.max(0,(j.reputacao||30)-(m.rep_cp||0));
   }
-
   await _salvar(uid, updates);
   toast(`🏠 ${m.l} vendida por ${fmt(vVenda)}.`,'ok');
 };
@@ -372,9 +338,7 @@ window.venderImovel = async function(id) {
 window.escolherCarro = async function(id, mod) {
   const j   = window.JOGADOR;
   const uid = j.uid || window.JOGADOR_UID;
-  if (j.no_serasa && mod !== 'vista' && id !== 'onibus') {
-    toast('Financiamento bloqueado — nome no Serasa.','ko'); return;
-  }
+  if (j.no_serasa && mod !== 'vista' && id !== 'onibus') { toast('Financiamento bloqueado — nome no Serasa.','ko'); return; }
   const cr = CARROS.find(x=>x.id===id);
   const updates = {};
 
@@ -412,29 +376,20 @@ window.venderCarro = async function(id) {
   const cr  = CARROS.find(x=>x.id===id);
   if (!cr || id === 'onibus') { toast('Operação inválida.','ko'); return; }
   const vVenda = Math.floor(cr.v * 0.5);
-  if (!confirm(`Vender ${cr.l}?\n\nValor de venda (50%): ${fmt(vVenda)}\n${j.pat?.transporte===id?'Você passará a usar transporte público ou outro veículo.':''}`)) return;
+  if (!confirm(`Vender ${cr.l}?\n\nValor de venda (50%): ${fmt(vVenda)}${j.pat?.transporte===id?'\nVocê passará a usar transporte público ou outro veículo.':''}`)) return;
 
   const novosCom = {...(j.carros_comprados||{})};
   delete novosCom[id];
-
-  const updates = {
-    carros_comprados: novosCom,
-    dinheiro: (j.dinheiro||0) + vVenda,
-  };
-
+  const updates  = { carros_comprados: novosCom, dinheiro: (j.dinheiro||0) + vVenda };
   if (j.pat?.transporte === id) {
     const outros = Object.keys(novosCom).filter(k=>novosCom[k] && k!=='onibus');
     updates['pat.transporte'] = outros.length > 0 ? outros[0] : 'onibus';
     if ((cr.rep||0) > 0) updates.reputacao = Math.max(0,(j.reputacao||30)-(cr.rep||0));
   }
-
-  // Limpar financiamento se houver
   if (j.financiamentos?.[id]) {
-    const novosFins = {...(j.financiamentos||{})};
-    delete novosFins[id];
+    const novosFins = {...(j.financiamentos||{})}; delete novosFins[id];
     updates.financiamentos = novosFins;
   }
-
   await _salvar(uid, updates);
   toast(`🚗 ${cr.l} vendido por ${fmt(vVenda)}!`,'ok',5000);
 };
@@ -443,29 +398,15 @@ window.devolverCarro = async function(carroId) {
   const j   = window.JOGADOR;
   const uid = j.uid || window.JOGADOR_UID;
   const fin = (j.financiamentos || {})[carroId];
-  if (!fin || fin.parcelas_restantes <= 0) {
-    toast('Nenhum financiamento ativo para este veículo.','ko'); return;
-  }
+  if (!fin || fin.parcelas_restantes <= 0) { toast('Nenhum financiamento ativo para este veículo.','ko'); return; }
   const totalParcelas = Math.round(fin.valor_total / fin.parcela_mensal) || 1;
   const pagas         = totalParcelas - fin.parcelas_restantes;
-  const valorPago     = pagas * fin.parcela_mensal;
-  const reembolso     = Math.floor(valorPago * 0.5);
+  const reembolso     = Math.floor(pagas * fin.parcela_mensal * 0.5);
+  if (!confirm(`Devolver ${fin.nome}?\n\nParcelas pagas: ${pagas}/${totalParcelas}\nReembolso (50%): ${fmt(reembolso)}\n\nVocê voltará para o ônibus.`)) return;
 
-  if (!confirm(
-    `Devolver ${fin.nome}?\n\nParcelas pagas: ${pagas}/${totalParcelas}\nValor pago: ${fmt(valorPago)}\nReembolso (50%): ${fmt(reembolso)}\n\nVocê voltará para o ônibus.`
-  )) return;
-
-  const novosFins = {...(j.financiamentos||{})};
-  delete novosFins[carroId];
-  const novosCom  = {...(j.carros_comprados||{})};
-  delete novosCom[carroId];
-
-  await _salvar(uid, {
-    financiamentos:  novosFins,
-    carros_comprados: novosCom,
-    'pat.transporte': 'onibus',
-    dinheiro:         (j.dinheiro||0) + reembolso,
-  });
+  const novosFins = {...(j.financiamentos||{})}; delete novosFins[carroId];
+  const novosCom  = {...(j.carros_comprados||{})}; delete novosCom[carroId];
+  await _salvar(uid, { financiamentos: novosFins, carros_comprados: novosCom, 'pat.transporte': 'onibus', dinheiro: (j.dinheiro||0) + reembolso });
   toast(`🚗 Carro devolvido. +${fmt(reembolso)} de reembolso.`,'ok',5000);
 };
 
@@ -483,13 +424,13 @@ window.escolherEscritorioPat = async function(id) {
 // RENDERIZAÇÃO — LOJA
 // ════════════════════════════════════════════════════════
 window.renderLoja = function(j, el) {
-  const comprados = (j.compras||[]).map(c=>c.id);
+  const comprados  = (j.compras||[]).map(c=>c.id);
   const congUsados = j.congressos_usados || {};
   const mesAtual   = _mesAtual();
   const anoAtual   = _anoAtual();
 
-  const porCategoria = {status:[], prof:[], exp:[], cong:[]};
-  SHOP.forEach(it => (porCategoria[it.cat]||porCategoria.status).push(it));
+  const porCat = {status:[], prof:[], exp:[], cong:[]};
+  SHOP.forEach(it => (porCat[it.cat] || porCat.status).push(it));
 
   function renderCard(it) {
     const jatem      = comprados.includes(it.id);
@@ -502,17 +443,16 @@ window.renderLoja = function(j, el) {
       if (usadoAno) {
         actionHtml = `<div class="pc-ativo" style="color:var(--txt3)">✓ Participado (ano ${anoAtual})</div>`;
       } else if (!mesCorreto) {
-        actionHtml = `<div style="font-size:.6rem;color:var(--txt3);margin-top:.3rem">📅 Disponível em ${MESES_NOME[it.mes-1]}</div>`;
+        actionHtml = `<div style="font-size:.65rem;color:var(--txt3);margin-top:.3rem">📅 Disponível em ${MESES_NOME[it.mes-1]}</div>`;
       } else if ((j.dinheiro||0) >= it.p) {
         actionHtml = `<button class="btn btn-sm btn-sec" style="width:100%;margin-top:.3rem" onclick="window.comprarItem('${it.id}')">Participar ${fmt(it.p)}</button>`;
       } else {
         actionHtml = `<div style="font-size:.65rem;color:var(--ardosia);margin-top:.3rem">Saldo insuficiente</div>`;
       }
     } else if (jatem) {
-      const vVenda = Math.floor(it.p * 0.5);
       actionHtml = `
         <div class="pc-ativo">✓ Adquirido</div>
-        <button class="btn-vender" onclick="window.venderItem('${it.id}')">Vender ${fmt(vVenda)}</button>`;
+        <button class="btn-vender" onclick="window.venderItem('${it.id}')">Vender ${fmt(Math.floor(it.p*.5))}</button>`;
     } else if ((j.dinheiro||0) >= it.p) {
       actionHtml = `<button class="btn btn-sm btn-sec" style="width:100%;margin-top:.3rem" onclick="window.comprarItem('${it.id}')">Comprar ${fmt(it.p)}</button>`;
     } else {
@@ -522,9 +462,7 @@ window.renderLoja = function(j, el) {
     return `<div class="pat-card ${jatem&&!isCong?'ativo':usadoAno?'ativo':''}">
       <img class="pc-img" src="${it.img}" alt="${it.n}" loading="lazy">
       <div class="pc-nome">${it.n}</div>
-      <div class="pc-det">${it.d}</div>
-      ${isCong?`<div class="pc-det" style="color:var(--navy3);font-size:.58rem">📅 ${MESES_NOME[it.mes-1]}</div>`:''}
-      <div class="pc-rep">${fmt(it.p)}</div>
+      ${isCong?`<div style="font-size:.6rem;color:var(--navy3);margin-bottom:.1rem">📅 ${MESES_NOME[it.mes-1]}</div>`:''}
       ${actionHtml}
     </div>`;
   }
@@ -536,24 +474,16 @@ window.renderLoja = function(j, el) {
     </div>
 
     <div class="secao-header" style="margin-top:.8rem"><div class="secao-titulo" style="font-size:.82rem">👔 Status</div></div>
-    <div class="grid-cards" style="margin-bottom:1rem">
-      ${porCategoria.status.map(renderCard).join('')}
-    </div>
+    <div class="grid-cards" style="margin-bottom:1rem">${porCat.status.map(renderCard).join('')}</div>
 
     <div class="secao-header"><div class="secao-titulo" style="font-size:.82rem">💼 Profissional</div></div>
-    <div class="grid-cards" style="margin-bottom:1rem">
-      ${[...porCategoria.prof,...porCategoria.exp].map(renderCard).join('')}
-    </div>
+    <div class="grid-cards" style="margin-bottom:1rem">${[...porCat.prof,...porCat.exp].map(renderCard).join('')}</div>
 
-    <div class="secao-header"><div class="secao-titulo" style="font-size:.82rem">✈️ Congressos</div>
+    <div class="secao-header">
+      <div class="secao-titulo" style="font-size:.82rem">✈️ Congressos</div>
       <span class="secao-badge" style="font-size:.62rem">1× por ano · mês fixo</span>
     </div>
-    <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.5rem">
-      Cada congresso pode ser frequentado uma vez por ano no mês indicado.
-    </div>
-    <div class="grid-cards" style="margin-bottom:1.2rem">
-      ${porCategoria.cong.map(renderCard).join('')}
-    </div>`;
+    <div class="grid-cards" style="margin-bottom:1.2rem">${porCat.cong.map(renderCard).join('')}</div>`;
 };
 
 // ════════════════════════════════════════════════════════
@@ -566,22 +496,13 @@ window.comprarItem = async function(id) {
   if (!it) return;
   if ((j.dinheiro||0) < it.p) { toast('Saldo insuficiente.','ko'); return; }
 
-  // Congress — lógica especial
   if (it.cat === 'cong') {
     const mesAtual  = _mesAtual();
     const anoAtual  = _anoAtual();
-    if (mesAtual !== it.mes) {
-      toast(`Congresso disponível apenas em ${MESES_NOME[it.mes-1]}.`,'ko'); return;
-    }
-    const congUsados = j.congressos_usados || {};
-    if (congUsados[it.id] === anoAtual) {
-      toast('Você já participou deste congresso este ano.','ko'); return;
-    }
-    const netBonus = {cong_par:8, cong_ber:7, cong_lis:6, cong_sp:5, cong_rio:5}[it.id] || 5;
-    const updates = {
-      dinheiro: (j.dinheiro||0) - it.p,
-      [`congressos_usados.${it.id}`]: anoAtual,
-    };
+    if (mesAtual !== it.mes) { toast(`Congresso disponível apenas em ${MESES_NOME[it.mes-1]}.`,'ko'); return; }
+    if ((j.congressos_usados||{})[it.id] === anoAtual) { toast('Você já participou deste congresso este ano.','ko'); return; }
+    const netBonus = {cong_par:8,cong_ber:7,cong_lis:6,cong_sp:5,cong_rio:5}[it.id] || 5;
+    const updates  = { dinheiro: (j.dinheiro||0)-it.p, [`congressos_usados.${it.id}`]: anoAtual };
     if (it.rep > 0) updates.reputacao = Math.min(100,(j.reputacao||30)+it.rep);
     updates['skills.networking'] = Math.min(window.REP_CAP?.[j.cargo_id]||55, ((j.skills||{}).networking||10)+netBonus);
     await _salvar(uid, updates);
@@ -590,12 +511,8 @@ window.comprarItem = async function(id) {
   }
 
   if ((j.compras||[]).some(c=>c.id===id)) { toast('Você já possui este item.',''); return; }
-
-  const novasCompras = [...(j.compras||[]), {id:it.id,i:'📦',n:it.n,rep:it.rep||0,p:it.p,img:it.img}];
-  const updates = {
-    dinheiro: (j.dinheiro||0) - it.p,
-    compras:  novasCompras,
-  };
+  const novasCompras = [...(j.compras||[]), {id:it.id,n:it.n,rep:it.rep||0,p:it.p,img:it.img}];
+  const updates = { dinheiro: (j.dinheiro||0)-it.p, compras: novasCompras };
   if (it.rep > 0) updates.reputacao = Math.min(100,(j.reputacao||30)+it.rep);
 
   if (it.id==='bj') updates['skills.pesquisa'] = Math.min(window.REP_CAP?.[j.cargo_id]||55, ((j.skills||{}).pesquisa||18)+8);
@@ -610,7 +527,6 @@ window.comprarItem = async function(id) {
     updates['skills.persuasao'] = Math.min(window.REP_CAP?.[j.cargo_id]||55, ((j.skills||{}).persuasao||12)+6);
     updates['skills.oratoria']  = Math.min(window.REP_CAP?.[j.cargo_id]||55, ((j.skills||{}).oratoria||15)+4);
   }
-
   await _salvar(uid, updates);
   toast(`${it.n} adquirido!${it.rep>0?` +${it.rep} rep`:''}`, 'ok');
 };
@@ -622,19 +538,11 @@ window.venderItem = async function(id) {
   const j   = window.JOGADOR;
   const uid = j.uid || window.JOGADOR_UID;
   const it  = SHOP.find(x=>x.id===id);
-  if (!it) return;
-  if (!(j.compras||[]).some(c=>c.id===id)) { toast('Item não encontrado.','ko'); return; }
-
+  if (!it || !(j.compras||[]).some(c=>c.id===id)) { toast('Item não encontrado.','ko'); return; }
   const vVenda = Math.floor(it.p * 0.5);
   if (!confirm(`Vender ${it.n}?\n\nValor de venda (50%): ${fmt(vVenda)}${it.rep>0?`\nPerda de reputação: -${it.rep} rep`:''}`)) return;
-
-  const novasCompras = (j.compras||[]).filter(c=>c.id!==id);
-  const updates = {
-    dinheiro: (j.dinheiro||0) + vVenda,
-    compras:  novasCompras,
-  };
+  const updates = { dinheiro: (j.dinheiro||0)+vVenda, compras: (j.compras||[]).filter(c=>c.id!==id) };
   if ((it.rep||0) > 0) updates.reputacao = Math.max(0,(j.reputacao||30)-(it.rep||0));
-
   await _salvar(uid, updates);
   toast(`${it.n} vendido por ${fmt(vVenda)}.${it.rep>0?` -${it.rep} rep`:''}`, 'ok');
 };
@@ -647,14 +555,8 @@ window.estudarSkill = async function(sk, skLabel) {
   const uid = j.uid || window.JOGADOR_UID;
   if ((j.dinheiro||0) < 400) { toast('Saldo insuficiente. Estudar custa R$400.','ko'); return; }
   if ((j.study_queue||[]).some(s=>s.skill===sk)) { toast('Já há um estudo desta skill em andamento.','ko'); return; }
-
   const mesAtual = window.SERVER?.mes_global || 1;
-  const novaFila = [...(j.study_queue||[]), {
-    skill:         sk,
-    skill_label:   skLabel,
-    ganho:         3,
-    mes_conclusao: mesAtual + 1,
-  }];
+  const novaFila = [...(j.study_queue||[]), { skill:sk, skill_label:skLabel, ganho:3, mes_conclusao:mesAtual+1 }];
   await _salvar(uid, { dinheiro:(j.dinheiro||0)-500, study_queue:novaFila });
   toast(`📖 Estudando ${skLabel} — resultado em 1 mês!`, 'ok');
 };
