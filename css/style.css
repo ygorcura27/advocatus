@@ -1635,6 +1635,7 @@ a:hover { color: var(--navy); }
   font-size: .75rem; font-weight: 700; color: var(--ouro); flex-shrink: 0;
   font-variant-numeric: tabular-nums;
 }
+.esc-emp-img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: inherit; }
 .esc-cliente-info { flex: 1; min-width: 0; }
 .esc-cliente-nome { font-size: .8rem; font-weight: 600; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .esc-cliente-tipo { font-size: .62rem; color: var(--txt3); margin-top: 1px; }

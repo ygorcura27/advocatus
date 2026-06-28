@@ -30,10 +30,20 @@ function _avatar(nome) {
   return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36'%3E%3Ccircle cx='18' cy='18' r='18' fill='%232E4270'/%3E%3Ctext x='18' y='23' font-size='12' font-weight='700' fill='%23C9A227' text-anchor='middle' font-family='DM Sans,Arial'%3E${ini}%3C/text%3E%3C/svg%3E`;
 }
 
-// Ícone de empresa (iniciais em fundo navy)
+function _slugEmpresa(nome) {
+  return (nome||'').toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+// Tenta carregar img/empresas/{slug}.png; cai para iniciais se não existir
 function _logoEmpresa(nome) {
-  const ini = (nome||'?').split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase().slice(0,2);
-  return `<div class="esc-cliente-logo">${ini}</div>`;
+  const slug = _slugEmpresa(nome);
+  const ini  = (nome||'?').split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase().slice(0,2);
+  return `<div class="esc-cliente-logo" style="overflow:hidden;padding:0">
+    <img src="img/empresas/${slug}.png" class="esc-emp-img" alt="${nome}"
+         onerror="this.parentElement.removeAttribute('style');this.parentElement.textContent='${ini}'">
+  </div>`;
 }
 
 // Constantes para aceitar/delegar oportunidades
