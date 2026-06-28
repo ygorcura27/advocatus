@@ -407,9 +407,9 @@ async function _carregarEscritorioProprio(escId, j) {
           ${_escClientesCard()}
           ${_escSocietarioCard(esc, j)}
         </div>
+        <div id="esc-processos-bloco"></div>
         <div id="esc-oportunidades-bloco"></div>
         <div id="esc-workspace-bloco"></div>
-        <div id="esc-processos-bloco"></div>
         <div id="esc-financas-upgrade">
           ${window.renderBlocoFinancas ? window.renderBlocoFinancas(esc, j) : ''}
         </div>
@@ -653,8 +653,8 @@ async function _renderEscritorioFuncionario(j, el, escId) {
         </button>
       </div>
     </div>
-    <div id="esc-oportunidades-bloco"></div>
-    <div id="esc-processos-bloco"></div>`;
+    <div id="esc-processos-bloco"></div>
+    <div id="esc-oportunidades-bloco"></div>`;
 
   const elEquipe = document.getElementById('esc-equipe-embed');
   if (elEquipe && window.renderEquipePainel) window.renderEquipePainel(j, escId, elEquipe);
@@ -813,7 +813,7 @@ async function _escKpis(esc, j) {
 
   let salariosTotais    = 0;
   let listaFuncionarios = [];
-  let receitaRecorrente = 0;
+  const receitaRecorrente = esc ? (esc.faturamento_recorrente_mes || 0) : 0;
 
   if (esc && esc.id) {
     try {
@@ -828,12 +828,6 @@ async function _escKpis(esc, j) {
           salariosTotais += sal;
           listaFuncionarios.push({ ...f, sal });
         }
-      });
-
-      const clSnap = await getDocs(collection(fbDb, 'escritorios', esc.id, 'clientes'));
-      clSnap.docs.forEach(d => {
-        const c = d.data();
-        if (c.recorrente) receitaRecorrente += c.valor_mensal || 0;
       });
     } catch (e) {
       console.warn('[KPI DESPESAS]', e);

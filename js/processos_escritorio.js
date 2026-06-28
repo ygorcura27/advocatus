@@ -18,7 +18,6 @@ const TIER_ORDER     = { D:0, C:1, B:2, A:3, S:4 };
 const CARGO_TIER_MAX = { est:'D', ass:'C', jnr:'B', pln:'A', snr:'S', asc:'S', soc:'S' };
 const TIER_CHANCE    = { S:.10, A:.15, B:.25, C:.35, D:.50 };
 const TIER_CAP_ESC   = { 1:2, 2:5, 3:7, 4:10, 5:13 };
-const PROG_MES       = { est:18, ass:22, jnr:30, pln:38, snr:48, asc:55, soc:65 };
 
 const TIER_COR = { S:'var(--verm2)', A:'var(--amber)', B:'var(--navy3)', C:'var(--verde2)', D:'var(--txt4)' };
 
@@ -841,68 +840,9 @@ window.removerGestor = async function(escId) {
   }
 };
 
-// ─── Avanço de progresso mensal ───────────────────────────────────────────────
-
-window.avancarProgressoMensal = async function(escId) {
-  try {
-    const snap = await getDocs(
-      query(collection(db, 'escritorios', escId, 'processos_pool'), where('status', '==', 'em_andamento'))
-    );
-
-    const proms = [];
-    for (const d of snap.docs) {
-      const p = { id: d.id, ...d.data() };
-      if (!p.func_cargo) continue;
-
-      const baseGanho = PROG_MES[p.func_cargo] || 18;
-      const variacao  = Math.round((Math.random() * 12) - 4);
-      const ganho     = Math.max(5, baseGanho + variacao);
-      const novoProg  = Math.min(100, (p.progresso || 0) + ganho);
-      const novoStatus = novoProg >= 100 ? 'aguardando_sentenca' : 'em_andamento';
-
-      proms.push(updateDoc(doc(db, 'escritorios', escId, 'processos_pool', p.id), {
-        progresso: novoProg, status: novoStatus,
-      }));
-    }
-
-    if (proms.length) await Promise.all(proms);
-
-    // Reset energia NPC mensal e verificar burnout
-    const fSnap = await getDocs(collection(db, 'escritorios', escId, 'funcionarios'));
-    const fProms = [];
-    for (const fd of fSnap.docs) {
-      const f = fd.data();
-      const npcUsado = f.energia_npc_usada_mes || 0;
-      const sobrecarg = npcUsado > NPC_ENERGIA_MES - NPC_OVERLOAD_TH;
-      let novosMeses = f.meses_sobrecarregado || 0;
-      let burnoutNPC = f.burnout_npc || false;
-      let burnoutRest = f.burnout_npc_restante || 0;
-
-      if (burnoutNPC) {
-        burnoutRest = Math.max(0, burnoutRest - 1);
-        if (burnoutRest === 0) burnoutNPC = false;
-      } else if (sobrecarg) {
-        novosMeses++;
-        if (novosMeses >= 3) {
-          burnoutNPC = true;
-          burnoutRest = 3;
-          novosMeses = 0;
-        }
-      } else {
-        novosMeses = 0;
-      }
-
-      fProms.push(updateDoc(doc(db, 'escritorios', escId, 'funcionarios', fd.id), {
-        energia_npc_usada_mes: 0,
-        meses_sobrecarregado: novosMeses,
-        burnout_npc: burnoutNPC,
-        burnout_npc_restante: burnoutRest,
-      }));
-    }
-
-    if (fProms.length) await Promise.all(fProms);
-    console.log(`[PROGRESSO MENSAL] ${proms.length} processo(s), ${fProms.length} NPC(s) atualizados em ${escId}`);
-  } catch (e) {
-    console.error('[AVANCAR PROGRESSO]', e);
-  }
-};
+// (A função avancarProgressoMensal foi REMOVIDA deste arquivo — ela nunca
+// era chamada por nada no frontend (o avanço de mês real sempre rodou só
+// pela Cloud Function functions/avancar_mes.js, que não a conhecia).
+// Migrada para dentro de functions/avancar_mes.js (_processarProgressoNPCsCF),
+// que é onde o avanço de mês de fato acontece. Manter aqui seria deixar
+// uma segunda fonte de verdade morta e divergente da implementação real.)

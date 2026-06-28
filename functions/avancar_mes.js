@@ -33,6 +33,70 @@ const REP_CAP = {
   dadj:55, def:70, dch:85, dge:100,
 };
 
+// Progresso mensal de casos do pool delegados a NPCs + reset de energia NPC.
+// Essa lógica existia antes apenas no frontend (js/processos_escritorio.js,
+// window.avancarProgressoMensal), mas nada no app a chamava — o avanço de
+// mês real sempre rodou só por esta Cloud Function, que não sabia da
+// existência dela. Resultado prático: processos delegados a NPCs ficavam
+// travados em 0% de progresso para sempre (nunca chegavam a
+// "aguardando_sentença", então nunca apareciam no Histórico) e a energia
+// dos NPCs (`energia_npc_usada_mes`) nunca era zerada, deixando-os
+// permanentemente indisponíveis após acumularem uso.
+const NPC_PROG_MES    = { est:18, ass:22, jnr:30, pln:38, snr:48, asc:55, soc:65 };
+const NPC_ENERGIA_MES = 100;
+const NPC_OVERLOAD_TH = 20;
+
+async function _processarProgressoNPCsCF(db, escRef) {
+  const poolSnap = await escRef.collection('processos_pool')
+    .where('status', '==', 'em_andamento').get();
+
+  const proms = [];
+  for (const d of poolSnap.docs) {
+    const p = d.data();
+    if (!p.func_cargo) continue;
+    const baseGanho = NPC_PROG_MES[p.func_cargo] || 18;
+    const variacao  = Math.round((Math.random() * 12) - 4);
+    const ganho     = Math.max(5, baseGanho + variacao);
+    const novoProg  = Math.min(100, (p.progresso || 0) + ganho);
+    const novoStatus = novoProg >= 100 ? 'aguardando_sentenca' : 'em_andamento';
+    proms.push(d.ref.update({ progresso: novoProg, status: novoStatus }));
+  }
+  if (proms.length) await Promise.all(proms);
+
+  const fSnap = await escRef.collection('funcionarios').get();
+  const fProms = [];
+  for (const fd of fSnap.docs) {
+    const f = fd.data();
+    const npcUsado  = f.energia_npc_usada_mes || 0;
+    const sobrecarg = npcUsado > NPC_ENERGIA_MES - NPC_OVERLOAD_TH;
+    let novosMeses  = f.meses_sobrecarregado || 0;
+    let burnoutNPC  = f.burnout_npc || false;
+    let burnoutRest = f.burnout_npc_restante || 0;
+
+    if (burnoutNPC) {
+      burnoutRest = Math.max(0, burnoutRest - 1);
+      if (burnoutRest === 0) burnoutNPC = false;
+    } else if (sobrecarg) {
+      novosMeses++;
+      if (novosMeses >= 3) {
+        burnoutNPC = true;
+        burnoutRest = 3;
+        novosMeses = 0;
+      }
+    } else {
+      novosMeses = 0;
+    }
+
+    fProms.push(fd.ref.update({
+      energia_npc_usada_mes: 0,
+      meses_sobrecarregado: novosMeses,
+      burnout_npc: burnoutNPC,
+      burnout_npc_restante: burnoutRest,
+    }));
+  }
+  if (fProms.length) await Promise.all(fProms);
+}
+
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
@@ -250,7 +314,7 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
   if (j.escritorio_proprio_id) {
     try {
       const escRefProprio = db.collection('escritorios').doc(j.escritorio_proprio_id);
-      await escRefProprio.update({ faturamento_mes_atual: 0 });
+      await escRefProprio.update({ faturamento_mes_atual: 0, faturamento_recorrente_mes: 0 });
       const funcSnap = await escRefProprio
         .collection('funcionarios')
         .get();
@@ -991,6 +1055,8 @@ async function _processarServicosMensalCF(db, uid, j) {
   const esc  = escSnap.data();
   const tier = esc.tier || 1;
 
+  await _processarProgressoNPCsCF(db, escRef);
+
   const oldOpSnap = await escRef.collection('oportunidades').where('status','==','disponivel').get();
   await Promise.all(oldOpSnap.docs.map(d => d.ref.delete()));
 
@@ -1025,6 +1091,7 @@ async function _processarServicosMensalCF(db, uid, j) {
       await escRef.update({
         caixa: (esc.caixa||0) + receitaRecorrente,
         faturamento_mes_atual: (esc.faturamento_mes_atual||0) + receitaRecorrente,
+        faturamento_recorrente_mes: (esc.faturamento_recorrente_mes||0) + receitaRecorrente,
       });
     } else {
       await db.collection('jogadores').doc(uid).update({
