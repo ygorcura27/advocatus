@@ -408,8 +408,8 @@ async function _carregarEscritorioProprio(escId, j) {
           ${_escSocietarioCard(esc, j)}
         </div>
         <div id="esc-oportunidades-bloco"></div>
-        <div id="esc-workspace-bloco"></div>
         <div id="esc-processos-bloco"></div>
+        <div id="esc-workspace-bloco"></div>
         <div id="esc-financas-upgrade">
           ${window.renderBlocoFinancas ? window.renderBlocoFinancas(esc, j) : ''}
         </div>
