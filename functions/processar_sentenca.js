@@ -133,6 +133,20 @@ async function _finalizarProcessoDefinitivo(db, processoRef, jogadorRef, p, j, s
       }
     } catch (e) { logger.warn('Penalidade rep escritório falhou:', e); }
   }
+  // Marcar o processo_pool de origem como concluído (quando o jogador assumiu manualmente)
+  if (p.pool_proc_subcol_id && p.pool_proc_esc_id) {
+    try {
+      const resultado = favoravelAoJogador ? (score >= 80 ? 'procedente' : 'parcial') : 'improcedente';
+      await db.collection('escritorios').doc(p.pool_proc_esc_id)
+        .collection('processos_pool').doc(p.pool_proc_subcol_id)
+        .update({
+          status: 'concluido',
+          resultado,
+          valor_recebido: honPotencial,
+          concluido_em: new Date().toISOString(),
+        });
+    } catch (e) { logger.warn('Atualização processos_pool falhou:', e); }
+  }
 }
 
 exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (request) => {

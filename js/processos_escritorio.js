@@ -471,23 +471,37 @@ window._assumirCasoPool = async function(escId, procId, containerId) {
   }
 
   try {
-    await Promise.all([
-      updateDoc(doc(db, 'jogadores', uid), { energia_usada_mes: energiaUsada + CUSTO }),
-      updateDoc(doc(db, 'escritorios', escId, 'processos_pool', procId), {
-        status: 'aguardando_sentenca',
-        assumido_uid:  uid,
-        assumido_nome: j.nome_personagem || 'Dono',
-        func_id:   null,
-        func_nome: null,
-        func_cargo: null,
-        progresso: 100,
-        assumido_em: new Date().toISOString(),
-      }),
-    ]);
+    const poolRef  = doc(db, 'escritorios', escId, 'processos_pool', procId);
+    const poolSnap = await getDoc(poolRef);
+    if (!poolSnap.exists()) { toast('Processo não encontrado.', 'ko'); return; }
+    const poolProc = poolSnap.data();
 
+    // Descontar energia imediatamente
+    await updateDoc(doc(db, 'jogadores', uid), { energia_usada_mes: energiaUsada + CUSTO });
     j.energia_usada_mes = energiaUsada + CUSTO;
     window.JOGADOR = j;
-    toast(`✅ Caso assumido! Clique em "⚖️ Sentença" para finalizar. -${CUSTO}⚡`, 'ok');
+
+    // Marcar o pool como em andamento pelo jogador (sem progresso = 100)
+    await updateDoc(poolRef, {
+      status: 'em_andamento',
+      assumido_uid:  uid,
+      assumido_nome: j.nome_personagem || 'Dono',
+      func_id:   null,
+      func_nome: null,
+      func_cargo: null,
+      progresso: 0,
+      assumido_em: new Date().toISOString(),
+    });
+
+    // Criar processo completo (provas → teses → audiência) e abrir
+    if (window.criarProcessoDoPool) {
+      const novoProcId = await window.criarProcessoDoPool(escId, procId, poolProc);
+      await updateDoc(poolRef, { processo_ref: novoProcId });
+      toast(`⚖️ Caso assumido! Siga o fluxo: provas → teses → audiência. -${CUSTO}⚡`, 'ok', 4000);
+      window.abrirProcesso(novoProcId);
+    } else {
+      toast('Módulo de processos não carregado ainda. Tente novamente.', 'ko');
+    }
 
     const elPool = document.getElementById('esc-processos-bloco');
     if (elPool) window.renderProcessosPool(j, escId, elPool);

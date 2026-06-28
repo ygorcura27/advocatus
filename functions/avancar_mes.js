@@ -1176,6 +1176,13 @@ async function _logGestaoCF(escRef, texto) {
   await escRef.collection('log_gestao').add({ texto, criado_em: new Date().toISOString() });
 }
 
+const _TIER_ORDER_CF     = { D:0, C:1, B:2, A:3, S:4 };
+const _CARGO_TIER_MAX_CF = { est:'D', ass:'C', jnr:'B', pln:'A', snr:'S', asc:'S', soc:'S' };
+function _npcPodeManejar(cargo_id, tier) {
+  const maxTier = _CARGO_TIER_MAX_CF[cargo_id] || 'D';
+  return (_TIER_ORDER_CF[tier] || 0) <= (_TIER_ORDER_CF[maxTier] || 0);
+}
+
 async function _autoAtribuirProcessosMensalCF(db, escRef, esc) {
   const poolSnap = await escRef.collection('processos_pool')
     .where('status', '==', 'disponivel').get();
@@ -1191,12 +1198,11 @@ async function _autoAtribuirProcessosMensalCF(db, escRef, esc) {
   const gestorNome = esc.gestor_nome || 'O gestor';
 
   for (const procDoc of poolSnap.docs) {
-    const npc = npcsDisponiveis
-      .filter(f => (100 - (f.energia_npc_usada_mes||0)) >= 40)
-      .sort((a,b) => (100-(b.energia_npc_usada_mes||0)) - (100-(a.energia_npc_usada_mes||0)))[0];
-    if (!npc) break;
-
     const proc = procDoc.data();
+    const npc = npcsDisponiveis
+      .filter(f => (100 - (f.energia_npc_usada_mes||0)) >= 40 && _npcPodeManejar(f.cargo_id, proc.tier||'D'))
+      .sort((a,b) => (100-(b.energia_npc_usada_mes||0)) - (100-(a.energia_npc_usada_mes||0)))[0];
+    if (!npc) continue; // pula este processo — nenhum NPC qualificado disponível
     await procDoc.ref.update({
       status: 'em_andamento',
       func_id: npc.id,

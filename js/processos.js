@@ -1973,6 +1973,65 @@ function mesTotalPessoalProc(j) {
 }
 
 // ════════════════════════════════════════════════════════
+// CRIAR PROCESSO A PARTIR DO POOL DO ESCRITÓRIO
+// Chamado por _assumirCasoPool (processos_escritorio.js) quando
+// o jogador assume manualmente um processo do pool.
+// ════════════════════════════════════════════════════════
+window.criarProcessoDoPool = async function(escId, poolProcId, poolProc) {
+  const j = window.JOGADOR;
+  const areaBanco = _areaBancoParaEspecialidade(poolProc.area || j.especialidade || 'civil');
+  const TIER_DIF = { S:'alta', A:'alta', B:'media', C:'baixa', D:'baixa' };
+  const dif = TIER_DIF[poolProc.tier || 'D'] || 'media';
+  const PROC = gerarProcesso(areaBanco, dif);
+  const TXT  = gerarTextoLocal(PROC);
+  const mesG = mesTotalPessoalProc(j);
+
+  const proc = {
+    numero: TXT.numero,
+    tipo: PROC.conflito.nome,
+    autor: TXT.autor_nome,
+    reu: TXT.reu_nome,
+    area: poolProc.area || j.especialidade || 'civil',
+    area_banco: areaBanco,
+    tribunal: PROC.tribunal,
+    instancia: '1grau',
+    instancia_seguinte: tribunalRecursal(PROC, '1grau'),
+    meu_lado: PROC.meuLado,
+    dificuldade_extra: PROC.dificuldadeExtra,
+    conflito_id: PROC.conflito.id,
+    fatos_ativos: PROC.fatosAtivos,
+    fatos_narrativa: TXT.fatos,
+    teses: PROC.teses,
+    provas: PROC.provas,
+    juiz: TXT.juiz,
+    args_audiencia: TXT.args,
+    resps_audiencia: TXT.resps,
+    provas_selecionadas: [],
+    teses_selecionadas: [],
+    convencimento: PROC.dificuldadeExtra ? 28 : 38,
+    rodada_audiencia: 0,
+    status: 'andamento',
+    progresso: 0,
+    valor: PROC.valor_causa,
+    advogado_uid: j.uid,
+    escritorio_id: j.escritorio_proprio_id || j.escritorio_empregado_id || null,
+    distribuido_pelo_escritorio: false,
+    hon_total_acumulado: 0,
+    hon_pendente: 0,
+    urgente: false,
+    criado_mes: mesG,
+    prazo_limite_mes: mesG + 3,
+    encerrado_mes: null,
+    recurso_pendente: false,
+    pool_proc_subcol_id: poolProcId,
+    pool_proc_esc_id: escId,
+  };
+
+  const ref = await addDoc(collection(db, 'processos'), proc);
+  return ref.id;
+};
+
+// ════════════════════════════════════════════════════════
 // ABRIR PROCESSO (modal principal)
 // ════════════════════════════════════════════════════════
 let _estado = null; // { procId, proc, fase }
