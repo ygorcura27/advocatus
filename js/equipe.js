@@ -190,10 +190,11 @@ function _cardFuncionario(f, escId, energiaDisp) {
   const podeCoordenar = energiaDisp >= ci.custo_coord;
 
   const ini = (f.nome||'?').split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase().slice(0,2);
-  const svgFallback = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='153' height='153'%3E%3Ccircle cx='76' cy='76' r='76' fill='%232E4270'/%3E%3Ctext x='76' y='96' font-size='36' font-weight='700' fill='%23C9A227' text-anchor='middle' font-family='DM Sans,Arial'%3E${ini}%3C/text%3E%3C/svg%3E`;
+  const svgSrc = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='153' height='153'%3E%3Ccircle cx='76' cy='76' r='76' fill='%232E4270'/%3E%3Ctext x='76' y='96' font-size='36' font-weight='700' fill='%23C9A227' text-anchor='middle' font-family='DM Sans,Arial'%3E${ini}%3C/text%3E%3C/svg%3E`;
+  const nomeEsc = f.nome.replace(/'/g, "\\'");
   const fotoHtml = (f.tipo === 'npc' && f.foto_npc)
-    ? `<img src="img/npcs%20escritorio/${f.foto_npc}" alt="${f.nome}" style="width:153px;height:153px;object-fit:cover;border-radius:var(--r);flex-shrink:0" onerror="this.onerror=null;this.src='${svgFallback}'">`
-    : `<img src="${svgFallback}" alt="${ini}" style="width:153px;height:153px;border-radius:var(--r);flex-shrink:0">`;
+    ? `<img src="img/npcs%20escritorio/${f.foto_npc}" alt="${f.nome}" style="width:153px;height:153px;object-fit:cover;border-radius:var(--r);flex-shrink:0" onerror="window._svgNpcFallback(this,'${nomeEsc}')">`
+    : `<img src="${svgSrc}" alt="${ini}" style="width:153px;height:153px;border-radius:var(--r);flex-shrink:0">`;
 
   return `
     <div class="card" style="margin-bottom:.5rem;border-left:3px solid var(--navy3)">

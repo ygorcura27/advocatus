@@ -26,8 +26,20 @@ const ESP_LABEL = {
 
 function _avatarSvg(nome) {
   const ini = (nome||'?').split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase().slice(0,2);
-  return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Ccircle cx='24' cy='24' r='24' fill='%232E4270'/%3E%3Ctext x='24' y='30' font-size='14' font-weight='700' fill='%23C9A227' text-anchor='middle' font-family='DM Sans,Arial'%3E${ini}%3C/text%3E%3C/svg%3E`;
+  return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='153' height='153'%3E%3Ccircle cx='76' cy='76' r='76' fill='%232E4270'/%3E%3Ctext x='76' y='96' font-size='36' font-weight='700' fill='%23C9A227' text-anchor='middle' font-family='DM Sans,Arial'%3E${ini}%3C/text%3E%3C/svg%3E`;
 }
+
+// Função global de fallback: garante que quotes no SVG não quebrem o onerror
+window._svgNpcFallback = function(el, nome) {
+  el.onerror = null;
+  const ini = (nome||'?').split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase().slice(0,2);
+  el.src = 'data:image/svg+xml,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="153" height="153">' +
+    '<circle cx="76" cy="76" r="76" fill="#2E4270"/>' +
+    '<text x="76" y="96" font-size="36" font-weight="700" fill="#C9A227" text-anchor="middle" font-family="DM Sans,Arial">' + ini + '</text>' +
+    '</svg>'
+  );
+};
 
 // Retorna src da foto do NPC; cai para SVG com iniciais se não tiver foto
 function _avatarSrc(func) {
@@ -36,6 +48,15 @@ function _avatarSrc(func) {
     return `img/npcs%20escritorio/${func.foto_npc}`;
   }
   return _avatarSvg(nome);
+}
+
+// Foto placeholder para cliente PF (pessoa física)
+function _fotoClientePF(nome) {
+  const ini = (nome||'?').split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase().slice(0,2);
+  return `<div class="esc-cliente-logo">
+    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='153' height='153'%3E%3Ccircle cx='76' cy='76' r='76' fill='%232E4270'/%3E%3Ctext x='76' y='96' font-size='36' font-weight='700' fill='%23C9A227' text-anchor='middle' font-family='DM Sans,Arial'%3E${ini}%3C/text%3E%3C/svg%3E"
+         alt="${nome}" style="width:100%;height:100%;object-fit:cover;border-radius:0">
+  </div>`;
 }
 
 function _slugEmpresa(nome) {
@@ -125,7 +146,7 @@ window.renderEquipePainel = async function(j, escId, el) {
       return `
       <div class="esc-membro${emBurnout?' npc-em-burnout':sobrecarregado?' npc-sobrecarregado-card':''}" id="membro-${func.id}">
         <img class="esc-membro-avatar" src="${_avatarSrc(func)}" alt="${nome}"
-             onerror="this.onerror=null;this.src='${_avatarSvg(nome)}'">
+             onerror="window._svgNpcFallback(this,'${nome.replace(/'/g,"\\'")}')">`
         <div class="esc-membro-info">
           <div class="esc-membro-nome">${nome} ${energiaBadge}</div>
           <div class="esc-membro-cargo">${cargo}</div>
@@ -252,30 +273,51 @@ window.renderOportunidadesPainel = async function(j, escId, el) {
     const top5    = todas.slice(0, 5);
     const temMais = todas.length > 5;
 
-    const tipoIcon = { PF:'👤', PJ:'🏢', consulta:'📋', contrato:'📄', causa:'⚖️' };
-    const ESP_L    = { tributario:'Tributário', contencioso:'Contencioso', trabalhista:'Trabalhista', criminal:'Criminal', societario:'Societário', civil:'Civil', consumidor:'Consumidor', ambiental:'Ambiental', administrativo:'Administrativo', familia:'Família', imobiliario:'Imobiliário', empresarial:'Empresarial' };
+    const ESP_L = { tributario:'Tributário', contencioso:'Contencioso', trabalhista:'Trabalhista', criminal:'Criminal', societario:'Societário', civil:'Civil', consumidor:'Consumidor', ambiental:'Ambiental', administrativo:'Administrativo', familia:'Família', imobiliario:'Imobiliário', empresarial:'Empresarial' };
+
+    const TIPO_LABEL = {
+      consulta:    '📋 Consulta Jurídica',
+      parecer:     '📑 Parecer Jurídico',
+      contrato:    '📄 Elaboração de Contrato',
+      notificacao: '📨 Notificação Extrajudicial',
+      cobranca:    '💰 Cobrança / Recuperação',
+    };
+    const TIPO_COR = {
+      consulta:    'var(--verde2)',
+      parecer:     'var(--amber)',
+      contrato:    'var(--navy3)',
+      notificacao: 'var(--txt3)',
+      cobranca:    'var(--verm2)',
+    };
 
     const energiaUsada = j.energia_usada_mes || 0;
     const energiaTotal = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
     const energiaDisp  = Math.max(0, energiaTotal - energiaUsada);
 
     const rows = top5.map(op => {
-      const icone    = op.icone || tipoIcon[op.tipo_cliente] || tipoIcon[op.tipo] || '🌟';
       const valor    = op.valor_estimado || op.valor || 0;
       const area     = ESP_L[op.area || op.especialidade] || op.area || '';
       const cliente  = op.nome_cliente || op.cliente || '';
       const podAceit = energiaDisp >= ACEITAR_ENERGIA;
+      const tipoLabel = TIPO_LABEL[op.tipo] || op.tipo || 'Serviço Jurídico';
+      const tipoCor   = TIPO_COR[op.tipo] || 'var(--navy3)';
+      const fotoBloco = op.cliente_tipo === 'PJ'
+        ? _logoEmpresa(cliente)
+        : _fotoClientePF(cliente);
 
       return `
-      <div class="esc-opport" id="opport-${op.id}">
-        <div class="esc-opport-icone">${icone}</div>
+      <div class="esc-opport" id="opport-${op.id}" style="align-items:start;padding:.5rem .6rem">
+        ${fotoBloco}
         <div style="flex:1;min-width:0">
-          <div class="esc-opport-titulo">${op.titulo || op.nome || 'Oportunidade'}</div>
-          ${cliente ? `<div style="font-size:.68rem;color:var(--txt3);margin-top:.1rem">${cliente}</div>` : ''}
-          ${area    ? `<div style="font-size:.63rem;color:var(--txt4)">${area}</div>` : ''}
+          <div style="margin-bottom:.3rem">
+            <span style="font-size:.6rem;font-weight:700;padding:.12rem .4rem;border-radius:6px;background:${tipoCor}20;color:${tipoCor};border:1px solid ${tipoCor}">${tipoLabel}</span>
+          </div>
+          <div class="esc-opport-titulo" style="margin-bottom:.15rem">${cliente || 'Cliente'}</div>
+          ${area ? `<div style="font-size:.63rem;color:var(--txt4)">📁 ${area}</div>` : ''}
           ${op.descricao ? `<div class="esc-opport-desc">${op.descricao}</div>` : ''}
+          <div style="font-size:.82rem;font-weight:700;color:var(--verde2);margin-top:.35rem;font-variant-numeric:tabular-nums">${valor ? _fmt(valor) : '—'}</div>
+          <div style="font-size:.6rem;color:var(--txt4);margin-top:.1rem">⚡${op.energia||25} energia · +${op.confianca_gerada||0} confiança</div>
         </div>
-        ${valor ? `<div style="font-size:.78rem;font-weight:700;color:var(--verde2);flex-shrink:0;font-variant-numeric:tabular-nums;margin-right:.4rem">${_fmt(valor)}</div>` : ''}
         <div class="esc-opport-acoes">
           <button class="btn btn-sm btn-prim esc-opbtn"
             title="Aceitar pessoalmente — 25⚡ — 100% do valor"

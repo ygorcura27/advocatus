@@ -330,6 +330,22 @@ service cloud.firestore {
               || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
       }
 
+      // Subcoleção: pool de processos — dono/sócios do escritório leem e escrevem.
+      match /processos_pool/{procId} {
+        allow read: if isAuth()
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+        allow create: if isAuth()
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+        allow update: if isAuth()
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+        allow delete: if isAuth()
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+      }
+
       allow delete: if false;
     }
 
