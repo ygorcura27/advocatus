@@ -248,7 +248,7 @@ function _cardRelacionamento(r, j) {
                onerror="this.onerror=null;this.src='img/npcs/_placeholder.png'">
           <div style="flex:1;min-width:0">
             <div style="font-weight:700;font-size:.92rem;color:var(--navy)">${r.nome}</div>
-            <div style="font-size:.68rem;color:var(--ouro2);margin-bottom:.3rem">${label} · ${meses} meses · ${tracosLabel}</div>
+            <div style="font-size:.68rem;color:var(--ouro2);margin-bottom:.3rem">${label} · ${_formatarIdade(meses)} · ${tracosLabel}</div>
             <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem">
               <div style="flex:1;height:6px;background:var(--bg2);border-radius:3px;overflow:hidden">
                 <div style="height:100%;width:${pct}%;background:${cor};border-radius:3px"></div>
@@ -342,7 +342,7 @@ function _cardExConjuge(r, j) {
         <div style="flex:1;min-width:0">
           <div style="font-weight:700;font-size:.92rem;color:var(--navy)">${r.nome}</div>
           <div style="font-size:.68rem;color:var(--txt3);margin-bottom:.25rem">
-            ${meses} meses de casamento · Afinidade restante: ${afinidade}
+            ${_formatarIdade(meses)} de casamento · Afinidade restante: ${afinidade}
           </div>
           <div style="font-size:.72rem;color:var(--verm2);margin-bottom:.5rem">💔 ${motivoTexto}</div>
           <div style="display:flex;flex-wrap:wrap;gap:.35rem">
@@ -897,7 +897,7 @@ window.abrirPerfilNpc = async function(relId) {
              onclick="window.abrirFotoExpandida('${avatarUrl}', '${r.nome.replace(/'/g, "\\'")}')">
         <div class="fb-header-info">
           <div class="fb-nome">${r.nome}</div>
-          <div class="fb-status">${label} de ${j.nome_personagem || 'você'} · há ${meses} ${meses===1?'mês':'meses'}</div>
+          <div class="fb-status">${label} de ${j.nome_personagem || 'você'} · há ${_formatarIdade(meses)}</div>
         </div>
       </div>
       <div class="fb-body">
