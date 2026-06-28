@@ -171,16 +171,14 @@ window.renderProcessosPool = async function(j, escId, el) {
       historico = histSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     } catch (e) { /* sem índice — tenta fallback */ }
 
-    // Gestor + tier do escritório (fonte de verdade: doc do escritório)
+    // Gestor atual
     let gestorNome = null;
-    let tierEsc    = j.escritorio_tier || 1;
     try {
       const escSnap = await getDoc(doc(db, 'escritorios', escId));
-      if (escSnap.exists()) {
-        gestorNome = escSnap.data().gestor_nome || null;
-        tierEsc    = escSnap.data().tier || j.escritorio_tier || 1;
-      }
+      if (escSnap.exists()) gestorNome = escSnap.data().gestor_nome || null;
     } catch(e) {}
+
+    const tierEsc = j.escritorio_tier || 1;
     const uid     = j.uid || window.JOGADOR_UID;
 
     // Coluna 1 — pool + em andamento + aguardando sentença
@@ -239,6 +237,7 @@ function _renderColPool(disponiveis, emAndamento, aguardSent, j, escId) {
   const energiaDisp = Math.max(0,
     (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - (j.energia_usada_mes || 0));
 
+  const CUSTO_ASSUMIR = 25;
   const CUSTO_DESIGN  = 5;
 
   // Aguardando sentença
@@ -267,19 +266,13 @@ function _renderColPool(disponiveis, emAndamento, aguardSent, j, escId) {
       <div class="proc-pool-area">⚙️</div>
       <div style="flex:1;min-width:0">
         <div class="proc-pool-titulo">${p.titulo}</div>
-        <div class="proc-pool-meta">${p.assumido_uid === uid ? 'você' : (p.func_nome||'—')} · ${p.cliente_nome||'—'}</div>
+        <div class="proc-pool-meta">${p.assumido_uid ? 'você' : (p.func_nome||'—')} · ${p.cliente_nome||'—'}</div>
         ${_barraProgresso(p.progresso||0)}
       </div>
-      <div style="text-align:right;flex-shrink:0;margin-right:.3rem">
+      <div style="text-align:right;flex-shrink:0">
         <div style="font-size:.68rem;font-weight:700;color:var(--navy)">${p.progresso||0}%</div>
         <div style="font-size:.6rem;color:var(--txt4)">${_fmtP(p.honorarios)}</div>
       </div>
-      ${p.assumido_uid === uid
-        ? `<button class="btn btn-sm btn-prim" style="font-size:.6rem;padding:.18rem .38rem;white-space:nowrap"
-             onclick="window._abrirModalProcessoPool('${escId}','${p.id}')">
-             Trabalhar
-           </button>`
-        : ''}
     </div>`).join('');
 
   // Disponíveis — botões "Assumir" e "Designar ↓"
@@ -296,8 +289,11 @@ function _renderColPool(disponiveis, emAndamento, aguardSent, j, escId) {
       </div>
       <div style="display:flex;flex-direction:column;gap:.2rem">
         <button class="btn btn-sm btn-prim" style="font-size:.6rem;padding:.18rem .38rem;white-space:nowrap"
-          onclick="window._assumirCasoPool('${escId}','${p.id}')">
-          Assumir
+          onclick="${energiaDisp >= CUSTO_ASSUMIR
+            ? `window._assumirCasoPool('${escId}','${p.id}','proc-${p.id}')`
+            : `toast('⚡ Energia insuficiente (${energiaDisp}/${CUSTO_ASSUMIR}).','ko')`}"
+          ${energiaDisp < CUSTO_ASSUMIR ? 'style="opacity:.45;cursor:not-allowed;font-size:.6rem;padding:.18rem .38rem"' : ''}>
+          ⚡${CUSTO_ASSUMIR} Assumir
         </button>
         <button class="btn btn-sm btn-sec" style="font-size:.6rem;padding:.18rem .38rem;white-space:nowrap"
           onclick="window._designarProcessoPicker('${escId}','${p.id}','proc-${p.id}')">
@@ -401,167 +397,45 @@ function _renderColHistorico(historico) {
   }).join('');
 }
 
-// ─── Assumir caso pessoalmente (sem custo de energia) ────────────────────────
+// ─── Assumir caso pessoalmente ────────────────────────────────────────────────
 
-window._assumirCasoPool = async function(escId, procId) {
+window._assumirCasoPool = async function(escId, procId, containerId) {
   const j   = window.JOGADOR;
   const uid = j.uid || window.JOGADOR_UID;
+  const CUSTO = 25;
+
+  const energiaUsada = j.energia_usada_mes || 0;
+  const energiaTotal = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
+  if (Math.max(0, energiaTotal - energiaUsada) < CUSTO) {
+    toast(`⚡ Energia insuficiente (requer ${CUSTO}).`, 'ko');
+    return;
+  }
 
   try {
-    await updateDoc(doc(db, 'escritorios', escId, 'processos_pool', procId), {
-      status:        'em_andamento',
-      assumido_uid:  uid,
-      assumido_nome: j.nome_personagem || 'Dono',
-      func_id:       null,
-      func_nome:     null,
-      func_cargo:    null,
-      progresso:     0,
-      assumido_em:   new Date().toISOString(),
-    });
+    await Promise.all([
+      updateDoc(doc(db, 'jogadores', uid), { energia_usada_mes: energiaUsada + CUSTO }),
+      updateDoc(doc(db, 'escritorios', escId, 'processos_pool', procId), {
+        status: 'aguardando_sentenca',
+        assumido_uid:  uid,
+        assumido_nome: j.nome_personagem || 'Dono',
+        func_id:   null,
+        func_nome: null,
+        func_cargo: null,
+        progresso: 100,
+        assumido_em: new Date().toISOString(),
+      }),
+    ]);
+
+    j.energia_usada_mes = energiaUsada + CUSTO;
+    window.JOGADOR = j;
+    toast(`✅ Caso assumido! Clique em "⚖️ Sentença" para finalizar. -${CUSTO}⚡`, 'ok');
 
     const elPool = document.getElementById('esc-processos-bloco');
     if (elPool) window.renderProcessosPool(j, escId, elPool);
-
-    // Abrir página do processo imediatamente
-    window._abrirModalProcessoPool(escId, procId);
   } catch (e) {
     console.error('[ASSUMIR CASO]', e);
     toast('Erro ao assumir caso.', 'ko');
   }
-};
-
-// ─── Modal / página do processo pool ────────────────────────────────────────
-
-const _PROC_ACOES = [
-  { id:'pesquisa',  label:'📖 Pesquisa Jurídica',  custo:10, ganho:25, desc:'Levantamento de jurisprudência e doutrina.' },
-  { id:'peticao',   label:'📝 Protocolar Petição',  custo:15, ganho:35, desc:'Elaboração e protocolo de peça processual.' },
-  { id:'audiencia', label:'🎤 Sustentação Oral',    custo:20, ganho:50, desc:'Audiência de instrução ou sustentação perante o tribunal.' },
-];
-
-window._abrirModalProcessoPool = async function(escId, procId) {
-  let proc;
-  try {
-    const snap = await getDoc(doc(db, 'escritorios', escId, 'processos_pool', procId));
-    if (!snap.exists()) { toast('Processo não encontrado.', 'ko'); return; }
-    proc = { id: procId, ...snap.data() };
-  } catch(e) {
-    toast('Erro ao carregar processo.', 'ko');
-    return;
-  }
-
-  const j           = window.JOGADOR;
-  const energiaTotal = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
-  const energiaDisp  = Math.max(0, energiaTotal - (j.energia_usada_mes || 0));
-  const prog         = proc.progresso || 0;
-  const pronto       = prog >= 100 || proc.status === 'aguardando_sentenca';
-  const corProg      = prog >= 80 ? 'var(--verde2)' : prog >= 50 ? 'var(--amber)' : 'var(--navy3)';
-
-  const acoesHtml = pronto ? '' : _PROC_ACOES.map(a => {
-    const temEnergia = energiaDisp >= a.custo;
-    return `
-    <button class="btn btn-ghost btn-block proc-acao-btn"
-      style="display:flex;justify-content:space-between;align-items:center;padding:.6rem .8rem;text-align:left;margin-bottom:.3rem;${!temEnergia ? 'opacity:.4;cursor:not-allowed' : ''}"
-      onclick="${temEnergia
-        ? `window._acaoProcessoPool('${escId}','${procId}','${a.id}')`
-        : `toast('⚡ Energia insuficiente (${energiaDisp}/${a.custo}).','ko')`}">
-      <div>
-        <div style="font-weight:600;font-size:.82rem">${a.label}</div>
-        <div style="font-size:.63rem;color:var(--txt3)">${a.desc}</div>
-      </div>
-      <div style="text-align:right;flex-shrink:0;margin-left:.8rem">
-        <div style="font-size:.7rem;font-weight:700;color:var(--navy)">+${a.ganho}%</div>
-        <div style="font-size:.6rem;color:var(--txt3)">-${a.custo}⚡</div>
-      </div>
-    </button>`;
-  }).join('');
-
-  const corpo = `
-    <div style="background:var(--surface2);border:var(--borda-sub);border-radius:var(--r);padding:.75rem .9rem;margin-bottom:1rem">
-      <div style="font-size:.6rem;color:var(--txt3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.3rem">
-        ${proc.cliente_nome||'—'} · ${proc.area||'Civil'} · ${_tierBadge(proc.tier||'D')}
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div style="font-size:.78rem;font-weight:700;color:var(--verde2)">${_fmtP(proc.honorarios)}</div>
-        <div style="font-size:.65rem;color:var(--txt3)">⚡ disponível: ${energiaDisp}/${energiaTotal}</div>
-      </div>
-    </div>
-
-    <div style="margin-bottom:1rem">
-      <div style="display:flex;justify-content:space-between;font-size:.7rem;color:var(--txt3);margin-bottom:.35rem">
-        <span>Instrução processual</span>
-        <span style="font-weight:700;color:${corProg}">${prog}%</span>
-      </div>
-      <div style="height:10px;background:var(--bg2);border-radius:5px;overflow:hidden">
-        <div style="height:100%;width:${Math.min(100, prog)}%;background:${corProg};border-radius:5px;transition:width .4s"></div>
-      </div>
-    </div>
-
-    ${pronto
-      ? `<div style="background:var(--verde-bg);border:1px solid var(--verde3);border-radius:var(--r);padding:.75rem;text-align:center;margin-bottom:1rem">
-           <div style="font-size:.75rem;font-weight:700;color:var(--verde)">✅ Instrução concluída</div>
-           <div style="font-size:.65rem;color:var(--txt3);margin-top:.2rem">O processo está pronto para julgamento.</div>
-         </div>
-         <button class="btn btn-prim btn-block" style="margin-bottom:.4rem"
-           onclick="fecharModal();window._processarSentencaModal('${escId}','${procId}')">
-           ⚖️ Solicitar Sentença ${energiaDisp >= 10 ? '' : '<span style=\\"font-size:.65rem\\">(⚡ insuf.)</span>'}
-         </button>`
-      : `<div style="font-size:.65rem;color:var(--txt3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem">Ações disponíveis</div>
-         ${acoesHtml}`}
-  `;
-
-  abrirModal(`⚖️ ${proc.titulo}`, corpo);
-};
-
-// ─── Executar ação no processo (pesquisa / petição / audiência) ───────────────
-
-window._acaoProcessoPool = async function(escId, procId, tipo) {
-  const j   = window.JOGADOR;
-  const uid = j.uid || window.JOGADOR_UID;
-  const acao = _PROC_ACOES.find(a => a.id === tipo);
-  if (!acao) return;
-
-  const energiaUsada = j.energia_usada_mes || 0;
-  const energiaTotal = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
-  if (Math.max(0, energiaTotal - energiaUsada) < acao.custo) {
-    toast(`⚡ Energia insuficiente (requer ${acao.custo}).`, 'ko');
-    return;
-  }
-
-  try {
-    const snap    = await getDoc(doc(db, 'escritorios', escId, 'processos_pool', procId));
-    const progAtual = snap.data()?.progresso || 0;
-    const novoProg  = Math.min(100, progAtual + acao.ganho);
-    const novoStatus = novoProg >= 100 ? 'aguardando_sentenca' : 'em_andamento';
-
-    await Promise.all([
-      updateDoc(doc(db, 'jogadores', uid), { energia_usada_mes: energiaUsada + acao.custo }),
-      updateDoc(doc(db, 'escritorios', escId, 'processos_pool', procId), {
-        progresso: novoProg,
-        status:    novoStatus,
-      }),
-    ]);
-
-    j.energia_usada_mes = energiaUsada + acao.custo;
-    window.JOGADOR = j;
-    toast(`${acao.label} concluída! +${acao.ganho}% · -${acao.custo}⚡`, 'ok');
-
-    // Reabrir modal atualizado
-    fecharModal();
-    await window._abrirModalProcessoPool(escId, procId);
-
-    const elPool = document.getElementById('esc-processos-bloco');
-    if (elPool) window.renderProcessosPool(j, escId, elPool);
-  } catch(e) {
-    console.error('[ACAO PROCESSO POOL]', e);
-    toast('Erro ao realizar ação.', 'ko');
-  }
-};
-
-// ─── Solicitar sentença a partir do modal ────────────────────────────────────
-
-window._processarSentencaModal = async function(escId, procId) {
-  const uid = window.JOGADOR?.uid || window.JOGADOR_UID;
-  await window._processarSentenca(escId, procId, uid);
 };
 
 // ─── Picker de processos para NPC específico ──────────────────────────────────
@@ -844,73 +718,56 @@ window._processarSentenca = async function(escId, procId, uid) {
 // ─── Geração mensal de processos ──────────────────────────────────────────────
 
 window.gerarProcessosMensais = async function(escId, tierEscritorio) {
+  const cap = TIER_CAP_ESC[tierEscritorio || 1] || 2;
   const s   = window.SERVER || {};
   const mes = s.mes_global || 1;
 
   try {
-    // Ler tier e especialidade direto do documento do escritório (evita dado desatualizado do jogador)
-    let realTier = tierEscritorio || 1;
-    let escEsp   = null;
-    try {
-      const escSnap = await getDoc(doc(db, 'escritorios', escId));
-      if (escSnap.exists()) {
-        realTier = escSnap.data().tier || tierEscritorio || 1;
-        escEsp   = escSnap.data().especialidade_principal || escSnap.data().especialidade || null;
-      }
-    } catch(_) {}
+    const clSnap = await getDocs(collection(db, 'escritorios', escId, 'clientes'));
+    const clientes = clSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-    const cap = TIER_CAP_ESC[realTier] || 2;
-
-    const [clSnap, existSnap] = await Promise.all([
-      getDocs(collection(db, 'escritorios', escId, 'clientes')),
-      getDocs(query(collection(db, 'escritorios', escId, 'processos_pool'), where('criado_mes', '==', mes))),
-    ]);
-    const clientes     = clSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const existSnap = await getDocs(query(
+      collection(db, 'escritorios', escId, 'processos_pool'),
+      where('criado_mes', '==', mes)
+    ));
     const jaGeradosMes = existSnap.size;
 
     if (jaGeradosMes >= cap) {
-      toast(`Pool do mês cheio (${cap} processos para Tier ${realTier}).`, 'ko');
+      toast(`Pool do mês cheio (${cap} processos gerados).`, 'ko');
       return;
     }
 
     const vagasRestantes = cap - jaGeradosMes;
+    let gerados = 0;
     const promessas = [];
 
-    // ── 1. Processos oriundos de clientes cadastrados ─────────────────────────
     for (const cl of clientes) {
-      if (promessas.length >= vagasRestantes) break;
+      if (gerados >= vagasRestantes) break;
       const tier   = _clienteTier(cl.valor_mensal || 0);
       const chance = TIER_CHANCE[tier] || .10;
       if (Math.random() > chance) continue;
+
       const area       = cl.area || cl.especialidade || AREA_DEFAULT[Math.floor(Math.random() * AREA_DEFAULT.length)];
       const honorarios = _tierHonorarios(tier);
+      const titulo     = _randTitulo(area);
+
       promessas.push(addDoc(collection(db, 'escritorios', escId, 'processos_pool'), {
-        titulo: _randTitulo(area), cliente_id: cl.id, cliente_nome: cl.nome || 'Cliente',
-        area, tier, honorarios, icone: '⚖️', status: 'disponivel', progresso: 0,
+        titulo, cliente_id: cl.id, cliente_nome: cl.nome || 'Cliente',
+        area, tier, honorarios, icone: '⚖️',
+        status: 'disponivel', progresso: 0,
         func_id: null, func_nome: null, func_cargo: null, resultado: null,
         criado_mes: mes, criado_em: new Date().toISOString(),
       }));
+      gerados++;
     }
 
-    // ── 2. Demanda de mercado — preenche vagas restantes até o cap do tier ────
-    // (Um escritório de alto tier atrai casos mesmo sem clientes cadastrados)
-    const TIER_MARKET_TIER = { 1:'D', 2:'D', 3:'C', 4:'B', 5:'A' };
-    const marketTier = TIER_MARKET_TIER[realTier] || 'D';
-    const areasBase  = escEsp ? [escEsp, ...AREA_DEFAULT] : AREA_DEFAULT;
-
-    while (promessas.length < vagasRestantes) {
-      const area       = areasBase[Math.floor(Math.random() * areasBase.length)];
-      const honorarios = _tierHonorarios(marketTier);
-      promessas.push(addDoc(collection(db, 'escritorios', escId, 'processos_pool'), {
-        titulo: _randTitulo(area), cliente_id: null, cliente_nome: 'Cliente Avulso',
-        area, tier: marketTier, honorarios, icone: '⚖️', status: 'disponivel', progresso: 0,
-        func_id: null, func_nome: null, func_cargo: null, resultado: null,
-        criado_mes: mes, criado_em: new Date().toISOString(),
-      }));
+    if (!promessas.length) {
+      toast('Nenhum processo gerado (verifique os clientes ativos).', 'ko');
+      return;
     }
 
     await Promise.all(promessas);
-    toast(`✅ ${promessas.length} processo(s) gerado(s) — pool do Tier ${realTier} atualizado!`, 'ok');
+    toast(`✅ ${gerados} processo(s) gerado(s) no pool!`, 'ok');
 
     const el = document.getElementById('esc-processos-bloco');
     if (el && window.JOGADOR) window.renderProcessosPool(window.JOGADOR, escId, el);
