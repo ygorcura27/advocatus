@@ -17,7 +17,7 @@ const CARGO_L_P      = { est:'Estagiário', ass:'Assistente', jnr:'Jur. Júnior'
 const TIER_ORDER     = { D:0, C:1, B:2, A:3, S:4 };
 const CARGO_TIER_MAX = { est:'D', ass:'C', jnr:'B', pln:'A', snr:'S', asc:'S', soc:'S' };
 const TIER_CHANCE    = { S:.10, A:.15, B:.25, C:.35, D:.50 };
-const TIER_CAP_ESC   = { 1:2, 2:5, 3:7, 4:10, 5:13 };
+const TIER_CAP_ESC   = { 1:4, 2:8, 3:12, 4:18, 5:24 };
 
 const TIER_COR = { S:'var(--verm2)', A:'var(--amber)', B:'var(--navy3)', C:'var(--verde2)', D:'var(--txt4)' };
 
@@ -173,11 +173,17 @@ window.renderProcessosPool = async function(j, escId, el) {
       historico = histSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     } catch (e) { /* sem índice — tenta fallback */ }
 
-    // Gestor atual
+    // Gestor atual e tier real do escritório
     let gestorNome = null;
+    let tierEsc    = j.escritorio_tier || 1;
     try {
       const escSnap = await getDoc(doc(db, 'escritorios', escId));
-      if (escSnap.exists()) gestorNome = escSnap.data().gestor_nome || null;
+      if (escSnap.exists()) {
+        const escData = escSnap.data();
+        gestorNome = escData.gestor_nome || null;
+        // Usar tier do documento (j.escritorio_tier pode estar desatualizado após upgrades)
+        tierEsc = escData.tier || tierEsc;
+      }
     } catch(e) {}
 
     // Diário da gestão — designações, sentenças e burnout do mês
@@ -189,8 +195,7 @@ window.renderProcessosPool = async function(j, escId, el) {
       diario = diarioSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     } catch (e) { /* sem índice ainda — deixa vazio */ }
 
-    const tierEsc = j.escritorio_tier || 1;
-    const uid     = j.uid || window.JOGADOR_UID;
+    const uid = j.uid || window.JOGADOR_UID;
 
     // Coluna 1 — pool + em andamento + aguardando sentença
     const col1Html = _renderColPool(disponiveis, emAndamento, aguardSent, j, escId);
@@ -275,18 +280,36 @@ function _renderColPool(disponiveis, emAndamento, aguardSent, j, escId) {
         : `<span style="font-size:.6rem;color:var(--txt4)">⚡ insuf.</span>`}
     </div>`).join('');
 
-  // Em andamento
-  const rowsAnd = emAndamento.map(p => `
+  // Em andamento — separar processos do jogador e processos da gestão automática
+  const andJogador = emAndamento.filter(p => p.assumido_uid);
+  const andGestao  = emAndamento.filter(p => !p.assumido_uid);
+
+  const rowsAndJog = andJogador.map(p => `
     <div class="proc-pool-row">
       <div class="proc-pool-area">⚙️</div>
       <div style="flex:1;min-width:0">
         <div class="proc-pool-titulo">${p.titulo}</div>
-        <div class="proc-pool-meta">${p.assumido_uid ? 'você' : (p.func_nome||'—')} · ${p.cliente_nome||'—'}</div>
+        <div class="proc-pool-meta">Você · ${p.cliente_nome||'—'}</div>
         ${_barraProgresso(p.progresso||0)}
       </div>
       <div style="text-align:right;flex-shrink:0">
         <div style="font-size:.68rem;font-weight:700;color:var(--navy)">${p.progresso||0}%</div>
         <div style="font-size:.6rem;color:var(--txt4)">${_fmtP(p.honorarios)}</div>
+      </div>
+    </div>`).join('');
+
+  const rowsAndGes = andGestao.map(p => `
+    <div class="proc-pool-row" style="border-left:2px solid var(--verde2)">
+      <div class="proc-pool-area">👤</div>
+      <div style="flex:1;min-width:0">
+        <div class="proc-pool-titulo">${p.titulo}</div>
+        <div class="proc-pool-meta" style="color:var(--verde2)">${p.func_nome||'Equipe'} · ${p.cliente_nome||'—'}</div>
+        ${_barraProgresso(p.progresso||0)}
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:.68rem;font-weight:700;color:var(--navy)">${p.progresso||0}%</div>
+        <div style="font-size:.6rem;color:var(--txt4)">${_fmtP(p.honorarios)}</div>
+        <div style="font-size:.55rem;color:var(--verde2);margin-top:.1rem">gestão auto</div>
       </div>
     </div>`).join('');
 
@@ -334,10 +357,15 @@ function _renderColPool(disponiveis, emAndamento, aguardSent, j, escId) {
         <div class="proc-pool-grupo-titulo">📂 Disponíveis (${disponiveis.length})</div>
         ${rowsDisp}
       </div>` : ''}
-    ${emAndamento.length ? `
+    ${andJogador.length ? `
       <div class="proc-pool-grupo">
-        <div class="proc-pool-grupo-titulo" style="color:var(--navy3)">⚙️ Em andamento (${emAndamento.length})</div>
-        ${rowsAnd}
+        <div class="proc-pool-grupo-titulo" style="color:var(--navy3)">⚙️ Seus casos em andamento (${andJogador.length})</div>
+        ${rowsAndJog}
+      </div>` : ''}
+    ${andGestao.length ? `
+      <div class="proc-pool-grupo">
+        <div class="proc-pool-grupo-titulo" style="color:var(--verde2)">👥 Gerenciados pela equipe (${andGestao.length})</div>
+        ${rowsAndGes}
       </div>` : ''}`;
 }
 
@@ -759,7 +787,13 @@ window._processarSentenca = async function(escId, procId, uid) {
 // ─── Geração mensal de processos ──────────────────────────────────────────────
 
 window.gerarProcessosMensais = async function(escId, tierEscritorio) {
-  const cap = TIER_CAP_ESC[tierEscritorio || 1] || 2;
+  // Tier real: ler do Firestore para evitar valor desatualizado em j.escritorio_tier
+  let tierReal = tierEscritorio || 1;
+  try {
+    const escSnap2 = await getDoc(doc(db, 'escritorios', escId));
+    if (escSnap2.exists()) tierReal = escSnap2.data().tier || tierReal;
+  } catch(e) {}
+  const cap = TIER_CAP_ESC[tierReal] || 4;
   const s   = window.SERVER || {};
   const mes = s.mes_global || 1;
 

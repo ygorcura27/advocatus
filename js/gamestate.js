@@ -81,12 +81,6 @@ function _atualizarSidebarEsquerda(j) {
   _set('sl-rep-cap', `Cap ${cap}`);
   _style('sl-rep-fill', 'width', `${Math.min(100, pct)}%`);
 
-  // Stats rápidos
-  _set('sm-dinheiro', fmt(saldo));
-  _set('sm-rep',      String(rep));
-  _set('sm-energia',  String(energia));
-  _set('sm-wins',     `${aprov}%`);
-
   // Brasão dinâmico
   _renderBrasao(j.cargo_id, rep);
 
@@ -106,34 +100,6 @@ function _atualizarSidebarDireita(j) {
   // Bloco de energia + botão avançar mês
   if (window.renderBlocoEnergia) {
     window.renderBlocoEnergia(j);
-  } else {
-    // Fallback simples enquanto o módulo carrega
-    const el = document.getElementById('bloco-energia');
-    if (el) {
-      const usado = j.energia_usada_mes || 0;
-      const disp  = Math.max(0, (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - usado);
-      const cor   = disp > 50 ? '#5A9A3A' : disp > 20 ? '#B8922A' : '#A83A3A';
-      const pronto = disp <= 5;
-      el.innerHTML = `
-        <div class="bloco-titulo">⚡ Energia Mensal <span style="font-weight:700;color:${cor}">${disp}/100</span></div>
-        <div class="energia-bar-wrap" style="margin-bottom:.6rem">
-          <div class="energia-bar-fill" style="width:${disp}%;background:${cor}"></div>
-        </div>
-        <div style="font-size:.63rem;color:var(--txt4);line-height:1.85;margin-bottom:.7rem">
-          <div style="display:flex;justify-content:space-between"><span>Pesquisa jurídica</span><span>-10 ⚡</span></div>
-          <div style="display:flex;justify-content:space-between"><span>Audiência</span><span>-20 ⚡</span></div>
-          <div style="display:flex;justify-content:space-between"><span>Acordo</span><span>-5 ⚡</span></div>
-        </div>
-        <button class="btn-avancar-mes ${pronto ? 'pronto' : ''}"
-          onclick="window.avancarMes(${pronto ? 'false' : 'true'})"
-          ${!pronto ? 'style="background:linear-gradient(135deg,#6B7FA0,#9BAAC4);border-color:#D1D8EE;color:#fff;opacity:.75"' : ''}>
-          <span class="bam-icon">${pronto ? '▶' : '⚡'}</span>
-          <div>
-            ${pronto ? 'Avançar mês' : 'Forçar avanço'}
-            <span class="bam-hint">${pronto ? 'Energia esgotada — pronto!' : disp + ' ⚡ restantes'}</span>
-          </div>
-        </button>`;
-    }
   }
 
   const wA  = j.wins_ano   || 0;

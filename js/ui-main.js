@@ -92,9 +92,14 @@ function renderPerfil(j, el) {
   const escNome = j.escritorio_nome || 'Advocacia Solo';
   const s = window.SERVER || {};
 
+  const fotoUrl = window.USER_PHOTO_URL || '';
+  const fotoHtml = fotoUrl
+    ? `<img src="${fotoUrl}" class="profile-photo" alt="${j.nome_personagem||'Perfil'}" style="object-fit:cover;border-radius:50%;width:80px;height:80px;border:2px solid var(--ouro)">`
+    : `<div class="profile-photo">⚖️</div>`;
+
   el.innerHTML = `
     <div class="profile-hero">
-      <div class="profile-photo">⚖️</div>
+      ${fotoHtml}
       <div>
         <div class="profile-hero-nome">${j.nome_personagem || '—'}</div>
         <div class="profile-hero-titulo">${label} · ${esp} · Rio de Janeiro</div>

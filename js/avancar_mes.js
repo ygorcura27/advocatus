@@ -23,57 +23,21 @@ export function renderBlocoEnergia(j) {
   const el = document.getElementById('bloco-energia');
   if (!el) return;
 
-  // Teto dinâmico: 100 normais + até 25 de bônus de academia (total até 125⚡).
-  const energiaTotal = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
-  const usado       = j.energia_usada_mes || 0;
-  const disponivel  = Math.max(0, energiaTotal - usado);
-  const pct         = Math.round((disponivel / energiaTotal) * 100);
-  const podeAvancar = disponivel <= ENERGIA_MIN;
-  const corBarra    = disponivel > 50 ? '#5A9A3A' : disponivel > 20 ? '#B8922A' : '#A83A3A';
-
   // ── Verificar bloqueio de férias de janeiro ──
-  const mesAtual        = j.mes_pessoal !== undefined ? j.mes_pessoal : -1;
-  const bloqueadoAte    = j.janeiro_bloqueado_ate ? new Date(j.janeiro_bloqueado_ate) : null;
-  const emFerias        = mesAtual === 0 && bloqueadoAte && Date.now() < bloqueadoAte.getTime();
+  const mesAtual     = j.mes_pessoal !== undefined ? j.mes_pessoal : -1;
+  const bloqueadoAte = j.janeiro_bloqueado_ate ? new Date(j.janeiro_bloqueado_ate) : null;
+  const emFerias     = mesAtual === 0 && bloqueadoAte && Date.now() < bloqueadoAte.getTime();
 
   if (emFerias) {
-    // Mostrar countdown de férias
-    el.innerHTML = _renderBlocoFerias(disponivel, pct, corBarra, bloqueadoAte, energiaTotal);
-    _iniciarCountdownFerias(bloqueadoAte, el, j);
+    el.innerHTML = `<button class="btn btn-ghost btn-block" disabled style="opacity:.45;font-size:.78rem;cursor:not-allowed">
+      🔒 Recesso de Janeiro — aguarde
+    </button>`;
     return;
   }
 
-  el.innerHTML = `
-    <div class="bloco-titulo">
-      ⚡ Energia do Mês
-      <span style="color:${corBarra};font-weight:700">${disponivel}/${energiaTotal}</span>
-    </div>
-    <div class="energia-bar-wrap" style="margin-bottom:.5rem">
-      <div class="energia-bar-fill" id="energia-fill"
-        style="width:${pct}%;background:linear-gradient(90deg,${corBarra}88,${corBarra})">
-      </div>
-    </div>
-    <div style="font-size:.63rem;color:var(--ardosia);line-height:1.8;margin-bottom:.6rem">
-      <div style="display:flex;justify-content:space-between"><span>Pesquisa jurídica</span><span>-10 ⚡</span></div>
-      <div style="display:flex;justify-content:space-between"><span>Audiência</span><span>-20 ⚡</span></div>
-      <div style="display:flex;justify-content:space-between"><span>Caso complexo/STJ/STF</span><span>-35 ⚡</span></div>
-      <div style="display:flex;justify-content:space-between"><span>Networking</span><span>-5 ⚡</span></div>
-      <div style="display:flex;justify-content:space-between"><span>Curso</span><span>-10 ⚡</span></div>
-    </div>
-    ${podeAvancar
-      ? `<button id="btn-avancar" class="btn btn-prim btn-block"
-           style="animation:pulseGold .8s ease infinite alternate"
-           onclick="window.avancarMes()">
-           ▶ Avançar mês →
-         </button>
-         <div style="font-size:.63rem;color:var(--ardosia2);text-align:center;margin-top:.3rem">
-           Energia baixa — mês pronto para avançar
-         </div>`
-      : `<button id="btn-avancar" class="btn btn-ghost btn-block"
-           onclick="window.avancarMes(true)"
-           style="font-size:.72rem;opacity:.7">
-           Avançar mês agora (${disponivel} ⚡ restantes)
-         </button>`}`;
+  el.innerHTML = `<button id="btn-avancar" class="btn btn-prim btn-block" onclick="window.avancarMes()">
+    ▶ Avançar mês
+  </button>`;
 }
 
 // ── Bloco visual de férias de janeiro ──

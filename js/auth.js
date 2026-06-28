@@ -89,16 +89,12 @@ function _iniciarListeners(uid) {
 function _atualizarTopbarUsuario(user, jogador) {
   const avatar = document.getElementById('tb-avatar');
   const nome   = document.getElementById('tb-nome');
-  const rep    = document.getElementById('tb-rep');
-  const saldo  = document.getElementById('tb-saldo');
 
-  if (avatar && user.photoURL) {
-    avatar.src = user.photoURL;
-    avatar.style.display = 'block';
+  if (user.photoURL) {
+    window.USER_PHOTO_URL = user.photoURL;
+    if (avatar) { avatar.src = user.photoURL; avatar.style.display = 'block'; }
   }
-  if (nome)  nome.textContent  = jogador.nome_personagem || user.displayName || '—';
-  if (rep)   rep.textContent   = jogador.reputacao || 0;
-  if (saldo) saldo.textContent = _fmt(jogador.dinheiro || 0);
+  if (nome) nome.textContent = jogador.nome_personagem || user.displayName || '—';
 }
 
 // ════════════════════════════════════════════════════════
@@ -120,20 +116,7 @@ function _atualizarRelogio(server) {
 }
 
 function _atualizarTickLabel() {
-  const el = document.getElementById('server-tick');
-  if (!el) return;
-  const j = window.JOGADOR;
-  if (!j) { el.textContent = ''; return; }
-
-  const usado      = j.energia_usada_mes || 0;
-  const disponivel = Math.max(0, (window.getEnergiaTotal?window.getEnergiaTotal(j):100) - usado);
-
-  if (disponivel <= 5) {
-    el.innerHTML = `<span style="cursor:pointer;text-decoration:underline;color:var(--ouro2)" onclick="window.avancarMes()">▶ Avançar mês</span>`;
-  } else {
-    el.innerHTML = `<span>⚡ ${disponivel} energia</span>`;
-    el.style.color = '';
-  }
+  // Sem exibição de energia na topbar — nada a atualizar no tick
 }
 
 // Atualizar relógio e label quando jogador mudar

@@ -38,11 +38,6 @@
 
   <!-- Usuário -->
   <div class="topbar-user">
-    <!-- Saldo -->
-    <div class="tb-saldo-bloco">
-      <div class="tb-saldo-label">Saldo</div>
-      <span id="tb-saldo" class="tb-saldo-val">—</span>
-    </div>
     <div id="tb-serasa" class="topbar-serasa">🚨</div>
     <img id="tb-avatar" class="topbar-avatar" src="" alt="" style="display:none">
     <span id="tb-nome" class="topbar-nome">—</span>
@@ -125,25 +120,6 @@
       </div>
     </nav>
 
-    <!-- Stats rápidos -->
-    <div class="stats-rapidos">
-      <div class="stat-mini">
-        <div class="v money" id="sm-dinheiro">R$0</div>
-        <div class="l">Saldo</div>
-      </div>
-      <div class="stat-mini">
-        <div class="v gold" id="sm-rep">0</div>
-        <div class="l">Reputação</div>
-      </div>
-      <div class="stat-mini">
-        <div class="v" id="sm-energia">100</div>
-        <div class="l">Energia</div>
-      </div>
-      <div class="stat-mini">
-        <div class="v gold" id="sm-wins">0%</div>
-        <div class="l">Aproveit.</div>
-      </div>
-    </div>
   </aside>
 
   <!-- ══ ÁREA CENTRAL ══ -->
@@ -185,12 +161,11 @@
       <div class="pa-pct" id="pa-pct">0% concluído</div>
     </div>
 
-    <!-- Energia + Botão Avançar Mês (injetado por avancar_mes.js) -->
+    <!-- Botão Avançar Mês (injetado por avancar_mes.js) -->
     <div class="energia-bloco" id="bloco-energia">
-      <div class="bloco-titulo">⚡ Energia Mensal <span>100/100</span></div>
-      <div class="energia-bar-wrap">
-        <div class="energia-bar-fill" style="width:100%"></div>
-      </div>
+      <button id="btn-avancar" class="btn btn-prim btn-block" onclick="window.avancarMes()">
+        ▶ Avançar mês
+      </button>
     </div>
 
     <!-- Evento global -->
@@ -500,25 +475,7 @@ window.addEventListener('jogador:update', (e) => {
   const btn  = document.getElementById('btn-avancar-mobile');
   if (fill) { fill.style.width = disp + '%'; fill.style.background = cor; }
   if (val)  val.textContent = disp + '/100';
-  if (btn) {
-    if (disp <= 5) { btn.textContent = '▶ Avançar'; btn.classList.add('pronto'); }
-    else           { btn.textContent = '⚡ ' + disp; btn.classList.remove('pronto'); }
-  }
-
-  // ── Topbar: saldo ──
-  const saldoEl = document.getElementById('tb-saldo');
-  if (saldoEl && j.dinheiro !== undefined) {
-    const d = j.dinheiro || 0;
-    saldoEl.textContent = d >= 1000000
-      ? 'R$ ' + (d/1000000).toFixed(2) + 'M'
-      : 'R$ ' + Number(d).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
-  }
-
-  // ── Topbar: botão avançar mês (sem exibir energia) ──
-  const tickEl = document.getElementById('server-tick');
-  if (tickEl && disp <= 5) {
-    tickEl.innerHTML = '<button onclick="window.avancarMes()" class="tb-btn-avancar pronto">▶ Avançar mês</button>';
-  }
+  if (btn)  { btn.textContent = '▶ Avançar'; btn.classList.add('pronto'); }
 });
 
 window.fmt = function(n) {
