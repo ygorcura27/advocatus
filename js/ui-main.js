@@ -204,50 +204,9 @@ async function _carregarFeedAtividade(uid) {
 }
 
 // ════════════════════════════════════════════════════════
-// PROCESSOS — lista e ações
-// ════════════════════════════════════════════════════════
+// PROCESSOS — redirecionado para o Escritório (menu removido do nav)
 function renderProcessos(j, el) {
-  el.innerHTML = `
-    <div class="secao-header">
-      <div class="secao-titulo">⚖️ Meus Processos</div>
-      <button class="btn btn-sm btn-sec" onclick="window.novoProcesso && window.novoProcesso()">+ Novo caso</button>
-    </div>
-    <div id="lista-processos">
-      <div style="font-size:.78rem;color:var(--ardosia)">Carregando processos...</div>
-    </div>
-    <div class="ornamento">— ✦ —</div>
-    <div id="secao-pool-escritorio"></div>
-    <div class="ornamento">— ✦ —</div>
-    <div id="secao-carteira-processual"></div>
-    <div class="ornamento">— ✦ —</div>
-    <div class="secao-header" style="margin-top:.5rem">
-      <div class="secao-titulo">📁 Processos Encerrados</div>
-    </div>
-    <div id="lista-processos-enc">
-      <div style="font-size:.78rem;color:var(--ardosia)">Carregando...</div>
-    </div>`;
-
-  _carregarProcessos(j.uid);
-
-  // Pool do escritório (dono ou empregado) — antes ficava completamente
-  // invisível: os casos eram criados certo no Firestore via
-  // novoProcessoPool/novoProcessoPoolEmpregado, mas nenhuma tela os
-  // listava. renderPoolEscritorio() já existe em processos.js e cuida de
-  // checar se o jogador trabalha em escritório, buscar os casos e
-  // renderizar — ou deixar o container vazio se for solo.
-  const poolEl = document.getElementById('secao-pool-escritorio');
-  if (poolEl && window.renderPoolEscritorio) {
-    window.renderPoolEscritorio(poolEl);
-  }
-
-  // Carteira processual (recursos pendentes e decisões de recurso
-  // aguardando o jogador) — antes existia em processos.js mas nenhuma
-  // tela chamava, então processos recorridos ficavam invisíveis mesmo
-  // já estando de fato em fase de recurso no Firestore.
-  const carteiraEl = document.getElementById('secao-carteira-processual');
-  if (carteiraEl && window.renderCarteiraProcessual) {
-    window.renderCarteiraProcessual(carteiraEl);
-  }
+  renderEscritorio(j, el);
 }
 
 async function _carregarProcessos(uid) {
