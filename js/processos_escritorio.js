@@ -1,12 +1,13 @@
 /**
- * PROCESSOS DO ESCRITÓRIO — pool gerado por clientes, designação para NPCs, sentença
+ * PROCESSOS DO ESCRITÓRIO — pool, fase recursal, histórico
+ * Layout de 3 colunas no painel do escritório.
  */
 
-import { collection, query, where, orderBy, limit, getDocs, addDoc, doc, updateDoc, increment, Timestamp }
+import { collection, query, where, orderBy, limit, getDocs, addDoc, doc, updateDoc, getDoc, increment }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { db } from './firebase-init.js';
 
-// ─── Constantes ───────────────────────────────────────────────────────────────
+// ─── Constantes do pool de processos ─────────────────────────────────────────
 
 const SKILLS_REL     = ['escrita_juridica', 'pesquisa', 'oratoria', 'persuasao', 'argumentacao'];
 const CARGO_MULT     = { est:.30, ass:.42, jnr:.58, pln:.70, snr:.85, asc:.94, soc:1.00 };
@@ -17,13 +18,20 @@ const TIER_ORDER     = { D:0, C:1, B:2, A:3, S:4 };
 const CARGO_TIER_MAX = { est:'D', ass:'C', jnr:'B', pln:'A', snr:'S', asc:'S', soc:'S' };
 const TIER_CHANCE    = { S:.10, A:.15, B:.25, C:.35, D:.50 };
 const TIER_CAP_ESC   = { 1:2, 2:5, 3:7, 4:10, 5:13 };
-const SENT_LIMITE    = { jnr:1, pln:2, snr:3, asc:5 }; // soc = ilimitado
-
-// Progresso base mensal por cargo (%)
 const PROG_MES       = { est:18, ass:22, jnr:30, pln:38, snr:48, asc:55, soc:65 };
 
 const TIER_COR = { S:'var(--verm2)', A:'var(--amber)', B:'var(--navy3)', C:'var(--verde2)', D:'var(--txt4)' };
-const TIER_TAG = { S:'S', A:'A', B:'B', C:'C', D:'D' };
+
+// ─── Constantes de energia NPC ────────────────────────────────────────────────
+
+const NPC_ENERGIA_MES = 100;
+const NPC_CUSTO_PROC  = 40;   // energia NPC por processo designado
+const NPC_OVERLOAD_TH = 20;   // abaixo disso, aviso de sobrecarga
+
+// Exportar para uso em escritorio_painel.js
+window.NPC_CUSTO_OP   = 25;   // energia NPC por oportunidade delegada
+window.NPC_ENERGIA_MES = NPC_ENERGIA_MES;
+window.NPC_OVERLOAD_TH = NPC_OVERLOAD_TH;
 
 const PROC_TITULOS = {
   civil:          ['Ação de Cobrança','Ação de Reparação de Danos','Ação Declaratória de Nulidade','Ação de Obrigação de Fazer'],
@@ -98,113 +106,106 @@ function _podeManejar(cargoId, tierProc) {
   return TIER_ORDER[tierProc] <= TIER_ORDER[CARGO_TIER_MAX[cargoId] || 'D'];
 }
 
-// ─── RENDER pool de processos no painel do escritório ─────────────────────────
+function _tierBadge(tier) {
+  return `<span style="font-size:.58rem;font-weight:700;padding:.1rem .35rem;border-radius:8px;background:${TIER_COR[tier]}20;color:${TIER_COR[tier]};border:1px solid ${TIER_COR[tier]}">Tier ${tier}</span>`;
+}
+
+function _barraProgresso(pct) {
+  const cor = pct >= 80 ? 'var(--verde2)' : pct >= 50 ? 'var(--amber)' : 'var(--navy3)';
+  return `<div style="height:4px;background:var(--bg2);border-radius:3px;overflow:hidden;margin-top:.25rem">
+    <div style="height:100%;width:${pct}%;background:${cor};border-radius:3px;transition:width .4s"></div>
+  </div>`;
+}
+
+// ─── Checagem de energia do NPC ───────────────────────────────────────────────
+
+function _npcEnergiaBadge(func) {
+  if (func.burnout_npc) {
+    return `<span class="npc-badge npc-burnout" title="Em burnout — ${func.burnout_npc_restante || 0} mês(es) restantes">🔴 Burnout</span>`;
+  }
+  const usado = func.energia_npc_usada_mes || 0;
+  const disp  = NPC_ENERGIA_MES - usado;
+  if (disp < NPC_OVERLOAD_TH) {
+    return `<span class="npc-badge npc-sobrecarregado" title="Sobrecarregado este mês (${disp}⚡ restantes)">⚠️ Sobrecarregado</span>`;
+  }
+  return '';
+}
+
+// Exportar para uso no escritorio_painel.js
+window._npcEnergiaBadge = _npcEnergiaBadge;
+
+// ─── RENDER principal — 3 colunas ────────────────────────────────────────────
 
 window.renderProcessosPool = async function(j, escId, el) {
   try {
-    const snap = await getDocs(
-      query(collection(db, 'escritorios', escId, 'processos_pool'), orderBy('criado_em', 'desc'), limit(40))
+    // Carregar todos os processos do pool
+    const poolSnap = await getDocs(
+      query(collection(db, 'escritorios', escId, 'processos_pool'), orderBy('criado_em', 'desc'), limit(60))
     );
-    const todos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const todos = poolSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
     const disponiveis  = todos.filter(p => p.status === 'disponivel');
     const emAndamento  = todos.filter(p => p.status === 'em_andamento');
     const aguardSent   = todos.filter(p => p.status === 'aguardando_sentenca');
 
-    const _tierBadge = (tier) =>
-      `<span style="font-size:.58rem;font-weight:700;padding:.1rem .35rem;border-radius:8px;background:${TIER_COR[tier]}20;color:${TIER_COR[tier]};border:1px solid ${TIER_COR[tier]}">Tier ${TIER_TAG[tier]}</span>`;
+    // Col 2: Fase recursal (processos da coleção principal vinculados a este escritório)
+    let recursais = [];
+    try {
+      const recSnap = await getDocs(query(
+        collection(db, 'processos'),
+        where('pool_escritorio_id', '==', escId),
+        where('status', 'in', ['recurso_pendente', 'aguardando_decisao_recurso'])
+      ));
+      recursais = recSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (e) { /* sem índice ainda — deixa vazio */ }
 
-    const _barraProgresso = (pct) => {
-      const cor = pct >= 80 ? 'var(--verde2)' : pct >= 50 ? 'var(--amber)' : 'var(--navy3)';
-      return `<div style="height:5px;background:var(--bg2);border-radius:3px;overflow:hidden;margin-top:.25rem">
-        <div style="height:100%;width:${pct}%;background:${cor};border-radius:3px;transition:width .4s"></div>
-      </div>`;
-    };
+    // Col 3: Histórico últimos 5
+    let historico = [];
+    try {
+      const histSnap = await getDocs(
+        query(collection(db, 'escritorios', escId, 'processos_pool'),
+          where('status', '==', 'concluido'),
+          orderBy('concluido_em', 'desc'),
+          limit(5))
+      );
+      historico = histSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (e) { /* sem índice — tenta fallback */ }
 
-    const rowDisp = disponiveis.map(p => `
-      <div class="proc-pool-row" id="proc-${p.id}">
-        <div class="proc-pool-area">${p.icone || '⚖️'}</div>
-        <div style="flex:1;min-width:0">
-          <div class="proc-pool-titulo">${p.titulo}</div>
-          <div class="proc-pool-meta">${p.cliente_nome || '—'} · ${p.area || 'Civil'}</div>
-        </div>
-        <div style="text-align:right;flex-shrink:0;margin-right:.5rem">
-          <div style="font-size:.72rem;font-weight:700;color:var(--verde2);font-variant-numeric:tabular-nums">${_fmtP(p.honorarios)}</div>
-          <div style="margin-top:.15rem">${_tierBadge(p.tier || 'D')}</div>
-        </div>
-        <button class="btn btn-sm btn-sec" style="font-size:.62rem;padding:.2rem .45rem;white-space:nowrap"
-          onclick="window._designarProcessoPicker('${escId}','${p.id}','proc-${p.id}')">
-          Designar ↓
-        </button>
-      </div>`).join('');
-
-    const rowAnd = emAndamento.map(p => `
-      <div class="proc-pool-row">
-        <div class="proc-pool-area">${p.icone || '⚖️'}</div>
-        <div style="flex:1;min-width:0">
-          <div class="proc-pool-titulo">${p.titulo}</div>
-          <div class="proc-pool-meta">${p.func_nome || '—'} · ${p.cliente_nome || '—'}</div>
-          ${_barraProgresso(p.progresso || 0)}
-        </div>
-        <div style="text-align:right;flex-shrink:0">
-          <div style="font-size:.68rem;font-weight:700;color:var(--navy)">${p.progresso || 0}%</div>
-          <div style="font-size:.6rem;color:var(--txt4)">${_fmtP(p.honorarios)}</div>
-        </div>
-      </div>`).join('');
-
-    const rowSent = aguardSent.map(p => `
-      <div class="proc-pool-row" id="sent-${p.id}">
-        <div class="proc-pool-area">⏳</div>
-        <div style="flex:1;min-width:0">
-          <div class="proc-pool-titulo">${p.titulo}</div>
-          <div class="proc-pool-meta">${p.cliente_nome || '—'} · concluído por ${p.func_nome || '—'}</div>
-        </div>
-        <div style="text-align:right;flex-shrink:0;margin-right:.5rem">
-          <div style="font-size:.72rem;font-weight:700;color:var(--amber);font-variant-numeric:tabular-nums">${_fmtP(p.honorarios)}</div>
-          <div style="margin-top:.15rem">${_tierBadge(p.tier || 'D')}</div>
-        </div>
-        <button class="btn btn-sm btn-prim" style="font-size:.62rem;padding:.2rem .45rem;white-space:nowrap"
-          onclick="window._processarSentenca('${escId}','${p.id}','${j.uid || window.JOGADOR_UID}')">
-          ⚖️ Sentença
-        </button>
-      </div>`).join('');
-
-    const s = window.SERVER || {};
     const tierEsc = j.escritorio_tier || 1;
-    const capMes  = TIER_CAP_ESC[tierEsc] || 2;
+    const uid     = j.uid || window.JOGADOR_UID;
+
+    // Coluna 1 — pool + em andamento + aguardando sentença
+    const col1Html = _renderColPool(disponiveis, emAndamento, aguardSent, j, escId);
+
+    // Coluna 2 — fase recursal
+    const col2Html = _renderColRecursal(recursais);
+
+    // Coluna 3 — histórico
+    const col3Html = _renderColHistorico(historico);
 
     el.innerHTML = `
       <div class="esc-card-bloco" style="margin-bottom:1.1rem">
-        <div class="secao-header" style="margin-bottom:.6rem;border-bottom:1px solid var(--borda-sub);padding-bottom:.5rem">
-          <div class="secao-titulo" style="font-size:.88rem;font-weight:700">⚖️ Pool de Processos</div>
+        <div class="secao-header" style="margin-bottom:.8rem;border-bottom:1px solid #E8ECF5;padding-bottom:.5rem">
+          <div class="secao-titulo" style="font-size:.88rem;font-weight:700">⚖️ Gestão de Processos</div>
           <button class="btn btn-sm btn-ghost" style="font-size:.62rem;padding:.18rem .5rem"
             onclick="window.gerarProcessosMensais('${escId}',${tierEsc})">
             🔄 Gerar do mês
           </button>
         </div>
-
-        ${aguardSent.length ? `
-          <div class="proc-pool-grupo">
-            <div class="proc-pool-grupo-titulo" style="color:var(--amber)">⏳ Aguardando sentença (${aguardSent.length})</div>
-            ${rowSent}
-          </div>` : ''}
-
-        ${disponiveis.length ? `
-          <div class="proc-pool-grupo">
-            <div class="proc-pool-grupo-titulo">📂 Disponíveis (${disponiveis.length})</div>
-            ${rowDisp}
-          </div>` : ''}
-
-        ${emAndamento.length ? `
-          <div class="proc-pool-grupo">
-            <div class="proc-pool-grupo-titulo" style="color:var(--navy3)">⚙️ Em andamento (${emAndamento.length})</div>
-            ${rowAnd}
-          </div>` : ''}
-
-        ${todos.length === 0 ? `
-          <div style="font-size:.78rem;color:var(--txt3);padding:.6rem 0;text-align:center">
-            Nenhum processo no pool. Use "Gerar do mês" ou aguarde o próximo mês.
-          </div>` : ''}
+        <div class="proc-tres-cols">
+          <div class="proc-col">
+            <div class="proc-col-header">📂 Novos Processos (${disponiveis.length + emAndamento.length + aguardSent.length})</div>
+            ${col1Html}
+          </div>
+          <div class="proc-col">
+            <div class="proc-col-header">📁 Fase Recursal (${recursais.length})</div>
+            ${col2Html}
+          </div>
+          <div class="proc-col">
+            <div class="proc-col-header">✅ Histórico</div>
+            ${col3Html}
+          </div>
+        </div>
       </div>`;
 
   } catch (e) {
@@ -213,7 +214,215 @@ window.renderProcessosPool = async function(j, escId, el) {
   }
 };
 
-// ─── Abrir picker de PROCESSOS para um NPC específico (a partir do card do NPC) ──
+// ─── Coluna 1: Pool de novos processos ────────────────────────────────────────
+
+function _renderColPool(disponiveis, emAndamento, aguardSent, j, escId) {
+  const uid = j.uid || window.JOGADOR_UID;
+  const energiaDisp = Math.max(0,
+    (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - (j.energia_usada_mes || 0));
+
+  const CUSTO_ASSUMIR = 25;
+  const CUSTO_DESIGN  = 5;
+
+  // Aguardando sentença
+  const rowsSent = aguardSent.map(p => `
+    <div class="proc-pool-row" id="sent-${p.id}">
+      <div class="proc-pool-area">⏳</div>
+      <div style="flex:1;min-width:0">
+        <div class="proc-pool-titulo">${p.titulo}</div>
+        <div class="proc-pool-meta">${p.cliente_nome||'—'} · ${p.assumido_uid ? 'você' : (p.func_nome||'—')}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;margin-right:.5rem">
+        <div style="font-size:.7rem;font-weight:700;color:var(--amber)">${_fmtP(p.honorarios)}</div>
+        <div style="margin-top:.1rem">${_tierBadge(p.tier||'D')}</div>
+      </div>
+      ${energiaDisp >= 10
+        ? `<button class="btn btn-sm btn-prim" style="font-size:.62rem;padding:.2rem .45rem;white-space:nowrap"
+             onclick="window._processarSentenca('${escId}','${p.id}','${uid}')">
+             ⚖️ Sentença
+           </button>`
+        : `<span style="font-size:.6rem;color:var(--txt4)">⚡ insuf.</span>`}
+    </div>`).join('');
+
+  // Em andamento
+  const rowsAnd = emAndamento.map(p => `
+    <div class="proc-pool-row">
+      <div class="proc-pool-area">⚙️</div>
+      <div style="flex:1;min-width:0">
+        <div class="proc-pool-titulo">${p.titulo}</div>
+        <div class="proc-pool-meta">${p.assumido_uid ? 'você' : (p.func_nome||'—')} · ${p.cliente_nome||'—'}</div>
+        ${_barraProgresso(p.progresso||0)}
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:.68rem;font-weight:700;color:var(--navy)">${p.progresso||0}%</div>
+        <div style="font-size:.6rem;color:var(--txt4)">${_fmtP(p.honorarios)}</div>
+      </div>
+    </div>`).join('');
+
+  // Disponíveis — botões "Assumir" e "Designar ↓"
+  const rowsDisp = disponiveis.map(p => `
+    <div class="proc-pool-row" id="proc-${p.id}">
+      <div class="proc-pool-area">${p.icone||'⚖️'}</div>
+      <div style="flex:1;min-width:0">
+        <div class="proc-pool-titulo">${p.titulo}</div>
+        <div class="proc-pool-meta">${p.cliente_nome||'—'} · ${p.area||'Civil'}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;margin-right:.3rem">
+        <div style="font-size:.7rem;font-weight:700;color:var(--verde2)">${_fmtP(p.honorarios)}</div>
+        <div style="margin-top:.1rem">${_tierBadge(p.tier||'D')}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:.2rem">
+        <button class="btn btn-sm btn-prim" style="font-size:.6rem;padding:.18rem .38rem;white-space:nowrap"
+          onclick="${energiaDisp >= CUSTO_ASSUMIR
+            ? `window._assumirCasoPool('${escId}','${p.id}','proc-${p.id}')`
+            : `toast('⚡ Energia insuficiente (${energiaDisp}/${CUSTO_ASSUMIR}).','ko')`}"
+          ${energiaDisp < CUSTO_ASSUMIR ? 'style="opacity:.45;cursor:not-allowed;font-size:.6rem;padding:.18rem .38rem"' : ''}>
+          ⚡${CUSTO_ASSUMIR} Assumir
+        </button>
+        <button class="btn btn-sm btn-sec" style="font-size:.6rem;padding:.18rem .38rem;white-space:nowrap"
+          onclick="window._designarProcessoPicker('${escId}','${p.id}','proc-${p.id}')">
+          👥 Designar ↓
+        </button>
+      </div>
+    </div>`).join('');
+
+  if (!disponiveis.length && !emAndamento.length && !aguardSent.length) {
+    return `<div style="font-size:.75rem;color:var(--txt3);padding:.5rem 0;text-align:center">
+      Nenhum processo no pool. Use "Gerar do mês" acima.
+    </div>`;
+  }
+
+  return `
+    ${aguardSent.length ? `
+      <div class="proc-pool-grupo">
+        <div class="proc-pool-grupo-titulo" style="color:var(--amber)">⏳ Ag. sentença (${aguardSent.length})</div>
+        ${rowsSent}
+      </div>` : ''}
+    ${disponiveis.length ? `
+      <div class="proc-pool-grupo">
+        <div class="proc-pool-grupo-titulo">📂 Disponíveis (${disponiveis.length})</div>
+        ${rowsDisp}
+      </div>` : ''}
+    ${emAndamento.length ? `
+      <div class="proc-pool-grupo">
+        <div class="proc-pool-grupo-titulo" style="color:var(--navy3)">⚙️ Em andamento (${emAndamento.length})</div>
+        ${rowsAnd}
+      </div>` : ''}`;
+}
+
+// ─── Coluna 2: Fase recursal ──────────────────────────────────────────────────
+
+function _renderColRecursal(recursais) {
+  if (!recursais.length) {
+    return `<div style="font-size:.75rem;color:var(--txt3);padding:.5rem 0;text-align:center">
+      Nenhum processo em fase recursal.
+    </div>`;
+  }
+
+  return recursais.map(p => {
+    if (p.status === 'aguardando_decisao_recurso') {
+      return `
+      <div class="proc-recursal-row">
+        <div style="font-size:.6rem;color:var(--txt4);font-family:monospace">${p.numero||'—'}</div>
+        <div style="font-size:.75rem;font-weight:600;color:var(--navy);margin:.1rem 0">${p.autor||'—'} vs ${p.reu||'—'}</div>
+        <div style="font-size:.63rem;color:var(--txt4)">${p.tipo||'—'} · sentença desfavorável</div>
+        <div style="display:flex;gap:.35rem;margin-top:.5rem">
+          <button class="btn btn-sm btn-prim" style="flex:1;font-size:.62rem"
+            onclick="window.decidirRecursoSentencaProducao && window.decidirRecursoSentencaProducao('${p.id}',true)">
+            ⚖️ Recorrer
+          </button>
+          <button class="btn btn-sm btn-ghost" style="flex:1;font-size:.62rem"
+            onclick="window.decidirRecursoSentencaProducao && window.decidirRecursoSentencaProducao('${p.id}',false)">
+            Aceitar
+          </button>
+        </div>
+      </div>`;
+    }
+    const label = p.quem_recorre === 'jogador' ? 'Você recorreu' : 'Parte contrária recorreu';
+    return `
+    <div class="proc-recursal-row">
+      <div style="font-size:.6rem;color:var(--txt4);font-family:monospace">${p.numero||'—'}</div>
+      <div style="font-size:.75rem;font-weight:600;color:var(--navy);margin:.1rem 0">${p.autor||'—'} vs ${p.reu||'—'}</div>
+      <div style="font-size:.63rem;color:var(--txt4)">${label} · ${p.instancia_seguinte||'—'}</div>
+      <button class="btn btn-sm btn-prim btn-block" style="margin-top:.4rem;font-size:.62rem"
+        onclick="window.jogarRecursoProducao && window.jogarRecursoProducao('${p.id}')">
+        ⚖️ Sustentar Recurso
+      </button>
+    </div>`;
+  }).join('');
+}
+
+// ─── Coluna 3: Histórico ──────────────────────────────────────────────────────
+
+function _renderColHistorico(historico) {
+  if (!historico.length) {
+    return `<div style="font-size:.75rem;color:var(--txt3);padding:.5rem 0;text-align:center">
+      Nenhum processo concluído ainda.
+    </div>`;
+  }
+
+  return historico.map(p => {
+    const cor = { procedente:'var(--verde2)', parcial:'var(--amber)', improcedente:'var(--verm2)' }[p.resultado] || 'var(--txt4)';
+    const icone = { procedente:'✅', parcial:'🟡', improcedente:'❌' }[p.resultado] || '—';
+    return `
+    <div class="proc-hist-row">
+      <div style="display:flex;justify-content:space-between;align-items:start">
+        <div style="flex:1;min-width:0;margin-right:.4rem">
+          <div style="font-size:.72rem;font-weight:600;color:var(--txt1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.titulo}</div>
+          <div style="font-size:.6rem;color:var(--txt4)">${p.cliente_nome||'—'} · ${p.func_nome||'você'}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:.6rem;color:${cor}">${icone}</div>
+          <div style="font-size:.65rem;font-weight:700;color:var(--verde2)">${_fmtP(p.valor_recebido)}</div>
+        </div>
+      </div>
+      <div style="margin-top:.2rem">${_tierBadge(p.tier||'D')}</div>
+    </div>`;
+  }).join('');
+}
+
+// ─── Assumir caso pessoalmente ────────────────────────────────────────────────
+
+window._assumirCasoPool = async function(escId, procId, containerId) {
+  const j   = window.JOGADOR;
+  const uid = j.uid || window.JOGADOR_UID;
+  const CUSTO = 25;
+
+  const energiaUsada = j.energia_usada_mes || 0;
+  const energiaTotal = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
+  if (Math.max(0, energiaTotal - energiaUsada) < CUSTO) {
+    toast(`⚡ Energia insuficiente (requer ${CUSTO}).`, 'ko');
+    return;
+  }
+
+  try {
+    await Promise.all([
+      updateDoc(doc(db, 'jogadores', uid), { energia_usada_mes: energiaUsada + CUSTO }),
+      updateDoc(doc(db, 'escritorios', escId, 'processos_pool', procId), {
+        status: 'aguardando_sentenca',
+        assumido_uid:  uid,
+        assumido_nome: j.nome_personagem || 'Dono',
+        func_id:   null,
+        func_nome: null,
+        func_cargo: null,
+        progresso: 100,
+        assumido_em: new Date().toISOString(),
+      }),
+    ]);
+
+    j.energia_usada_mes = energiaUsada + CUSTO;
+    window.JOGADOR = j;
+    toast(`✅ Caso assumido! Clique em "⚖️ Sentença" para finalizar. -${CUSTO}⚡`, 'ok');
+
+    const elPool = document.getElementById('esc-processos-bloco');
+    if (elPool) window.renderProcessosPool(j, escId, elPool);
+  } catch (e) {
+    console.error('[ASSUMIR CASO]', e);
+    toast('Erro ao assumir caso.', 'ko');
+  }
+};
+
+// ─── Picker de processos para NPC específico ──────────────────────────────────
 
 window._abrirDesignarParaFunc = async function(escId, funcId, cargoId, containerId) {
   const container = document.getElementById(containerId);
@@ -226,7 +435,14 @@ window._abrirDesignarParaFunc = async function(escId, funcId, cargoId, container
   const energiaDisp = Math.max(0,
     (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - (j.energia_usada_mes || 0));
 
-  const CUSTO = 5;
+  // Verificar energia NPC
+  let func = null;
+  try {
+    const fSnap = await getDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId));
+    if (fSnap.exists()) func = { id: fSnap.id, ...fSnap.data() };
+  } catch (e) { /* usa defaults */ }
+
+  const CUSTO_DONO = 5;
 
   let processos = [];
   try {
@@ -241,9 +457,14 @@ window._abrirDesignarParaFunc = async function(escId, funcId, cargoId, container
   picker.style.cssText = 'margin-top:.5rem;padding:.6rem .7rem;background:var(--bg2);border-radius:var(--r);border:1px solid var(--bg3);grid-column:1/-1';
 
   if (!processos.length) {
-    picker.innerHTML = `<div style="font-size:.75rem;color:var(--txt3)">Nenhum processo disponível no pool. Clique em "Gerar do mês" no Pool de Processos.</div>`;
+    picker.innerHTML = `<div style="font-size:.75rem;color:var(--txt3)">Nenhum processo disponível. Use "Gerar do mês".</div>`;
   } else {
-    const temEnergia = energiaDisp >= CUSTO;
+    const npcEnergiaUsada = func?.energia_npc_usada_mes || 0;
+    const npcEnergiaDisp  = NPC_ENERGIA_MES - npcEnergiaUsada;
+    const npcSobrecarregado = npcEnergiaDisp < NPC_OVERLOAD_TH;
+
+    const temEnergiaDono = energiaDisp >= CUSTO_DONO;
+
     const linhas = processos.map(p => {
       const podeMane = _podeManejar(cargoId, p.tier || 'D');
       const aviso    = !podeMane ? `<span style="font-size:.6rem;color:var(--amber)">⚠️ acima do cargo</span>` : '';
@@ -251,25 +472,31 @@ window._abrirDesignarParaFunc = async function(escId, funcId, cargoId, container
       <div style="display:flex;align-items:center;gap:.45rem;padding:.3rem 0;border-bottom:1px solid var(--bg3)">
         <div style="flex:1;min-width:0">
           <div style="font-size:.75rem;font-weight:600;color:var(--txt1)">${p.titulo} ${aviso}</div>
-          <div style="font-size:.63rem;color:var(--txt4)">${p.cliente_nome || '—'} · ${p.area || 'Civil'} · ${_fmtP(p.honorarios)}</div>
+          <div style="font-size:.63rem;color:var(--txt4)">${p.cliente_nome||'—'} · ${_fmtP(p.honorarios)}</div>
         </div>
-        <span style="font-size:.58rem;font-weight:700;padding:.1rem .35rem;border-radius:8px;background:${TIER_COR[p.tier||'D']}20;color:${TIER_COR[p.tier||'D']};border:1px solid ${TIER_COR[p.tier||'D']}">Tier ${p.tier||'D'}</span>
-        <button class="btn btn-sm btn-prim" style="font-size:.62rem;padding:.2rem .4rem;${!temEnergia?'opacity:.4;cursor:not-allowed':''}"
-          onclick="${temEnergia ? `window._confirmarDesignar('${escId}','${p.id}','${funcId}','${cargoId}','${window.JOGADOR?.nome_personagem||'Dono'}')` : `toast('⚡ Energia insuficiente.','ko')`}">
-          ⚡${CUSTO} Designar
+        <button class="btn btn-sm btn-prim" style="font-size:.62rem;padding:.2rem .4rem"
+          onclick="window._confirmarDesignar('${escId}','${p.id}','${funcId}','${cargoId}','${(func?.nome||'Funcionário').replace(/'/g,"\\'")}')">
+          ⚡${CUSTO_DONO} Designar
         </button>
       </div>`;
     }).join('');
 
+    const avisoSobrecarga = npcSobrecarregado
+      ? `<div style="font-size:.68rem;color:var(--amber);background:rgba(184,146,42,.1);border-radius:4px;padding:.3rem .5rem;margin-bottom:.4rem">
+           ⚠️ Funcionário sobrecarregado (${npcEnergiaDisp} NPC⚡ restantes). Designar pode causar burnout.
+         </div>`
+      : `<div style="font-size:.63rem;color:var(--txt4);margin-bottom:.3rem">Capacidade NPC: ${npcEnergiaDisp}/${NPC_ENERGIA_MES}⚡</div>`;
+
     picker.innerHTML = `
-      <div style="font-size:.68rem;font-weight:600;color:var(--txt2);margin-bottom:.4rem">Escolher processo para designar:</div>
+      ${avisoSobrecarga}
+      <div style="font-size:.68rem;font-weight:600;color:var(--txt2);margin-bottom:.4rem">Escolher processo:</div>
       ${linhas}`;
   }
 
   container.appendChild(picker);
 };
 
-// ─── Picker para designar um processo a um NPC ────────────────────────────────
+// ─── Picker de NPC para um processo ──────────────────────────────────────────
 
 window._designarProcessoPicker = async function(escId, procId, containerId) {
   const container = document.getElementById(containerId);
@@ -282,55 +509,54 @@ window._designarProcessoPicker = async function(escId, procId, containerId) {
   const energiaDisp = Math.max(0,
     (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - (j.energia_usada_mes || 0));
 
-  // Carregar funcionários disponíveis
   let funcs = [];
   try {
     const fSnap = await getDocs(collection(db, 'escritorios', escId, 'funcionarios'));
     funcs = fSnap.docs
       .map(d => ({ id: d.id, ...d.data() }))
-      .filter(f => f.ativo !== false && !f.processo_id) // sem processo atual
+      .filter(f => f.ativo !== false && !f.burnout_npc && !f.processo_id)
       .sort((a, b) => {
         const ord = { soc:6, asc:5, snr:4, pln:3, jnr:2, ass:1, est:0 };
-        return (ord[b.cargo_id] || 0) - (ord[a.cargo_id] || 0);
+        return (ord[b.cargo_id]||0) - (ord[a.cargo_id]||0);
       });
   } catch (e) { console.error('[DESIGNAR PICKER]', e); }
 
-  // Pegar tier do processo
   let procTier = 'D';
   try {
-    const { doc: fDoc, getDoc: fGet } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-    const { db: fDb } = await import('./firebase-init.js');
-    const pSnap = await fGet(fDoc(fDb, 'escritorios', escId, 'processos_pool', procId));
+    const pSnap = await getDoc(doc(db, 'escritorios', escId, 'processos_pool', procId));
     if (pSnap.exists()) procTier = pSnap.data().tier || 'D';
-  } catch (e) { /* usa D como fallback */ }
+  } catch (e) { /* usa D */ }
 
   const picker = document.createElement('div');
   picker.className = 'designar-picker';
 
-  const CUSTO_ENERGIA = 5;
-  const temEnergia = energiaDisp >= CUSTO_ENERGIA;
+  const CUSTO_DONO = 5;
+  const temEnergia = energiaDisp >= CUSTO_DONO;
 
   if (!funcs.length) {
-    picker.innerHTML = `<div style="font-size:.75rem;color:var(--txt3)">Nenhum funcionário disponível (todos já estão em processos).</div>`;
+    picker.innerHTML = `<div style="font-size:.75rem;color:var(--txt3)">Nenhum funcionário disponível (todos ocupados ou em burnout).</div>`;
   } else {
     const linhas = funcs.map(f => {
       const cargo     = CARGO_L_P[f.cargo_id] || f.cargo_id;
       const nome      = f.nome || f.name || cargo;
       const podeMane  = _podeManejar(f.cargo_id, procTier);
       const aviso     = !podeMane ? `<span style="font-size:.6rem;color:var(--amber)">⚠️ acima do cargo</span>` : '';
-      const ok        = temEnergia;
+      const npcUsado  = f.energia_npc_usada_mes || 0;
+      const npcDisp   = NPC_ENERGIA_MES - npcUsado;
+      const sobrecarg = npcDisp < NPC_OVERLOAD_TH;
+      const sobLabel  = sobrecarg ? `<span style="font-size:.58rem;color:var(--amber)"> ⚠️ sobrecarregado</span>` : '';
       const efic      = _calcEficiencia(f);
-      const eficLabel = Math.round(efic * 100);
 
       return `
       <div style="display:flex;align-items:center;gap:.45rem;padding:.3rem 0;border-bottom:1px solid var(--bg3)">
         <div style="flex:1;min-width:0">
-          <div style="font-size:.75rem;font-weight:600;color:var(--txt1)">${nome} ${aviso}</div>
-          <div style="font-size:.63rem;color:var(--txt4)">${cargo} · efic. ${eficLabel}%</div>
+          <div style="font-size:.75rem;font-weight:600;color:var(--txt1)">${nome}${aviso}${sobLabel}</div>
+          <div style="font-size:.63rem;color:var(--txt4)">${cargo} · efic. ${Math.round(efic*100)}% · NPC⚡ ${npcDisp}</div>
         </div>
-        <div style="font-size:.65rem;color:${ok?'var(--amber)':'var(--verm2)'};margin-right:.4rem">⚡${CUSTO_ENERGIA}</div>
-        <button class="btn btn-sm btn-sec" style="font-size:.62rem;padding:.2rem .4rem;${!ok?'opacity:.4;cursor:not-allowed':''}"
-          onclick="${ok ? `window._confirmarDesignar('${escId}','${procId}','${f.id}','${f.cargo_id}','${nome.replace(/'/g,"\\'")}')` : `toast('⚡ Energia insuficiente.','ko')`}">
+        <button class="btn btn-sm btn-sec" style="font-size:.62rem;padding:.2rem .4rem;${!temEnergia?'opacity:.4;cursor:not-allowed':''}"
+          onclick="${temEnergia
+            ? `window._confirmarDesignar('${escId}','${procId}','${f.id}','${f.cargo_id}','${nome.replace(/'/g,"\\'")}',${sobrecarg})`
+            : `toast('⚡ Energia insuficiente.','ko')`}">
           Designar
         </button>
       </div>`;
@@ -338,7 +564,7 @@ window._designarProcessoPicker = async function(escId, procId, containerId) {
 
     picker.innerHTML = `
       <div style="font-size:.68rem;font-weight:600;color:var(--txt2);margin-bottom:.4rem">
-        Escolher advogado${!temEnergia ? ` <span style="color:var(--verm2)">(⚡ insuficiente)</span>` : ''}:
+        Designar advogado${!temEnergia ? ` <span style="color:var(--verm2)">(⚡ insuf.)</span>` : ''}:
       </div>
       ${linhas}`;
   }
@@ -348,58 +574,68 @@ window._designarProcessoPicker = async function(escId, procId, containerId) {
 
 // ─── Confirmar designação ─────────────────────────────────────────────────────
 
-window._confirmarDesignar = async function(escId, procId, funcId, cargoId, nomeFunc) {
+window._confirmarDesignar = async function(escId, procId, funcId, cargoId, nomeFunc, sobrecarregado = false) {
   const j   = window.JOGADOR;
   const uid = j.uid || window.JOGADOR_UID;
-  const CUSTO = 5;
+  const CUSTO_DONO = 5;
 
   const energiaUsada = j.energia_usada_mes || 0;
   const energiaTotal = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
-  if (Math.max(0, energiaTotal - energiaUsada) < CUSTO) {
+  if (Math.max(0, energiaTotal - energiaUsada) < CUSTO_DONO) {
     toast('⚡ Energia insuficiente para designar.', 'ko');
     return;
   }
 
+  // Aviso de sobrecarga — mas permite continuar
+  if (sobrecarregado) {
+    const continuar = confirm(`⚠️ ${nomeFunc} está sobrecarregado este mês. Designar assim mesmo pode causar burnout. Continuar?`);
+    if (!continuar) return;
+  }
+
   try {
-    const { doc: fDoc, updateDoc: fUpd } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-    const { db: fDb } = await import('./firebase-init.js');
+    // Carregar dados do funcionário para atualizar energia NPC
+    const fSnap = await getDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId));
+    const funcData = fSnap.exists() ? fSnap.data() : {};
+    const npcEnergiaNova = (funcData.energia_npc_usada_mes || 0) + NPC_CUSTO_PROC;
+    const novosMesesSobrecarg = npcEnergiaNova >= NPC_ENERGIA_MES - NPC_OVERLOAD_TH
+      ? (funcData.meses_sobrecarregado || 0) + 1
+      : 0;
 
     await Promise.all([
-      fUpd(fDoc(fDb, 'jogadores', uid), { energia_usada_mes: energiaUsada + CUSTO }),
-      fUpd(fDoc(fDb, 'escritorios', escId, 'processos_pool', procId), {
+      updateDoc(doc(db, 'jogadores', uid), { energia_usada_mes: energiaUsada + CUSTO_DONO }),
+      updateDoc(doc(db, 'escritorios', escId, 'processos_pool', procId), {
         status: 'em_andamento',
         func_id: funcId, func_cargo: cargoId, func_nome: nomeFunc,
         designado_em: new Date().toISOString(),
         progresso: 0,
       }),
-      fUpd(fDoc(fDb, 'escritorios', escId, 'funcionarios', funcId), {
+      updateDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId), {
         processo_id: procId,
+        energia_npc_usada_mes: npcEnergiaNova,
+        meses_sobrecarregado: novosMesesSobrecarg,
       }),
     ]);
 
-    j.energia_usada_mes = energiaUsada + CUSTO;
+    j.energia_usada_mes = energiaUsada + CUSTO_DONO;
     window.JOGADOR = j;
-    toast(`📋 ${nomeFunc} designado para o processo. ⚡-${CUSTO}`, 'ok');
+    toast(`📋 ${nomeFunc} designado para o processo. ⚡-${CUSTO_DONO}`, 'ok');
 
     const elPool = document.getElementById('esc-processos-bloco');
-    if (elPool && window.renderProcessosPool) window.renderProcessosPool(j, escId, elPool);
+    if (elPool) window.renderProcessosPool(j, escId, elPool);
   } catch (e) {
     console.error('[CONFIRMAR DESIGNAR]', e);
     toast('Erro ao designar processo.', 'ko');
   }
 };
 
-// ─── Processar sentença (dono ou advogado com cargo adequado) ─────────────────
+// ─── Processar sentença ───────────────────────────────────────────────────────
 
 window._processarSentenca = async function(escId, procId, uid) {
   const j = window.JOGADOR;
 
-  // Pegar dados do processo
   let proc;
   try {
-    const { doc: fDoc, getDoc: fGet } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-    const { db: fDb } = await import('./firebase-init.js');
-    const snap = await fGet(fDoc(fDb, 'escritorios', escId, 'processos_pool', procId));
+    const snap = await getDoc(doc(db, 'escritorios', escId, 'processos_pool', procId));
     if (!snap.exists()) return;
     proc = { id: procId, ...snap.data() };
   } catch (e) {
@@ -407,7 +643,6 @@ window._processarSentenca = async function(escId, procId, uid) {
     return;
   }
 
-  // Custo de energia para processar sentença: 10 para o dono
   const CUSTO_SENT = 10;
   const energiaUsada = j.energia_usada_mes || 0;
   const energiaTotal = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
@@ -416,7 +651,6 @@ window._processarSentenca = async function(escId, procId, uid) {
     return;
   }
 
-  // Calcular resultado baseado em habilidades do dono
   const skills = j.skills || {};
   const vals   = SKILLS_REL.map(s => skills[s] || 0);
   const media  = vals.reduce((a, b) => a + b, 0) / vals.length;
@@ -436,25 +670,20 @@ window._processarSentenca = async function(escId, procId, uid) {
   }[resultado];
 
   try {
-    const { doc: fDoc, updateDoc: fUpd } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-    const { db: fDb } = await import('./firebase-init.js');
-
-    const { increment: fInc } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-
     await Promise.all([
-      fUpd(fDoc(fDb, 'jogadores', uid), { energia_usada_mes: energiaUsada + CUSTO_SENT }),
-      fUpd(fDoc(fDb, 'escritorios', escId), {
-        caixa: fInc(valorRecebido),
-        faturamento_mes_atual: fInc(valorRecebido),
+      updateDoc(doc(db, 'jogadores', uid), { energia_usada_mes: energiaUsada + CUSTO_SENT }),
+      updateDoc(doc(db, 'escritorios', escId), {
+        caixa: increment(valorRecebido),
+        faturamento_mes_atual: increment(valorRecebido),
       }),
-      fUpd(fDoc(fDb, 'escritorios', escId, 'processos_pool', procId), {
+      updateDoc(doc(db, 'escritorios', escId, 'processos_pool', procId), {
         status: 'concluido',
-        resultado, valor_recebido: valorRecebido,
+        resultado,
+        valor_recebido: valorRecebido,
         concluido_em: new Date().toISOString(),
       }),
-      // Liberar funcionário
       proc.func_id
-        ? fUpd(fDoc(fDb, 'escritorios', escId, 'funcionarios', proc.func_id), { processo_id: null })
+        ? updateDoc(doc(db, 'escritorios', escId, 'funcionarios', proc.func_id), { processo_id: null })
         : Promise.resolve(),
     ]);
 
@@ -463,32 +692,28 @@ window._processarSentenca = async function(escId, procId, uid) {
     toast(`${resultadoLabel} +${_fmtP(valorRecebido)} no caixa.`, resultado === 'improcedente' ? 'ko' : 'ok');
 
     const elPool = document.getElementById('esc-processos-bloco');
-    if (elPool && window.renderProcessosPool) window.renderProcessosPool(j, escId, elPool);
+    if (elPool) window.renderProcessosPool(j, escId, elPool);
   } catch (e) {
     console.error('[SENTENÇA]', e);
     toast('Erro ao processar sentença.', 'ko');
   }
 };
 
-// ─── Geração mensal de processos a partir dos clientes ────────────────────────
+// ─── Geração mensal de processos ──────────────────────────────────────────────
 
 window.gerarProcessosMensais = async function(escId, tierEscritorio) {
-  const cap  = TIER_CAP_ESC[tierEscritorio || 1] || 2;
-  const s    = window.SERVER || {};
-  const mes  = s.mes_global || 1;
+  const cap = TIER_CAP_ESC[tierEscritorio || 1] || 2;
+  const s   = window.SERVER || {};
+  const mes = s.mes_global || 1;
 
   try {
     const clSnap = await getDocs(collection(db, 'escritorios', escId, 'clientes'));
     const clientes = clSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-    // Verificar quantos processos já gerados este mês
-    const { getDocs: fGDocs, collection: fCol, query: fQ, where: fW } = await import(
-      'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js'
-    );
-    const { db: fDb } = await import('./firebase-init.js');
-
-    const existSnap = await fGDocs(fQ(fCol(fDb, 'escritorios', escId, 'processos_pool'),
-      fW('criado_mes', '==', mes)));
+    const existSnap = await getDocs(query(
+      collection(db, 'escritorios', escId, 'processos_pool'),
+      where('criado_mes', '==', mes)
+    ));
     const jaGeradosMes = existSnap.size;
 
     if (jaGeradosMes >= cap) {
@@ -506,32 +731,22 @@ window.gerarProcessosMensais = async function(escId, tierEscritorio) {
       const chance = TIER_CHANCE[tier] || .10;
       if (Math.random() > chance) continue;
 
-      const area     = cl.area || cl.especialidade || AREA_DEFAULT[Math.floor(Math.random() * AREA_DEFAULT.length)];
+      const area       = cl.area || cl.especialidade || AREA_DEFAULT[Math.floor(Math.random() * AREA_DEFAULT.length)];
       const honorarios = _tierHonorarios(tier);
-      const titulo   = _randTitulo(area);
+      const titulo     = _randTitulo(area);
 
-      promessas.push(addDoc(collection(fDb, 'escritorios', escId, 'processos_pool'), {
-        titulo,
-        cliente_id:   cl.id,
-        cliente_nome: cl.nome || 'Cliente',
-        area,
-        tier,
-        honorarios,
-        icone: '⚖️',
-        status:       'disponivel',
-        progresso:    0,
-        func_id:      null,
-        func_nome:    null,
-        func_cargo:   null,
-        resultado:    null,
-        criado_mes:   mes,
-        criado_em:    new Date().toISOString(),
+      promessas.push(addDoc(collection(db, 'escritorios', escId, 'processos_pool'), {
+        titulo, cliente_id: cl.id, cliente_nome: cl.nome || 'Cliente',
+        area, tier, honorarios, icone: '⚖️',
+        status: 'disponivel', progresso: 0,
+        func_id: null, func_nome: null, func_cargo: null, resultado: null,
+        criado_mes: mes, criado_em: new Date().toISOString(),
       }));
       gerados++;
     }
 
-    if (promessas.length === 0) {
-      toast('Nenhum processo gerado este mês (verifique os clientes ativos).', 'ko');
+    if (!promessas.length) {
+      toast('Nenhum processo gerado (verifique os clientes ativos).', 'ko');
       return;
     }
 
@@ -546,18 +761,13 @@ window.gerarProcessosMensais = async function(escId, tierEscritorio) {
   }
 };
 
-// ─── Avanço de progresso mensal para processos em andamento ──────────────────
+// ─── Avanço de progresso mensal ───────────────────────────────────────────────
 
 window.avancarProgressoMensal = async function(escId) {
   try {
     const snap = await getDocs(
       query(collection(db, 'escritorios', escId, 'processos_pool'), where('status', '==', 'em_andamento'))
     );
-
-    const { doc: fDoc, updateDoc: fUpd } = await import(
-      'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js'
-    );
-    const { db: fDb } = await import('./firebase-init.js');
 
     const proms = [];
     for (const d of snap.docs) {
@@ -568,20 +778,50 @@ window.avancarProgressoMensal = async function(escId) {
       const variacao  = Math.round((Math.random() * 12) - 4);
       const ganho     = Math.max(5, baseGanho + variacao);
       const novoProg  = Math.min(100, (p.progresso || 0) + ganho);
+      const novoStatus = novoProg >= 100 ? 'aguardando_sentenca' : 'em_andamento';
 
-      const podeSentenca = ['jnr','pln','snr','asc','soc'].includes(p.func_cargo);
-      const novoStatus   = novoProg >= 100
-        ? (podeSentenca ? 'aguardando_sentenca' : 'aguardando_sentenca')
-        : 'em_andamento';
-
-      proms.push(fUpd(fDoc(fDb, 'escritorios', escId, 'processos_pool', p.id), {
-        progresso: novoProg,
-        status: novoStatus,
+      proms.push(updateDoc(doc(db, 'escritorios', escId, 'processos_pool', p.id), {
+        progresso: novoProg, status: novoStatus,
       }));
     }
 
     if (proms.length) await Promise.all(proms);
-    console.log(`[PROGRESSO MENSAL] ${proms.length} processo(s) avançados em ${escId}`);
+
+    // Reset energia NPC mensal e verificar burnout
+    const fSnap = await getDocs(collection(db, 'escritorios', escId, 'funcionarios'));
+    const fProms = [];
+    for (const fd of fSnap.docs) {
+      const f = fd.data();
+      const npcUsado = f.energia_npc_usada_mes || 0;
+      const sobrecarg = npcUsado > NPC_ENERGIA_MES - NPC_OVERLOAD_TH;
+      let novosMeses = f.meses_sobrecarregado || 0;
+      let burnoutNPC = f.burnout_npc || false;
+      let burnoutRest = f.burnout_npc_restante || 0;
+
+      if (burnoutNPC) {
+        burnoutRest = Math.max(0, burnoutRest - 1);
+        if (burnoutRest === 0) burnoutNPC = false;
+      } else if (sobrecarg) {
+        novosMeses++;
+        if (novosMeses >= 3) {
+          burnoutNPC = true;
+          burnoutRest = 3;
+          novosMeses = 0;
+        }
+      } else {
+        novosMeses = 0;
+      }
+
+      fProms.push(updateDoc(doc(db, 'escritorios', escId, 'funcionarios', fd.id), {
+        energia_npc_usada_mes: 0,
+        meses_sobrecarregado: novosMeses,
+        burnout_npc: burnoutNPC,
+        burnout_npc_restante: burnoutRest,
+      }));
+    }
+
+    if (fProms.length) await Promise.all(fProms);
+    console.log(`[PROGRESSO MENSAL] ${proms.length} processo(s), ${fProms.length} NPC(s) atualizados em ${escId}`);
   } catch (e) {
     console.error('[AVANCAR PROGRESSO]', e);
   }

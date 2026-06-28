@@ -1764,18 +1764,58 @@ a:hover { color: var(--navy); }
   .esc-acoes-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
+/* ── Layout 3 colunas de processos ── */
+.proc-tres-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: .65rem;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .proc-tres-cols { grid-template-columns: 1fr; }
+}
+.proc-col {
+  background: var(--surface);
+  border: 1px solid #E8ECF5;
+  border-radius: var(--r);
+  padding: .75rem .8rem;
+  min-height: 120px;
+}
+.proc-col-header {
+  font-size: .75rem;
+  font-weight: 700;
+  color: var(--navy);
+  margin-bottom: .55rem;
+  padding-bottom: .4rem;
+  border-bottom: 1px solid #E8ECF5;
+}
+
+/* ── Linha de processo recursal ── */
+.proc-recursal-row {
+  padding: .5rem .4rem;
+  border-bottom: 1px solid var(--bg2);
+}
+.proc-recursal-row:last-child { border-bottom: none; }
+
+/* ── Linha histórico ── */
+.proc-hist-row {
+  padding: .45rem .35rem;
+  border-bottom: 1px solid var(--bg2);
+}
+.proc-hist-row:last-child { border-bottom: none; }
+
 /* ── Pool de processos do escritório ── */
 .proc-pool-row {
-  display: flex; align-items: center; gap: .5rem;
-  padding: .5rem .4rem; border-bottom: 1px solid var(--bg2);
+  display: flex; align-items: center; gap: .4rem;
+  padding: .45rem .35rem; border-bottom: 1px solid var(--bg2);
 }
 .proc-pool-row:last-child { border-bottom: none; }
-.proc-pool-area  { font-size: 1rem; flex-shrink: 0; }
-.proc-pool-titulo { font-size: .78rem; font-weight: 600; color: var(--navy); }
-.proc-pool-meta   { font-size: .63rem; color: var(--txt3); margin-top: 1px; }
-.proc-pool-grupo  { margin-bottom: .6rem; }
+.proc-pool-area  { font-size: .9rem; flex-shrink: 0; }
+.proc-pool-titulo { font-size: .75rem; font-weight: 600; color: var(--navy); }
+.proc-pool-meta   { font-size: .6rem; color: var(--txt3); margin-top: 1px; }
+.proc-pool-grupo  { margin-bottom: .55rem; }
 .proc-pool-grupo-titulo {
-  font-size: .66rem; font-weight: 700; letter-spacing: .06em;
+  font-size: .63rem; font-weight: 700; letter-spacing: .06em;
   text-transform: uppercase; color: var(--txt4);
   margin-bottom: .3rem; padding-bottom: .2rem;
   border-bottom: 1px solid var(--bg2);
@@ -1786,6 +1826,31 @@ a:hover { color: var(--navy); }
   border: 1px solid var(--bg3);
 }
 .esc-membro-btn.em-proc { opacity: .45; cursor: not-allowed; }
+
+/* ── Badges NPC energia / burnout ── */
+.npc-badge {
+  display: inline-block;
+  font-size: .58rem; font-weight: 700;
+  padding: .1rem .35rem; border-radius: 8px;
+  vertical-align: middle; margin-left: .25rem;
+}
+.npc-burnout {
+  background: rgba(168,58,58,.12);
+  color: var(--verm2);
+  border: 1px solid var(--verm2);
+}
+.npc-sobrecarregado {
+  background: rgba(184,146,42,.1);
+  color: var(--amber);
+  border: 1px solid var(--amber);
+}
+.npc-em-burnout {
+  opacity: .7;
+  border-left: 3px solid var(--verm2) !important;
+}
+.npc-sobrecarregado-card {
+  border-left: 3px solid var(--amber) !important;
+}
 
 /* ── Botão Ver Balancete ── */
 .btn-balancete {

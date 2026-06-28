@@ -332,15 +332,72 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
     mensagens.push({ assunto:'🚨 Assalto!', corpo:`Você foi assaltado. -R$ ${perda.toLocaleString('pt-BR')} (10% do saldo).`, tipo:'urgente' });
   }
 
-  if (saudeMental < 20 && !j.em_burnout) {
-    updates.em_burnout      = true;
-    updates.burnout_ate_mes = mesGlobal + 3;
-    mensagens.push({ assunto:'🔴 Burnout', corpo:'Saúde mental crítica. Sem novos casos por 3 meses.', tipo:'urgente' });
+  // ── Burnout recalibrado por energia restante ─────────────────────
+  // Energia restante = total - gasta (sem bônus de academia, conservativo)
+  const energiaRestante = Math.max(0, ENERGIA_TOTAL - energiaGasta);
+
+  if (!j.em_burnout) {
+    // Verificar exaustão (10-15 restantes) — não acumula com burnout
+    if (energiaRestante >= 10 && energiaRestante <= 15) {
+      const novosExaustao = (j.meses_exaustao || 0) + 1;
+      updates.meses_exaustao = novosExaustao;
+      if (novosExaustao >= 3) {
+        // Penalidade: -5 energia por 3 meses
+        updates.penalidade_energia_ate = mesGlobal + 3;
+        updates.penalidade_energia_val = (j.penalidade_energia_val || 0) + 5;
+        updates.meses_exaustao = 0;
+        mensagens.push({
+          assunto: '😓 Exaustão',
+          corpo: '3 meses seguidos com pouca energia. -5⚡ de energia disponível pelos próximos 3 meses.',
+          tipo: 'urgente',
+        });
+      }
+    } else if (energiaRestante > 15) {
+      updates.meses_exaustao = 0;
+    }
+
+    // Verificar burnout (0-10 restantes por 3 meses consecutivos)
+    if (energiaRestante <= 10) {
+      const novosBaixa = (j.meses_baixa_energia || 0) + 1;
+      updates.meses_baixa_energia = novosBaixa;
+      if (novosBaixa >= 3) {
+        updates.em_burnout          = true;
+        updates.meses_baixa_energia = 0;
+        updates.meses_recuperacao   = 0;
+        updates.meses_exaustao      = 0;
+        mensagens.push({
+          assunto: '🔴 Burnout Total',
+          corpo: '3 meses seguidos com energia crítica (0-10⚡). Você entrou em burnout. Precise de 3 meses com >10⚡ restantes para se recuperar.',
+          tipo: 'urgente',
+        });
+      }
+    } else {
+      updates.meses_baixa_energia = 0;
+    }
+  } else {
+    // Em burnout — verificar recuperação (3 meses consecutivos com >10 restantes)
+    if (energiaRestante > 10) {
+      const novosRec = (j.meses_recuperacao || 0) + 1;
+      updates.meses_recuperacao = novosRec;
+      if (novosRec >= 3) {
+        updates.em_burnout        = false;
+        updates.meses_recuperacao = 0;
+        saudeMental = Math.max(30, saudeMental);
+        mensagens.push({
+          assunto: '✅ Recuperado do Burnout',
+          corpo: '3 meses com energia saudável. Você se recuperou do burnout!',
+          tipo: 'positivo',
+        });
+      }
+    } else {
+      updates.meses_recuperacao = 0;
+    }
   }
-  if (j.em_burnout && mesGlobal >= (j.burnout_ate_mes || 0)) {
-    updates.em_burnout = false;
-    saudeMental = Math.max(30, saudeMental);
-    mensagens.push({ assunto:'✅ Recuperado', corpo:'Você se recuperou do burnout.', tipo:'positivo' });
+
+  // Remover penalidade de energia quando vencer
+  if (j.penalidade_energia_ate && mesGlobal > j.penalidade_energia_ate) {
+    updates.penalidade_energia_ate = null;
+    updates.penalidade_energia_val = 0;
   }
 
   updates.saude_mental = saudeMental;

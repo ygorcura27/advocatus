@@ -98,13 +98,22 @@ window.renderEquipePainel = async function(j, escId, el) {
       ).join('');
 
       const temProc = !!func.processo_id;
+      const emBurnout = !!func.burnout_npc;
+      const npcUsado  = func.energia_npc_usada_mes || 0;
+      const npcDisp   = (window.NPC_ENERGIA_MES || 100) - npcUsado;
+      const sobrecarregado = !emBurnout && npcDisp < (window.NPC_OVERLOAD_TH || 20);
+      const energiaBadge = window._npcEnergiaBadge ? window._npcEnergiaBadge(func) : '';
+
       return `
-      <div class="esc-membro" id="membro-${func.id}">
+      <div class="esc-membro${emBurnout?' npc-em-burnout':sobrecarregado?' npc-sobrecarregado-card':''}" id="membro-${func.id}">
         <img class="esc-membro-avatar" src="${_avatar(nome)}" alt="${nome}">
         <div class="esc-membro-info">
-          <div class="esc-membro-nome">${nome}</div>
+          <div class="esc-membro-nome">${nome} ${energiaBadge}</div>
           <div class="esc-membro-cargo">${cargo}</div>
           <div class="esc-membro-esp">${esp}</div>
+          ${emBurnout
+            ? `<div style="font-size:.6rem;color:var(--verm2)">Burnout — ${func.burnout_npc_restante||0} mês(es) afastado</div>`
+            : `<div style="font-size:.6rem;color:var(--txt4)">NPC⚡ ${npcDisp}/100</div>`}
         </div>
         <div class="esc-membro-prod">
           <div class="esc-membro-prod-label">Produtividade</div>
@@ -112,8 +121,13 @@ window.renderEquipePainel = async function(j, escId, el) {
           <div style="display:flex;gap:3px;margin-top:2px">${dots}</div>
         </div>
         <div class="esc-membro-acoes">
-          <button class="esc-membro-btn${temProc?' em-proc':''}" title="${temProc?'Já tem processo':'Designar processo'}"
-            onclick="${temProc ? `toast('${nome} já está em um processo.','ko')` : `window._abrirDesignarParaFunc('${escId}','${func.id}','${func.cargo_id}','membro-${func.id}')`}">
+          <button class="esc-membro-btn${temProc?' em-proc':''}${emBurnout?' em-proc':''}"
+            title="${emBurnout?'Em burnout':'Designar processo'}"
+            onclick="${emBurnout
+              ? `toast('${nome.replace(/'/g,"\\'")} está em burnout e não pode trabalhar.','ko')`
+              : temProc
+                ? `toast('${nome.replace(/'/g,"\\'")} já está em um processo.','ko')`
+                : `window._abrirDesignarParaFunc('${escId}','${func.id}','${func.cargo_id}','membro-${func.id}')`}">
             📋
           </button>
           <button class="esc-membro-btn demitir" title="Demitir" onclick="window._demitirFuncionario('${escId}','${func.id}','${nome.replace(/'/g,"\\'")}')">✕</button>
@@ -345,18 +359,25 @@ window._mostrarDelegacaoPicker = async function(escId, opId, valor, containerId)
   if (!funcs.length) {
     picker.innerHTML = `<div style="font-size:.75rem;color:var(--txt3)">Nenhum funcionário ativo para delegar.</div>`;
   } else {
-    const linhas = funcs.map(f => {
+    const NPC_TOT = window.NPC_ENERGIA_MES || 100;
+    const NPC_OVL = window.NPC_OVERLOAD_TH || 20;
+
+    const linhas = funcs.filter(f => !f.burnout_npc).map(f => {
       const cargo  = CARGO_INFO[f.cargo_id]?.l || f.cargo_id;
       const nome   = f.nome || f.name || cargo;
       const eng    = DELEGAR_ENERGIA[f.cargo_id] || 5;
       const pct    = DELEGAR_PCT[f.cargo_id] || .20;
       const recebe = Math.round(valor * pct);
       const ok     = energiaDisp >= eng;
+      const npcUsado = f.energia_npc_usada_mes || 0;
+      const npcDisp  = NPC_TOT - npcUsado;
+      const sobrecarg = npcDisp < NPC_OVL;
+      const sobLabel  = sobrecarg ? `<span style="font-size:.58rem;color:var(--amber)"> ⚠️</span>` : '';
       return `
       <div class="delegar-picker-linha">
         <div style="flex:1;min-width:0">
-          <div style="font-size:.75rem;font-weight:600;color:var(--txt1)">${nome}</div>
-          <div style="font-size:.63rem;color:var(--txt4)">${cargo}</div>
+          <div style="font-size:.75rem;font-weight:600;color:var(--txt1)">${nome}${sobLabel}</div>
+          <div style="font-size:.63rem;color:var(--txt4)">${cargo} · NPC⚡ ${npcDisp}</div>
         </div>
         <div style="font-size:.67rem;text-align:right;margin-right:.5rem">
           <div style="color:${ok?'var(--amber)':'var(--verm2)'}">⚡${eng}</div>
@@ -364,22 +385,28 @@ window._mostrarDelegacaoPicker = async function(escId, opId, valor, containerId)
           <div style="color:var(--txt4)">${Math.round(pct*100)}%</div>
         </div>
         <button class="btn btn-sm btn-sec" style="font-size:.62rem;padding:.2rem .4rem;${!ok?'opacity:.4;cursor:not-allowed':''}"
-          onclick="${ok ? `window._confirmarDelegacao('${escId}','${opId}',${valor},'${f.id}','${f.cargo_id}',${eng},${recebe})` : `toast('⚡ Energia insuficiente.','ko')`}">
+          onclick="${ok ? `window._confirmarDelegacao('${escId}','${opId}',${valor},'${f.id}','${f.cargo_id}',${eng},${recebe},${sobrecarg})` : `toast('⚡ Energia insuficiente.','ko')`}">
           Delegar
         </button>
       </div>`;
     }).join('');
 
+    const emBurnout = funcs.filter(f => f.burnout_npc);
+    const avisoB = emBurnout.length
+      ? `<div style="font-size:.63rem;color:var(--txt4);margin-bottom:.3rem">🔴 ${emBurnout.length} funcionário(s) em burnout não listado(s).</div>`
+      : '';
+
     picker.innerHTML = `
+      ${avisoB}
       <div style="font-size:.68rem;font-weight:600;color:var(--txt2);margin-bottom:.4rem">Escolher funcionário:</div>
-      ${linhas}`;
+      ${linhas || '<div style="font-size:.75rem;color:var(--txt3)">Nenhum disponível.</div>'}`;
   }
 
   container.appendChild(picker);
 };
 
 // ─── Confirmar delegação ──────────────────────────────────────────────────
-window._confirmarDelegacao = async function(escId, opId, valor, funcId, cargoId, eng, recebe) {
+window._confirmarDelegacao = async function(escId, opId, valor, funcId, cargoId, eng, recebe, sobrecarregado = false) {
   const j   = window.JOGADOR;
   const uid = j.uid || window.JOGADOR_UID;
 
@@ -390,11 +417,28 @@ window._confirmarDelegacao = async function(escId, opId, valor, funcId, cargoId,
     return;
   }
 
+  if (sobrecarregado) {
+    const continuar = confirm(`⚠️ Este funcionário está sobrecarregado este mês. Designar pode causar burnout. Continuar?`);
+    if (!continuar) return;
+  }
+
   try {
-    const { doc: fDoc, updateDoc: fUpd, increment: fInc } = await import(
+    const { doc: fDoc, updateDoc: fUpd, increment: fInc, getDoc: fGet } = await import(
       'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js'
     );
     const { db: fDb } = await import('./firebase-init.js');
+
+    // Atualizar energia NPC ao delegar
+    const CUSTO_OP_NPC = window.NPC_CUSTO_OP || 25;
+    const NPC_TOT      = window.NPC_ENERGIA_MES || 100;
+    const NPC_OVL      = window.NPC_OVERLOAD_TH || 20;
+
+    const fSnap = await fGet(fDoc(fDb, 'escritorios', escId, 'funcionarios', funcId));
+    const fData = fSnap.exists() ? fSnap.data() : {};
+    const npcNova = (fData.energia_npc_usada_mes || 0) + CUSTO_OP_NPC;
+    const novosMeses = npcNova >= NPC_TOT - NPC_OVL
+      ? (fData.meses_sobrecarregado || 0) + 1
+      : 0;
 
     await Promise.all([
       fUpd(fDoc(fDb, 'jogadores', uid),
@@ -404,6 +448,8 @@ window._confirmarDelegacao = async function(escId, opId, valor, funcId, cargoId,
       fUpd(fDoc(fDb, 'escritorios', escId, 'oportunidades', opId),
         { status: 'delegada', delegado_func_id: funcId, delegado_cargo: cargoId,
           valor_recebido: recebe, valor_total: valor, aceito_em: new Date().toISOString() }),
+      fUpd(fDoc(fDb, 'escritorios', escId, 'funcionarios', funcId),
+        { energia_npc_usada_mes: npcNova, meses_sobrecarregado: novosMeses }),
     ]);
 
     j.energia_usada_mes = energiaUsada + eng;

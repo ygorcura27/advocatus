@@ -33,7 +33,7 @@ function _renderizar() {
 
   switch (_painelAtivo) {
     case 'perfil':       renderPerfil(j, main);       break;
-    case 'processos':    renderProcessos(j, main);     break;
+    case 'processos':    renderEscritorio(j, main);     break;
     case 'escritorio':   renderEscritorio(j, main);    break;
     case 'equipe':
       if (window.renderEquipe) {
@@ -344,12 +344,23 @@ function _cardProcessoEnc(id, p) {
 // ════════════════════════════════════════════════════════
 // ESCRITÓRIO
 // ════════════════════════════════════════════════════════
-function renderEscritorio(j, el) {
-  const isSolo  = !j.escritorio_proprio_id && (!j.escritorio_empregado_id || j.escritorio_id === 'solo' || !j.escritorio_id);
 
-  // Empregado num escritório NPC (não é o dono) → vista de empregado
+// Verifica se o jogador tem poder de contratar (dono, ou pleno+ com skills altas)
+function _podeContratar(j) {
+  if (j.escritorio_proprio_id) return true;
+  if (j.poder_contratar) return true;
+  if (!['pln','snr','asc','soc'].includes(j.cargo_id)) return false;
+  const gestao   = j.skills?.gestao   || 0;
+  const lideranca = j.skills?.lideranca || 0;
+  return gestao >= 80 && lideranca >= 80;
+}
+
+function renderEscritorio(j, el) {
+  const isSolo  = !j.escritorio_proprio_id && (!j.escritorio_id || j.escritorio_id === 'solo' || !j.escritorio_id);
+
+  // Contratado em escritório (NPC ou próprio de outro) → vista expandida de funcionário
   if (!isSolo && !j.escritorio_proprio_id && j.escritorio_id && j.escritorio_id !== 'solo') {
-    _renderEscritorioNPC(j, el);
+    _renderEscritorioFuncionario(j, el, j.escritorio_id);
     return;
   }
 
@@ -644,7 +655,60 @@ async function _carregarEscritorio(escId) {
 }
 
 // ════════════════════════════════════════════════════════
-// ESCRITÓRIO NPC DETALHADO
+// ESCRITÓRIO — VISTA DE FUNCIONÁRIO CONTRATADO
+// Acesso completo ao pool de processos e oportunidades,
+// sem KPIs financeiros. Contratar restrito por cargo/skills.
+// ════════════════════════════════════════════════════════
+async function _renderEscritorioFuncionario(j, el, escId) {
+  const podeCtrt = _podeContratar(j);
+  const tier     = j.escritorio_tier || 1;
+
+  el.innerHTML = `
+    ${_escHero(j, null)}
+    <div class="esc-grid-3">
+      <div class="esc-card-bloco">
+        <div class="secao-header" style="margin-bottom:.8rem">
+          <div class="secao-titulo">Equipe do Escritório</div>
+          ${podeCtrt
+            ? `<button class="btn btn-sm btn-prim" onclick="window.navTo('equipe',null)" style="font-size:.7rem">+ Contratar</button>`
+            : `<span style="font-size:.65rem;color:var(--txt3)">Só o dono ou Pleno+ alto</span>`}
+        </div>
+        <div id="esc-equipe-embed"><div style="font-size:.78rem;color:var(--txt3)">Carregando...</div></div>
+      </div>
+      <div class="esc-card-bloco">
+        <div class="secao-header" style="margin-bottom:.8rem">
+          <div class="secao-titulo">Clientes</div>
+        </div>
+        <div id="esc-clientes-embed"><div style="font-size:.78rem;color:var(--txt3)">Carregando...</div></div>
+      </div>
+      <div class="esc-card-bloco">
+        <div class="secao-header" style="margin-bottom:.8rem">
+          <div class="secao-titulo">Sua Posição</div>
+        </div>
+        <div style="font-size:.8rem;color:var(--navy);font-weight:600">${j.nome_personagem||'—'}</div>
+        <div style="font-size:.7rem;color:var(--txt3)">${j.cargo_id?.toUpperCase()||'—'} · Tier ${tier}</div>
+        <div style="font-size:.7rem;color:var(--txt3);margin-top:.3rem">${j.escritorio_nome||'—'}</div>
+        ${podeCtrt ? `<div style="font-size:.65rem;color:var(--verde2);margin-top:.5rem">✅ Poder de contratar ativo</div>` : ''}
+        <button class="btn btn-ghost btn-sm btn-block" style="margin-top:.8rem" onclick="window.sairEscritorio&&window.sairEscritorio()">
+          Sair do escritório
+        </button>
+      </div>
+    </div>
+    <div id="esc-oportunidades-bloco"></div>
+    <div id="esc-processos-bloco"></div>`;
+
+  const elEquipe = document.getElementById('esc-equipe-embed');
+  if (elEquipe && window.renderEquipePainel) window.renderEquipePainel(j, escId, elEquipe);
+  const elClientes = document.getElementById('esc-clientes-embed');
+  if (elClientes && window.renderClientesPainel) window.renderClientesPainel(j, escId, elClientes);
+  const elOp = document.getElementById('esc-oportunidades-bloco');
+  if (elOp && window.renderOportunidadesPainel) window.renderOportunidadesPainel(j, escId, elOp);
+  const elProc = document.getElementById('esc-processos-bloco');
+  if (elProc && window.renderProcessosPool) window.renderProcessosPool(j, escId, elProc);
+}
+
+// ════════════════════════════════════════════════════════
+// ESCRITÓRIO NPC DETALHADO (legado — mantido para referência)
 // ════════════════════════════════════════════════════════
 function _renderEscritorioNPC(j, el) {
   // Tentar carregar dados do escritório NPC

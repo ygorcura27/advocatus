@@ -455,10 +455,12 @@ export function custoFilhoPorIdade(idade) {
   return 0; // independente após 22
 }
 
-/** Energia total disponível considerando bônus da academia */
+/** Energia total disponível considerando bônus da academia e penalidade de exaustão */
 window.getEnergiaTotal = function(j) {
-  const bonus = (j && j.academia_ativa) ? (j.academia_bonus_energia || 0) : 0;
-  return 100 + bonus;
+  if (!j) return 100;
+  const bonus = j.academia_ativa ? (j.academia_bonus_energia || 0) : 0;
+  const pen   = j.penalidade_energia_val || 0;
+  return Math.max(10, 100 + bonus - pen);
 };
 
 /** Custo de adesão à academia, escalando com reputação */
