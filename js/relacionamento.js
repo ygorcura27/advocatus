@@ -124,6 +124,17 @@ window.renderVidaPessoal = async function(j, el) {
   ));
   const relacionamentos = relSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
+  // Buscar ex-cônjuges (esposo/a separado/a)
+  let exConjuges = [];
+  try {
+    const exSnap = await getDocs(query(
+      collection(db, 'jogadores', uid, 'relacionamentos'),
+      where('ativo', '==', false),
+      where('estagio', '==', 'esposo')
+    ));
+    exConjuges = exSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch(e) { /* índice composto pode não existir ainda */ }
+
   // Buscar filhos
   const filhosSnap = await getDocs(collection(db, 'jogadores', uid, 'filhos'));
   const filhos = filhosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -152,6 +163,15 @@ window.renderVidaPessoal = async function(j, el) {
            <span style="font-size:.72rem">Vá a algum lugar para conhecer pessoas novas.</span>
          </div>`
       : relacionamentos.map(r => _cardRelacionamento(r, j)).join('')}
+
+    <!-- Ex-cônjuge separado/a -->
+    ${exConjuges.length > 0 ? `
+      <div class="secao-header" style="margin-top:1.2rem">
+        <div class="secao-titulo">💔 Ex-cônjuge</div>
+        <span class="secao-badge" style="background:var(--verm3)20;color:var(--verm2)">Separado/a</span>
+      </div>
+      ${exConjuges.map(r => _cardExConjuge(r, j)).join('')}
+    ` : ''}
 
     <!-- Filhos -->
     ${filhos.length > 0 ? `
@@ -301,6 +321,91 @@ function _mesesNoRelacionamento(r, j) {
   const mesAtualTotal = (j.ano_pessoal||1)*12 + (j.mes_pessoal||0);
   return Math.max(0, mesAtualTotal - r.iniciado_mes_total);
 }
+
+function _cardExConjuge(r, j) {
+  const avatarUrl = _avatarUrlNpc(r);
+  const meses = _mesesNoRelacionamento(r, j);
+  const motivoMap = {
+    natural: 'O desgaste do dia a dia foi mais forte que o amor.',
+    flagra:  'A traição foi descoberta.',
+    ciumes:  'Uma crise de ciúmes destruiu o casamento.',
+  };
+  const motivoTexto = motivoMap[r.motivo_separacao] || 'O relacionamento chegou ao fim.';
+  const jaUsouMes = r.tentou_reatar_mes === true;
+  const afinidade = r.afinidade || 0;
+
+  return `
+    <div class="card" style="margin-bottom:.6rem;border-left:3px solid var(--verm3);opacity:.92">
+      <div style="display:flex;align-items:start;gap:.6rem">
+        <img src="${avatarUrl}" alt="${r.nome}" class="rel-avatar-mini"
+             onerror="this.onerror=null;this.src='img/npcs/_placeholder.png'">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:.92rem;color:var(--navy)">${r.nome}</div>
+          <div style="font-size:.68rem;color:var(--txt3);margin-bottom:.25rem">
+            ${meses} meses de casamento · Afinidade restante: ${afinidade}
+          </div>
+          <div style="font-size:.72rem;color:var(--verm2);margin-bottom:.5rem">💔 ${motivoTexto}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:.35rem">
+            <button class="btn btn-sm btn-ghost" onclick="window.abrirLojaPresentes('${r.id}','${r.nome}')">
+              🎁 Dar presente
+            </button>
+            <button class="btn btn-sm ${jaUsouMes ? 'btn-ghost' : 'btn-prim'}" ${jaUsouMes ? 'disabled' : ''}
+              onclick="window.tentarReatar('${r.id}','${r.nome}')"
+              title="${jaUsouMes ? 'Já tentou este mês' : '10% de chance de reatar (−10⚡)'}">
+              💌 Tentar reatar ${jaUsouMes ? '(aguarde próximo mês)' : '(−10⚡)'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+window.tentarReatar = async function(relId, nome) {
+  const j   = window.JOGADOR;
+  const uid = j?.uid || window.JOGADOR_UID;
+
+  const relRef  = doc(db, 'jogadores', uid, 'relacionamentos', relId);
+  const relSnap = await getDoc(relRef);
+  if (!relSnap.exists()) { toast('Relacionamento não encontrado.', 'ko'); return; }
+  const r = relSnap.data();
+
+  if (r.tentou_reatar_mes) { toast('Você já tentou reatar este mês. Aguarde o próximo.', 'ko'); return; }
+
+  const usado = j.energia_usada_mes || 0;
+  const disp  = Math.max(0, (j.energia_total || 100) - usado);
+  if (disp < 10) { toast('⚡ Energia insuficiente para tentar reatar.', 'ko'); return; }
+
+  await updateDoc(doc(db,'jogadores',uid), { energia_usada_mes: usado + 10 });
+
+  const sucesso = Math.random() < 0.10;
+
+  if (sucesso) {
+    await updateDoc(relRef, {
+      ativo: true,
+      tentou_reatar_mes: false,
+      motivo_separacao: null,
+      separado_em: null,
+    });
+    // Retravar o NPC para este jogador
+    if (r.npc_id) {
+      try { await _travarNpcParaJogador(r.npc_id, uid, relId, r.nome); } catch(e) {}
+    }
+    await _registrarEvento(uid, relId, {
+      tipo: 'reatar', label: `Você e ${nome} reataram o casamento`,
+      mes_pessoal: j.mes_pessoal||0, ano_pessoal: j.ano_pessoal||1,
+    });
+    toast(`💞 ${nome} aceitou recomeçar! O histórico do casamento foi preservado.`, 'ok', 5000);
+    setTimeout(()=>window.navTo&&window.navTo('vida_pessoal',null), 600);
+  } else {
+    await updateDoc(relRef, { tentou_reatar_mes: true });
+    await _registrarEvento(uid, relId, {
+      tipo: 'tentativa_reatar', label: `Você tentou reatar com ${nome}, mas ela não estava pronta`,
+      mes_pessoal: j.mes_pessoal||0, ano_pessoal: j.ano_pessoal||1,
+    });
+    toast(`💔 ${nome} não estava pronta desta vez. Tente novamente no próximo mês.`, 'neutro', 5000);
+    setTimeout(()=>window.navTo&&window.navTo('vida_pessoal',null), 600);
+  }
+};
 
 // ════════════════════════════════════════════════════════
 // CONHECER PESSOAS

@@ -1184,6 +1184,15 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
     .where('ativo', '==', true).get();
   const rels = relSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
+  // Reset mensal da flag de tentativa de reatar para ex-cônjuges separados
+  try {
+    const exEspSnap = await db.collection('jogadores').doc(uid).collection('relacionamentos')
+      .where('ativo', '==', false).where('estagio', '==', 'esposo').get();
+    for (const eDoc of exEspSnap.docs) {
+      if (eDoc.data().tentou_reatar_mes) await eDoc.ref.update({ tentou_reatar_mes: false });
+    }
+  } catch(e) { /* índice pode não existir ainda */ }
+
   // Busca de filhos UMA VEZ (fora do loop) para a checagem de Familiar
   // ("sem filhos COM ELA após os 30") — evita N queries redundantes para
   // N relacionamentos ativos. Monta um Set de relacionamento_id que já
@@ -1382,11 +1391,12 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
       if (Math.random() < FLAGRA_REL.chance_namorada_com_affair) {
         upd.ativo = false;
         upd.afinidade = 0;
+        if (r.estagio === 'esposo') { upd.separado_em = new Date().toISOString(); upd.motivo_separacao = 'flagra'; }
         smDelta -= FLAGRA_REL.penalidade_sm;
         await db.collection('jogadores').doc(uid).collection('inbox').add({
           de:'sistema', para_uid:uid,
-          assunto:'💔 Flagrado(a) traindo!',
-          corpo:`${r.nome} descobriu seu affair e terminou o relacionamento. -${FLAGRA_REL.penalidade_sm} saúde mental.`,
+          assunto: r.estagio === 'esposo' ? '💔 Separação — traição descoberta' : '💔 Flagrado(a) traindo!',
+          corpo:`${r.nome} descobriu seu affair e ${r.estagio === 'esposo' ? 'pediu a separação' : 'terminou o relacionamento'}. -${FLAGRA_REL.penalidade_sm} saúde mental.`,
           tipo:'sistema', tipo_noticia:'negativo', lida:false, criado_em:new Date().toISOString(),
         });
       }
@@ -1397,13 +1407,31 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
       }
     } else if (Math.random() < estagio.termino_chance) {
       upd.ativo = false;
+      if (r.estagio === 'esposo') { upd.separado_em = new Date().toISOString(); upd.motivo_separacao = 'natural'; }
       let danoTermino = IMPACTO_SM_REL.termino[r.estagio] || 10;
       // Romântica: término dói 50% mais na saúde mental do jogador.
       for (const e of efeitos) if (e.multiplicador_dano_sm_termino !== undefined) danoTermino *= e.multiplicador_dano_sm_termino;
       smDelta -= Math.round(danoTermino);
+      const assuntoTerm = r.estagio === 'esposo' ? '💔 Separação' : `💔 Término com ${r.nome}`;
+      const corpoTerm = r.estagio === 'esposo'
+        ? `${r.nome} pediu a separação. O desgaste do dia a dia pesou mais que o amor. -${Math.round(danoTermino)} saúde mental. Você pode tentar reatar em Vida Pessoal.`
+        : `${r.nome} decidiu encerrar o relacionamento. -${Math.round(danoTermino)} saúde mental.`;
+      await db.collection('jogadores').doc(uid).collection('inbox').add({
+        de:'sistema', para_uid:uid, assunto:assuntoTerm, corpo:corpoTerm,
+        tipo:'sistema', tipo_noticia:'negativo', lida:false, criado_em:new Date().toISOString(),
+      });
     } else if (Math.random() < estagio.tempo_chance) {
       upd.afinidade = Math.max(0, Math.floor((upd.afinidade ?? r.afinidade) * 0.7));
-      smDelta -= IMPACTO_SM_REL.tempo[r.estagio] || 5;
+      const smTempoDano = IMPACTO_SM_REL.tempo[r.estagio] || 5;
+      smDelta -= smTempoDano;
+      const assuntoTempo = r.estagio === 'esposo' ? '😔 Dando um tempo no casamento' : `😔 ${r.nome} quer dar um tempo`;
+      const corpoTempo = r.estagio === 'esposo'
+        ? `${r.nome} pediu um tempo no casamento. A afinidade caiu 30%. -${smTempoDano} saúde mental. Cuide do relacionamento para que não evolua para separação.`
+        : `${r.nome} pediu um tempo. A afinidade caiu 30%. -${smTempoDano} saúde mental.`;
+      await db.collection('jogadores').doc(uid).collection('inbox').add({
+        de:'sistema', para_uid:uid, assunto:assuntoTempo, corpo:corpoTempo,
+        tipo:'sistema', tipo_noticia:'negativo', lida:false, criado_em:new Date().toISOString(),
+      });
       // "Dar um tempo": trava o NPC globalmente para o MESMO jogador —
       // outros não podem conhecê-la enquanto isso, só ele pode reatar.
       if (r.npc_id) await _marcarNpcEmTempoCF(db, r.npc_id, uid, r.id);
