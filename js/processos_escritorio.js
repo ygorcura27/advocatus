@@ -137,9 +137,13 @@ window._npcEnergiaBadge = _npcEnergiaBadge;
 
 window.renderProcessosPool = async function(j, escId, el) {
   try {
-    // Carregar todos os processos do pool
+    // Carregar todos os processos do pool. Ordena por criado_mes (sempre
+    // presente) em vez de criado_em — o Firestore exclui silenciosamente da
+    // consulta qualquer doc que não tenha o campo usado no orderBy, então um
+    // processo antigo sem criado_em nunca apareceria aqui, mesmo contando
+    // para o limite mensal de "Gerar do mês" (que filtra por criado_mes).
     const poolSnap = await getDocs(
-      query(collection(db, 'escritorios', escId, 'processos_pool'), orderBy('criado_em', 'desc'), limit(60))
+      query(collection(db, 'escritorios', escId, 'processos_pool'), orderBy('criado_mes', 'desc'), limit(60))
     );
     const todos = poolSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
@@ -176,6 +180,15 @@ window.renderProcessosPool = async function(j, escId, el) {
       const escSnap = await getDoc(doc(db, 'escritorios', escId));
       if (escSnap.exists()) gestorNome = escSnap.data().gestor_nome || null;
     } catch(e) {}
+
+    // Diário da gestão — designações, sentenças e burnout do mês
+    let diario = [];
+    try {
+      const diarioSnap = await getDocs(query(
+        collection(db, 'escritorios', escId, 'log_gestao'), orderBy('criado_em', 'desc'), limit(12)
+      ));
+      diario = diarioSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (e) { /* sem índice ainda — deixa vazio */ }
 
     const tierEsc = j.escritorio_tier || 1;
     const uid     = j.uid || window.JOGADOR_UID;
@@ -220,6 +233,10 @@ window.renderProcessosPool = async function(j, escId, el) {
             <div class="proc-col-header">✅ Histórico</div>
             ${col3Html}
           </div>
+        </div>
+        <div style="margin-top:.9rem;border-top:1px solid #E8ECF5;padding-top:.7rem">
+          <div class="proc-col-header" style="margin-bottom:.4rem">📋 Diário da Gestão</div>
+          ${_renderDiarioGestao(diario)}
         </div>
       </div>`;
 
@@ -365,6 +382,22 @@ function _renderColRecursal(recursais) {
       </button>
     </div>`;
   }).join('');
+}
+
+// ─── Diário da gestão: designações, sentenças e burnout narrados em ordem ─────
+
+function _renderDiarioGestao(diario) {
+  if (!diario.length) {
+    return `<div style="font-size:.75rem;color:var(--txt3);padding:.5rem 0;text-align:center">
+      Nada registrado ainda. Designações, sentenças e burnout de NPCs aparecem aqui a cada mês.
+    </div>`;
+  }
+  return `<div style="display:flex;flex-direction:column;gap:.35rem">
+    ${diario.map(e => `
+      <div style="font-size:.7rem;color:var(--txt2);padding:.3rem .5rem;background:var(--surface2);border-radius:6px">
+        ${e.texto}
+      </div>`).join('')}
+  </div>`;
 }
 
 // ─── Coluna 3: Histórico ──────────────────────────────────────────────────────
@@ -684,6 +717,13 @@ window._processarSentenca = async function(escId, procId, uid) {
     improcedente: '❌ Improcedente',
   }[resultado];
 
+  const quemAtuou = proc.assumido_uid ? (j.nome_personagem || 'Você') : (proc.func_nome || 'A equipe');
+  const logResultado = {
+    procedente:   `✅ ${quemAtuou} obteve sentença favorável em "${proc.titulo}". +${_fmtP(valorRecebido)}.`,
+    parcial:      `🟡 ${quemAtuou} obteve sentença parcialmente favorável em "${proc.titulo}". +${_fmtP(valorRecebido)}.`,
+    improcedente: `❌ ${quemAtuou} perdeu o caso "${proc.titulo}" (sentença desfavorável). +${_fmtP(valorRecebido)}.`,
+  }[resultado];
+
   try {
     await Promise.all([
       updateDoc(doc(db, 'jogadores', uid), { energia_usada_mes: energiaUsada + CUSTO_SENT }),
@@ -700,6 +740,9 @@ window._processarSentenca = async function(escId, procId, uid) {
       proc.func_id
         ? updateDoc(doc(db, 'escritorios', escId, 'funcionarios', proc.func_id), { processo_id: null })
         : Promise.resolve(),
+      addDoc(collection(db, 'escritorios', escId, 'log_gestao'), {
+        texto: logResultado, criado_em: new Date().toISOString(),
+      }),
     ]);
 
     j.energia_usada_mes = energiaUsada + CUSTO_SENT;
@@ -732,7 +775,7 @@ window.gerarProcessosMensais = async function(escId, tierEscritorio) {
     const jaGeradosMes = existSnap.size;
 
     if (jaGeradosMes >= cap) {
-      toast(`Pool do mês cheio (${cap} processos gerados).`, 'ko');
+      toast(`Pool do mês cheio (${jaGeradosMes}/${cap} processos já gerados este mês).`, 'ko');
       return;
     }
 

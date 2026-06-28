@@ -51,6 +51,7 @@ async function _processarProgressoNPCsCF(db, escRef) {
     .where('status', '==', 'em_andamento').get();
 
   const proms = [];
+  const logsProgresso = [];
   for (const d of poolSnap.docs) {
     const p = d.data();
     if (!p.func_cargo) continue;
@@ -60,11 +61,17 @@ async function _processarProgressoNPCsCF(db, escRef) {
     const novoProg  = Math.min(100, (p.progresso || 0) + ganho);
     const novoStatus = novoProg >= 100 ? 'aguardando_sentenca' : 'em_andamento';
     proms.push(d.ref.update({ progresso: novoProg, status: novoStatus }));
+    if (novoStatus === 'aguardando_sentenca') {
+      logsProgresso.push(_logGestaoCF(escRef,
+        `⚙️ ${p.func_nome||'Um membro da equipe'} concluiu o trabalho em "${p.titulo}" — aguardando sentença.`));
+    }
   }
   if (proms.length) await Promise.all(proms);
+  if (logsProgresso.length) await Promise.all(logsProgresso);
 
   const fSnap = await escRef.collection('funcionarios').get();
   const fProms = [];
+  const logsBurnout = [];
   for (const fd of fSnap.docs) {
     const f = fd.data();
     const npcUsado  = f.energia_npc_usada_mes || 0;
@@ -75,13 +82,17 @@ async function _processarProgressoNPCsCF(db, escRef) {
 
     if (burnoutNPC) {
       burnoutRest = Math.max(0, burnoutRest - 1);
-      if (burnoutRest === 0) burnoutNPC = false;
+      if (burnoutRest === 0) {
+        burnoutNPC = false;
+        logsBurnout.push(_logGestaoCF(escRef, `✅ ${f.nome||'Membro da equipe'} se recuperou do burnout e voltou a trabalhar.`));
+      }
     } else if (sobrecarg) {
       novosMeses++;
       if (novosMeses >= 3) {
         burnoutNPC = true;
         burnoutRest = 3;
         novosMeses = 0;
+        logsBurnout.push(_logGestaoCF(escRef, `🔴 ${f.nome||'Membro da equipe'} entrou em burnout após 3 meses sobrecarregado — afastado por 3 meses.`));
       }
     } else {
       novosMeses = 0;
@@ -95,6 +106,7 @@ async function _processarProgressoNPCsCF(db, escRef) {
     }));
   }
   if (fProms.length) await Promise.all(fProms);
+  if (logsBurnout.length) await Promise.all(logsBurnout);
 }
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
@@ -1159,6 +1171,11 @@ async function _processarAutogestaoOportunidadesCF(db, escRef, esc) {
   }
 }
 
+// Diário da gestão — feed narrativo lido pelo painel "Histórico" do escritório.
+async function _logGestaoCF(escRef, texto) {
+  await escRef.collection('log_gestao').add({ texto, criado_em: new Date().toISOString() });
+}
+
 async function _autoAtribuirProcessosMensalCF(db, escRef, esc) {
   const poolSnap = await escRef.collection('processos_pool')
     .where('status', '==', 'disponivel').get();
@@ -1171,12 +1188,15 @@ async function _autoAtribuirProcessosMensalCF(db, escRef, esc) {
 
   if (npcsDisponiveis.length === 0) return;
 
+  const gestorNome = esc.gestor_nome || 'O gestor';
+
   for (const procDoc of poolSnap.docs) {
     const npc = npcsDisponiveis
       .filter(f => (100 - (f.energia_npc_usada_mes||0)) >= 40)
       .sort((a,b) => (100-(b.energia_npc_usada_mes||0)) - (100-(a.energia_npc_usada_mes||0)))[0];
     if (!npc) break;
 
+    const proc = procDoc.data();
     await procDoc.ref.update({
       status: 'em_andamento',
       func_id: npc.id,
@@ -1192,6 +1212,9 @@ async function _autoAtribuirProcessosMensalCF(db, escRef, esc) {
       energia_npc_usada_mes: npc.energia_npc_usada_mes,
       processo_id: procDoc.id,
     });
+
+    await _logGestaoCF(escRef,
+      `👤 ${gestorNome} designou "${proc.titulo}" (${proc.cliente_nome||'cliente'}) para ${npc.nome}.`);
   }
 }
 

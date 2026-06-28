@@ -346,6 +346,19 @@ service cloud.firestore {
               || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
       }
 
+      // Diário da gestão — feed somente-leitura de designações/sentenças/
+      // burnout, narrado para dono e sócios. Escrita só de criação (log é
+      // append-only); Cloud Functions usam Admin SDK e ignoram esta regra.
+      match /log_gestao/{logId} {
+        allow read: if isAuth()
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+        allow create: if isAuth()
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+        allow update, delete: if false;
+      }
+
       allow delete: if false;
     }
 
