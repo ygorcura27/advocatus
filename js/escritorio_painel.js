@@ -24,10 +24,18 @@ const ESP_LABEL = {
   familia:'Família', imobiliario:'Imobiliário', empresarial:'Empresarial',
 };
 
-// Placeholder SVG com iniciais douradas em fundo navy
-function _avatar(nome) {
+function _avatarSvg(nome) {
   const ini = (nome||'?').split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase().slice(0,2);
-  return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36'%3E%3Ccircle cx='18' cy='18' r='18' fill='%232E4270'/%3E%3Ctext x='18' y='23' font-size='12' font-weight='700' fill='%23C9A227' text-anchor='middle' font-family='DM Sans,Arial'%3E${ini}%3C/text%3E%3C/svg%3E`;
+  return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Ccircle cx='24' cy='24' r='24' fill='%232E4270'/%3E%3Ctext x='24' y='30' font-size='14' font-weight='700' fill='%23C9A227' text-anchor='middle' font-family='DM Sans,Arial'%3E${ini}%3C/text%3E%3C/svg%3E`;
+}
+
+// Retorna src da foto do NPC; cai para SVG com iniciais se não tiver foto
+function _avatarSrc(func) {
+  const nome = func.nome || func.name || '?';
+  if (func.tipo === 'npc' && func.foto_npc) {
+    return `img/npcs%20escritorio/${func.foto_npc}`;
+  }
+  return _avatarSvg(nome);
 }
 
 function _slugEmpresa(nome) {
@@ -116,7 +124,8 @@ window.renderEquipePainel = async function(j, escId, el) {
 
       return `
       <div class="esc-membro${emBurnout?' npc-em-burnout':sobrecarregado?' npc-sobrecarregado-card':''}" id="membro-${func.id}">
-        <img class="esc-membro-avatar" src="${_avatar(nome)}" alt="${nome}">
+        <img class="esc-membro-avatar" src="${_avatarSrc(func)}" alt="${nome}"
+             onerror="this.onerror=null;this.src='${_avatarSvg(nome)}'">
         <div class="esc-membro-info">
           <div class="esc-membro-nome">${nome} ${energiaBadge}</div>
           <div class="esc-membro-cargo">${cargo}</div>

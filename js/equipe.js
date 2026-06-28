@@ -305,6 +305,16 @@ window._contratarNPC = async function(cargo_min, escId) {
   const sobrenome    = NOMES_NPC.sobrenomes[Math.floor(Math.random() * NOMES_NPC.sobrenomes.length)];
   const nome         = primeiroNome + ' ' + sobrenome;
 
+  // Atribuir foto única dentro deste escritório (1-20, sem repetir)
+  const prefixoFoto = sexo === 'm' ? 'foto_npc_homem_' : 'foto_npc_mulher_';
+  let foto_npc = null;
+  try {
+    const fSnap = await getDocs(collection(db, 'escritorios', escId, 'funcionarios'));
+    const fotosUsadas = new Set(fSnap.docs.map(d => d.data().foto_npc).filter(Boolean));
+    const pool = Array.from({length: 20}, (_, i) => `${prefixoFoto}${i+1}.png`).filter(f => !fotosUsadas.has(f));
+    if (pool.length > 0) foto_npc = pool[Math.floor(Math.random() * pool.length)];
+  } catch(e) { /* segue sem foto */ }
+
   // Skills baseadas no cargo (com variação ±30%)
   const BASE_SKILLS = {
     est: { pesquisa:12, escrita:10, argumentacao:10, oratoria:8  },
@@ -322,6 +332,7 @@ window._contratarNPC = async function(cargo_min, escId) {
   const funcionario = {
     nome, cargo_id, skills, sexo,
     tipo:       'npc',
+    foto_npc,
     escritorio_id: escId,
     dono_uid:   uid,
     ativo:      true,
