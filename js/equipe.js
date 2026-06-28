@@ -118,6 +118,11 @@ window.renderEquipe = async function(j, el) {
   const totalSalarios = funcs.reduce((s,f) => s + (CARGO_INFO[f.cargo_id]?.sal || 0), 0);
   const energiaDisp   = Math.max(0, 100 - (j.energia_usada_mes || 0));
 
+  // Maior cargo presente (para exibir botão de Gestor)
+  const maxCargoOrdem = funcs.length > 0
+    ? Math.max(...funcs.map(f => CARGO_IDX[f.cargo_id] ?? 0))
+    : -1;
+
   el.innerHTML = `
     <div style="margin-bottom:.8rem"><button class="btn btn-ghost btn-sm" onclick="window.navTo('escritorio',null)">← Escritório</button></div>
     <div class="secao-header">
@@ -142,15 +147,15 @@ window.renderEquipe = async function(j, el) {
     </div>
 
     <!-- Grupos de cargo -->
-    ${_renderGrupo('🎓 Estagiários', estagiarios, cap.estagiarios, 'est', escId, energiaDisp)}
-    ${_renderGrupo('📋 Assistentes', assistentes, cap.assistentes, 'ass', escId, energiaDisp)}
-    ${_renderGrupo('⚖️ Advogados', advogados, cap.advogados, 'jnr', escId, energiaDisp)}
+    ${_renderGrupo('🎓 Estagiários', estagiarios, cap.estagiarios, 'est', escId, energiaDisp, maxCargoOrdem)}
+    ${_renderGrupo('📋 Assistentes', assistentes, cap.assistentes, 'ass', escId, energiaDisp, maxCargoOrdem)}
+    ${_renderGrupo('⚖️ Advogados', advogados, cap.advogados, 'jnr', escId, energiaDisp, maxCargoOrdem)}
 
     <!-- Processos para revisão (90% concluídos por funcionários) -->
     ${await _renderProcessosPendentesRevisao(j, escId)}`;
 };
 
-function _renderGrupo(titulo, membros, vagas, cargo_min, escId, energiaDisp) {
+function _renderGrupo(titulo, membros, vagas, cargo_min, escId, energiaDisp, maxCargoOrdem = -1) {
   const ci = CARGO_INFO[cargo_min] || CARGO_INFO.est;
   return `
     <div style="margin-bottom:1.2rem">
@@ -165,7 +170,7 @@ function _renderGrupo(titulo, membros, vagas, cargo_min, escId, energiaDisp) {
       </div>
       ${membros.length === 0
         ? `<div style="font-size:.75rem;color:var(--txt4);padding:.5rem 0">Nenhum ${titulo.split(' ')[1].toLowerCase()} contratado ainda.</div>`
-        : membros.map(f => _cardFuncionario(f, escId, energiaDisp)).join('')}
+        : membros.map(f => _cardFuncionario(f, escId, energiaDisp, maxCargoOrdem)).join('')}
     </div>`;
 }
 
@@ -182,12 +187,13 @@ function _calcProd(func) {
   return Math.min(98, Math.max(20, Math.round((media / cap) * 70 + bon + pen + 10)));
 }
 
-function _cardFuncionario(f, escId, energiaDisp) {
+function _cardFuncionario(f, escId, energiaDisp, maxCargoOrdem = -1) {
   const ci    = CARGO_INFO[f.cargo_id] || CARGO_INFO.est;
   const skills = f.skills || {};
   const prod   = _calcProd(f);
   const prodColor = prod >= 80 ? '#2E8B57' : prod >= 60 ? '#B7791F' : '#C0392B';
   const podeCoordenar = energiaDisp >= ci.custo_coord;
+  const ehMaxCargo = maxCargoOrdem >= 0 && (CARGO_IDX[f.cargo_id] ?? 0) >= maxCargoOrdem;
 
   const ini = (f.nome||'?').split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase().slice(0,2);
   const svgSrc = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='153' height='153'%3E%3Ccircle cx='76' cy='76' r='76' fill='%232E4270'/%3E%3Ctext x='76' y='96' font-size='36' font-weight='700' fill='%23C9A227' text-anchor='middle' font-family='DM Sans,Arial'%3E${ini}%3C/text%3E%3C/svg%3E`;
@@ -197,11 +203,11 @@ function _cardFuncionario(f, escId, energiaDisp) {
     : `<img src="${svgSrc}" alt="${ini}" style="width:153px;height:153px;border-radius:var(--r);flex-shrink:0">`;
 
   return `
-    <div class="card" style="margin-bottom:.5rem;border-left:3px solid var(--navy3)">
+    <div class="card" style="margin-bottom:.5rem;border-left:3px solid ${ehMaxCargo?'var(--ouro2)':'var(--navy3)'}">
       <div style="display:flex;align-items:start;justify-content:space-between;gap:.8rem">
         ${fotoHtml}
         <div style="flex:1;min-width:0">
-          <div style="font-weight:700;font-size:.88rem;color:var(--navy)">${f.nome}</div>
+          <div style="font-weight:700;font-size:.88rem;color:var(--navy)">${f.nome}${ehMaxCargo?` <span style="font-size:.58rem;color:var(--ouro2);font-weight:600">★ Maior cargo</span>`:''}</div>
           <div style="font-size:.68rem;color:var(--ouro2);margin-bottom:.3rem">${ci.l} · Produtividade: <b style="color:${prodColor}">${prod}%</b></div>
           <div style="display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.4rem">
             ${Object.entries(skills).map(([k,v])=>
@@ -223,6 +229,10 @@ function _cardFuncionario(f, escId, energiaDisp) {
             title="${!podeCoordenar?'Energia insuficiente':'Designar processo'}">
             📋 Designar (-${ci.custo_coord}⚡)
           </button>
+          ${ehMaxCargo ? `<button class="btn btn-sm btn-ghost" style="color:var(--ouro2);border-color:var(--ouro2)"
+            onclick="window.salvarGestor('${escId}','${f.id}','${nomeEsc}')">
+            👤 Gestor
+          </button>` : ''}
           <button class="btn btn-sm btn-ghost btn-danger"
             onclick="window.demitirFuncionario('${f.id}','${escId}','${f.nome}')">
             Demitir
@@ -273,15 +283,13 @@ const qSnap = { docs: [...qSnap1.docs, ...qSnap2.docs], empty: qSnap1.empty && q
 // CONTRATAR FUNCIONÁRIO
 // ════════════════════════════════════════════════════════
 window.abrirModalContratar = function(cargo_min, escId) {
-  const j = window.JOGADOR;
-
   abrirModal('👤 Contratar Funcionário',
     `<div style="font-size:.78rem;color:var(--txt2);margin-bottom:1rem">
-      Você pode contratar um <b>NPC gerado pelo jogo</b> ou convidar um <b>jogador real</b> pelo e-mail.
+      Escolha como deseja contratar:
     </div>
     <div style="display:flex;flex-direction:column;gap:.5rem;margin-bottom:1rem">
-      <button class="btn btn-prim btn-block" onclick="window._contratarNPC('${cargo_min}','${escId}')">
-        🤖 Contratar NPC (imediato)
+      <button class="btn btn-prim btn-block" onclick="window._mostrarCandidatosNPC('${cargo_min}','${escId}')">
+        🤖 Selecionar candidato NPC
       </button>
       <button class="btn btn-sec btn-block" onclick="window._abrirConviteJogador('${cargo_min}','${escId}')">
         👤 Convidar jogador real
@@ -291,6 +299,123 @@ window.abrirModalContratar = function(cargo_min, escId) {
       NPCs têm skills aleatórias. Jogadores reais trazem suas próprias habilidades.
     </div>`
   );
+};
+
+window._mostrarCandidatosNPC = async function(cargo_min, escId) {
+  const CARGOS_DISP = { est:['est'], ass:['ass'], jnr:['jnr','pln','snr'] };
+  const cargos = CARGOS_DISP[cargo_min] || ['est'];
+
+  const BASE_SKILLS = {
+    est: { pesquisa:12, escrita:10, argumentacao:10, oratoria:8  },
+    ass: { pesquisa:22, escrita:20, argumentacao:18, oratoria:15 },
+    jnr: { pesquisa:30, escrita:28, argumentacao:28, oratoria:25 },
+    pln: { pesquisa:40, escrita:38, argumentacao:38, oratoria:35 },
+    snr: { pesquisa:50, escrita:48, argumentacao:48, oratoria:45 },
+  };
+
+  // Fotos já em uso neste escritório
+  let fotosUsadas = new Set();
+  try {
+    const fSnap = await getDocs(collection(db, 'escritorios', escId, 'funcionarios'));
+    fotosUsadas = new Set(fSnap.docs.map(d => d.data().foto_npc).filter(Boolean));
+  } catch(e) {}
+  const fotosLocais = new Set(fotosUsadas);
+
+  const candidatos = [];
+  for (let i = 0; i < 3; i++) {
+    const cargo_id = cargos[Math.floor(Math.random() * Math.min(2, cargos.length))];
+    const ci = CARGO_INFO[cargo_id];
+    const sexo = Math.random() < 0.5 ? 'm' : 'f';
+    const nome = NOMES_NPC[sexo][Math.floor(Math.random() * NOMES_NPC[sexo].length)]
+               + ' ' + NOMES_NPC.sobrenomes[Math.floor(Math.random() * NOMES_NPC.sobrenomes.length)];
+
+    const prefixo = sexo === 'm' ? 'foto_npc_homem_' : 'foto_npc_mulher_';
+    const pool = Array.from({length:20}, (_,k) => `${prefixo}${k+1}.png`).filter(f => !fotosLocais.has(f));
+    const foto_npc = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null;
+    if (foto_npc) fotosLocais.add(foto_npc);
+
+    const base = BASE_SKILLS[cargo_id] || BASE_SKILLS.est;
+    const skills = {};
+    Object.entries(base).forEach(([k,v]) => {
+      skills[k] = Math.max(1, Math.round(v * (0.7 + Math.random() * 0.6)));
+    });
+
+    candidatos.push({ nome, cargo_id, ci, sexo, foto_npc, skills });
+  }
+
+  window._candidatosNPC = candidatos;
+
+  const cards = candidatos.map((c, idx) => {
+    const ini = c.nome.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase().slice(0,2);
+    const svgSrc = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Ccircle cx='40' cy='40' r='40' fill='%232E4270'/%3E%3Ctext x='40' y='51' font-size='22' font-weight='700' fill='%23C9A227' text-anchor='middle' font-family='DM Sans,Arial'%3E${ini}%3C/text%3E%3C/svg%3E`;
+    const fotoSrc = c.foto_npc ? `img/npcs%20escritorio/${c.foto_npc}` : svgSrc;
+    const nomeSafe = c.nome.replace(/'/g, "\\'");
+    return `
+      <div class="card" style="margin-bottom:0;display:flex;gap:.7rem;align-items:flex-start">
+        <img src="${fotoSrc}" alt="${c.nome}"
+             style="width:80px;height:80px;object-fit:cover;border-radius:var(--r);flex-shrink:0"
+             onerror="this.onerror=null;this.src='${svgSrc}'">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;color:var(--navy);font-size:.88rem">${c.nome}</div>
+          <div style="font-size:.68rem;color:var(--ouro2);margin:.1rem 0">${c.ci.l}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:.2rem;margin:.3rem 0">
+            ${Object.entries(c.skills).map(([k,v]) =>
+              `<span style="font-size:.58rem;padding:.08rem .3rem;background:var(--navy-light);border-radius:20px;color:var(--navy3)">${_skillLabel(k)}: ${v}</span>`
+            ).join('')}
+          </div>
+          <div style="font-size:.65rem;color:var(--txt4);margin-bottom:.4rem">
+            Salário: <b style="color:var(--verm2)">R$ ${c.ci.sal.toLocaleString('pt-BR')}/mês</b>
+          </div>
+          <button class="btn btn-sm btn-prim btn-block"
+            onclick="window._confirmarContratarCandidato(${idx},'${escId}')">
+            Contratar
+          </button>
+        </div>
+      </div>`;
+  }).join('');
+
+  const ci_ref = CARGO_INFO[cargo_min] || CARGO_INFO.est;
+  abrirModal(`👤 Candidatos — ${ci_ref.l}`,
+    `<div style="font-size:.75rem;color:var(--txt3);margin-bottom:.8rem">
+      Escolha um dos candidatos disponíveis:
+    </div>
+    <div style="display:flex;flex-direction:column;gap:.6rem">${cards}</div>`
+  );
+};
+
+window._confirmarContratarCandidato = async function(idx, escId) {
+  const c = (window._candidatosNPC || [])[idx];
+  if (!c) { toast('Candidato nao encontrado.', 'ko'); return; }
+
+  const j   = window.JOGADOR;
+  const uid = j?.uid || window.JOGADOR_UID;
+  const ci  = CARGO_INFO[c.cargo_id] || CARGO_INFO.est;
+
+  // Re-verificar unicidade da foto ao contratar
+  let foto_npc = c.foto_npc;
+  try {
+    const fSnap = await getDocs(collection(db, 'escritorios', escId, 'funcionarios'));
+    const fotosUsadas = new Set(fSnap.docs.map(d => d.data().foto_npc).filter(Boolean));
+    if (foto_npc && fotosUsadas.has(foto_npc)) {
+      const prefixo = c.sexo === 'm' ? 'foto_npc_homem_' : 'foto_npc_mulher_';
+      const pool = Array.from({length:20}, (_,i) => `${prefixo}${i+1}.png`).filter(f => !fotosUsadas.has(f));
+      foto_npc = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null;
+    }
+  } catch(e) {}
+
+  try {
+    await addDoc(collection(db, 'escritorios', escId, 'funcionarios'), {
+      nome: c.nome, cargo_id: c.cargo_id, skills: c.skills, sexo: c.sexo,
+      tipo: 'npc', foto_npc, escritorio_id: escId, dono_uid: uid,
+      ativo: true, acoes_mes_usadas: 0, acao_atual: null,
+      criado_em: new Date().toISOString(),
+    });
+    fecharModal();
+    toast(`✅ ${c.nome} (${ci.l}) contratado! Salario: R$ ${ci.sal.toLocaleString('pt-BR')}/mes`, 'ok', 5000);
+    setTimeout(() => window.navTo && window.navTo('equipe', null), 600);
+  } catch(err) {
+    toast('Erro ao contratar: ' + err.message, 'ko');
+  }
 };
 
 window._contratarNPC = async function(cargo_min, escId) {
