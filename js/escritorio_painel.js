@@ -233,8 +233,6 @@ window.renderOportunidadesPainel = async function(j, escId, el) {
     const top5    = todas.slice(0, 5);
     const temMais = todas.length > 5;
 
-    if (top5.length === 0) { el.innerHTML = ''; return; }
-
     const tipoIcon = { PF:'👤', PJ:'🏢', consulta:'📋', contrato:'📄', causa:'⚖️' };
     const ESP_L    = { tributario:'Tributário', contencioso:'Contencioso', trabalhista:'Trabalhista', criminal:'Criminal', societario:'Societário', civil:'Civil', consumidor:'Consumidor', ambiental:'Ambiental', administrativo:'Administrativo', familia:'Família', imobiliario:'Imobiliário', empresarial:'Empresarial' };
 
@@ -283,7 +281,9 @@ window.renderOportunidadesPainel = async function(j, escId, el) {
             : `<a href="#" class="esc-ver-todos" onclick="window.navTo('clientes',null);return false">Ver todas</a>`}
         </div>
         <div style="font-size:.64rem;color:var(--txt4);margin-bottom:.5rem">⚡ Energia disponível: <b style="color:${energiaDisp>50?'var(--verde2)':energiaDisp>20?'var(--amber)':'var(--verm2)'}">${energiaDisp}/${energiaTotal}</b></div>
-        ${rows}
+        ${top5.length === 0
+          ? `<div style="font-size:.78rem;color:var(--txt3);text-align:center;padding:.8rem 0">Sem oportunidades do mês no momento.</div>`
+          : rows}
       </div>`;
 
   } catch (err) {
