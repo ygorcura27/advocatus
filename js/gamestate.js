@@ -223,11 +223,37 @@ function _atualizarCronologia(mesIdx, ano, j) {
     }).join('');
   }
 
-  // Countdown = energia restante até poder avançar o mês
+  // Countdown: Janeiro bloqueado → timer mm:ss; outros meses → "Pode avançar"
+  if (window._countdownInterval) {
+    clearInterval(window._countdownInterval);
+    window._countdownInterval = null;
+  }
   if (j) {
-    const usado = j.energia_usada_mes || 0;
-    const disp  = Math.max(0, (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - usado);
-    _set('cron-countdown', disp <= 5 ? 'Pronto ▶' : `${disp} ⚡ energia`);
+    const mesAtual     = j.mes_pessoal !== undefined ? j.mes_pessoal : mesIdx;
+    const bloqueadoAte = j.janeiro_bloqueado_ate ? new Date(j.janeiro_bloqueado_ate) : null;
+    const emJaneiro    = mesAtual === 0;
+    const bloqueado    = emJaneiro && bloqueadoAte && Date.now() < bloqueadoAte.getTime();
+
+    if (bloqueado) {
+      const _tick = () => {
+        const el = document.getElementById('cron-countdown');
+        if (!el) { clearInterval(window._countdownInterval); return; }
+        const restante = Math.max(0, bloqueadoAte.getTime() - Date.now());
+        if (restante <= 0) {
+          el.textContent = 'Pode avançar';
+          clearInterval(window._countdownInterval);
+          window._countdownInterval = null;
+          return;
+        }
+        const mins = Math.floor(restante / 60000);
+        const secs = Math.floor((restante % 60000) / 1000);
+        el.textContent = `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+      };
+      _tick();
+      window._countdownInterval = setInterval(_tick, 1000);
+    } else {
+      _set('cron-countdown', 'Pode avançar');
+    }
   }
 
   // ── Progresso do Ano ──

@@ -2062,7 +2062,7 @@ a:hover { color: var(--navy); }
 }
 .cronologia-sep { height: 1px; background: rgba(255,255,255,.1); margin: .5rem 0; }
 .cronologia-prox { font-size: .65rem; color: rgba(255,255,255,.6); text-align: center; }
-.cronologia-prox b { color: var(--ouro); }
+.cronologia-prox b { color: var(--ouro); font-size: .95rem; font-family: var(--font-mono); letter-spacing: .06em; }
 
 .progresso-ano-bloco {
   background: var(--surface);
