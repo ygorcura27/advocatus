@@ -84,63 +84,105 @@ function _renderizar() {
 // PERFIL
 // ════════════════════════════════════════════════════════
 function renderPerfil(j, el) {
-  const cap    = window.REP_CAP[j.cargo_id] || 55;
-  const label  = window.CARGO_LABEL[j.cargo_id] || j.cargo_id;
-  const total  = (j.wins||0) + (j.losses||0);
-  const aprov  = total > 0 ? Math.round((j.wins||0)/total*100) : 0;
-  const esp    = _espLabel(j.especialidade);
-  const escNome = j.escritorio_nome || 'Advocacia Solo';
-  const s = window.SERVER || {};
+  const cap      = window.REP_CAP[j.cargo_id] || 55;
+  const label    = window.CARGO_LABEL[j.cargo_id] || j.cargo_id;
+  const total    = (j.wins||0) + (j.losses||0);
+  const aprov    = total > 0 ? Math.round((j.wins||0)/total*100) : 0;
+  const esp      = _espLabel(j.especialidade);
+  const escNome  = j.escritorio_nome || 'Advocacia Solo';
+  const photoURL = window.FIREBASE_USER_PHOTO || null;
+  const rep      = j.reputacao || 0;
+  const repPct   = Math.min(100, Math.round(rep / cap * 100));
+  const repCor   = repPct >= 80 ? 'var(--verde2)' : repPct >= 50 ? 'var(--ouro2)' : repPct >= 25 ? 'var(--navy3)' : 'var(--txt4)';
+
+  const energiaTotal = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
+  const energiaUsada = j.energia_usada_mes || 0;
+  const energiaDisp  = Math.max(0, energiaTotal - energiaUsada);
+  const energiaPct   = Math.round((energiaDisp / energiaTotal) * 100);
+  const corE = energiaDisp > 50 ? 'var(--verde2)' : energiaDisp > 20 ? 'var(--amber)' : 'var(--verm2)';
+
+  const ini = (j.nome_personagem || '?').split(' ').slice(0,2).map(n => n[0]).join('').toUpperCase().slice(0,2);
+  const photoHtml = photoURL
+    ? `<img class="prof-photo-img" src="${photoURL}" alt="${j.nome_personagem||''}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+    : '';
+  const avatarSvg = `<div class="prof-photo-svg" style="${photoURL ? 'display:none' : 'display:flex'}">
+    <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+      <circle cx="50" cy="50" r="50" fill="#2E4270"/>
+      <text x="50" y="65" font-size="28" font-weight="700" fill="#C9A227" text-anchor="middle" font-family="DM Sans,Arial">${ini}</text>
+    </svg>
+  </div>`;
+
+  const saldo = j.dinheiro || 0;
+  const saldoStr = saldo >= 1000000
+    ? 'R$ ' + (saldo/1000000).toFixed(2).replace('.',',') + 'M'
+    : 'R$ ' + Number(saldo).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
 
   el.innerHTML = `
-    <div class="profile-hero">
-      <div class="profile-photo">⚖️</div>
-      <div>
-        <div class="profile-hero-nome">${j.nome_personagem || '—'}</div>
-        <div class="profile-hero-titulo">${label} · ${esp} · Rio de Janeiro</div>
-        <div class="profile-hero-meta">
-          <span class="meta-tag">📅 ${j.anos_carreira || 0} anos de carreira</span>
-          <span class="meta-tag">⚖️ ${total} casos no total</span>
-          <span class="meta-tag">✅ ${aprov}% de aproveitamento</span>
-          <span class="meta-tag">🏢 ${escNome}</span>
-          <span class="meta-tag">👤 ${j.idade || 22} anos · Geração ${j.geracao || 1}</span>
+    <!-- HERO -->
+    <div class="prof-hero">
+      <div class="prof-hero-inner">
+        <div class="prof-photo-wrap">
+          ${photoHtml}
+          ${avatarSvg}
         </div>
-      </div>
-      <div class="hero-badges">
-        <span class="badge-pill badge-cargo">${label}</span>
-        <span class="badge-pill badge-esp">${esp}</span>
-        ${j.oab ? '<span class="badge-pill badge-oab">OAB ✓</span>' : ''}
-        ${j.no_serasa ? '<span class="badge-pill" style="background:rgba(122,32,32,.25);color:var(--verm3);border:1px solid rgba(200,80,80,.35)">🚨 Serasa</span>' : ''}
+        <div class="prof-hero-info">
+          <div class="prof-nome">${j.nome_personagem || '—'}</div>
+          <div class="prof-cargo-esp">${label} · <span style="color:var(--ouro)">${esp}</span></div>
+          <div class="prof-meta-tags">
+            <span class="prof-meta-tag">📅 ${j.anos_carreira || 0} anos de carreira</span>
+            <span class="prof-meta-tag">⚖️ ${total} casos</span>
+            <span class="prof-meta-tag">✅ ${aprov}% aproveitamento</span>
+            <span class="prof-meta-tag">🏢 ${escNome}</span>
+            <span class="prof-meta-tag">👤 ${j.idade || 22} anos · Geração ${j.geracao || 1}</span>
+          </div>
+        </div>
+        <div class="prof-hero-badges">
+          <div class="prof-badge-cargo">${label}</div>
+          <span class="prof-badge-esp">${esp}</span>
+          ${j.oab ? '<span class="prof-badge-oab">OAB ✓</span>' : ''}
+          ${j.no_serasa ? '<span class="prof-badge-serasa">🚨 Serasa</span>' : ''}
+        </div>
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:.5rem;margin-bottom:1.2rem">
-      ${_miniStatCard('💰','Saldo', _fmtExt(j.dinheiro||0),'money')}
-      ${_miniStatCard('📈','Renda/mês', _fmtExt(j.renda_calculada||0),'money')}
-      ${_miniStatCard('💸','Despesas', _fmtExt(j.despesas_calculadas||0),'danger')}
-      ${_miniStatCardRep('🏅','Reputação', j.reputacao||0, cap)}
+    <!-- SALDO + ENERGIA + PRESTÍGIO -->
+    <div class="prof-vitals">
+      <div class="prof-vital-card prof-vital-saldo">
+        <div class="pvc-icon">🏦</div>
+        <div class="pvc-content">
+          <div class="pvc-label">Saldo Disponível</div>
+          <div class="pvc-valor">${saldoStr}</div>
+        </div>
+      </div>
+      <div class="prof-vital-card">
+        <div class="pvc-icon" style="color:${corE}">⚡</div>
+        <div class="pvc-content" style="flex:1">
+          <div style="display:flex;justify-content:space-between;align-items:baseline">
+            <div class="pvc-label">Energia do Mês</div>
+            <div class="pvc-valor-sm" style="color:${corE}">${energiaDisp}/${energiaTotal}</div>
+          </div>
+          <div class="pvc-bar-wrap">
+            <div class="pvc-bar-fill" style="width:${energiaPct}%;background:${corE}"></div>
+          </div>
+          <div class="pvc-hint">Pesquisa -10⚡ · Petição -15⚡ · Audiência -20⚡</div>
+        </div>
+      </div>
+      <div class="prof-vital-card">
+        <div class="pvc-icon" style="color:${repCor}">🏅</div>
+        <div class="pvc-content" style="flex:1">
+          <div style="display:flex;justify-content:space-between;align-items:baseline">
+            <div class="pvc-label">Prestígio</div>
+            <div class="pvc-valor-sm" style="color:${repCor}">${rep}/${cap}</div>
+          </div>
+          <div class="pvc-bar-wrap">
+            <div class="pvc-bar-fill" style="width:${repPct}%;background:${repCor}"></div>
+          </div>
+          <div class="pvc-hint">${repPct >= 90 ? '👑 Elite' : repPct >= 70 ? '⭐ Destaque' : repPct >= 40 ? '📈 Crescendo' : '🌱 Iniciante'} · Cap ${cap}</div>
+        </div>
+      </div>
     </div>
 
-    <!-- Energia do mês -->
-    ${(() => {
-      const energiaUsada = j.energia_usada_mes||0;
-      const energiaDisp  = Math.max(0, 100 - energiaUsada);
-      const corE = energiaDisp > 50 ? 'var(--verde2)' : energiaDisp > 20 ? 'var(--amber)' : 'var(--verm2)';
-      return `<div style="margin-bottom:1rem;padding:.75rem;background:var(--surface2);border:var(--borda-sub);border-radius:var(--r)">
-        <div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--txt3);margin-bottom:.3rem">
-          <span>⚡ Energia do mês</span>
-          <span style="font-weight:700;color:${corE}">${energiaDisp}/100</span>
-        </div>
-        <div style="height:8px;background:var(--bg2);border-radius:4px;overflow:hidden">
-          <div style="height:100%;width:${energiaDisp}%;background:${corE};border-radius:4px;transition:width .4s"></div>
-        </div>
-        <div style="font-size:.62rem;color:var(--txt4);margin-top:.25rem">
-          Pesquisa -5⚡ · Petição -10⚡ · Diligência -15⚡ · Audiência -20⚡
-        </div>
-      </div>`;
-    })()}
-
-    <!-- Atributos -->
+    <!-- ATRIBUTOS -->
     <div class="secao-header">
       <div class="secao-titulo">📊 Atributos</div>
     </div>
@@ -151,8 +193,21 @@ function renderPerfil(j, el) {
       ${_attrRow('🎓','Prestígio Acadêmico', j.prestigio_academico||0, 'roxo')}
     </div>
 
-    <!-- Feed de atividade recente -->
+    <!-- DESTAQUES DO PERFIL -->
     <div class="secao-header">
+      <div class="secao-titulo">🏆 Destaques do Perfil</div>
+    </div>
+    <div class="prof-destaques">
+      <div class="prof-destaque-item"><span class="pdi-icon">⚖️</span><div><div class="pdi-label">Especialidade</div><div class="pdi-val">${esp}</div></div></div>
+      <div class="prof-destaque-item"><span class="pdi-icon">✅</span><div><div class="pdi-label">Taxa de Sucesso</div><div class="pdi-val">${aprov}% de aproveitamento</div></div></div>
+      <div class="prof-destaque-item"><span class="pdi-icon">🏅</span><div><div class="pdi-label">Reputação Atual</div><div class="pdi-val">${rep} pontos</div></div></div>
+      <div class="prof-destaque-item"><span class="pdi-icon">🏢</span><div><div class="pdi-label">Posição no Escritório</div><div class="pdi-val">${label}</div></div></div>
+      <div class="prof-destaque-item"><span class="pdi-icon">👥</span><div><div class="pdi-label">Geração</div><div class="pdi-val">Geração ${j.geracao || 1}</div></div></div>
+      <div class="prof-destaque-item"><span class="pdi-icon">🎂</span><div><div class="pdi-label">Idade Atual</div><div class="pdi-val">${j.idade || 22} anos</div></div></div>
+    </div>
+
+    <!-- ATIVIDADE RECENTE -->
+    <div class="secao-header" style="margin-top:1rem">
       <div class="secao-titulo">📋 Atividade Recente</div>
       <span class="secao-badge">${_calJogador(j)}</span>
     </div>
@@ -160,7 +215,6 @@ function renderPerfil(j, el) {
       <div style="font-size:.78rem;color:var(--ardosia);padding:.5rem 0">Carregando feed...</div>
     </div>`;
 
-  // Carregar feed do inbox assincronamente
   _carregarFeedAtividade(j.uid);
 }
 
