@@ -189,10 +189,17 @@ function _cardFuncionario(f, escId, energiaDisp) {
   const prodColor = prod >= 80 ? '#2E8B57' : prod >= 60 ? '#B7791F' : '#C0392B';
   const podeCoordenar = energiaDisp >= ci.custo_coord;
 
+  const ini = (f.nome||'?').split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase().slice(0,2);
+  const svgFallback = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='153' height='153'%3E%3Ccircle cx='76' cy='76' r='76' fill='%232E4270'/%3E%3Ctext x='76' y='96' font-size='36' font-weight='700' fill='%23C9A227' text-anchor='middle' font-family='DM Sans,Arial'%3E${ini}%3C/text%3E%3C/svg%3E`;
+  const fotoHtml = (f.tipo === 'npc' && f.foto_npc)
+    ? `<img src="img/npcs%20escritorio/${f.foto_npc}" alt="${f.nome}" style="width:153px;height:153px;object-fit:cover;border-radius:var(--r);flex-shrink:0" onerror="this.onerror=null;this.src='${svgFallback}'">`
+    : `<img src="${svgFallback}" alt="${ini}" style="width:153px;height:153px;border-radius:var(--r);flex-shrink:0">`;
+
   return `
     <div class="card" style="margin-bottom:.5rem;border-left:3px solid var(--navy3)">
       <div style="display:flex;align-items:start;justify-content:space-between;gap:.8rem">
-        <div style="flex:1">
+        ${fotoHtml}
+        <div style="flex:1;min-width:0">
           <div style="font-weight:700;font-size:.88rem;color:var(--navy)">${f.nome}</div>
           <div style="font-size:.68rem;color:var(--ouro2);margin-bottom:.3rem">${ci.l} · Produtividade: <b style="color:${prodColor}">${prod}%</b></div>
           <div style="display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.4rem">
@@ -210,12 +217,12 @@ function _cardFuncionario(f, escId, energiaDisp) {
           </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:.3rem;flex-shrink:0">
-          <button class="btn btn-sm btn-prim" ${!podeCoordenar?'disabled':''} 
+          <button class="btn btn-sm btn-prim" ${!podeCoordenar?'disabled':''}
             onclick="window.abrirModalDesignar('${f.id}','${escId}')"
             title="${!podeCoordenar?'Energia insuficiente':'Designar processo'}">
             📋 Designar (-${ci.custo_coord}⚡)
           </button>
-          <button class="btn btn-sm btn-ghost btn-danger" 
+          <button class="btn btn-sm btn-ghost btn-danger"
             onclick="window.demitirFuncionario('${f.id}','${escId}','${f.nome}')">
             Demitir
           </button>

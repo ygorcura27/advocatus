@@ -522,6 +522,7 @@ async function _processarDistribuicaoProcessosMensal(db, uid, j, novoCalendario,
 
   if (j.escritorio_empregado_id && !j.escritorio_proprio_id) {
     updates.processos_novos_mes = 0;
+    try { await _verificarElegibilidadeGestorCF(db, uid, j); } catch(e) { logger.warn('Gestor check:', e.message); }
   }
 
   // Este é o reset que faltava e causava o bug "limite 3/3 atingido sem
@@ -1009,6 +1010,10 @@ async function _processarServicosMensalCF(db, uid, j) {
 
   await _processarAutogestaoOportunidadesCF(db, escRef, esc);
 
+  if (esc.gestor_id) {
+    await _autoAtribuirProcessosMensalCF(db, escRef, esc);
+  }
+
   let receitaRecorrente = 0;
   const clRecSnap = await escRef.collection('clientes').where('recorrente','==',true).get();
   for (const cDoc of clRecSnap.docs) {
@@ -1085,6 +1090,87 @@ async function _processarAutogestaoOportunidadesCF(db, escRef, esc) {
   if (caixaGanho > 0) {
     await escRef.update({ caixa: (esc.caixa||0) + caixaGanho });
   }
+}
+
+async function _autoAtribuirProcessosMensalCF(db, escRef, esc) {
+  const poolSnap = await escRef.collection('processos_pool')
+    .where('status', '==', 'disponivel').get();
+  if (poolSnap.empty) return;
+
+  const fSnap = await escRef.collection('funcionarios').get();
+  const npcsDisponiveis = fSnap.docs
+    .map(d => ({id:d.id, ...d.data()}))
+    .filter(f => f.tipo === 'npc' && f.ativo !== false && !f.burnout_npc);
+
+  if (npcsDisponiveis.length === 0) return;
+
+  for (const procDoc of poolSnap.docs) {
+    const npc = npcsDisponiveis
+      .filter(f => (100 - (f.energia_npc_usada_mes||0)) >= 40)
+      .sort((a,b) => (100-(b.energia_npc_usada_mes||0)) - (100-(a.energia_npc_usada_mes||0)))[0];
+    if (!npc) break;
+
+    await procDoc.ref.update({
+      status: 'em_andamento',
+      func_id: npc.id,
+      func_nome: npc.nome,
+      func_cargo: npc.cargo_id,
+      designado_por_gestor: true,
+      designado_em: new Date().toISOString(),
+      progresso: 0,
+    });
+
+    npc.energia_npc_usada_mes = (npc.energia_npc_usada_mes||0) + 40;
+    await escRef.collection('funcionarios').doc(npc.id).update({
+      energia_npc_usada_mes: npc.energia_npc_usada_mes,
+      processo_id: procDoc.id,
+    });
+  }
+}
+
+async function _verificarElegibilidadeGestorCF(db, uid, j) {
+  const escId = j.escritorio_empregado_id;
+  if (!escId) return;
+
+  const escRef = db.collection('escritorios').doc(escId);
+  const escSnap = await escRef.get();
+  if (!escSnap.exists) return;
+  const esc = escSnap.data();
+
+  if (esc.gestor_id) return;
+
+  const CARGO_ORDER = { est:0, ass:1, jnr:2, pln:3, snr:4, asc:5, soc:6 };
+  const GESTAO_CAP  = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
+  const NETWORK_CAP = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
+
+  const cargo_id   = j.cargo_id;
+  const gestaoCap  = GESTAO_CAP[cargo_id] || 55;
+  const networkCap = NETWORK_CAP[cargo_id] || 55;
+  const gestaoAtual = (j.skills||{}).gestao || 0;
+  const netAtual    = j.networking || 0;
+
+  if (gestaoAtual < gestaoCap) return;
+  if (netAtual < networkCap * 0.7) return;
+
+  const fSnap = await escRef.collection('funcionarios').get();
+  const funcs = fSnap.docs.map(d=>({id:d.id,...d.data()})).filter(f=>f.ativo!==false);
+
+  const maiorOrdem = Math.max(...funcs.map(f => CARGO_ORDER[f.cargo_id]||0), 0);
+  const meuOrdem   = CARGO_ORDER[cargo_id] || 0;
+  if (meuOrdem < maiorOrdem) return;
+
+  await escRef.update({
+    gestor_id: uid,
+    gestor_nome: j.nome_personagem || 'Gestor',
+    gestor_cargo: cargo_id,
+  });
+
+  await db.collection('jogadores').doc(uid).collection('inbox').add({
+    de:'sistema', para_uid: uid,
+    assunto: 'Voce e o novo Gestor do Escritorio',
+    corpo: `Sua dedicacao e lideranca foram reconhecidas. Voce foi promovido(a) a Gestor(a) de ${esc.nome||'escritorio'}. A partir de agora coordena a alocacao de processos da equipe a cada mes.`,
+    tipo:'sistema', tipo_noticia:'positivo', lida:false, criado_em: new Date().toISOString(),
+  });
 }
 
 async function _processarCursosMensalCF(db, uid, j) {

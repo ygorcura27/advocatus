@@ -171,6 +171,13 @@ window.renderProcessosPool = async function(j, escId, el) {
       historico = histSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     } catch (e) { /* sem índice — tenta fallback */ }
 
+    // Gestor atual
+    let gestorNome = null;
+    try {
+      const escSnap = await getDoc(doc(db, 'escritorios', escId));
+      if (escSnap.exists()) gestorNome = escSnap.data().gestor_nome || null;
+    } catch(e) {}
+
     const tierEsc = j.escritorio_tier || 1;
     const uid     = j.uid || window.JOGADOR_UID;
 
@@ -186,11 +193,20 @@ window.renderProcessosPool = async function(j, escId, el) {
     el.innerHTML = `
       <div class="esc-card-bloco" style="margin-bottom:1.1rem">
         <div class="secao-header" style="margin-bottom:.8rem;border-bottom:1px solid #E8ECF5;padding-bottom:.5rem">
-          <div class="secao-titulo" style="font-size:.88rem;font-weight:700">⚖️ Gestão de Processos</div>
-          <button class="btn btn-sm btn-ghost" style="font-size:.62rem;padding:.18rem .5rem"
-            onclick="window.gerarProcessosMensais('${escId}',${tierEsc})">
-            🔄 Gerar do mês
-          </button>
+          <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+            <div class="secao-titulo" style="font-size:.88rem;font-weight:700">⚖️ Gestão de Processos</div>
+            ${gestorNome ? `<span style="font-size:.65rem;color:var(--verde2)">👤 Gestor: ${gestorNome}</span>` : ''}
+          </div>
+          <div style="display:flex;gap:.3rem;flex-shrink:0">
+            <button class="btn btn-sm btn-ghost" style="font-size:.62rem;padding:.18rem .5rem"
+              onclick="window.gerarProcessosMensais('${escId}',${tierEsc})">
+              🔄 Gerar do mês
+            </button>
+            <button class="btn btn-sm btn-sec" style="font-size:.62rem;padding:.18rem .5rem"
+              onclick="window.abrirDelegacaoGestao('${escId}')">
+              👤 Delegar Gestão
+            </button>
+          </div>
         </div>
         <div class="proc-tres-cols">
           <div class="proc-col">
@@ -210,7 +226,7 @@ window.renderProcessosPool = async function(j, escId, el) {
 
   } catch (e) {
     console.error('[PROCESSOS POOL]', e);
-    el.innerHTML = '';
+    el.innerHTML = `<div class="card" style="color:var(--verm2);font-size:.8rem;padding:1rem">⚠️ Erro ao carregar processos. Recarregue a página.</div>`;
   }
 };
 
@@ -758,6 +774,70 @@ window.gerarProcessosMensais = async function(escId, tierEscritorio) {
   } catch (e) {
     console.error('[GERAR PROCESSOS]', e);
     toast('Erro ao gerar processos.', 'ko');
+  }
+};
+
+// ─── Delegar Gestão ───────────────────────────────────────────────────────────
+
+window.abrirDelegacaoGestao = async function(escId) {
+  const fSnap = await getDocs(query(
+    collection(db, 'escritorios', escId, 'funcionarios'),
+    where('tipo', '==', 'npc')
+  ));
+  const npcs = fSnap.docs.map(d => ({id: d.id, ...d.data()}))
+    .filter(f => f.ativo !== false && !f.burnout_npc);
+
+  if (npcs.length === 0) {
+    toast('Nenhum NPC disponivel para assumir a gestao.', 'ko');
+    return;
+  }
+
+  const CARGO_L = { est:'Estagiario', ass:'Assistente', jnr:'Junior', pln:'Pleno', snr:'Senior', asc:'Associado', soc:'Socio' };
+
+  abrirModal('👤 Delegar Gestao do Escritorio',
+    `<div style="font-size:.78rem;color:var(--txt2);margin-bottom:1rem">
+      O gestor designado atribuira automaticamente processos disponiveis a equipe no inicio de cada mes.
+      O dono ainda controla recursos e execucao de sentencas.
+    </div>
+    <div style="display:flex;flex-direction:column;gap:.4rem">
+      <button class="btn btn-ghost btn-block" style="text-align:left;padding:.6rem .8rem;color:var(--verm2)"
+        onclick="window.removerGestor('${escId}')">
+        ❌ Remover gestor atual
+      </button>
+      ${npcs.map(f => `
+        <button class="btn btn-ghost btn-block" style="text-align:left;padding:.6rem .8rem"
+          onclick="window.salvarGestor('${escId}','${f.id}','${(f.nome||'').replace(/'/g,"\\'")}')">
+          <div style="font-weight:600;font-size:.82rem">${f.nome}</div>
+          <div style="font-size:.65rem;color:var(--txt3)">${CARGO_L[f.cargo_id]||f.cargo_id}</div>
+        </button>`).join('')}
+    </div>`
+  );
+};
+
+window.salvarGestor = async function(escId, funcId, nome) {
+  try {
+    await updateDoc(doc(db, 'escritorios', escId), {
+      gestor_id: funcId,
+      gestor_nome: nome,
+    });
+    fecharModal();
+    toast(`✅ ${nome} e o novo gestor do escritorio.`, 'ok', 4000);
+    const elProc = document.getElementById('esc-processos-bloco');
+    if (elProc && window.JOGADOR) window.renderProcessosPool(window.JOGADOR, escId, elProc);
+  } catch(e) {
+    toast('Erro ao salvar gestor: ' + e.message, 'ko');
+  }
+};
+
+window.removerGestor = async function(escId) {
+  try {
+    await updateDoc(doc(db, 'escritorios', escId), { gestor_id: null, gestor_nome: null });
+    fecharModal();
+    toast('Gestor removido.', 'ok');
+    const elProc = document.getElementById('esc-processos-bloco');
+    if (elProc && window.JOGADOR) window.renderProcessosPool(window.JOGADOR, escId, elProc);
+  } catch(e) {
+    toast('Erro: ' + e.message, 'ko');
   }
 };
 
