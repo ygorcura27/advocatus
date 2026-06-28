@@ -29,7 +29,6 @@ onAuthStateChanged(auth, async (user) => {
   }
 
   window.JOGADOR_UID = user.uid;
-  window.FIREBASE_USER_PHOTO = user.photoURL || null;
 
   // Verificar se jogador existe
   const snap = await getDoc(doc(db, 'jogadores', user.uid));

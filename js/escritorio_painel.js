@@ -146,7 +146,7 @@ window.renderEquipePainel = async function(j, escId, el) {
       return `
       <div class="esc-membro${emBurnout?' npc-em-burnout':sobrecarregado?' npc-sobrecarregado-card':''}" id="membro-${func.id}">
         <img class="esc-membro-avatar" src="${_avatarSrc(func)}" alt="${nome}"
-             onerror="window._svgNpcFallback(this,'${nome.replace(/'/g,"\\'")}')">
+             onerror="window._svgNpcFallback(this,'${nome.replace(/'/g,"\\'")}')">`
         <div class="esc-membro-info">
           <div class="esc-membro-nome">${nome} ${energiaBadge}</div>
           <div class="esc-membro-cargo">${cargo}</div>
