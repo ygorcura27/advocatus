@@ -38,17 +38,6 @@
 
   <!-- Usuário -->
   <div class="topbar-user">
-    <!-- Bloco de prestígio -->
-    <div class="tb-pres-bloco">
-      <div class="tb-pres-header">
-        <span id="tb-rep" class="tb-rep-val">—</span>
-        <span id="tb-rep-cap" class="tb-rep-cap">/35</span>
-      </div>
-      <div class="tb-pres-bar-wrap">
-        <div class="tb-pres-bar-fill" id="tb-pres-fill" style="width:0%"></div>
-      </div>
-      <div id="tb-pres-label" class="tb-pres-label">Prestígio</div>
-    </div>
     <!-- Saldo -->
     <div class="tb-saldo-bloco">
       <div class="tb-saldo-label">Saldo</div>
@@ -516,22 +505,6 @@ window.addEventListener('jogador:update', (e) => {
     else           { btn.textContent = '⚡ ' + disp; btn.classList.remove('pronto'); }
   }
 
-  // ── Topbar: prestígio ──
-  const cap      = (window.REP_CAP || {})[j.cargo_id] || 35;
-  const rep      = j.reputacao || 0;
-  const pct      = Math.min(100, Math.round(rep / cap * 100));
-  const corPres  = pct >= 80 ? '#4AAB77' : pct >= 50 ? '#C9A227' : pct >= 25 ? '#3A5080' : '#9BAAC4';
-  const tierLabel= pct >= 90 ? '👑 Elite' : pct >= 70 ? '⭐ Destaque' : pct >= 40 ? '📈 Crescendo' : '🌱 Iniciante';
-
-  const presEl   = document.getElementById('tb-pres-fill');
-  const repEl    = document.getElementById('tb-rep');
-  const capEl    = document.getElementById('tb-rep-cap');
-  const labelEl  = document.getElementById('tb-pres-label');
-  if (presEl)  { presEl.style.width = pct + '%'; presEl.style.background = corPres; }
-  if (repEl)   repEl.textContent = rep;
-  if (capEl)   capEl.textContent = '/' + cap;
-  if (labelEl) labelEl.textContent = tierLabel;
-
   // ── Topbar: saldo ──
   const saldoEl = document.getElementById('tb-saldo');
   if (saldoEl && j.dinheiro !== undefined) {
@@ -541,14 +514,10 @@ window.addEventListener('jogador:update', (e) => {
       : 'R$ ' + Number(d).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
   }
 
-  // ── Topbar: botão avançar mês ──
+  // ── Topbar: botão avançar mês (sem exibir energia) ──
   const tickEl = document.getElementById('server-tick');
-  if (tickEl) {
-    if (disp <= 5) {
-      tickEl.innerHTML = '<button onclick="window.avancarMes()" class="tb-btn-avancar pronto">▶ Avançar mês</button>';
-    } else {
-      tickEl.innerHTML = '<span class="tb-energia-badge">⚡ ' + disp + '</span>';
-    }
+  if (tickEl && disp <= 5) {
+    tickEl.innerHTML = '<button onclick="window.avancarMes()" class="tb-btn-avancar pronto">▶ Avançar mês</button>';
   }
 });
 

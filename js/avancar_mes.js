@@ -73,10 +73,7 @@ export function renderBlocoEnergia(j) {
            onclick="window.avancarMes(true)"
            style="font-size:.72rem;opacity:.7">
            Avançar mês agora (${disponivel} ⚡ restantes)
-         </button>
-         <div style="font-size:.63rem;color:var(--ardosia);text-align:center;margin-top:.3rem">
-           Use mais ações para maximizar o mês
-         </div>`}`;
+         </button>`}`;
 }
 
 // ── Bloco visual de férias de janeiro ──

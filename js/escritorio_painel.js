@@ -65,10 +65,13 @@ function _slugEmpresa(nome) {
     .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
-// Tenta carregar img/empresas/{slug}.png; cai para iniciais se não existir
+// Tenta carregar img/empresas/{slug}.png; cai para iniciais se slug vazio ou imagem não existir
 function _logoEmpresa(nome) {
   const slug = _slugEmpresa(nome);
   const ini  = (nome||'?').split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase().slice(0,2);
+  if (!slug) {
+    return `<div class="esc-cliente-logo">${ini}</div>`;
+  }
   return `<div class="esc-cliente-logo" style="overflow:hidden;padding:0">
     <img src="img/empresas/${slug}.png" class="esc-emp-img" alt="${nome}"
          onerror="this.parentElement.removeAttribute('style');this.parentElement.textContent='${ini}'">

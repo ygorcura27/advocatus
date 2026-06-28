@@ -137,15 +137,14 @@ window._npcEnergiaBadge = _npcEnergiaBadge;
 
 window.renderProcessosPool = async function(j, escId, el) {
   try {
-    // Carregar todos os processos do pool. Ordena por criado_mes (sempre
-    // presente) em vez de criado_em — o Firestore exclui silenciosamente da
-    // consulta qualquer doc que não tenha o campo usado no orderBy, então um
-    // processo antigo sem criado_em nunca apareceria aqui, mesmo contando
-    // para o limite mensal de "Gerar do mês" (que filtra por criado_mes).
+    // Busca sem orderBy para incluir docs sem criado_mes (processos auto-atribuídos
+    // pela gestora via Cloud Function não têm esse campo). Ordena em JS depois.
     const poolSnap = await getDocs(
-      query(collection(db, 'escritorios', escId, 'processos_pool'), orderBy('criado_mes', 'desc'), limit(60))
+      query(collection(db, 'escritorios', escId, 'processos_pool'), limit(80))
     );
-    const todos = poolSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const todos = poolSnap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.criado_mes || 0) - (a.criado_mes || 0));
 
     const disponiveis  = todos.filter(p => p.status === 'disponivel');
     const emAndamento  = todos.filter(p => p.status === 'em_andamento');
