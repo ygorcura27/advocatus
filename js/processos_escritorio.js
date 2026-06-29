@@ -279,8 +279,21 @@ function _renderColPool(disponiveis, emAndamento, aguardSent, j, escId) {
   const CUSTO_ASSUMIR = 25;
   const CUSTO_DESIGN  = 5;
 
+  // Cargos que processam sentença automaticamente via CF (jnr+)
+  const CARGOS_AUTO_SENT = new Set(['jnr','pln','snr','asc','soc']);
+
   // Aguardando sentença
-  const rowsSent = aguardSent.map(p => `
+  const rowsSent = aguardSent.map(p => {
+    const isAutoNpc = !p.assumido_uid && CARGOS_AUTO_SENT.has(p.func_cargo);
+    const acaoHtml = isAutoNpc
+      ? `<span style="font-size:.6rem;color:var(--txt4);text-align:center;line-height:1.2">⏳ Sentença<br>automática</span>`
+      : energiaDisp >= 10
+        ? `<button class="btn btn-sm btn-prim" style="font-size:.62rem;padding:.2rem .45rem;white-space:nowrap"
+               onclick="window._processarSentenca('${escId}','${p.id}','${uid}')">
+               ⚖️ Sentença
+             </button>`
+        : `<span style="font-size:.6rem;color:var(--txt4)">⚡ insuf.</span>`;
+    return `
     <div class="proc-pool-row" id="sent-${p.id}">
       <div class="proc-pool-area">⏳</div>
       <div style="flex:1;min-width:0">
@@ -291,13 +304,9 @@ function _renderColPool(disponiveis, emAndamento, aguardSent, j, escId) {
         <div style="font-size:.7rem;font-weight:700;color:var(--amber)">${_fmtP(p.honorarios)}</div>
         <div style="margin-top:.1rem">${_tierBadge(p.tier||'D')}</div>
       </div>
-      ${energiaDisp >= 10
-        ? `<button class="btn btn-sm btn-prim" style="font-size:.62rem;padding:.2rem .45rem;white-space:nowrap"
-             onclick="window._processarSentenca('${escId}','${p.id}','${uid}')">
-             ⚖️ Sentença
-           </button>`
-        : `<span style="font-size:.6rem;color:var(--txt4)">⚡ insuf.</span>`}
-    </div>`).join('');
+      ${acaoHtml}
+    </div>`;
+  }).join('');
 
   // Em andamento — separar processos do jogador e processos da gestão automática
   // (docs em status recursal têm status diferente de 'em_andamento', nunca estão aqui)

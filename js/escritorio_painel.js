@@ -129,6 +129,14 @@ window.renderEquipePainel = async function(j, escId, el) {
       return;
     }
 
+    const _SKILLS_REL_P  = ['escrita_juridica','pesquisa','oratoria','persuasao','argumentacao'];
+    const _CARGO_CAP_P   = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
+    const calcEficPainel = f => {
+      const vals = _SKILLS_REL_P.map(s => (f.skills||{})[s] || 0);
+      const media = vals.reduce((a,b)=>a+b,0) / vals.length;
+      return Math.round(Math.min(100, (media / (_CARGO_CAP_P[f.cargo_id]||35)) * 100));
+    };
+
     const rows = top5.map(func => {
       const cargo     = CARGO_INFO[func.cargo_id]?.l || func.cargo_id;
       const nome      = func.nome || func.name || `${cargo} #${func.id.slice(0,4)}`;
@@ -145,6 +153,10 @@ window.renderEquipePainel = async function(j, escId, el) {
       const npcDisp   = (window.NPC_ENERGIA_MES || 100) - npcUsado;
       const sobrecarregado = !emBurnout && npcDisp < (window.NPC_OVERLOAD_TH || 20);
       const energiaBadge = window._npcEnergiaBadge ? window._npcEnergiaBadge(func) : '';
+
+      const isNpc     = func.tipo === 'npc';
+      const efic      = isNpc ? calcEficPainel(func) : null;
+      const eficColor = efic >= 80 ? 'var(--verde2)' : efic >= 55 ? 'var(--amber)' : 'var(--verm2)';
 
       return `
       <div class="esc-membro${emBurnout?' npc-em-burnout':sobrecarregado?' npc-sobrecarregado-card':''}" id="membro-${func.id}">
@@ -163,6 +175,11 @@ window.renderEquipePainel = async function(j, escId, el) {
           <div class="esc-membro-prod-val" style="color:${prodColor}">${prod}%</div>
           <div style="display:flex;gap:3px;margin-top:2px">${dots}</div>
         </div>
+        ${isNpc ? `
+        <div class="esc-membro-prod" style="min-width:62px">
+          <div class="esc-membro-prod-label">Eficiência</div>
+          <div class="esc-membro-prod-val" style="color:${eficColor}">${efic}%</div>
+        </div>` : ''}
         <div class="esc-membro-acoes">
           <button class="esc-membro-btn${temProc?' em-proc':''}${emBurnout?' em-proc':''}"
             title="${emBurnout?'Em burnout':'Designar processo'}"

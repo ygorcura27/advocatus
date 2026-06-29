@@ -66,6 +66,28 @@ function _eficienciaNPC(f) {
   return Math.max(0.4, Math.min(1.0, media / cap));
 }
 
+// ── Sentença automática pelo NPC (mirrors _sentencaOutcome do frontend) ──
+// Cargos jnr+ processam sentença com base nas próprias skills.
+// Est e ass não processam sentença — o processo fica em aguardando_sentenca
+// para o dono ou sócio do escritório resolver manualmente.
+const CARGOS_PROC_SENTENCA = new Set(['jnr','pln','snr','asc','soc']);
+
+function _rollSentenca([a, b]) {
+  const r = Math.random();
+  if (r < a) return 'procedente';
+  if (r < a + b) return 'parcial';
+  return 'improcedente';
+}
+
+function _sentencaOutcomeNPC(efic) {
+  if (efic >= .85) return _rollSentenca([.38,.45,.17]);
+  if (efic >= .70) return _rollSentenca([.25,.50,.25]);
+  if (efic >= .55) return _rollSentenca([.14,.48,.38]);
+  if (efic >= .40) return _rollSentenca([.07,.38,.55]);
+  if (efic >= .25) return _rollSentenca([.03,.25,.72]);
+  return                   _rollSentenca([.01,.12,.87]);
+}
+
 async function _processarProgressoNPCsCF(db, escRef) {
   // Buscar todos os processos em andamento por NPCs (exclui processos assumidos pelo jogador)
   const poolSnap = await escRef.collection('processos_pool')
@@ -101,16 +123,43 @@ async function _processarProgressoNPCsCF(db, escRef) {
     // Progresso por processo = total disponível ÷ número de casos ativos × eficiência de skills
     const progPorProc = (progTotal / numAtivos) * eff;
 
+    const podeProcessarSentenca = CARGOS_PROC_SENTENCA.has(npc.cargo_id);
+
     for (const procDoc of procDocs) {
       const p       = procDoc.data();
       const variacao = Math.round((Math.random() * 8) - 3); // −3 a +5
       const ganho   = Math.max(4, Math.round(progPorProc + variacao));
       const novoProg = Math.min(100, (p.progresso || 0) + ganho);
-      const novoStatus = novoProg >= 100 ? 'aguardando_sentenca' : 'em_andamento';
-      proms.push(procDoc.ref.update({ progresso: novoProg, status: novoStatus }));
-      if (novoStatus === 'aguardando_sentenca') {
+
+      if (novoProg >= 100 && podeProcessarSentenca) {
+        // Jnr+ processa sentença automaticamente com suas próprias skills
+        const resultado  = _sentencaOutcomeNPC(eff);
+        const hon        = p.honorarios || 0;
+        const valorRecebido = resultado === 'procedente' ? hon
+          : resultado === 'parcial' ? Math.round(hon * 0.55)
+          : Math.round(hon * 0.10);
+
+        proms.push(procDoc.ref.update({
+          progresso: 100, status: 'concluido',
+          resultado, valor_recebido: valorRecebido,
+          concluido_em: new Date().toISOString(),
+        }));
+        if (valorRecebido > 0) {
+          proms.push(escRef.update({
+            caixa: require('firebase-admin/firestore').FieldValue.increment(valorRecebido),
+            faturamento_mes_atual: require('firebase-admin/firestore').FieldValue.increment(valorRecebido),
+          }));
+        }
+        const iconRes = { procedente:'✅', parcial:'🟡', improcedente:'❌' }[resultado];
         logsProgress.push(_logGestaoCF(escRef,
-          `⚙️ ${p.func_nome||'Equipe'} concluiu "${p.titulo}" — aguardando sentença automática.`));
+          `${iconRes} ${npc.nome} processou sentença em "${p.titulo}" — ${resultado}. ${valorRecebido>0?'+R$ '+valorRecebido.toLocaleString('pt-BR'):''}`.trim()));
+      } else if (novoProg >= 100) {
+        // Est/ass atingiram 100% mas não podem processar sentença — aguarda dono
+        proms.push(procDoc.ref.update({ progresso: 100, status: 'aguardando_sentenca' }));
+        logsProgress.push(_logGestaoCF(escRef,
+          `⏳ ${p.func_nome||'Estagiário/Assistente'} concluiu o trabalho em "${p.titulo}" — aguarda sentença do responsável.`));
+      } else {
+        proms.push(procDoc.ref.update({ progresso: novoProg, status: 'em_andamento' }));
       }
     }
 
@@ -1265,16 +1314,29 @@ async function _autoAtribuirProcessosMensalCF(db, escRef, esc) {
 
   const gestorNome = esc.gestor_nome || 'O gestor';
 
+  // Pré-calcular eficiência de cada NPC (usada para priorização)
+  const eficMap = {};
+  for (const f of npcsDisponiveis) eficMap[f.id] = _eficienciaNPC(f);
+
+  // Limite de energia: (procCount+1)*20 <= 80 → máx 4 processos ativos por NPC
+  const ENERGIA_LIMITE_PROC = Math.floor((NPC_ENERGIA_MES - NPC_OVERLOAD_TH) / NPC_ENERGIA_POR_PROC); // = 4
+
   for (const procDoc of poolSnap.docs) {
     const proc = procDoc.data();
     const npc = npcsDisponiveis
       .filter(f => {
-        const maximo = NPC_MAX_PROC[f.cargo_id] || 1;
-        return (procCount[f.id] || 0) < maximo && _npcPodeManejar(f.cargo_id, proc.tier || 'D');
+        const atual = procCount[f.id] || 0;
+        const cabeNoMax  = atual < (NPC_MAX_PROC[f.cargo_id] || 1);
+        const naoPerdeEnergia = (atual + 1) <= ENERGIA_LIMITE_PROC; // não cai abaixo de 20%
+        return cabeNoMax && naoPerdeEnergia && _npcPodeManejar(f.cargo_id, proc.tier || 'D');
       })
-      // Preferir NPC com menos processos ativos (mais disponível), depois por cargo mais alto
-      .sort((a, b) => (procCount[a.id]||0) - (procCount[b.id]||0))[0];
-    if (!npc) continue; // nenhum NPC qualificado disponível para este processo
+      // Mais eficiente primeiro; em empate, menos processos ativos
+      .sort((a, b) => {
+        const de = (eficMap[b.id] || 0) - (eficMap[a.id] || 0);
+        if (Math.abs(de) > 0.01) return de;
+        return (procCount[a.id]||0) - (procCount[b.id]||0);
+      })[0];
+    if (!npc) continue; // nenhum NPC elegível — processo fica para dono/sócio
 
     // Incrementar contador local antes de continuar o loop
     procCount[npc.id] = (procCount[npc.id] || 0) + 1;

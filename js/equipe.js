@@ -195,7 +195,14 @@ function _calcProd(func) {
   return Math.min(98, Math.max(20, Math.round((media / cap) * 70 + bon + pen + 10)));
 }
 
-const _NPC_MAX_PROC_EQ = { est:1, ass:1, jnr:2, pln:3, snr:4, asc:5, soc:5 };
+const _NPC_MAX_PROC_EQ   = { est:1, ass:1, jnr:2, pln:3, snr:4, asc:5, soc:5 };
+const _SKILLS_REL_EQ     = ['escrita_juridica','pesquisa','oratoria','persuasao','argumentacao'];
+const _CARGO_CAP_EQ_EFIC = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
+function _calcEfic(func) {
+  const vals = _SKILLS_REL_EQ.map(s => (func.skills||{})[s] || 0);
+  const media = vals.reduce((a,b)=>a+b,0) / vals.length;
+  return Math.round(Math.min(100, (media / (_CARGO_CAP_EQ_EFIC[func.cargo_id]||35)) * 100));
+};
 
 function _cardFuncionario(f, escId, energiaDisp, procCount = {}) {
   const ci    = CARGO_INFO[f.cargo_id] || CARGO_INFO.est;
@@ -203,6 +210,8 @@ function _cardFuncionario(f, escId, energiaDisp, procCount = {}) {
   const prod   = _calcProd(f);
   const prodColor = prod >= 80 ? '#2E8B57' : prod >= 60 ? '#B7791F' : '#C0392B';
   const podeCoordenar = energiaDisp >= ci.custo_coord;
+  const efic      = f.tipo === 'npc' ? _calcEfic(f) : null;
+  const eficColor = efic >= 80 ? '#2E8B57' : efic >= 55 ? '#B7791F' : '#C0392B';
 
   const ini = (f.nome||'?').split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase().slice(0,2);
   const svgSrc = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='153' height='153'%3E%3Ccircle cx='76' cy='76' r='76' fill='%232E4270'/%3E%3Ctext x='76' y='96' font-size='36' font-weight='700' fill='%23C9A227' text-anchor='middle' font-family='DM Sans,Arial'%3E${ini}%3C/text%3E%3C/svg%3E`;
@@ -217,7 +226,7 @@ function _cardFuncionario(f, escId, energiaDisp, procCount = {}) {
         ${fotoHtml}
         <div style="flex:1;min-width:0">
           <div style="font-weight:700;font-size:.88rem;color:var(--navy)">${f.nome}</div>
-          <div style="font-size:.68rem;color:var(--ouro2);margin-bottom:.3rem">${ci.l} · Produtividade: <b style="color:${prodColor}">${prod}%</b></div>
+          <div style="font-size:.68rem;color:var(--ouro2);margin-bottom:.3rem">${ci.l} · Produtividade: <b style="color:${prodColor}">${prod}%</b>${efic !== null ? ` · Eficiência: <b style="color:${eficColor}">${efic}%</b>` : ''}</div>
           <div style="display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.4rem">
             ${Object.entries(skills).map(([k,v])=>
               `<span style="font-size:.6rem;padding:.1rem .35rem;background:var(--navy-light);border-radius:20px;color:var(--navy3)">${_skillLabel(k)}: ${v}</span>`
