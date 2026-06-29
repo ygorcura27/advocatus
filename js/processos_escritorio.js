@@ -808,25 +808,24 @@ window.gerarProcessosMensais = async function(escId, tierEscritorio) {
     if (escSnap2.exists()) tierReal = escSnap2.data().tier || tierReal;
   } catch(e) {}
   const cap = TIER_CAP_ESC[tierReal] || 4;
-  const s   = window.SERVER || {};
-  const mes = s.mes_global || 1;
 
   try {
     const clSnap = await getDocs(collection(db, 'escritorios', escId, 'clientes'));
     const clientes = clSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
+    // Contar apenas processos ATIVOS (não finalizados) — concluídos liberam vaga
     const existSnap = await getDocs(query(
       collection(db, 'escritorios', escId, 'processos_pool'),
-      where('criado_mes', '==', mes)
+      where('status', 'in', ['disponivel', 'em_andamento', 'aguardando_sentenca'])
     ));
-    const jaGeradosMes = existSnap.size;
+    const ativosAtuais = existSnap.size;
 
-    if (jaGeradosMes >= cap) {
-      toast(`Pool do mês cheio (${jaGeradosMes}/${cap} processos já gerados este mês).`, 'ko');
+    if (ativosAtuais >= cap) {
+      toast(`Pool cheio (${ativosAtuais}/${cap} processos ativos). Conclua casos para liberar vagas.`, 'ko');
       return;
     }
 
-    const vagasRestantes = cap - jaGeradosMes;
+    const vagasRestantes = cap - ativosAtuais;
     let gerados = 0;
     const promessas = [];
 
@@ -845,7 +844,7 @@ window.gerarProcessosMensais = async function(escId, tierEscritorio) {
         area, tier, honorarios, icone: '⚖️',
         status: 'disponivel', progresso: 0,
         func_id: null, func_nome: null, func_cargo: null, resultado: null,
-        criado_mes: mes, criado_em: new Date().toISOString(),
+        criado_em: new Date().toISOString(),
       }));
       gerados++;
     }

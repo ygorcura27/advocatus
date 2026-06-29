@@ -42,39 +42,93 @@ const REP_CAP = {
 // "aguardando_sentença", então nunca apareciam no Histórico) e a energia
 // dos NPCs (`energia_npc_usada_mes`) nunca era zerada, deixando-os
 // permanentemente indisponíveis após acumularem uso.
-const NPC_PROG_MES    = { est:18, ass:22, jnr:30, pln:38, snr:48, asc:55, soc:65 };
+// ── Constantes de NPC ────────────────────────────────────────────────────────
+// Progresso máximo que um NPC deste cargo entrega por mês se tiver UM processo.
+// Quando tem múltiplos, o total é dividido proporcionalmente.
+const NPC_PROG_TOTAL  = { est:20, ass:28, jnr:40, pln:55, snr:70, asc:82, soc:95 };
+
+// Custo de energia por processo ativo por mês (debita de energia_npc_usada_mes)
+const NPC_ENERGIA_POR_PROC = 20;
 const NPC_ENERGIA_MES = 100;
-const NPC_OVERLOAD_TH = 20;
+const NPC_OVERLOAD_TH = 20; // sobrecarga se usado > 80
+
+// Skills relevantes e cap de skills por cargo (espelha processos_escritorio.js)
+const SKILLS_REL_NPC  = ['escrita_juridica','pesquisa','oratoria','persuasao','argumentacao'];
+const CARGO_CAP_NPC   = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
+
+// ── Calc eficiência de skills (0.4 a 1.0) ──
+// 0.4 mínimo garante que NPCs sem skills ainda evoluem (lentamente)
+function _eficienciaNPC(f) {
+  const skills = f.skills || {};
+  const vals = SKILLS_REL_NPC.map(s => skills[s] || 0);
+  const media = vals.reduce((a,b)=>a+b,0) / vals.length;
+  const cap   = CARGO_CAP_NPC[f.cargo_id] || 35;
+  return Math.max(0.4, Math.min(1.0, media / cap));
+}
 
 async function _processarProgressoNPCsCF(db, escRef) {
+  // Buscar todos os processos em andamento por NPCs (exclui processos assumidos pelo jogador)
   const poolSnap = await escRef.collection('processos_pool')
     .where('status', '==', 'em_andamento').get();
 
-  const proms = [];
-  const logsProgresso = [];
+  // Agrupar por func_id (cada NPC tem sua pilha de processos)
+  const procsByNpc = {};
   for (const d of poolSnap.docs) {
     const p = d.data();
-    if (!p.func_cargo) continue;
-    const baseGanho = NPC_PROG_MES[p.func_cargo] || 18;
-    const variacao  = Math.round((Math.random() * 12) - 4);
-    const ganho     = Math.max(5, baseGanho + variacao);
-    const novoProg  = Math.min(100, (p.progresso || 0) + ganho);
-    const novoStatus = novoProg >= 100 ? 'aguardando_sentenca' : 'em_andamento';
-    proms.push(d.ref.update({ progresso: novoProg, status: novoStatus }));
-    if (novoStatus === 'aguardando_sentenca') {
-      logsProgresso.push(_logGestaoCF(escRef,
-        `⚙️ ${p.func_nome||'Um membro da equipe'} concluiu o trabalho em "${p.titulo}" — aguardando sentença.`));
-    }
+    if (!p.func_id || p.assumido_uid) continue; // ignorar processos assumidos pelo jogador
+    if (!procsByNpc[p.func_id]) procsByNpc[p.func_id] = [];
+    procsByNpc[p.func_id].push(d);
   }
-  if (proms.length) await Promise.all(proms);
-  if (logsProgresso.length) await Promise.all(logsProgresso);
 
+  // Buscar dados dos funcionários para calcular eficiência por skills
   const fSnap = await escRef.collection('funcionarios').get();
-  const fProms = [];
-  const logsBurnout = [];
+  const npcMap = {};
+  for (const fd of fSnap.docs) {
+    npcMap[fd.id] = { id: fd.id, ref: fd.ref, ...fd.data() };
+  }
+
+  const proms        = [];
+  const logsProgress = [];
+  const energiaAcum  = {}; // funcId → energia gasta neste processamento
+
+  for (const [funcId, procDocs] of Object.entries(procsByNpc)) {
+    const npc = npcMap[funcId];
+    if (!npc) continue;
+
+    const numAtivos  = procDocs.length;
+    const progTotal  = NPC_PROG_TOTAL[npc.cargo_id] || 20;
+    const eff        = _eficienciaNPC(npc);
+    // Progresso por processo = total disponível ÷ número de casos ativos × eficiência de skills
+    const progPorProc = (progTotal / numAtivos) * eff;
+
+    for (const procDoc of procDocs) {
+      const p       = procDoc.data();
+      const variacao = Math.round((Math.random() * 8) - 3); // −3 a +5
+      const ganho   = Math.max(4, Math.round(progPorProc + variacao));
+      const novoProg = Math.min(100, (p.progresso || 0) + ganho);
+      const novoStatus = novoProg >= 100 ? 'aguardando_sentenca' : 'em_andamento';
+      proms.push(procDoc.ref.update({ progresso: novoProg, status: novoStatus }));
+      if (novoStatus === 'aguardando_sentenca') {
+        logsProgress.push(_logGestaoCF(escRef,
+          `⚙️ ${p.func_nome||'Equipe'} concluiu "${p.titulo}" — aguardando sentença automática.`));
+      }
+    }
+
+    // Acumular custo de energia: 20 por processo ativo
+    energiaAcum[funcId] = (npc.energia_npc_usada_mes || 0) + NPC_ENERGIA_POR_PROC * numAtivos;
+  }
+
+  if (proms.length) await Promise.all(proms);
+  if (logsProgress.length) await Promise.all(logsProgress);
+
+  // Resetar energia + verificar sobrecarga/burnout (apenas para NPCs ativos)
+  const fProms    = [];
+  const logsBurn  = [];
   for (const fd of fSnap.docs) {
     const f = fd.data();
-    const npcUsado  = f.energia_npc_usada_mes || 0;
+    if (f.tipo !== 'npc') continue;
+
+    const npcUsado  = energiaAcum[fd.id] ?? (f.energia_npc_usada_mes || 0);
     const sobrecarg = npcUsado > NPC_ENERGIA_MES - NPC_OVERLOAD_TH;
     let novosMeses  = f.meses_sobrecarregado || 0;
     let burnoutNPC  = f.burnout_npc || false;
@@ -84,29 +138,31 @@ async function _processarProgressoNPCsCF(db, escRef) {
       burnoutRest = Math.max(0, burnoutRest - 1);
       if (burnoutRest === 0) {
         burnoutNPC = false;
-        logsBurnout.push(_logGestaoCF(escRef, `✅ ${f.nome||'Membro da equipe'} se recuperou do burnout e voltou a trabalhar.`));
+        logsBurn.push(_logGestaoCF(escRef,
+          `✅ ${f.nome||'Membro'} se recuperou do burnout e voltou a trabalhar.`));
       }
     } else if (sobrecarg) {
       novosMeses++;
       if (novosMeses >= 3) {
-        burnoutNPC = true;
+        burnoutNPC  = true;
         burnoutRest = 3;
-        novosMeses = 0;
-        logsBurnout.push(_logGestaoCF(escRef, `🔴 ${f.nome||'Membro da equipe'} entrou em burnout após 3 meses sobrecarregado — afastado por 3 meses.`));
+        novosMeses  = 0;
+        logsBurn.push(_logGestaoCF(escRef,
+          `🔴 ${f.nome||'Membro'} entrou em burnout (3 meses sobrecarregado) — afastado por 3 meses.`));
       }
     } else {
       novosMeses = 0;
     }
 
     fProms.push(fd.ref.update({
-      energia_npc_usada_mes: 0,
+      energia_npc_usada_mes: 0, // reset para o próximo mês
       meses_sobrecarregado: novosMeses,
       burnout_npc: burnoutNPC,
       burnout_npc_restante: burnoutRest,
     }));
   }
   if (fProms.length) await Promise.all(fProms);
-  if (logsBurnout.length) await Promise.all(logsBurnout);
+  if (logsBurn.length) await Promise.all(logsBurn);
 }
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
@@ -1178,6 +1234,9 @@ async function _logGestaoCF(escRef, texto) {
 
 const _TIER_ORDER_CF     = { D:0, C:1, B:2, A:3, S:4 };
 const _CARGO_TIER_MAX_CF = { est:'D', ass:'C', jnr:'B', pln:'A', snr:'S', asc:'S', soc:'S' };
+// Máximo de processos simultâneos por cargo
+const NPC_MAX_PROC = { est:1, ass:1, jnr:2, pln:3, snr:4, asc:5, soc:5 };
+
 function _npcPodeManejar(cargo_id, tier) {
   const maxTier = _CARGO_TIER_MAX_CF[cargo_id] || 'D';
   return (_TIER_ORDER_CF[tier] || 0) <= (_TIER_ORDER_CF[maxTier] || 0);
@@ -1195,14 +1254,31 @@ async function _autoAtribuirProcessosMensalCF(db, escRef, esc) {
 
   if (npcsDisponiveis.length === 0) return;
 
+  // Contar processos ativos por NPC para respeitar NPC_MAX_PROC
+  const ativosSnap = await escRef.collection('processos_pool')
+    .where('status', '==', 'em_andamento').get();
+  const procCount = {}; // funcId → quantidade de processos ativos
+  for (const d of ativosSnap.docs) {
+    const fid = d.data().func_id;
+    if (fid) procCount[fid] = (procCount[fid] || 0) + 1;
+  }
+
   const gestorNome = esc.gestor_nome || 'O gestor';
 
   for (const procDoc of poolSnap.docs) {
     const proc = procDoc.data();
     const npc = npcsDisponiveis
-      .filter(f => (100 - (f.energia_npc_usada_mes||0)) >= 40 && _npcPodeManejar(f.cargo_id, proc.tier||'D'))
-      .sort((a,b) => (100-(b.energia_npc_usada_mes||0)) - (100-(a.energia_npc_usada_mes||0)))[0];
-    if (!npc) continue; // pula este processo — nenhum NPC qualificado disponível
+      .filter(f => {
+        const maximo = NPC_MAX_PROC[f.cargo_id] || 1;
+        return (procCount[f.id] || 0) < maximo && _npcPodeManejar(f.cargo_id, proc.tier || 'D');
+      })
+      // Preferir NPC com menos processos ativos (mais disponível), depois por cargo mais alto
+      .sort((a, b) => (procCount[a.id]||0) - (procCount[b.id]||0))[0];
+    if (!npc) continue; // nenhum NPC qualificado disponível para este processo
+
+    // Incrementar contador local antes de continuar o loop
+    procCount[npc.id] = (procCount[npc.id] || 0) + 1;
+
     await procDoc.ref.update({
       status: 'em_andamento',
       func_id: npc.id,
@@ -1211,12 +1287,6 @@ async function _autoAtribuirProcessosMensalCF(db, escRef, esc) {
       designado_por_gestor: true,
       designado_em: new Date().toISOString(),
       progresso: 0,
-    });
-
-    npc.energia_npc_usada_mes = (npc.energia_npc_usada_mes||0) + 40;
-    await escRef.collection('funcionarios').doc(npc.id).update({
-      energia_npc_usada_mes: npc.energia_npc_usada_mes,
-      processo_id: procDoc.id,
     });
 
     await _logGestaoCF(escRef,
