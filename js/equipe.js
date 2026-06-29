@@ -111,6 +111,19 @@ window.renderEquipe = async function(j, el) {
   ));
   const funcs = fSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
+  // Contar processos ativos por NPC (para exibir capacidade usada/total)
+  const procCountEquipe = {};
+  try {
+    const ativos = await getDocs(query(
+      collection(db, 'escritorios', escId, 'processos_pool'),
+      where('status', '==', 'em_andamento')
+    ));
+    for (const d of ativos.docs) {
+      const fid = d.data().func_id;
+      if (fid) procCountEquipe[fid] = (procCountEquipe[fid] || 0) + 1;
+    }
+  } catch(e) { /* mantém vazio */ }
+
   const estagiarios = funcs.filter(f => f.cargo_id === 'est');
   const assistentes = funcs.filter(f => f.cargo_id === 'ass');
   const advogados   = funcs.filter(f => ['jnr','pln','snr'].includes(f.cargo_id));
@@ -142,15 +155,15 @@ window.renderEquipe = async function(j, el) {
     </div>
 
     <!-- Grupos de cargo -->
-    ${_renderGrupo('🎓 Estagiários', estagiarios, cap.estagiarios, 'est', escId, energiaDisp)}
-    ${_renderGrupo('📋 Assistentes', assistentes, cap.assistentes, 'ass', escId, energiaDisp)}
-    ${_renderGrupo('⚖️ Advogados', advogados, cap.advogados, 'jnr', escId, energiaDisp)}
+    ${_renderGrupo('🎓 Estagiários', estagiarios, cap.estagiarios, 'est', escId, energiaDisp, procCountEquipe)}
+    ${_renderGrupo('📋 Assistentes', assistentes, cap.assistentes, 'ass', escId, energiaDisp, procCountEquipe)}
+    ${_renderGrupo('⚖️ Advogados', advogados, cap.advogados, 'jnr', escId, energiaDisp, procCountEquipe)}
 
     <!-- Processos para revisão (90% concluídos por funcionários) -->
     ${await _renderProcessosPendentesRevisao(j, escId)}`;
 };
 
-function _renderGrupo(titulo, membros, vagas, cargo_min, escId, energiaDisp) {
+function _renderGrupo(titulo, membros, vagas, cargo_min, escId, energiaDisp, procCount = {}) {
   const ci = CARGO_INFO[cargo_min] || CARGO_INFO.est;
   return `
     <div style="margin-bottom:1.2rem">
@@ -165,7 +178,7 @@ function _renderGrupo(titulo, membros, vagas, cargo_min, escId, energiaDisp) {
       </div>
       ${membros.length === 0
         ? `<div style="font-size:.75rem;color:var(--txt4);padding:.5rem 0">Nenhum ${titulo.split(' ')[1].toLowerCase()} contratado ainda.</div>`
-        : membros.map(f => _cardFuncionario(f, escId, energiaDisp)).join('')}
+        : membros.map(f => _cardFuncionario(f, escId, energiaDisp, procCount)).join('')}
     </div>`;
 }
 
@@ -182,7 +195,9 @@ function _calcProd(func) {
   return Math.min(98, Math.max(20, Math.round((media / cap) * 70 + bon + pen + 10)));
 }
 
-function _cardFuncionario(f, escId, energiaDisp) {
+const _NPC_MAX_PROC_EQ = { est:1, ass:1, jnr:2, pln:3, snr:4, asc:5, soc:5 };
+
+function _cardFuncionario(f, escId, energiaDisp, procCount = {}) {
   const ci    = CARGO_INFO[f.cargo_id] || CARGO_INFO.est;
   const skills = f.skills || {};
   const prod   = _calcProd(f);
@@ -212,6 +227,30 @@ function _cardFuncionario(f, escId, energiaDisp) {
             <div style="font-size:.7rem;color:var(--amber);margin-bottom:.3rem">
               📋 Trabalhando em processo · ${f.acao_atual.progresso_delegado||0}% concluído
             </div>` : ''}
+          ${f.tipo === 'npc' ? (() => {
+            const npcUsado  = f.energia_npc_usada_mes || 0;
+            const npcDisp   = Math.max(0, 100 - npcUsado);
+            const emBurnout = !!f.burnout_npc;
+            const sobrecarr = !emBurnout && npcUsado > 80;
+            const pct       = Math.round((npcDisp / 100) * 100);
+            const corBarra  = emBurnout ? 'var(--verm2)' : sobrecarr ? 'var(--amber)' : 'var(--verde2)';
+            const maxProc   = _NPC_MAX_PROC_EQ[f.cargo_id] || 1;
+            const procAtivos = procCount[f.id] || 0;
+            const statusTxt = emBurnout
+              ? `🔴 Burnout — ${f.burnout_npc_restante||0} mês(es) afastado`
+              : sobrecarr
+                ? `⚠️ Sobrecarregado este mês`
+                : `⚡ ${npcDisp}/100 disponível`;
+            return `<div style="margin:.35rem 0 .3rem">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.2rem">
+                <span style="font-size:.6rem;color:${corBarra}">${statusTxt}</span>
+                <span style="font-size:.6rem;color:var(--txt4)">📋 ${procAtivos}/${maxProc} casos</span>
+              </div>
+              <div style="height:5px;background:var(--bg2);border-radius:3px;overflow:hidden">
+                <div style="height:100%;width:${pct}%;background:${corBarra};border-radius:3px;transition:width .4s"></div>
+              </div>
+            </div>`;
+          })() : ''}
           <div style="font-size:.68rem;color:var(--txt4)">
             Salário: <b style="color:var(--verm2)">R$ ${ci.sal.toLocaleString('pt-BR')}/mês</b>
             ${ci.hon_pct > 0 ? ` · Comissão: ${ci.hon_pct*100}% honorários` : ''}
