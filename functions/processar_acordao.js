@@ -270,10 +270,17 @@ if (escritorioDoCaso) {
   }
 
   if (transitouAgora) {
-    await processoRef.update({
-      status: jogadorGanhouEsteJulgamento ? 'ganho' : 'perdido',
-      encerrado_mes: mesTotalPessoal(j),
-    });
+    const statusFinal = jogadorGanhouEsteJulgamento ? 'ganho' : 'perdido';
+    await processoRef.update({ status: statusFinal, encerrado_mes: mesTotalPessoal(j) });
+    // Atualizar pool subcol (quando processo veio de _assumirCasoPool)
+    if (p.pool_proc_subcol_id && p.pool_proc_esc_id) {
+      try {
+        const resultado = jogadorGanhouEsteJulgamento ? 'procedente' : 'improcedente';
+        await db.collection('escritorios').doc(p.pool_proc_esc_id)
+          .collection('processos_pool').doc(p.pool_proc_subcol_id)
+          .update({ status: 'concluido', resultado, concluido_em: new Date().toISOString() });
+      } catch(e) { logger.warn('Pool subcol acordao update:', e); }
+    }
     if (jogadorGanhouEsteJulgamento) {
       // hon_pendente só existe quando o jogador tinha GANHO a sentença
       // original e a parte contrária recorreu (a sentença já calculou o
@@ -344,6 +351,13 @@ exports.decidirProximaInstancia = onCall({ region: 'southamerica-east1' }, async
 
   if (!recorrer) {
     await processoRef.update({ status: 'perdido', encerrado_mes: mesTotalPessoal(j) });
+    if (p.pool_proc_subcol_id && p.pool_proc_esc_id) {
+      try {
+        await db.collection('escritorios').doc(p.pool_proc_esc_id)
+          .collection('processos_pool').doc(p.pool_proc_subcol_id)
+          .update({ status: 'concluido', resultado: 'improcedente', concluido_em: new Date().toISOString() });
+      } catch(e) { logger.warn('Pool subcol decidir update:', e); }
+    }
     return { msg: 'Decisão aceita. Processo encerrado — trânsito em julgado.' };
   }
 

@@ -146,11 +146,17 @@ window.renderProcessosPool = async function(j, escId, el) {
       .map(d => ({ id: d.id, ...d.data() }))
       .sort((a, b) => (b.criado_mes || 0) - (a.criado_mes || 0));
 
+    const STATUSES_RECURSAL = ['recurso_pendente', 'aguardando_decisao_sentenca', 'aguardando_decisao_recurso'];
+
     const disponiveis  = todos.filter(p => p.status === 'disponivel');
     const emAndamento  = todos.filter(p => p.status === 'em_andamento');
     const aguardSent   = todos.filter(p => p.status === 'aguardando_sentenca');
+    // Pool docs assumidos pelo jogador que estão em fase recursal
+    const poolRecursal = todos.filter(p => p.assumido_uid && STATUSES_RECURSAL.includes(p.status));
 
-    // Col 2: Fase recursal (processos da coleção principal vinculados a este escritório)
+    // Col 2: Fase recursal — dois casos:
+    // a) processos antigos do pool colaborativo (campo pool_escritorio_id)
+    // b) processos assumidos via _assumirCasoPool (campo pool_proc_esc_id)
     let recursais = [];
     try {
       const recSnap = await getDocs(query(
@@ -160,6 +166,19 @@ window.renderProcessosPool = async function(j, escId, el) {
       ));
       recursais = recSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     } catch (e) { /* sem índice ainda — deixa vazio */ }
+
+    // Buscar os processos ligados ao pool subcol (via processo_ref) para o Col 2
+    if (poolRecursal.length > 0) {
+      const refs = poolRecursal.filter(p => p.processo_ref);
+      if (refs.length > 0) {
+        const snaps = await Promise.all(refs.map(p => getDoc(doc(db, 'processos', p.processo_ref))));
+        for (const snap of snaps) {
+          if (snap.exists() && STATUSES_RECURSAL.includes(snap.data().status)) {
+            recursais.push({ id: snap.id, ...snap.data() });
+          }
+        }
+      }
+    }
 
     // Col 3: Histórico últimos 5
     let historico = [];
@@ -281,7 +300,9 @@ function _renderColPool(disponiveis, emAndamento, aguardSent, j, escId) {
     </div>`).join('');
 
   // Em andamento — separar processos do jogador e processos da gestão automática
-  const andJogador = emAndamento.filter(p => p.assumido_uid);
+  // (excluir pool docs que já migraram para fase recursal)
+  const idsRecursal = new Set(poolRecursal.map(p => p.id));
+  const andJogador = emAndamento.filter(p => p.assumido_uid && !idsRecursal.has(p.id));
   const andGestao  = emAndamento.filter(p => !p.assumido_uid);
 
   const rowsAndJog = andJogador.map(p => `

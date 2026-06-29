@@ -230,6 +230,16 @@ exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (requ
     ? banco.decidirRecurso(100 - score)
     : true;
 
+  // Helper: atualizar o doc do pool subcol quando o processo muda de estado
+  async function _atualizarPoolSubcol(novoStatus) {
+    if (!p.pool_proc_subcol_id || !p.pool_proc_esc_id) return;
+    try {
+      await db.collection('escritorios').doc(p.pool_proc_esc_id)
+        .collection('processos_pool').doc(p.pool_proc_subcol_id)
+        .update({ status: novoStatus });
+    } catch (e) { logger.warn('Atualização pool subcol status falhou:', e); }
+  }
+
   if (recorre && favoravelAoJogador) {
     // Parte contrária (NPC) recorreu pelo sorteio — fluxo automático, igual antes.
     const { dataDisponivel, prazoFinal } = banco.calcularPrazosRecurso(j.mes_pessoal||0, j.ano_pessoal||1);
@@ -244,6 +254,7 @@ exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (requ
       encerrado_mes: null,
       convencimento: score,
     });
+    await _atualizarPoolSubcol('recurso_pendente');
     return { categoria, txt, repDelta, xpGanho, recorre: true, quemRecorre: 'parte_contraria', instanciaSeguinte: p.instancia_seguinte, demitido };
   } else if (recorre && !favoravelAoJogador) {
     // Jogador perdeu — recurso é DECISÃO dele, não sorteio. Fica aguardando
@@ -255,6 +266,7 @@ exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (requ
       hon_pendente: honPotencial,
       convencimento: score,
     });
+    await _atualizarPoolSubcol('aguardando_decisao_sentenca');
     return { categoria, txt, repDelta, xpGanho, recorre: false, aguardandoDecisaoDoJogador: true, score, instanciaSeguinte: p.instancia_seguinte, demitido };
   } else {
     await _finalizarProcessoDefinitivo(db, processoRef, jogadorRef, p, j, score, favoravelAoJogador, honPotencial, mesAtual, repDelta, logger);
@@ -317,5 +329,13 @@ exports.decidirRecursoSentenca = onCall({ region: 'southamerica-east1' }, async 
     prazo_final_recurso: prazoFinal,
     encerrado_mes: null,
   });
+  // Propagar estado para o pool subcol (se veio de _assumirCasoPool)
+  if (p.pool_proc_subcol_id && p.pool_proc_esc_id) {
+    try {
+      await db.collection('escritorios').doc(p.pool_proc_esc_id)
+        .collection('processos_pool').doc(p.pool_proc_subcol_id)
+        .update({ status: 'recurso_pendente' });
+    } catch (e) { logger.warn('Pool subcol recurso update (decidir):', e); }
+  }
   return { msg: `Recurso protocolado. Acesse a carteira processual para sustentar no ${p.instancia_seguinte}.` };
 });
