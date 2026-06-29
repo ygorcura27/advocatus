@@ -112,6 +112,7 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal) {
   const proms        = [];
   const logsProgress = [];
   const energiaAcum  = {}; // funcId → energia gasta neste processamento
+  const feedbackDelta = {}; // funcId → delta de feedback_ruim_acumulado neste mês
 
   for (const [funcId, procDocs] of Object.entries(procsByNpc)) {
     const npc = npcMap[funcId];
@@ -138,6 +139,13 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal) {
         const valorRecebido = resultado === 'procedente' ? hon
           : resultado === 'parcial' ? Math.round(hon * 0.55)
           : Math.round(hon * 0.10);
+
+        // Rastrear feedback para cálculo de estresse
+        if (resultado === 'procedente') {
+          feedbackDelta[funcId] = (feedbackDelta[funcId] || 0) - 1;
+        } else if (resultado === 'improcedente') {
+          feedbackDelta[funcId] = (feedbackDelta[funcId] || 0) + 1;
+        }
 
         proms.push(procDoc.ref.update({
           progresso: 100, status: 'concluido',
@@ -210,12 +218,27 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal) {
     // Salvar total real (visível na UI) + marcar mês para não double-count em designações futuras
     // O campo mes_energia indica a que mês pertence energia_npc_usada_mes
     const proximoMes = (mesGlobal || 0) + 1;
+
+    // Atualizar feedback_ruim_acumulado e recalcular estresse
+    const feedbackBase = f.feedback_ruim_acumulado || 0;
+    const novoFeedbackRuim = Math.max(0, feedbackBase + (feedbackDelta[fd.id] || 0));
+    const conflitosAtivos  = (f.conflitos_ativos || []).length;
+    const novoEstresse = Math.min(100,
+      (conflitosAtivos * 20) +
+      (novoFeedbackRuim * 10) +
+      (sobrecarg ? 10 : 0)
+    );
+
     fProms.push(fd.ref.update({
-      energia_npc_usada_mes: npcUsado, // total real: designações + processos
-      mes_energia: proximoMes,         // marca próximo mês como "limpo"
-      meses_sobrecarregado: novosMeses,
-      burnout_npc: burnoutNPC,
-      burnout_npc_restante: burnoutRest,
+      energia_npc_usada_mes:    npcUsado,   // total real: designações + processos
+      mes_energia:              proximoMes, // marca próximo mês como "limpo"
+      meses_sobrecarregado:     novosMeses,
+      burnout_npc:              burnoutNPC,
+      burnout_npc_restante:     burnoutRest,
+      meses_no_cargo:           (f.meses_no_cargo || 0) + 1,
+      casos_resolvidos_mes:     0,
+      feedback_ruim_acumulado:  novoFeedbackRuim,
+      estresse:                 novoEstresse,
     }));
   }
   if (fProms.length) await Promise.all(fProms);

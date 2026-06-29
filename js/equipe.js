@@ -3,11 +3,16 @@
  * Sistema de contratação, designação e gestão de funcionários
  */
 
-import { collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where, orderBy }
+import { collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where, orderBy, limit }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { db } from './firebase-init.js';
 import { SKILL_CAP } from './escritorios_npc.js';
 
+
+// ════════════════════════════════════════════════════════
+// ESTADO LOCAL (tab ativa na tela de Equipe)
+// ════════════════════════════════════════════════════════
+let _activeEquipeTab = 'equipe';
 
 // ════════════════════════════════════════════════════════
 // CONSTANTES
@@ -154,13 +159,30 @@ window.renderEquipe = async function(j, el) {
       </div>
     </div>
 
-    <!-- Grupos de cargo -->
-    ${_renderGrupo('🎓 Estagiários', estagiarios, cap.estagiarios, 'est', escId, energiaDisp, procCountEquipe)}
-    ${_renderGrupo('📋 Assistentes', assistentes, cap.assistentes, 'ass', escId, energiaDisp, procCountEquipe)}
-    ${_renderGrupo('⚖️ Advogados', advogados, cap.advogados, 'jnr', escId, energiaDisp, procCountEquipe)}
+    <!-- Abas: Equipe | Diário -->
+    <div style="display:flex;gap:0;margin-bottom:1rem;border-bottom:1px solid var(--navy-light)">
+      <button class="equipe-tab-btn" data-tab="equipe" onclick="window.switchEquipeTab('equipe')"
+        style="background:none;border:none;border-bottom:${_activeEquipeTab==='equipe'?'2px solid var(--ouro)':'2px solid transparent'};padding:.45rem 1rem;cursor:pointer;font-weight:700;font-size:.78rem;color:${_activeEquipeTab==='equipe'?'var(--ouro)':'var(--txt3)'}">
+        👥 Equipe
+      </button>
+      <button class="equipe-tab-btn" data-tab="diario" onclick="window.switchEquipeTab('diario')"
+        style="background:none;border:none;border-bottom:${_activeEquipeTab==='diario'?'2px solid var(--ouro)':'2px solid transparent'};padding:.45rem 1rem;cursor:pointer;font-weight:700;font-size:.78rem;color:${_activeEquipeTab==='diario'?'var(--ouro)':'var(--txt3)'}">
+        📓 Diário
+      </button>
+    </div>
 
-    <!-- Processos para revisão (90% concluídos por funcionários) -->
-    ${await _renderProcessosPendentesRevisao(j, escId)}`;
+    <!-- Pane: Equipe -->
+    <div class="equipe-tab-pane" data-tab="equipe" ${_activeEquipeTab==='diario'?'style="display:none"':''}>
+      ${_renderGrupo('🎓 Estagiários', estagiarios, cap.estagiarios, 'est', escId, energiaDisp, procCountEquipe)}
+      ${_renderGrupo('📋 Assistentes', assistentes, cap.assistentes, 'ass', escId, energiaDisp, procCountEquipe)}
+      ${_renderGrupo('⚖️ Advogados', advogados, cap.advogados, 'jnr', escId, energiaDisp, procCountEquipe)}
+      ${await _renderProcessosPendentesRevisao(j, escId)}
+    </div>
+
+    <!-- Pane: Diário da Equipe -->
+    <div class="equipe-tab-pane" data-tab="diario" ${_activeEquipeTab!=='diario'?'style="display:none"':''}>
+      ${await _renderDiarioEquipe(escId)}
+    </div>`;
 };
 
 function _renderGrupo(titulo, membros, vagas, cargo_min, escId, energiaDisp, procCount = {}) {
@@ -192,13 +214,23 @@ function _calcProd(func) {
   const cap    = _SKILL_CAP_EQ[func.cargo_id] || 35;
   const bon    = _CARGO_BON_EQ[func.cargo_id] || 0;
   const pen    = (func.acao_atual && (func.acao_atual.progresso_delegado || 0) < 20) ? -5 : 0;
-  return Math.min(98, Math.max(20, Math.round((media / cap) * 70 + bon + pen + 10)));
+  const stressMod = _calcStressMod(func);
+  return Math.min(98, Math.max(20, Math.round((media / cap) * 70 + bon + pen + stressMod + 10)));
 }
 
 const _NPC_MAX_PROC_EQ   = { est:1, ass:1, jnr:2, pln:3, snr:4, asc:5, soc:5 };
 const _CUSTO_NPC_TAREFA  = { est:15, ass:15, jnr:20, pln:20, snr:25, asc:25, soc:30 };
 const _SKILLS_REL_EQ     = ['escrita_juridica','pesquisa','oratoria','persuasao','argumentacao'];
 const _CARGO_CAP_EQ_EFIC = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
+
+// Modificador de produtividade por faixa de estresse
+function _calcStressMod(func) {
+  const s = func.estresse || 0;
+  if (s > 60) return -25;
+  if (s > 30) return -10;
+  return 0;
+}
+
 function _calcEfic(func) {
   const vals = _SKILLS_REL_EQ.map(s => (func.skills||{})[s] || 0);
   const media = vals.reduce((a,b)=>a+b,0) / vals.length;
@@ -261,6 +293,20 @@ function _cardFuncionario(f, escId, energiaDisp, procCount = {}) {
               </div>
             </div>`;
           })() : ''}
+          ${f.tipo === 'npc' && (f.estresse || 0) > 0 ? (() => {
+            const s  = f.estresse || 0;
+            const sc = s > 60 ? 'var(--verm2)' : s > 30 ? 'var(--amber)' : 'var(--verde2)';
+            const st = s > 60 ? '😤 Muito estressado' : s > 30 ? '😐 Tenso' : '😊 Tranquilo';
+            return `<div style="margin:.2rem 0">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.15rem">
+                <span style="font-size:.6rem;color:${sc}">${st}</span>
+                <span style="font-size:.6rem;color:var(--txt4)">🌡️ ${s}/100</span>
+              </div>
+              <div style="height:4px;background:var(--bg2);border-radius:3px;overflow:hidden">
+                <div style="height:100%;width:${s}%;background:${sc};border-radius:3px"></div>
+              </div>
+            </div>`;
+          })() : ''}
           <div style="font-size:.68rem;color:var(--txt4)">
             Salário: <b style="color:var(--verm2)">R$ ${ci.sal.toLocaleString('pt-BR')}/mês</b>
             ${ci.hon_pct > 0 ? ` · Comissão: ${ci.hon_pct*100}% honorários` : ''}
@@ -317,6 +363,70 @@ const qSnap = { docs: [...qSnap1.docs, ...qSnap2.docs], empty: qSnap1.empty && q
       </div>`;
   } catch(e) { return ''; }
 }
+
+// ════════════════════════════════════════════════════════
+// DIÁRIO DE EQUIPE
+// ════════════════════════════════════════════════════════
+const _DIARIO_ICONE = {
+  conflito_leve:'⚡', conflito_estrutural:'🔥', mediacao:'🤝', mentoria:'📚',
+  promocao:'⭐', ferias:'🏖️', competicao:'🏆', saida:'👋',
+  feedback_cliente:'💬', bonus:'💰', caso_importante:'⚖️',
+};
+
+async function _renderDiarioEquipe(escId) {
+  try {
+    const snap = await getDocs(query(
+      collection(db, 'escritorios', escId, 'log_equipe'),
+      orderBy('criado_em', 'desc'),
+      limit(60)
+    ));
+    if (snap.empty) {
+      return `<div style="text-align:center;padding:2rem;color:var(--txt4);font-size:.78rem">
+        📓 Nenhum evento registrado ainda.<br>
+        <span style="font-size:.7rem">Ações da equipe (conflitos, promoções, mentoria…) aparecerão aqui.</span>
+      </div>`;
+    }
+    return snap.docs.map(d => {
+      const e    = d.data();
+      const icon = _DIARIO_ICONE[e.tipo] || '📝';
+      const data = e.criado_em
+        ? new Date(e.criado_em).toLocaleDateString('pt-BR', { day:'2-digit', month:'short' })
+        : '';
+      return `<div class="card" style="margin-bottom:.4rem;border-left:3px solid var(--navy-light)">
+        <div style="display:flex;justify-content:space-between;align-items:start;gap:.5rem">
+          <div style="font-size:.78rem;color:var(--navy)">${icon} ${e.texto}</div>
+          <span style="font-size:.6rem;color:var(--txt4);white-space:nowrap">${data}</span>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(err) {
+    return `<div style="color:var(--txt4);font-size:.78rem;padding:1rem">Erro ao carregar diário.</div>`;
+  }
+}
+
+// Troca de aba sem re-render completo
+window.switchEquipeTab = function(tab) {
+  _activeEquipeTab = tab;
+  document.querySelectorAll('.equipe-tab-btn').forEach(b => {
+    const ativo = b.dataset.tab === tab;
+    b.style.color        = ativo ? 'var(--ouro)' : 'var(--txt3)';
+    b.style.borderBottom = ativo ? '2px solid var(--ouro)' : '2px solid transparent';
+  });
+  document.querySelectorAll('.equipe-tab-pane').forEach(p => {
+    p.style.display = p.dataset.tab === tab ? '' : 'none';
+  });
+};
+
+// Helper global para outros módulos gravarem no diário de equipe
+window.addLogEquipe = async function(escId, tipo, texto, envolvidos = []) {
+  if (!escId) return;
+  try {
+    await addDoc(collection(db, 'escritorios', escId, 'log_equipe'), {
+      texto, tipo, envolvidos,
+      criado_em: new Date().toISOString(),
+    });
+  } catch(e) { console.warn('addLogEquipe:', e); }
+};
 
 // ════════════════════════════════════════════════════════
 // CONTRATAR FUNCIONÁRIO
@@ -396,6 +506,22 @@ window._contratarNPC = async function(cargo_min, escId) {
     acoes_mes_usadas: 0,
     acao_atual: null,
     criado_em:  new Date().toISOString(),
+    // Dinâmica de equipe (etapas 1-4)
+    estresse:              0,
+    afinidade_com_npcs:    {},
+    mentor_id:             null,
+    aprendizes_ids:        [],
+    skill_sendo_treinada:  null,
+    meses_no_cargo:        0,
+    casos_resolvidos_mes:  0,
+    casos_resolvidos_total:0,
+    feedback_media_estrelas:   3,
+    feedback_media_acumulada:  0,
+    feedback_ruim_acumulado:   0,
+    reputacao_interna:     50,
+    conflitos_ativos:      [],
+    ultimas_ferias_mes_total: null,
+    clientes_vetados:      [],
   };
 
   try {
