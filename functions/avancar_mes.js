@@ -88,7 +88,7 @@ function _sentencaOutcomeNPC(efic) {
   return                   _rollSentenca([.01,.12,.87]);
 }
 
-async function _processarProgressoNPCsCF(db, escRef) {
+async function _processarProgressoNPCsCF(db, escRef, mesGlobal) {
   // Buscar todos os processos em andamento por NPCs (exclui processos assumidos pelo jogador)
   const poolSnap = await escRef.collection('processos_pool')
     .where('status', '==', 'em_andamento').get();
@@ -163,8 +163,8 @@ async function _processarProgressoNPCsCF(db, escRef) {
       }
     }
 
-    // Acumular custo de energia: 20 por processo ativo
-    energiaAcum[funcId] = (npc.energia_npc_usada_mes || 0) + NPC_ENERGIA_POR_PROC * numAtivos;
+    // Custos de processo para este mês (calculados frescos — designações estão em energia_npc_usada_mes)
+    energiaAcum[funcId] = NPC_ENERGIA_POR_PROC * numAtivos;
   }
 
   if (proms.length) await Promise.all(proms);
@@ -177,8 +177,12 @@ async function _processarProgressoNPCsCF(db, escRef) {
     const f = fd.data();
     if (f.tipo !== 'npc') continue;
 
-    const npcUsado  = energiaAcum[fd.id] ?? (f.energia_npc_usada_mes || 0);
-    const sobrecarg = npcUsado > NPC_ENERGIA_MES - NPC_OVERLOAD_TH;
+    // Somar: custos de designação acumulados no mês + custos de processos calculados agora
+    // mes_energia rastreia em qual mês as designações foram contabilizadas (evita double-count)
+    const designCosts = (f.mes_energia === mesGlobal) ? (f.energia_npc_usada_mes || 0) : 0;
+    const procCosts   = energiaAcum[fd.id] || 0;
+    const npcUsado    = designCosts + procCosts;
+    const sobrecarg   = npcUsado > NPC_ENERGIA_MES - NPC_OVERLOAD_TH;
     let novosMeses  = f.meses_sobrecarregado || 0;
     let burnoutNPC  = f.burnout_npc || false;
     let burnoutRest = f.burnout_npc_restante || 0;
@@ -203,8 +207,12 @@ async function _processarProgressoNPCsCF(db, escRef) {
       novosMeses = 0;
     }
 
+    // Salvar total real (visível na UI) + marcar mês para não double-count em designações futuras
+    // O campo mes_energia indica a que mês pertence energia_npc_usada_mes
+    const proximoMes = (mesGlobal || 0) + 1;
     fProms.push(fd.ref.update({
-      energia_npc_usada_mes: 0, // reset para o próximo mês
+      energia_npc_usada_mes: npcUsado, // total real: designações + processos
+      mes_energia: proximoMes,         // marca próximo mês como "limpo"
       meses_sobrecarregado: novosMeses,
       burnout_npc: burnoutNPC,
       burnout_npc_restante: burnoutRest,
@@ -1172,7 +1180,7 @@ async function _processarServicosMensalCF(db, uid, j) {
   const esc  = escSnap.data();
   const tier = esc.tier || 1;
 
-  await _processarProgressoNPCsCF(db, escRef);
+  await _processarProgressoNPCsCF(db, escRef, esc.mes_global || 0);
 
   const oldOpSnap = await escRef.collection('oportunidades').where('status','==','disponivel').get();
   await Promise.all(oldOpSnap.docs.map(d => d.ref.delete()));

@@ -196,6 +196,7 @@ function _calcProd(func) {
 }
 
 const _NPC_MAX_PROC_EQ   = { est:1, ass:1, jnr:2, pln:3, snr:4, asc:5, soc:5 };
+const _CUSTO_NPC_TAREFA  = { est:15, ass:15, jnr:20, pln:20, snr:25, asc:25, soc:30 };
 const _SKILLS_REL_EQ     = ['escrita_juridica','pesquisa','oratoria','persuasao','argumentacao'];
 const _CARGO_CAP_EQ_EFIC = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
 function _calcEfic(func) {
@@ -633,9 +634,16 @@ window._confirmarDesignar = async function(funcId, procId, escId) {
   }
   await updateDoc(doc(db, 'processos', procId), updatesProcesso);
  
+  const mesAtual      = j.mes_pessoal || 0;
+  const custoNpcTar   = _CUSTO_NPC_TAREFA[f.cargo_id] || 20;
+  // Rastreia mês da energia para não somar com mês anterior no avancarMes
+  const mesEnergiaNPC = f.mes_energia;
+  const energiaBase   = (mesEnergiaNPC === mesAtual) ? (f.energia_npc_usada_mes || 0) : 0;
   await updateDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId), {
-    acoes_mes_usadas: (f.acoes_mes_usadas || 0) + 1,
-    acao_atual: chegou100 ? null : { procId, progresso_delegado: progressoAlvo },
+    acoes_mes_usadas:      (f.acoes_mes_usadas || 0) + 1,
+    acao_atual:            chegou100 ? null : { procId, progresso_delegado: progressoAlvo },
+    energia_npc_usada_mes: energiaBase + custoNpcTar,
+    mes_energia:           mesAtual,
   });
 
   fecharModal();
