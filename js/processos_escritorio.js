@@ -300,9 +300,8 @@ function _renderColPool(disponiveis, emAndamento, aguardSent, j, escId) {
     </div>`).join('');
 
   // Em andamento — separar processos do jogador e processos da gestão automática
-  // (excluir pool docs que já migraram para fase recursal)
-  const idsRecursal = new Set(poolRecursal.map(p => p.id));
-  const andJogador = emAndamento.filter(p => p.assumido_uid && !idsRecursal.has(p.id));
+  // (docs em status recursal têm status diferente de 'em_andamento', nunca estão aqui)
+  const andJogador = emAndamento.filter(p => p.assumido_uid);
   const andGestao  = emAndamento.filter(p => !p.assumido_uid);
 
   const rowsAndJog = andJogador.map(p => `
