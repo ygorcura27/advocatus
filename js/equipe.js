@@ -474,7 +474,7 @@ const _DIARIO_ICONE = {
 async function _renderDiarioEquipe(escId) {
   try {
     const snap = await getDocs(query(
-      collection(db, 'escritorios', escId, 'log_gestao'),
+      collection(db, 'escritorios', escId, 'log_equipe'),
       orderBy('criado_em', 'desc'),
       limit(80)
     ));
@@ -1146,7 +1146,7 @@ window._confirmarMentoria = async function(mentorId, escId) {
       skill_sendo_treinada:    skill,
       meses_mentoria_restantes: dur,
     }),
-    addDoc(collection(db, 'escritorios', escId, 'log_gestao'), {
+    addDoc(collection(db, 'escritorios', escId, 'log_equipe'), {
       texto: `🎓 Mentoria iniciada: ${mentorData.nome} → ${aprendizData.nome} (${skillLabel}, ${dur} meses).`,
       criado_em: new Date().toISOString(),
     }),
@@ -1231,8 +1231,8 @@ window._confirmarPromocao = async function(funcId, escId, proxCargo) {
     meses_stress_alto: 0,
   });
 
-  await addDoc(collection(db, 'escritorios', escId, 'log_gestao'), {
-    msg: `✨ ${f.nome} foi promovido(a) para ${(CARGO_INFO[proxCargo]||{}).l||proxCargo} com salário de R$ ${salario.toLocaleString('pt-BR')}.`,
+  await addDoc(collection(db, 'escritorios', escId, 'log_equipe'), {
+    texto: `✨ ${f.nome} foi promovido(a) para ${(CARGO_INFO[proxCargo]||{}).l||proxCargo} com salário de R$ ${salario.toLocaleString('pt-BR')}.`,
     criado_em: new Date().toISOString(),
   });
 
@@ -1256,8 +1256,8 @@ window.concederFerias = async function(funcId, escId, nome) {
     estresse:               0,
   });
 
-  await addDoc(collection(db, 'escritorios', escId, 'log_gestao'), {
-    msg: `🏖️ ${nome} saiu de férias (mês ${mesGlob}).`,
+  await addDoc(collection(db, 'escritorios', escId, 'log_equipe'), {
+    texto: `🏖️ ${nome} saiu de férias (mês ${mesGlob}).`,
     criado_em: new Date().toISOString(),
   });
 
@@ -1355,8 +1355,8 @@ window._executarMediacao = async function(funcId, conflitoIdx, escId) {
     });
   }
 
-  await addDoc(collection(db, 'escritorios', escId, 'log_gestao'), {
-    msg: `⚖️ Mediação entre ${f.nome} e ${conflito.com_nome}: ${sucesso ? 'em processo de resolução' : 'fracassou — conflito continua'}.`,
+  await addDoc(collection(db, 'escritorios', escId, 'log_equipe'), {
+    texto: `⚖️ Mediação entre ${f.nome} e ${conflito.com_nome}: ${sucesso ? 'em processo de resolução' : 'fracassou — conflito continua'}.`,
     criado_em: new Date().toISOString(),
   });
 
