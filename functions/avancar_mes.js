@@ -631,6 +631,73 @@ async function _processarFeriasNPCsCF(db, escRef, fSnap, mesGlobal, uid) {
 }
 
 // ════════════════════════════════════════════════════════
+// PROCESSAMENTO MENSAL: ESTUDO AUTÔNOMO
+// ════════════════════════════════════════════════════════
+async function _processarEstudoNPCsCF(db, escRef, fSnap, uid) {
+  const CARGO_CAP_SKL = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
+  const CUSTO_ESTUDO  = 20;
+
+  const proms = [], logs = [];
+
+  for (const fd of fSnap.docs) {
+    const f = fd.data();
+    if (f.tipo !== 'npc' || f.ativo === false) continue;
+    if (f.burnout_npc || f.em_ferias) continue;
+    if (f.mentor_id) continue; // aprendiz em mentoria já está sendo treinado
+
+    const energiaUsada = f.energia_npc_usada_mes || 0;
+    if (energiaUsada + CUSTO_ESTUDO > 100) continue;
+
+    const cap    = CARGO_CAP_SKL[f.cargo_id] || 20;
+    const skills = f.skills || {};
+    const skillKeys = Object.keys(skills).filter(k => typeof skills[k] === 'number');
+    if (!skillKeys.length) continue;
+
+    // Skill designada pelo player OU a mais fraca percentualmente
+    let skill = f.skill_em_estudo && skillKeys.includes(f.skill_em_estudo)
+      ? f.skill_em_estudo
+      : skillKeys.reduce((best, k) =>
+          (skills[k] / cap) < (skills[best] / cap) ? k : best, skillKeys[0]);
+
+    const valorAtual = skills[skill] || 0;
+    if (valorAtual >= cap) {
+      // Se a skill designada já está no cap, busca outra
+      const alternativa = skillKeys.find(k => (skills[k] || 0) < cap);
+      if (!alternativa) continue;
+      skill = alternativa;
+    }
+
+    const ganho   = Math.random() < 0.4 ? 2 : 1; // 60% chance de +1, 40% de +2
+    const novoVal = Math.min(cap, valorAtual + ganho);
+    const pctAntes = Math.floor((valorAtual / cap) * 10) * 10;
+    const pctDepois = Math.floor((novoVal / cap) * 10) * 10;
+
+    proms.push(fd.ref.update({
+      [`skills.${skill}`]:    novoVal,
+      energia_npc_usada_mes: energiaUsada + CUSTO_ESTUDO,
+    }));
+
+    // Log apenas em marcos de 10% (80% e 100% do cap)
+    if (pctDepois > pctAntes && (pctDepois === 80 || pctDepois === 100)) {
+      const marco = pctDepois === 100 ? 'atingiu o limite' : `atingiu ${pctDepois}% do cap`;
+      logs.push(_logGestaoCF(escRef,
+        `📖 ${f.nome} ${marco} em ${_SKL_LABEL[skill]||skill} pelo estudo autônomo.`));
+      if (pctDepois >= 80 && uid) {
+        proms.push(db.collection('jogadores').doc(uid).collection('inbox').add({
+          de: 'sistema',
+          assunto: `📖 ${f.nome} evoluiu em ${_SKL_LABEL[skill]||skill}`,
+          corpo: `Pelo esforço próprio, ${f.nome} ${marco} em ${_SKL_LABEL[skill]||skill} (${novoVal}/${cap}).`,
+          tipo: 'estudo_marco', lida: false, criado_em: new Date().toISOString(),
+        }));
+      }
+    }
+  }
+
+  if (proms.length) await Promise.all(proms);
+  if (logs.length)  await Promise.all(logs);
+}
+
+// ════════════════════════════════════════════════════════
 // PROCESSAMENTO MENSAL: TURNOVER
 // ════════════════════════════════════════════════════════
 async function _verificarTurnoverNPCsCF(db, escRef, uid, fSnap) {
@@ -1774,6 +1841,7 @@ async function _processarServicosMensalCF(db, uid, j) {
   try {
     const fSnapFresh = await escRef.collection('funcionarios').get();
     await _processarMentoriaNPCsCF(db, escRef, fSnapFresh, uid);
+    await _processarEstudoNPCsCF(db, escRef, fSnapFresh, uid);
     await _processarConflitosNPCsCF(db, escRef, fSnapFresh, esc.mes_global || 0, uid);
     await _processarFeriasNPCsCF(db, escRef, fSnapFresh, esc.mes_global || 0, uid);
     await _verificarTurnoverNPCsCF(db, escRef, uid, fSnapFresh);

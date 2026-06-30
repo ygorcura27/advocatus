@@ -346,6 +346,16 @@ function _cardFuncionario(f, escId, energiaDisp, procCount = {}, mesGlobal = 0) 
               📚 Aprendiz de ${f.mentor_nome||'mentor'} · ${skLbl} · ${f.meses_mentoria_restantes||0} mês(es)
             </div>`;
           })() : ''}
+          ${f.tipo === 'npc' && !f.mentor_id && !f.burnout_npc && !f.em_ferias ? (() => {
+            const cap = _SKILL_CAP_EQ[f.cargo_id] || 20;
+            const skFoco = f.skill_em_estudo;
+            const lbl = skFoco ? (_SKILL_FULL_LBL[skFoco]||skFoco) : 'Auto (skill mais fraca)';
+            return `<div style="font-size:.63rem;color:var(--txt4);margin:.15rem 0">
+              📖 Estudo autônomo: <span style="color:var(--navy3)">${lbl}</span>
+              <button onclick="window.designarEstudo('${f.id}','${escId}')"
+                style="font-size:.55rem;padding:.05rem .25rem;margin-left:.3rem;background:transparent;border:1px solid var(--txt4);border-radius:3px;cursor:pointer;color:var(--txt4)">mudar</button>
+            </div>`;
+          })() : ''}
           ${f.tipo === 'npc' && (f.aprendizes_ids||[]).length > 0 ? `
             <div style="font-size:.65rem;color:var(--navy3);margin:.2rem 0">
               🎓 Mentor ativo: ${(f.aprendizes_ids||[]).length} aprendiz(es)
@@ -600,6 +610,7 @@ window._contratarNPC = async function(cargo_min, escId) {
     mentor_id:             null,
     aprendizes_ids:        [],
     skill_sendo_treinada:  null,
+    skill_em_estudo:       null,
     meses_no_cargo:        0,
     casos_resolvidos_mes:  0,
     casos_resolvidos_total:0,
@@ -951,6 +962,53 @@ function _renderToggleGestor(label, tipo, ativo, escId) {
     </button>
   </div>`;
 }
+
+// ════════════════════════════════════════════════════════
+// ESTUDO AUTÔNOMO
+// ════════════════════════════════════════════════════════
+window.designarEstudo = async function(funcId, escId) {
+  const snap = await getDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId));
+  if (!snap.exists()) return;
+  const f = { id: snap.id, ...snap.data() };
+  const skills = Object.keys(f.skills || {});
+  if (!skills.length) { toast('Nenhuma skill disponível.', 'ko'); return; }
+
+  const cap = _SKILL_CAP_EQ[f.cargo_id] || 20;
+  const opts = skills.map(sk => {
+    const v = f.skills[sk] || 0;
+    const pct = Math.round(v / cap * 100);
+    return `<option value="${sk}" ${f.skill_em_estudo === sk ? 'selected' : ''}>${_SKILL_FULL_LBL[sk]||sk} — ${v}/${cap} (${pct}%)</option>`;
+  }).join('');
+
+  abrirModal('📖 Foco de Estudo Autônomo',
+    `<div style="font-size:.78rem;color:var(--txt3);margin-bottom:.8rem">
+      <b>${f.nome}</b> estuda 1 skill por mês automaticamente (-20⚡ NPC).<br>
+      Escolha a skill para priorizar, ou deixe em "Auto" para a mais fraca.
+    </div>
+    <div class="campo"><label>Skill prioritária</label>
+      <select id="estudo-skill">
+        <option value="" ${!f.skill_em_estudo ? 'selected' : ''}>🤖 Auto — skill mais fraca</option>
+        ${opts}
+      </select>
+    </div>
+    <div style="display:flex;gap:.5rem;margin-top:.8rem">
+      <button class="btn btn-ghost" style="flex:1" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-prim" style="flex:1" onclick="window._confirmarEstudo('${funcId}','${escId}')">Salvar →</button>
+    </div>`
+  );
+};
+
+window._confirmarEstudo = async function(funcId, escId) {
+  const skill = document.getElementById('estudo-skill')?.value || null;
+  const { updateDoc } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+  await updateDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId), {
+    skill_em_estudo: skill || null,
+  });
+  fecharModal();
+  const lbl = skill ? (_SKILL_FULL_LBL[skill]||skill) : 'automático';
+  toast(`📖 Foco de estudo definido: ${lbl}.`, 'ok');
+  setTimeout(() => window.navTo && window.navTo('equipe', null), 400);
+};
 
 // ════════════════════════════════════════════════════════
 // TOGGLES DO GESTOR
