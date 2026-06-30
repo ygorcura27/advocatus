@@ -56,6 +56,38 @@ const NPC_OVERLOAD_TH = 20; // sobrecarga se usado > 80
 const SKILLS_REL_NPC  = ['escrita_juridica','pesquisa','oratoria','persuasao','argumentacao'];
 const CARGO_CAP_NPC   = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
 
+// ── Calcula efeito de feedback de um processo concluído (-2..+2) ──
+function _calcFeedbackEfeito(resultado, stressNPC, provasSel, provas) {
+  let score = 0;
+  const forcaAlta = (provasSel || []).filter(i => ((provas || [])[i]?.forca || 0) >= 7).length;
+  if (forcaAlta >= 2) score++;
+  if (resultado === 'procedente' || resultado === 'parcial') score++;
+  if (stressNPC > 70) score--;
+  return Math.max(-2, Math.min(2, score));
+}
+
+// ── Mapeamento efeito → estrelas: -2→1★, -1→2★, 0→3★, +1→4★, +2→5★ ──
+function _efeitoParaEstrelas(efeito) { return Math.round(efeito) + 3; }
+
+// ── Chance de recorrência por estrelas ──
+const RECORRENCIA_CHANCE = { 5: 0.90, 4: 0.60, 3: 0.25, 2: 0.10, 1: 0 };
+
+// ── Skill com maior gap para o cap (candidata ao bônus de ranking) ──
+function _escolherSkillBonus(npc) {
+  const CARGO_CAP_SKL = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
+  const cap    = CARGO_CAP_SKL[npc.cargo_id] || 35;
+  const skills = npc.skills || {};
+  const KEYS   = ['pesquisa','escrita_juridica','argumentacao','oratoria','persuasao'];
+  let gap = -1, sk = 'pesquisa';
+  for (const k of KEYS) { const g = cap - (skills[k] || 0); if (g > gap) { gap = g; sk = k; } }
+  return sk;
+}
+
+const _SKL_LABEL = {
+  pesquisa:'Pesquisa', escrita_juridica:'Escrita Jurídica',
+  argumentacao:'Argumentação', oratoria:'Oratória', persuasao:'Persuasão',
+};
+
 // ── Calc eficiência de skills (0.4 a 1.0) ──
 // 0.4 mínimo garante que NPCs sem skills ainda evoluem (lentamente)
 function _eficienciaNPC(f) {
@@ -109,10 +141,13 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal) {
     npcMap[fd.id] = { id: fd.id, ref: fd.ref, ...fd.data() };
   }
 
-  const proms        = [];
-  const logsProgress = [];
-  const energiaAcum  = {}; // funcId → energia gasta neste processamento
-  const feedbackDelta = {}; // funcId → delta de feedback_ruim_acumulado neste mês
+  const proms         = [];
+  const logsProgress  = [];
+  const energiaAcum   = {}; // funcId → energia gasta neste processamento
+  const feedbackDelta = {}; // funcId → delta de feedback_ruim_acumulado (estresse)
+  const completedByNpc = {}; // funcId → processos concluídos este mês
+  const winsByNpc      = {}; // funcId → vitórias (procedente/parcial)
+  const feedbackByNpc  = {}; // funcId → soma dos efeitos de feedback (-2..+2)
 
   for (const [funcId, procDocs] of Object.entries(procsByNpc)) {
     const npc = npcMap[funcId];
@@ -140,12 +175,18 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal) {
           : resultado === 'parcial' ? Math.round(hon * 0.55)
           : Math.round(hon * 0.10);
 
-        // Rastrear feedback para cálculo de estresse
+        // Rastrear feedback para estresse e ranking
         if (resultado === 'procedente') {
           feedbackDelta[funcId] = (feedbackDelta[funcId] || 0) - 1;
+          winsByNpc[funcId]     = (winsByNpc[funcId]     || 0) + 1;
         } else if (resultado === 'improcedente') {
           feedbackDelta[funcId] = (feedbackDelta[funcId] || 0) + 1;
+        } else if (resultado === 'parcial') {
+          winsByNpc[funcId] = (winsByNpc[funcId] || 0) + 1;
         }
+        completedByNpc[funcId] = (completedByNpc[funcId] || 0) + 1;
+        const fEfeito = _calcFeedbackEfeito(resultado, npc.estresse || 0, p.provas_selecionadas, p.provas);
+        feedbackByNpc[funcId]  = (feedbackByNpc[funcId]  || 0) + fEfeito;
 
         proms.push(procDoc.ref.update({
           progresso: 100, status: 'concluido',
@@ -178,9 +219,10 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal) {
   if (proms.length) await Promise.all(proms);
   if (logsProgress.length) await Promise.all(logsProgress);
 
-  // Resetar energia + verificar sobrecarga/burnout (apenas para NPCs ativos)
-  const fProms    = [];
-  const logsBurn  = [];
+  // Resetar energia + verificar sobrecarga/burnout + atualizar feedback (NPCs ativos)
+  const fProms     = [];
+  const logsBurn   = [];
+  const rankingData = []; // coleta para ordenar depois
   for (const fd of fSnap.docs) {
     const f = fd.data();
     if (f.tipo !== 'npc') continue;
@@ -215,12 +257,23 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal) {
       novosMeses = 0;
     }
 
-    // Salvar total real (visível na UI) + marcar mês para não double-count em designações futuras
-    // O campo mes_energia indica a que mês pertence energia_npc_usada_mes
     const proximoMes = (mesGlobal || 0) + 1;
 
-    // Atualizar feedback_ruim_acumulado e recalcular estresse
-    const feedbackBase = f.feedback_ruim_acumulado || 0;
+    // Feedback: atualiza média acumulada e estrelas
+    const nProcsMes      = completedByNpc[fd.id] || 0;
+    const feedEfeitoMes  = feedbackByNpc[fd.id]  || 0;
+    let novaMediaAcum   = f.feedback_media_acumulada || 0;
+    let novaMediaEst    = f.feedback_media_estrelas  || 3;
+    let novaRepInterna  = f.reputacao_interna || 50;
+    if (nProcsMes > 0) {
+      const efMed = feedEfeitoMes / nProcsMes;
+      novaMediaAcum   = Math.max(-2, Math.min(2, novaMediaAcum * 0.7 + efMed * 0.3));
+      novaMediaEst    = _efeitoParaEstrelas(novaMediaAcum);
+      novaRepInterna  = Math.max(0, Math.min(100, novaRepInterna + (efMed >= 1 ? 10 : efMed <= -1 ? -5 : 0)));
+    }
+
+    // Estresse: conflitos + feedback ruim acumulado + sobrecarga
+    const feedbackBase     = f.feedback_ruim_acumulado || 0;
     const novoFeedbackRuim = Math.max(0, feedbackBase + (feedbackDelta[fd.id] || 0));
     const conflitosAtivos  = (f.conflitos_ativos || []).length;
     const novoEstresse = Math.min(100,
@@ -229,20 +282,113 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal) {
       (sobrecarg ? 10 : 0)
     );
 
+    // Coletar para ranking mensal
+    const casosRanking = nProcsMes + (f.casos_resolvidos_mes || 0);
+    const vitorias     = winsByNpc[fd.id] || 0;
+    const taxaS        = casosRanking > 0 ? vitorias / casosRanking : 0;
+    const rankScore    = (casosRanking * 10) + (novaMediaAcum * 15) + (taxaS * 5);
+    rankingData.push({ id: fd.id, ref: fd.ref, f, rankScore, casosRanking });
+
     fProms.push(fd.ref.update({
-      energia_npc_usada_mes:    npcUsado,   // total real: designações + processos
-      mes_energia:              proximoMes, // marca próximo mês como "limpo"
+      energia_npc_usada_mes:    npcUsado,
+      mes_energia:              proximoMes,
       meses_sobrecarregado:     novosMeses,
       burnout_npc:              burnoutNPC,
       burnout_npc_restante:     burnoutRest,
       meses_no_cargo:           (f.meses_no_cargo || 0) + 1,
       casos_resolvidos_mes:     0,
+      casos_resolvidos_total:   (f.casos_resolvidos_total || 0) + nProcsMes,
       feedback_ruim_acumulado:  novoFeedbackRuim,
+      feedback_media_acumulada: novaMediaAcum,
+      feedback_media_estrelas:  novaMediaEst,
+      reputacao_interna:        novaRepInterna,
       estresse:                 novoEstresse,
     }));
   }
   if (fProms.length) await Promise.all(fProms);
   if (logsBurn.length) await Promise.all(logsBurn);
+
+  // ── Competição Mensal — Ranking entre NPCs ──────────────────────────────────
+  if (rankingData.length >= 2) {
+    const FV = require('firebase-admin/firestore').FieldValue;
+    rankingData.sort((a, b) => b.rankScore - a.rankScore);
+
+    const CARGO_CAP_SKL = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
+    const rankProms = [];
+    const rankLogs  = [];
+
+    const _bumpSkill = (npc, pts) => {
+      const sk  = _escolherSkillBonus(npc);
+      const cap = CARGO_CAP_SKL[npc.cargo_id] || 35;
+      const val = Math.min(cap, ((npc.skills || {})[sk] || 0) + pts);
+      return { field: `skills.${sk}`, val, skLabel: _SKL_LABEL[sk] || sk };
+    };
+
+    // 1º lugar: +5k caixa + skill +3
+    const r1 = rankingData[0];
+    if (r1.casosRanking > 0) {
+      const { field, val, skLabel } = _bumpSkill(r1.f, 3);
+      rankProms.push(r1.ref.update({ [field]: val,
+        ultimos_positions_ranking: [1, ...((r1.f.ultimos_positions_ranking || []).slice(0, 5))],
+        questiona_permanencia: false,
+      }));
+      rankProms.push(escRef.update({ caixa: FV.increment(5000) }));
+      rankLogs.push(_logGestaoCF(escRef,
+        `🏆 ${r1.f.nome} ficou em 1º lugar este mês! +R$5.000 ao caixa · ${skLabel} +3.`));
+    }
+
+    // 2º lugar: +2k caixa + skill +2
+    if (rankingData[1]) {
+      const r2 = rankingData[1];
+      if (r2.casosRanking > 0) {
+        const { field, val, skLabel } = _bumpSkill(r2.f, 2);
+        rankProms.push(r2.ref.update({ [field]: val,
+          ultimos_positions_ranking: [2, ...((r2.f.ultimos_positions_ranking || []).slice(0, 5))],
+          questiona_permanencia: false,
+        }));
+        rankProms.push(escRef.update({ caixa: FV.increment(2000) }));
+        rankLogs.push(_logGestaoCF(escRef,
+          `🥈 ${r2.f.nome} ficou em 2º lugar! +R$2.000 ao caixa · ${skLabel} +2.`));
+      }
+    }
+
+    // 3º lugar: +500 caixa
+    if (rankingData[2]) {
+      const r3 = rankingData[2];
+      if (r3.casosRanking > 0) {
+        rankProms.push(r3.ref.update({
+          ultimos_positions_ranking: [3, ...((r3.f.ultimos_positions_ranking || []).slice(0, 5))],
+          questiona_permanencia: false,
+        }));
+        rankProms.push(escRef.update({ caixa: FV.increment(500) }));
+        rankLogs.push(_logGestaoCF(escRef, `🥉 ${r3.f.nome} ficou em 3º lugar! +R$500 ao caixa.`));
+      }
+    }
+
+    // Último lugar: streak de penalidade
+    const rUlt = rankingData[rankingData.length - 1];
+    if (rUlt && rUlt.id !== rankingData[0].id) {
+      const posAtual = rankingData.length;
+      const histPos  = rUlt.f.ultimos_positions_ranking || [];
+      const novoHist = [posAtual, ...histPos.slice(0, 5)];
+      const streak   = novoHist.filter(p => p === posAtual).length;
+      const updUlt   = { ultimos_positions_ranking: novoHist };
+
+      if (streak >= 6) {
+        updUlt.questiona_permanencia = true;
+        rankLogs.push(_logGestaoCF(escRef,
+          `⚠️ ${rUlt.f.nome} está há ${streak} meses em último — questionando permanência no escritório.`));
+      } else if (streak >= 3) {
+        updUlt.estresse = Math.min(100, (rUlt.f.estresse || 0) + 15);
+        rankLogs.push(_logGestaoCF(escRef,
+          `⚠️ ${rUlt.f.nome} está há ${streak} meses em último lugar — aviso: +15 estresse.`));
+      }
+      rankProms.push(rUlt.ref.update(updUlt));
+    }
+
+    if (rankProms.length) await Promise.all(rankProms);
+    if (rankLogs.length)  await Promise.all(rankLogs);
+  }
 }
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
