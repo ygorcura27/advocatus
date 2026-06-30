@@ -116,6 +116,15 @@ function _barraProgresso(pct) {
   </div>`;
 }
 
+function _poolSomarMeses(m, a, delta) {
+  const total = (a * 12 + m) + delta;
+  return { mes: total % 12, ano: Math.floor(total / 12) };
+}
+function _poolMesTotal(m, a) { return (a || 1) * 12 + (m || 0); }
+
+// Contexto preservado entre _processarSentenca e os handlers do modal
+let _sentencaPoolCtx = null;
+
 // ─── Checagem de energia do NPC ───────────────────────────────────────────────
 
 function _npcEnergiaBadge(func) {
@@ -162,7 +171,7 @@ window.renderProcessosPool = async function(j, escId, el) {
       const recSnap = await getDocs(query(
         collection(db, 'processos'),
         where('pool_escritorio_id', '==', escId),
-        where('status', 'in', ['recurso_pendente', 'aguardando_decisao_recurso'])
+        where('status', 'in', ['recurso_pendente', 'aguardando_decisao_recurso', 'aguardando_decisao_sentenca'])
       ));
       recursais = recSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     } catch (e) { /* sem índice ainda — deixa vazio */ }
@@ -220,7 +229,8 @@ window.renderProcessosPool = async function(j, escId, el) {
     const col1Html = _renderColPool(disponiveis, emAndamento, aguardSent, j, escId);
 
     // Coluna 2 — fase recursal
-    const col2Html = _renderColRecursal(recursais);
+    const mesAtualTotal = _poolMesTotal(j.mes_pessoal, j.ano_pessoal);
+    const col2Html = _renderColRecursal(recursais, mesAtualTotal);
 
     // Coluna 3 — histórico
     const col3Html = _renderColHistorico(historico);
@@ -400,7 +410,7 @@ function _renderColPool(disponiveis, emAndamento, aguardSent, j, escId) {
 
 // ─── Coluna 2: Fase recursal ──────────────────────────────────────────────────
 
-function _renderColRecursal(recursais) {
+function _renderColRecursal(recursais, mesAtualTotal) {
   if (!recursais.length) {
     return `<div style="font-size:.75rem;color:var(--txt3);padding:.5rem 0;text-align:center">
       Nenhum processo em fase recursal.
@@ -408,7 +418,7 @@ function _renderColRecursal(recursais) {
   }
 
   return recursais.map(p => {
-    if (p.status === 'aguardando_decisao_recurso') {
+    if (p.status === 'aguardando_decisao_recurso' || p.status === 'aguardando_decisao_sentenca') {
       return `
       <div class="proc-recursal-row">
         <div style="font-size:.6rem;color:var(--txt4);font-family:monospace">${p.numero||'—'}</div>
@@ -427,15 +437,35 @@ function _renderColRecursal(recursais) {
       </div>`;
     }
     const label = p.quem_recorre === 'jogador' ? 'Você recorreu' : 'Parte contrária recorreu';
+    const labelBtn = p.quem_recorre === 'jogador' ? '⚖️ Sustentar Recurso' : '🛡️ Defender Sentença';
+
+    const dispMes = p.data_disponivel_recurso?.mes;
+    const dispAno = p.data_disponivel_recurso?.ano;
+    const disponivel = (dispMes !== undefined && dispAno !== undefined)
+      ? _poolMesTotal(dispMes, dispAno) <= mesAtualTotal
+      : true;
+
+    const prazoMes = p.prazo_final_recurso?.mes;
+    const prazoAno = p.prazo_final_recurso?.ano;
+    const restante = (prazoMes !== undefined && prazoAno !== undefined)
+      ? _poolMesTotal(prazoMes, prazoAno) - mesAtualTotal
+      : null;
+    const prazoExpirado = restante !== null && restante < 0;
+
     return `
     <div class="proc-recursal-row">
       <div style="font-size:.6rem;color:var(--txt4);font-family:monospace">${p.numero||'—'}</div>
       <div style="font-size:.75rem;font-weight:600;color:var(--navy);margin:.1rem 0">${p.autor||'—'} vs ${p.reu||'—'}</div>
       <div style="font-size:.63rem;color:var(--txt4)">${label} · ${p.instancia_seguinte||'—'}</div>
-      <button class="btn btn-sm btn-prim btn-block" style="margin-top:.4rem;font-size:.62rem"
-        onclick="window.jogarRecursoProducao && window.jogarRecursoProducao('${p.id}')">
-        ⚖️ Sustentar Recurso
-      </button>
+      ${disponivel
+        ? `<div style="font-size:.6rem;color:${prazoExpirado?'var(--verm2)':'var(--txt4)'};margin-top:.2rem">
+             Prazo: ${prazoExpirado ? '⚠️ EXPIRADO' : restante !== null ? restante + ' mês(es) restante(s)' : '—'}
+           </div>
+           <button class="btn btn-sm btn-prim btn-block" style="margin-top:.4rem;font-size:.62rem"
+             onclick="window.jogarRecursoProducao && window.jogarRecursoProducao('${p.id}')">
+             ${labelBtn} — ${p.instancia_seguinte||'TJ'}
+           </button>`
+        : `<div style="font-size:.6rem;color:var(--txt4);margin-top:.3rem">⏳ Aguardando movimentação judicial...</div>`}
     </div>`;
   }).join('');
 }
@@ -781,49 +811,232 @@ window._processarSentenca = async function(escId, procId, uid) {
     : resultado === 'parcial' ? Math.round(hon * 0.55)
     : Math.round(hon * 0.1);
 
-  const resultadoLabel = {
-    procedente: '✅ Procedente!',
-    parcial:    '🟡 Parcialmente procedente',
-    improcedente: '❌ Improcedente',
-  }[resultado];
+  if (resultado === 'procedente') {
+    const quemAtuou = proc.func_nome || 'A equipe';
+    try {
+      await Promise.all([
+        updateDoc(doc(db, 'jogadores', uid), { energia_usada_mes: energiaUsada + CUSTO_SENT }),
+        updateDoc(doc(db, 'escritorios', escId), {
+          caixa: increment(valorRecebido),
+          faturamento_mes_atual: increment(valorRecebido),
+        }),
+        updateDoc(doc(db, 'escritorios', escId, 'processos_pool', procId), {
+          status: 'concluido', resultado, valor_recebido: valorRecebido,
+          concluido_em: new Date().toISOString(),
+        }),
+        proc.func_id
+          ? updateDoc(doc(db, 'escritorios', escId, 'funcionarios', proc.func_id), { processo_id: null })
+          : Promise.resolve(),
+        addDoc(collection(db, 'escritorios', escId, 'log_gestao'), {
+          texto: `✅ ${quemAtuou} obteve sentença favorável em "${proc.titulo}". +${_fmtP(valorRecebido)}.`,
+          criado_em: new Date().toISOString(),
+        }),
+      ]);
+      j.energia_usada_mes = energiaUsada + CUSTO_SENT;
+      window.JOGADOR = j;
+      toast(`✅ Procedente! +${_fmtP(valorRecebido)} no caixa.`, 'ok');
+      const elPool = document.getElementById('esc-processos-bloco');
+      if (elPool) window.renderProcessosPool(j, escId, elPool);
+    } catch (e) {
+      console.error('[SENTENÇA PROCEDENTE]', e);
+      toast('Erro ao processar sentença.', 'ko');
+    }
+    return;
+  }
 
-  const quemAtuou = proc.assumido_uid ? (j.nome_personagem || 'Você') : (proc.func_nome || 'A equipe');
-  const logResultado = {
-    procedente:   `✅ ${quemAtuou} obteve sentença favorável em "${proc.titulo}". +${_fmtP(valorRecebido)}.`,
-    parcial:      `🟡 ${quemAtuou} obteve sentença parcialmente favorável em "${proc.titulo}". +${_fmtP(valorRecebido)}.`,
-    improcedente: `❌ ${quemAtuou} perdeu o caso "${proc.titulo}" (sentença desfavorável). +${_fmtP(valorRecebido)}.`,
-  }[resultado];
+  // Resultado desfavorável (parcial ou improcedente) — mostrar convencimento final
+  const isParcial = resultado === 'parcial';
 
+  // Para parcial: chance do adversário recorrer (~65% — equivalente ao manual para score ~65)
+  const opponentAppealed = isParcial && (Math.random() < 0.65);
+
+  _sentencaPoolCtx = { escId, procId, uid, proc, resultado, valorRecebido, energiaUsada, custo: CUSTO_SENT, j };
+
+  const resultadoLabel = isParcial ? '🟡 Parcialmente Procedente' : '❌ Improcedente';
+  const resultadoCor   = isParcial ? 'var(--amber)' : 'var(--verm2)';
+
+  let botoesHtml;
+  if (isParcial && opponentAppealed) {
+    _sentencaPoolCtx.opponentAppealed = true;
+    botoesHtml = `
+      <div style="background:rgba(239,159,39,.1);border:1px solid rgba(239,159,39,.3);border-radius:6px;padding:.6rem;margin-bottom:.8rem;font-size:.75rem;color:var(--amber)">
+        ⚠️ A parte contrária decidiu recorrer desta sentença. O processo vai ao Tribunal de Justiça.
+      </div>
+      <button class="btn btn-prim btn-block" onclick="window._poolModalRecorrerContrario()">OK — Ver na Fase Recursal</button>`;
+  } else if (isParcial) {
+    _sentencaPoolCtx.opponentAppealed = false;
+    botoesHtml = `
+      <div style="font-size:.73rem;color:var(--txt4);margin-bottom:.9rem">
+        A parte contrária aceitou o resultado. Deseja recorrer buscando decisão mais favorável?
+      </div>
+      <div style="display:flex;gap:.5rem">
+        <button class="btn btn-prim" style="flex:1" onclick="window._poolModalRecorrer()">⚖️ Recorrer</button>
+        <button class="btn btn-ghost" style="flex:1" onclick="window._poolModalAceitar()">Aceitar resultado</button>
+      </div>`;
+  } else {
+    botoesHtml = `
+      <div style="font-size:.73rem;color:var(--txt4);margin-bottom:.9rem">
+        Deseja recorrer desta sentença?
+      </div>
+      <div style="display:flex;gap:.5rem">
+        <button class="btn btn-prim" style="flex:1" onclick="window._poolModalRecorrer()">⚖️ Recorrer da decisão</button>
+        <button class="btn btn-ghost" style="flex:1" onclick="window._poolModalAceitar()">Aceitar e encerrar</button>
+      </div>`;
+  }
+
+  abrirModal('⚖️ Convencimento Final',
+    `<div style="text-align:center;margin-bottom:1rem">
+       <div style="font-size:1.6rem">${isParcial ? '🟡' : '❌'}</div>
+       <div style="font-weight:700;font-size:.88rem;color:${resultadoCor};margin:.25rem 0">${resultadoLabel}</div>
+       <div style="font-size:.72rem;color:var(--txt3)">"${proc.titulo}"</div>
+     </div>
+     <div style="font-size:.75rem;color:var(--txt3);margin-bottom:.7rem">
+       Honorários recebidos (provisório): <strong style="color:var(--verde2)">+${_fmtP(valorRecebido)}</strong>
+     </div>
+     ${botoesHtml}`
+  );
+};
+
+window._poolModalAceitar = async function() {
+  const ctx = _sentencaPoolCtx;
+  if (!ctx) return;
+  _sentencaPoolCtx = null;
+  const quemAtuou = ctx.proc.func_nome || 'A equipe';
+  const ico = ctx.resultado === 'parcial' ? '🟡' : '❌';
   try {
     await Promise.all([
-      updateDoc(doc(db, 'jogadores', uid), { energia_usada_mes: energiaUsada + CUSTO_SENT }),
-      updateDoc(doc(db, 'escritorios', escId), {
-        caixa: increment(valorRecebido),
-        faturamento_mes_atual: increment(valorRecebido),
+      updateDoc(doc(db, 'jogadores', ctx.uid), { energia_usada_mes: ctx.energiaUsada + ctx.custo }),
+      updateDoc(doc(db, 'escritorios', ctx.escId), {
+        caixa: increment(ctx.valorRecebido),
+        faturamento_mes_atual: increment(ctx.valorRecebido),
       }),
-      updateDoc(doc(db, 'escritorios', escId, 'processos_pool', procId), {
-        status: 'concluido',
-        resultado,
-        valor_recebido: valorRecebido,
-        concluido_em: new Date().toISOString(),
+      updateDoc(doc(db, 'escritorios', ctx.escId, 'processos_pool', ctx.procId), {
+        status: 'concluido', resultado: ctx.resultado,
+        valor_recebido: ctx.valorRecebido, concluido_em: new Date().toISOString(),
       }),
-      proc.func_id
-        ? updateDoc(doc(db, 'escritorios', escId, 'funcionarios', proc.func_id), { processo_id: null })
+      ctx.proc.func_id
+        ? updateDoc(doc(db, 'escritorios', ctx.escId, 'funcionarios', ctx.proc.func_id), { processo_id: null })
         : Promise.resolve(),
-      addDoc(collection(db, 'escritorios', escId, 'log_gestao'), {
-        texto: logResultado, criado_em: new Date().toISOString(),
+      addDoc(collection(db, 'escritorios', ctx.escId, 'log_gestao'), {
+        texto: `${ico} ${quemAtuou} — sentença ${ctx.resultado} em "${ctx.proc.titulo}". +${_fmtP(ctx.valorRecebido)}. Encerrado sem recurso.`,
+        criado_em: new Date().toISOString(),
       }),
     ]);
-
-    j.energia_usada_mes = energiaUsada + CUSTO_SENT;
-    window.JOGADOR = j;
-    toast(`${resultadoLabel} +${_fmtP(valorRecebido)} no caixa.`, resultado === 'improcedente' ? 'ko' : 'ok');
-
+    ctx.j.energia_usada_mes = ctx.energiaUsada + ctx.custo;
+    window.JOGADOR = ctx.j;
+    fecharModal();
+    toast(`${ico} Sentença aceita. +${_fmtP(ctx.valorRecebido)} no caixa.`, ctx.resultado === 'parcial' ? 'neutro' : 'ko');
     const elPool = document.getElementById('esc-processos-bloco');
-    if (elPool) window.renderProcessosPool(j, escId, elPool);
+    if (elPool) window.renderProcessosPool(ctx.j, ctx.escId, elPool);
   } catch (e) {
-    console.error('[SENTENÇA]', e);
-    toast('Erro ao processar sentença.', 'ko');
+    console.error('[ACEITAR POOL]', e);
+    toast('Erro ao encerrar processo.', 'ko');
+  }
+};
+
+async function _criarProcessoRecursalPool(ctx, quemRecorre) {
+  const j = ctx.j;
+  const bloq = 2 + Math.floor(Math.random() * 2);
+  const dataDisponivel = _poolSomarMeses(j.mes_pessoal || 0, j.ano_pessoal || 1, bloq);
+  const jan  = 2 + Math.floor(Math.random() * 2);
+  const prazoFinal = _poolSomarMeses(dataDisponivel.mes, dataDisponivel.ano, jan);
+  const scoreAnterior = ctx.resultado === 'parcial' ? 65 : 38;
+
+  const newProcRef = await addDoc(collection(db, 'processos'), {
+    titulo: ctx.proc.titulo || 'Processo',
+    autor:  ctx.proc.cliente_nome || 'Cliente',
+    reu:    'Parte contrária',
+    tipo:   ctx.proc.area || 'Cível',
+    numero: ctx.procId,
+    tribunal: 'TJRJ',
+    valor: ctx.proc.honorarios || 0,
+    fatos_narrativa: [], teses_selecionadas: [],
+    status: 'recurso_pendente',
+    pool_escritorio_id:  ctx.escId,
+    pool_proc_subcol_id: ctx.procId,
+    pool_proc_esc_id:    ctx.escId,
+    advogado_uid: ctx.uid,
+    instancia_atual:    '1grau',
+    instancia_seguinte: 'TJ',
+    quem_recorre: quemRecorre,
+    score_anterior: scoreAnterior,
+    hon_pendente: ctx.valorRecebido,
+    data_disponivel_recurso: dataDisponivel,
+    prazo_final_recurso:     prazoFinal,
+    criado_em: new Date().toISOString(),
+  });
+  return newProcRef.id;
+}
+
+window._poolModalRecorrer = async function() {
+  const ctx = _sentencaPoolCtx;
+  if (!ctx) return;
+  _sentencaPoolCtx = null;
+  try {
+    const newProcId = await _criarProcessoRecursalPool(ctx, 'jogador');
+    await Promise.all([
+      updateDoc(doc(db, 'jogadores', ctx.uid), { energia_usada_mes: ctx.energiaUsada + ctx.custo }),
+      updateDoc(doc(db, 'escritorios', ctx.escId), {
+        caixa: increment(ctx.valorRecebido),
+        faturamento_mes_atual: increment(ctx.valorRecebido),
+      }),
+      updateDoc(doc(db, 'escritorios', ctx.escId, 'processos_pool', ctx.procId), {
+        status: 'recurso_pendente', resultado: ctx.resultado,
+        valor_recebido: ctx.valorRecebido, processo_ref: newProcId,
+      }),
+      ctx.proc.func_id
+        ? updateDoc(doc(db, 'escritorios', ctx.escId, 'funcionarios', ctx.proc.func_id), { processo_id: null })
+        : Promise.resolve(),
+      addDoc(collection(db, 'escritorios', ctx.escId, 'log_gestao'), {
+        texto: `⚖️ Recurso protocolado em "${ctx.proc.titulo}" (sentença ${ctx.resultado}). Aguardando julgamento no TJ.`,
+        criado_em: new Date().toISOString(),
+      }),
+    ]);
+    ctx.j.energia_usada_mes = ctx.energiaUsada + ctx.custo;
+    window.JOGADOR = ctx.j;
+    fecharModal();
+    toast('⚖️ Recurso protocolado. Acompanhe na aba Fase Recursal.', 'ok', 4000);
+    const elPool = document.getElementById('esc-processos-bloco');
+    if (elPool) window.renderProcessosPool(ctx.j, ctx.escId, elPool);
+  } catch (e) {
+    console.error('[RECORRER POOL]', e);
+    toast('Erro ao protocolar recurso.', 'ko');
+  }
+};
+
+window._poolModalRecorrerContrario = async function() {
+  const ctx = _sentencaPoolCtx;
+  if (!ctx) return;
+  _sentencaPoolCtx = null;
+  try {
+    const newProcId = await _criarProcessoRecursalPool(ctx, 'parte_contraria');
+    await Promise.all([
+      updateDoc(doc(db, 'jogadores', ctx.uid), { energia_usada_mes: ctx.energiaUsada + ctx.custo }),
+      updateDoc(doc(db, 'escritorios', ctx.escId), {
+        caixa: increment(ctx.valorRecebido),
+        faturamento_mes_atual: increment(ctx.valorRecebido),
+      }),
+      updateDoc(doc(db, 'escritorios', ctx.escId, 'processos_pool', ctx.procId), {
+        status: 'recurso_pendente', resultado: ctx.resultado,
+        valor_recebido: ctx.valorRecebido, processo_ref: newProcId,
+      }),
+      ctx.proc.func_id
+        ? updateDoc(doc(db, 'escritorios', ctx.escId, 'funcionarios', ctx.proc.func_id), { processo_id: null })
+        : Promise.resolve(),
+      addDoc(collection(db, 'escritorios', ctx.escId, 'log_gestao'), {
+        texto: `⚠️ Parte contrária recorreu da sentença parcial em "${ctx.proc.titulo}". Você deverá defender no TJ.`,
+        criado_em: new Date().toISOString(),
+      }),
+    ]);
+    ctx.j.energia_usada_mes = ctx.energiaUsada + ctx.custo;
+    window.JOGADOR = ctx.j;
+    fecharModal();
+    toast('⚠️ Parte contrária recorreu. Processo na Fase Recursal.', 'neutro', 4000);
+    const elPool = document.getElementById('esc-processos-bloco');
+    if (elPool) window.renderProcessosPool(ctx.j, ctx.escId, elPool);
+  } catch (e) {
+    console.error('[RECURSO CONTRÁRIO POOL]', e);
+    toast('Erro ao registrar recurso adversarial.', 'ko');
   }
 };
 

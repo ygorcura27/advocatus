@@ -468,6 +468,57 @@ function mesTotalPessoal(mesPessoal, anoPessoal) {
   return (anoPessoal||1)*12 + (mesPessoal||0);
 }
 
+// ── Prazo recursal pool: -2 reputação do jogador se o recurso expirar sem ser jogado ──
+async function _verificarPrazosRecursaisPoolCF(db, escId, uid, updates, novoMes, novoAno) {
+  const novoMesTotal = (novoAno || 1) * 12 + (novoMes || 0);
+  const snap = await db.collection('processos')
+    .where('pool_escritorio_id', '==', escId)
+    .where('status', '==', 'recurso_pendente')
+    .get();
+
+  if (snap.empty) return;
+
+  const proms = [];
+  for (const procDoc of snap.docs) {
+    const p = procDoc.data();
+    if (!p.prazo_final_recurso) continue;
+    const prazoTotal = (p.prazo_final_recurso.ano || 1) * 12 + (p.prazo_final_recurso.mes || 0);
+    if (novoMesTotal <= prazoTotal) continue;
+
+    // Prazo expirado — finalizar como perdido
+    proms.push(procDoc.ref.update({
+      status: 'perdido',
+      encerrado_mes: novoMesTotal,
+      prazo_expirado: true,
+    }));
+
+    // Atualizar pool subcol se vinculado
+    if (p.pool_proc_subcol_id && p.pool_proc_esc_id) {
+      proms.push(
+        db.collection('escritorios').doc(p.pool_proc_esc_id)
+          .collection('processos_pool').doc(p.pool_proc_subcol_id)
+          .update({ status: 'concluido', resultado: 'improcedente', prazo_expirado: true })
+      );
+    }
+
+    // Log no diário da gestão
+    proms.push(
+      db.collection('escritorios').doc(escId)
+        .collection('log_gestao')
+        .add({
+          texto: `⏰ Prazo recursal expirado em "${p.titulo || p.autor || 'processo'}". Encerrado sem sustentação. −2 reputação.`,
+          criado_em: new Date().toISOString(),
+        })
+    );
+
+    // -2 reputação do jogador (acumulado em updates para o _commit)
+    const repAtual = updates.reputacao ?? 30;
+    updates.reputacao = Math.max(0, repAtual - 2);
+  }
+
+  if (proms.length) await Promise.all(proms);
+}
+
 // ════════════════════════════════════════════════════════
 // CALLABLE PRINCIPAL
 // ════════════════════════════════════════════════════════
@@ -846,6 +897,15 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
     await _processarRelacionamentosMensalCF(db, uid, j, { mes_pessoal: novoMes, ano_pessoal: novoAno }, updates.idade);
   } catch (e) {
     logger.warn('Erro no processamento mensal de relacionamentos:', e.message);
+  }
+
+  // ── PRAZOS RECURSAIS DO POOL (processos do escritório via _processarSentenca) ──
+  if (j.escritorio_proprio_id) {
+    try {
+      await _verificarPrazosRecursaisPoolCF(db, j.escritorio_proprio_id, uid, updates, novoMes, novoAno);
+    } catch (e) {
+      logger.warn('Erro ao verificar prazos recursais do pool:', e.message);
+    }
   }
 
   await _commit(db, uid, updates, mensagens, novoMes, novoAno);
