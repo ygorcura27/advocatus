@@ -212,12 +212,20 @@ service cloud.firestore {
       // Criação: o próprio advogado (caso individual) OU qualquer
       // dono/sócio/funcionário do escritório (caso de pool, onde
       // advogado_uid é null por design).
+      // _criarProcessoRecursalPool cria direto com status 'recurso_pendente'
+      // (já existe sentença, fase recursal começa do zero sem 'andamento').
       allow create: if isAuth()
-        && request.resource.data.status == 'andamento'
-        && request.resource.data.progresso == 0
         && (
-          request.resource.data.advogado_uid == request.auth.uid
-          || vinculadoAoEscritorioDoProcesso(request.resource.data)
+          // Processo novo (provas → teses → audiência)
+          (request.resource.data.status == 'andamento'
+           && request.resource.data.progresso == 0
+           && (
+             request.resource.data.advogado_uid == request.auth.uid
+             || vinculadoAoEscritorioDoProcesso(request.resource.data)
+           ))
+          // Processo recursal do pool (gerado após sentença, fase TJ)
+          || (request.resource.data.status == 'recurso_pendente'
+              && request.resource.data.advogado_uid == request.auth.uid)
         );
 
       // Update: o próprio advogado (caso individual) OU qualquer
