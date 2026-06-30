@@ -1137,6 +1137,7 @@ window._confirmarMentoria = async function(mentorId, escId) {
   const aprendizData = aprendizSnap.data();
   const mentorData   = mentorSnap.data();
 
+  const skillLabel = _SKILL_FULL_LBL[skill] || skill;
   await Promise.all([
     updateDoc(mentorRef,   { aprendizes_ids: [...(mentorData.aprendizes_ids||[]), aprendizId] }),
     updateDoc(aprendizRef, {
@@ -1145,10 +1146,14 @@ window._confirmarMentoria = async function(mentorId, escId) {
       skill_sendo_treinada:    skill,
       meses_mentoria_restantes: dur,
     }),
+    addDoc(collection(db, 'escritorios', escId, 'log_gestao'), {
+      texto: `🎓 Mentoria iniciada: ${mentorData.nome} → ${aprendizData.nome} (${skillLabel}, ${dur} meses).`,
+      criado_em: new Date().toISOString(),
+    }),
   ]);
 
   fecharModal();
-  toast(`🎓 Mentoria iniciada: ${mentorData.nome} → ${aprendizData.nome} (${_SKILL_FULL_LBL[skill]||skill}, ${dur} meses)`, 'ok', 5000);
+  toast(`🎓 Mentoria iniciada: ${mentorData.nome} → ${aprendizData.nome} (${skillLabel}, ${dur} meses)`, 'ok', 5000);
   setTimeout(() => window.navTo && window.navTo('equipe', null), 600);
 };
 
