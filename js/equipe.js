@@ -173,9 +173,9 @@ window.renderEquipe = async function(j, el) {
 
     <!-- Pane: Equipe -->
     <div class="equipe-tab-pane" data-tab="equipe" ${_activeEquipeTab==='diario'?'style="display:none"':''}>
-      ${_renderGrupo('🎓 Estagiários', estagiarios, cap.estagiarios, 'est', escId, energiaDisp, procCountEquipe)}
-      ${_renderGrupo('📋 Assistentes', assistentes, cap.assistentes, 'ass', escId, energiaDisp, procCountEquipe)}
-      ${_renderGrupo('⚖️ Advogados', advogados, cap.advogados, 'jnr', escId, energiaDisp, procCountEquipe)}
+      ${_renderGrupo('🎓 Estagiários', estagiarios, cap.estagiarios, 'est', escId, energiaDisp, procCountEquipe, esc.mes_global || 0)}
+      ${_renderGrupo('📋 Assistentes', assistentes, cap.assistentes, 'ass', escId, energiaDisp, procCountEquipe, esc.mes_global || 0)}
+      ${_renderGrupo('⚖️ Advogados', advogados, cap.advogados, 'jnr', escId, energiaDisp, procCountEquipe, esc.mes_global || 0)}
       ${await _renderProcessosPendentesRevisao(j, escId)}
     </div>
 
@@ -185,7 +185,7 @@ window.renderEquipe = async function(j, el) {
     </div>`;
 };
 
-function _renderGrupo(titulo, membros, vagas, cargo_min, escId, energiaDisp, procCount = {}) {
+function _renderGrupo(titulo, membros, vagas, cargo_min, escId, energiaDisp, procCount = {}, mesGlobal = 0) {
   const ci = CARGO_INFO[cargo_min] || CARGO_INFO.est;
   return `
     <div style="margin-bottom:1.2rem">
@@ -200,12 +200,23 @@ function _renderGrupo(titulo, membros, vagas, cargo_min, escId, energiaDisp, pro
       </div>
       ${membros.length === 0
         ? `<div style="font-size:.75rem;color:var(--txt4);padding:.5rem 0">Nenhum ${titulo.split(' ')[1].toLowerCase()} contratado ainda.</div>`
-        : membros.map(f => _cardFuncionario(f, escId, energiaDisp, procCount)).join('')}
+        : membros.map(f => _cardFuncionario(f, escId, energiaDisp, procCount, mesGlobal)).join('')}
     </div>`;
 }
 
 const _SKILL_CAP_EQ = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
 const _CARGO_BON_EQ = { est:0,  ass:5,  jnr:10, pln:15, snr:20, asc:25, soc:30  };
+
+const _CARGO_MENTOR_EQ   = new Set(['pln','snr','asc','soc']);
+const _CARGO_APRENDIZ_EQ = new Set(['est','ass','jnr']);
+const _CARGO_PROX_EQ     = { est:'ass', ass:'jnr', jnr:'pln', pln:'snr', snr:'asc', asc:'soc' };
+const _CARGO_SAL_MIN_EQ  = { est:1700, ass:2500, jnr:3500, pln:5750, snr:9000, asc:18000, soc:35000 };
+const _CARGO_SAL_MAX_EQ  = { est:1700, ass:3500, jnr:6500, pln:11000, snr:20000, asc:35000, soc:65000 };
+const _SKILL_FULL_LBL    = {
+  pesquisa:'Pesquisa', escrita:'Escrita', escrita_juridica:'Escrita Jur.',
+  argumentacao:'Argumentação', oratoria:'Oratória', persuasao:'Persuasão',
+  negociacao:'Negociação', gestao:'Gestão',
+};
 
 function _calcProd(func) {
   const skills = func.skills || {};
@@ -237,7 +248,21 @@ function _calcEfic(func) {
   return Math.round(Math.min(100, (media / (_CARGO_CAP_EQ_EFIC[func.cargo_id]||35)) * 100));
 };
 
-function _cardFuncionario(f, escId, energiaDisp, procCount = {}) {
+function _elegibilidadePromocao(f) {
+  const prox = _CARGO_PROX_EQ[f.cargo_id];
+  if (!prox) return null;
+  const cap_prox   = _SKILL_CAP_EQ[prox] || 0;
+  const skillVals  = Object.values(f.skills || {}).filter(v => typeof v === 'number');
+  const mediaSkill = skillVals.length ? skillVals.reduce((a,b)=>a+b,0)/skillVals.length : 0;
+  const ok_meses   = (f.meses_no_cargo || 0) >= 6;
+  const ok_casos   = (f.casos_resolvidos_total || 0) >= 10;
+  const ok_feedback= (f.feedback_media_estrelas || 3) >= 3.5;
+  const ok_skills  = mediaSkill >= cap_prox * 0.5;
+  return { elegivel: ok_meses && ok_casos && ok_feedback && ok_skills,
+    prox, ok_meses, ok_casos, ok_feedback, ok_skills };
+}
+
+function _cardFuncionario(f, escId, energiaDisp, procCount = {}, mesGlobal = 0) {
   const ci    = CARGO_INFO[f.cargo_id] || CARGO_INFO.est;
   const skills = f.skills || {};
   const prod   = _calcProd(f);
@@ -307,6 +332,49 @@ function _cardFuncionario(f, escId, energiaDisp, procCount = {}) {
               </div>
             </div>`;
           })() : ''}
+          ${f.tipo === 'npc' && f.mentor_id ? (() => {
+            const skLbl = _SKILL_FULL_LBL[f.skill_sendo_treinada] || f.skill_sendo_treinada || '—';
+            return `<div style="font-size:.65rem;color:var(--verde2);margin:.2rem 0;background:var(--verde-bg);padding:.2rem .4rem;border-radius:4px">
+              📚 Aprendiz de ${f.mentor_nome||'mentor'} · ${skLbl} · ${f.meses_mentoria_restantes||0} mês(es)
+            </div>`;
+          })() : ''}
+          ${f.tipo === 'npc' && (f.aprendizes_ids||[]).length > 0 ? `
+            <div style="font-size:.65rem;color:var(--navy3);margin:.2rem 0">
+              🎓 Mentor ativo: ${(f.aprendizes_ids||[]).length} aprendiz(es)
+            </div>` : ''}
+          ${f.tipo === 'npc' && f.em_ferias ? `
+            <div style="font-size:.65rem;color:var(--txt3);margin:.2rem 0;background:var(--bg2);padding:.2rem .4rem;border-radius:4px">
+              🏖️ Em férias este mês
+            </div>` : ''}
+          ${f.tipo === 'npc' && !f.em_ferias && mesGlobal - (f.ultimas_ferias_mes_total ?? 0) >= 12 && (f.meses_no_cargo||0) >= 12 ? `
+            <div style="font-size:.65rem;color:var(--amber);margin:.2rem 0">
+              ✅ Férias disponíveis (${mesGlobal - (f.ultimas_ferias_mes_total ?? 0)} meses sem descanso)
+            </div>` : ''}
+          ${f.tipo === 'npc' && (f.conflitos_ativos||[]).length > 0 ? (() => {
+            return (f.conflitos_ativos||[]).map((c, idx) => {
+              const cor = c.tipo === 'estrutural' ? 'var(--verm2)' : 'var(--amber)';
+              const lbl = c.tipo === 'estrutural' ? '⚠️ Conflito estrutural' : '😤 Desentendimento';
+              return `<div style="font-size:.65rem;color:${cor};margin:.15rem 0;display:flex;justify-content:space-between;align-items:center">
+                <span>${lbl} com ${c.com_nome}</span>
+                ${!c.em_mediacao
+                  ? `<button style="font-size:.55rem;padding:.1rem .3rem;background:${cor};color:#fff;border:none;border-radius:3px;cursor:pointer"
+                      onclick="window.mediarConflito('${f.id}',${idx},'${escId}')">Mediar</button>`
+                  : `<span style="font-size:.55rem;color:var(--verde2)">Em mediação</span>`}
+              </div>`;
+            }).join('');
+          })() : ''}
+          ${f.tipo === 'npc' ? (() => {
+            const promo = _elegibilidadePromocao(f);
+            if (!promo?.elegivel) return '';
+            const proxCi = CARGO_INFO[promo.prox];
+            return `<div style="font-size:.65rem;color:var(--verde2);margin:.2rem 0;background:var(--verde-bg);padding:.2rem .4rem;border-radius:4px">
+              ✨ Elegível para promoção → ${proxCi?.l || promo.prox}
+            </div>`;
+          })() : ''}
+          ${f.tipo === 'npc' && f.aviso_saida ? `
+            <div style="font-size:.65rem;color:var(--verm2);margin:.2rem 0;font-weight:700">
+              🚨 Risco de saída — estresse crítico!
+            </div>` : ''}
           <div style="font-size:.68rem;color:var(--txt4)">
             Salário: <b style="color:var(--verm2)">R$ ${ci.sal.toLocaleString('pt-BR')}/mês</b>
             ${ci.hon_pct > 0 ? ` · Comissão: ${ci.hon_pct*100}% honorários` : ''}
@@ -318,6 +386,18 @@ function _cardFuncionario(f, escId, energiaDisp, procCount = {}) {
             title="${!podeCoordenar?'Energia insuficiente':'Designar processo'}">
             📋 Designar (-${ci.custo_coord}⚡)
           </button>
+          ${f.tipo === 'npc' && _CARGO_MENTOR_EQ.has(f.cargo_id) && !f.burnout_npc && !f.em_ferias && (f.aprendizes_ids||[]).length < 2 ? `
+            <button class="btn btn-sm btn-sec" onclick="window.abrirModalMentoria('${f.id}','${escId}')">
+              🎓 Mentoria
+            </button>` : ''}
+          ${f.tipo === 'npc' && (_elegibilidadePromocao(f)||{}).elegivel ? `
+            <button class="btn btn-sm btn-sec" onclick="window.abrirModalPromover('${f.id}','${escId}')">
+              ✨ Promover
+            </button>` : ''}
+          ${f.tipo === 'npc' && !f.em_ferias && mesGlobal - (f.ultimas_ferias_mes_total ?? 0) >= 12 && (f.meses_no_cargo||0) >= 12 ? `
+            <button class="btn btn-sm btn-sec" onclick="window.concederFerias('${f.id}','${escId}','${f.nome.replace(/'/g,"\\'")}')">
+              🏖️ Férias
+            </button>` : ''}
           <button class="btn btn-sm btn-ghost btn-danger"
             onclick="window.demitirFuncionario('${f.id}','${escId}','${f.nome}')">
             Demitir
@@ -902,4 +982,293 @@ window._enviarConviteJogador = async function(escId) {
 
   fecharModal();
   toast(`✉️ Convite enviado para ${email}!`, 'ok', 4000);
+};
+
+// ════════════════════════════════════════════════════════
+// MENTORIA
+// ════════════════════════════════════════════════════════
+window.abrirModalMentoria = async function(mentorId, escId) {
+  const mentorSnap = await getDoc(doc(db, 'escritorios', escId, 'funcionarios', mentorId));
+  if (!mentorSnap.exists()) return;
+  const mentor = { id: mentorSnap.id, ...mentorSnap.data() };
+
+  const fSnap = await getDocs(collection(db, 'escritorios', escId, 'funcionarios'));
+  const aprendizElegiveis = fSnap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .filter(f => f.tipo === 'npc' && _CARGO_APRENDIZ_EQ.has(f.cargo_id) && !f.mentor_id && !f.burnout_npc && !f.em_ferias && f.id !== mentorId);
+
+  if (!aprendizElegiveis.length) {
+    toast('Não há aprendizes disponíveis (est/ass/jnr sem mentor ativo).', 'ko', 4000);
+    return;
+  }
+
+  const skills = Object.keys(mentor.skills || {});
+  const skillOpts = skills.map(sk => `<option value="${sk}">${_SKILL_FULL_LBL[sk] || sk} (nível ${mentor.skills[sk]})</option>`).join('');
+  const aprendizOpts = aprendizElegiveis.map(f => `<option value="${f.id}">${f.nome} (${(CARGO_INFO[f.cargo_id]||{}).l||f.cargo_id})</option>`).join('');
+
+  abrirModal('🎓 Iniciar Mentoria',
+    `<div style="font-size:.78rem;color:var(--txt3);margin-bottom:.8rem">
+      Mentor: <b>${mentor.nome}</b><br>
+      Até 2 aprendizes · Gasta 30 energia NPC/mês do mentor.
+    </div>
+    <div class="campo"><label>Aprendiz</label>
+      <select id="ment-aprendiz">${aprendizOpts}</select>
+    </div>
+    <div class="campo"><label>Skill a treinar</label>
+      <select id="ment-skill">${skillOpts}</select>
+    </div>
+    <div class="campo"><label>Duração (meses)</label>
+      <select id="ment-dur">
+        ${[3,4,5,6].map(n=>`<option value="${n}">${n} meses</option>`).join('')}
+      </select>
+    </div>
+    <div style="display:flex;gap:.5rem;margin-top:.8rem">
+      <button class="btn btn-ghost" style="flex:1" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-prim" style="flex:1" onclick="window._confirmarMentoria('${mentorId}','${escId}')">Iniciar →</button>
+    </div>`
+  );
+};
+
+window._confirmarMentoria = async function(mentorId, escId) {
+  const aprendizId = document.getElementById('ment-aprendiz')?.value;
+  const skill      = document.getElementById('ment-skill')?.value;
+  const dur        = parseInt(document.getElementById('ment-dur')?.value || '3');
+  if (!aprendizId || !skill) { toast('Selecione aprendiz e skill.', 'ko'); return; }
+
+  const { updateDoc, doc: fdoc, arrayUnion } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+  const mentorRef   = doc(db, 'escritorios', escId, 'funcionarios', mentorId);
+  const aprendizRef = doc(db, 'escritorios', escId, 'funcionarios', aprendizId);
+  const aprendizSnap = await getDoc(aprendizRef);
+  const mentorSnap   = await getDoc(mentorRef);
+  if (!aprendizSnap.exists() || !mentorSnap.exists()) return;
+  const aprendizData = aprendizSnap.data();
+  const mentorData   = mentorSnap.data();
+
+  await Promise.all([
+    updateDoc(mentorRef,   { aprendizes_ids: [...(mentorData.aprendizes_ids||[]), aprendizId] }),
+    updateDoc(aprendizRef, {
+      mentor_id:               mentorId,
+      mentor_nome:             mentorData.nome,
+      skill_sendo_treinada:    skill,
+      meses_mentoria_restantes: dur,
+    }),
+  ]);
+
+  fecharModal();
+  toast(`🎓 Mentoria iniciada: ${mentorData.nome} → ${aprendizData.nome} (${_SKILL_FULL_LBL[skill]||skill}, ${dur} meses)`, 'ok', 5000);
+  setTimeout(() => window.navTo && window.navTo('equipe', null), 600);
+};
+
+// ════════════════════════════════════════════════════════
+// PROMOÇÃO MANUAL
+// ════════════════════════════════════════════════════════
+window.abrirModalPromover = async function(funcId, escId) {
+  const snap = await getDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId));
+  if (!snap.exists()) return;
+  const f = { id: snap.id, ...snap.data() };
+  const promo = _elegibilidadePromocao(f);
+  if (!promo) return;
+
+  const proxCi   = CARGO_INFO[promo.prox] || {};
+  const salMin   = _CARGO_SAL_MIN_EQ[promo.prox] || 1700;
+  const salMax   = _CARGO_SAL_MAX_EQ[promo.prox] || 5000;
+  const tick = c => c ? '✅' : '❌';
+
+  abrirModal('✨ Promover Funcionário',
+    `<div style="font-size:.78rem;margin-bottom:.8rem">
+      Promover <b>${f.nome}</b> para <b>${proxCi.l || promo.prox}</b>
+    </div>
+    <div style="font-size:.7rem;color:var(--txt3);margin-bottom:.8rem">
+      ${tick(promo.ok_meses)} 6+ meses no cargo (${f.meses_no_cargo||0} meses)<br>
+      ${tick(promo.ok_casos)} 10+ casos resolvidos (${f.casos_resolvidos_total||0} casos)<br>
+      ${tick(promo.ok_feedback)} Feedback ≥ 3.5★ (${(f.feedback_media_estrelas||3).toFixed(1)}★)<br>
+      ${tick(promo.ok_skills)} Skills ≥ 50% do novo cap
+    </div>
+    <div class="campo">
+      <label>Salário proposto: <b id="prom-sal-label">R$ ${salMin.toLocaleString('pt-BR')}</b></label>
+      <input type="range" id="prom-sal" min="${salMin}" max="${salMax}" step="100" value="${salMin}"
+        oninput="document.getElementById('prom-sal-label').textContent='R$ '+parseInt(this.value).toLocaleString('pt-BR')">
+      <div style="display:flex;justify-content:space-between;font-size:.65rem;color:var(--txt4)">
+        <span>R$ ${salMin.toLocaleString('pt-BR')}</span><span>R$ ${salMax.toLocaleString('pt-BR')}</span>
+      </div>
+    </div>
+    <div style="font-size:.65rem;color:var(--txt3);margin-bottom:.5rem">
+      NPC aceita se: oferta ≥ R$ ${Math.round(salMax*0.7).toLocaleString('pt-BR')} OU reputação interna ≥ 60
+    </div>
+    <div style="display:flex;gap:.5rem;margin-top:.8rem">
+      <button class="btn btn-ghost" style="flex:1" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-prim" style="flex:1" onclick="window._confirmarPromocao('${funcId}','${escId}','${promo.prox}')">Oferecer →</button>
+    </div>`
+  );
+};
+
+window._confirmarPromocao = async function(funcId, escId, proxCargo) {
+  const salario = parseInt(document.getElementById('prom-sal')?.value || '0');
+  const { updateDoc, doc: fdoc } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+
+  const snap = await getDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId));
+  if (!snap.exists()) return;
+  const f = snap.data();
+
+  const salMax     = _CARGO_SAL_MAX_EQ[proxCargo] || salario;
+  const repInterna = f.reputacao_interna || 50;
+  const aceita     = salario >= salMax * 0.7 || repInterna >= 60;
+
+  if (!aceita) {
+    await updateDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId), {
+      estresse:         Math.min(100, (f.estresse || 0) + 5),
+      reputacao_interna: Math.max(0, repInterna - 10),
+    });
+    fecharModal();
+    toast(`${f.nome} recusou a oferta — salário abaixo do esperado.`, 'ko', 4000);
+    return;
+  }
+
+  const novoStress = Math.max(0, (f.estresse || 0) - 20);
+  await updateDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId), {
+    cargo_id:      proxCargo,
+    meses_no_cargo: 0,
+    estresse:      novoStress,
+    aviso_saida:   false,
+    meses_stress_alto: 0,
+  });
+
+  await addDoc(collection(db, 'escritorios', escId, 'log_gestao'), {
+    msg: `✨ ${f.nome} foi promovido(a) para ${(CARGO_INFO[proxCargo]||{}).l||proxCargo} com salário de R$ ${salario.toLocaleString('pt-BR')}.`,
+    criado_em: new Date().toISOString(),
+  });
+
+  fecharModal();
+  toast(`🎉 ${f.nome} aceita! Promovido(a) para ${(CARGO_INFO[proxCargo]||{}).l||proxCargo}.`, 'ok', 5000);
+  setTimeout(() => window.navTo && window.navTo('equipe', null), 600);
+};
+
+// ════════════════════════════════════════════════════════
+// FÉRIAS
+// ════════════════════════════════════════════════════════
+window.concederFerias = async function(funcId, escId, nome) {
+  const escSnap = await getDoc(doc(db, 'escritorios', escId));
+  if (!escSnap.exists()) return;
+  const mesGlob = escSnap.data().mes_global || 0;
+
+  const { updateDoc, doc: fdoc } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+  await updateDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId), {
+    em_ferias:              true,
+    ultimas_ferias_mes_total: mesGlob,
+    estresse:               0,
+  });
+
+  await addDoc(collection(db, 'escritorios', escId, 'log_gestao'), {
+    msg: `🏖️ ${nome} saiu de férias (mês ${mesGlob}).`,
+    criado_em: new Date().toISOString(),
+  });
+
+  toast(`🏖️ ${nome} está de férias este mês — estresse zerado!`, 'ok', 4000);
+  setTimeout(() => window.navTo && window.navTo('equipe', null), 600);
+};
+
+// ════════════════════════════════════════════════════════
+// MEDIAÇÃO DE CONFLITOS
+// ════════════════════════════════════════════════════════
+window.mediarConflito = async function(funcId, conflitoIdx, escId) {
+  const snap = await getDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId));
+  if (!snap.exists()) return;
+  const f = snap.data();
+  const conflito = (f.conflitos_ativos || [])[conflitoIdx];
+  if (!conflito) return;
+
+  const escSnap = await getDoc(doc(db, 'escritorios', escId));
+  const tier = (escSnap.data() || {}).tier || 1;
+
+  const tipo = conflito.tipo;
+  const custoEnergia = tipo === 'estrutural' ? 10 : 5;
+  const custoFinanceiro = tipo === 'estrutural' ? (tier >= 3 ? 3000 : tier >= 2 ? 2000 : 1000) : 0;
+  const taxaSucesso = tipo === 'estrutural' ? '20-40%' : '100%';
+
+  abrirModal('⚖️ Mediar Conflito',
+    `<div style="font-size:.8rem;margin-bottom:.8rem">
+      <b>${tipo === 'estrutural' ? '⚠️ Conflito Estrutural' : '😤 Desentendimento'}</b><br>
+      ${f.nome} × ${conflito.com_nome}
+    </div>
+    <div style="font-size:.7rem;color:var(--txt3);margin-bottom:.8rem">
+      Custo: <b>${custoEnergia} energia</b> sua${custoFinanceiro > 0 ? ` + <b>R$ ${custoFinanceiro.toLocaleString('pt-BR')}</b>` : ''}<br>
+      Taxa de sucesso: <b>${taxaSucesso}</b><br>
+      ${tipo === 'estrutural' ? 'Se bem-sucedida, resolve no próximo mês.' : 'Resolve automaticamente no próximo mês.'}
+    </div>
+    <div style="display:flex;gap:.5rem;margin-top:.8rem">
+      <button class="btn btn-ghost" style="flex:1" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-prim" style="flex:1" onclick="window._executarMediacao('${funcId}',${conflitoIdx},'${escId}')">Mediar →</button>
+    </div>`
+  );
+};
+
+window._executarMediacao = async function(funcId, conflitoIdx, escId) {
+  const j   = window.JOGADOR;
+  const uid = j?.uid || window.JOGADOR_UID;
+
+  const snap = await getDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId));
+  if (!snap.exists()) return;
+  const f = snap.data();
+  const conflito = (f.conflitos_ativos || [])[conflitoIdx];
+  if (!conflito) { fecharModal(); return; }
+
+  const escSnap = await getDoc(doc(db, 'escritorios', escId));
+  const escData = escSnap.data() || {};
+  const tier = escData.tier || 1;
+  const tipo = conflito.tipo;
+  const custoEnergia   = tipo === 'estrutural' ? 10 : 5;
+  const custoFinanceiro = tipo === 'estrutural' ? (tier >= 3 ? 3000 : tier >= 2 ? 2000 : 1000) : 0;
+
+  const jSnap = await getDoc(doc(db, 'jogadores', uid));
+  const jData = jSnap.data() || {};
+  const energiaAtual = Math.max(0, 100 - (jData.energia_usada_mes || 0));
+  if (energiaAtual < custoEnergia) {
+    fecharModal();
+    toast(`Energia insuficiente (precisa de ${custoEnergia}, tem ${energiaAtual}).`, 'ko', 4000);
+    return;
+  }
+
+  const { updateDoc, doc: fdoc, FieldValue } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+
+  const sucesso = tipo === 'estrutural' ? Math.random() < 0.3 : true;
+
+  const updConflitos = (f.conflitos_ativos || []).map((c, idx) =>
+    idx === conflitoIdx ? { ...c, em_mediacao: sucesso } : c
+  );
+
+  const { updateDoc: updDoc } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+  await updateDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId), { conflitos_ativos: updConflitos });
+
+  // Espelhar no outro NPC
+  const outroSnap = await getDoc(doc(db, 'escritorios', escId, 'funcionarios', conflito.com_id));
+  if (outroSnap.exists()) {
+    const outroData = outroSnap.data();
+    const outroConflitos = (outroData.conflitos_ativos || []).map(c =>
+      c.com_id === funcId ? { ...c, em_mediacao: sucesso } : c
+    );
+    await updateDoc(doc(db, 'escritorios', escId, 'funcionarios', conflito.com_id), { conflitos_ativos: outroConflitos });
+  }
+
+  // Debitar energia e caixa
+  await updateDoc(doc(db, 'jogadores', uid), {
+    energia_usada_mes: (jData.energia_usada_mes || 0) + custoEnergia,
+  });
+  if (custoFinanceiro > 0) {
+    await updateDoc(doc(db, 'escritorios', escId), {
+      caixa: Math.max(0, (escData.caixa || 0) - custoFinanceiro),
+    });
+  }
+
+  await addDoc(collection(db, 'escritorios', escId, 'log_gestao'), {
+    msg: `⚖️ Mediação entre ${f.nome} e ${conflito.com_nome}: ${sucesso ? 'em processo de resolução' : 'fracassou — conflito continua'}.`,
+    criado_em: new Date().toISOString(),
+  });
+
+  fecharModal();
+  if (sucesso) {
+    toast(`✅ Mediação iniciada — conflito será resolvido no próximo mês!`, 'ok', 4000);
+  } else {
+    toast(`❌ Mediação fracassou — conflito estrutural persiste.`, 'ko', 4000);
+  }
+  setTimeout(() => window.navTo && window.navTo('equipe', null), 600);
 };

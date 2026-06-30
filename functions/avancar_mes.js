@@ -391,6 +391,227 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal) {
   }
 }
 
+// ════════════════════════════════════════════════════════
+// PROCESSAMENTO MENSAL: MENTORIA
+// ════════════════════════════════════════════════════════
+async function _processarMentoriaNPCsCF(escRef, fSnap) {
+  const allNpcs = {};
+  for (const fd of fSnap.docs) allNpcs[fd.id] = { id: fd.id, ref: fd.ref, ...fd.data() };
+
+  const proms = [], logs = [];
+  const CARGO_CAP_SKL = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
+
+  for (const fd of fSnap.docs) {
+    const aprendiz = fd.data();
+    if (aprendiz.tipo !== 'npc' || !aprendiz.mentor_id) continue;
+    if ((aprendiz.meses_mentoria_restantes || 0) <= 0) continue;
+    if (aprendiz.burnout_npc || aprendiz.em_ferias) continue;
+
+    const mentor = allNpcs[aprendiz.mentor_id];
+    if (!mentor || mentor.burnout_npc || mentor.em_ferias) continue;
+
+    const skill = aprendiz.skill_sendo_treinada;
+    if (!skill) continue;
+
+    const mentorSkillVal  = (mentor.skills || {})[skill] || 10;
+    const ganhoBase       = Math.max(1, Math.round(mentorSkillVal * 0.1));
+    const numAprendizes   = (mentor.aprendizes_ids || []).length;
+    const afinA           = (aprendiz.afinidade_com_npcs || {})[mentor.id] ?? 50;
+    const afinB           = (mentor.afinidade_com_npcs || {})[fd.id] ?? 50;
+    const afinMedia       = (afinA + afinB) / 2;
+    const bonusAfinidade  = afinMedia >= 80 ? 3 : 0;
+    const penaltyIncompat = afinMedia <= 20 ? 0.5 : 1.0;
+    const malusMulti      = numAprendizes > 1 ? 2 : 0;
+    const ganhoTotal      = Math.max(1, Math.round((ganhoBase + bonusAfinidade - malusMulti) * penaltyIncompat));
+
+    const capAprendiz    = CARGO_CAP_SKL[aprendiz.cargo_id] || 20;
+    const novoValAprendiz = Math.min(capAprendiz, ((aprendiz.skills || {})[skill] || 0) + ganhoTotal);
+    const capMentor      = CARGO_CAP_SKL[mentor.cargo_id] || 55;
+    const novoValMentor  = Math.min(capMentor, mentorSkillVal + 2);
+    const novosRestantes = (aprendiz.meses_mentoria_restantes || 1) - 1;
+
+    const updAprendiz = { [`skills.${skill}`]: novoValAprendiz, meses_mentoria_restantes: novosRestantes };
+    const updMentor   = { [`skills.${skill}`]: novoValMentor, energia_npc_usada_mes: (mentor.energia_npc_usada_mes || 0) + 30 };
+
+    if (novosRestantes <= 0) {
+      updAprendiz.mentor_id = null;
+      updAprendiz.skill_sendo_treinada = null;
+      updAprendiz.meses_mentoria_restantes = 0;
+      updMentor.aprendizes_ids = (mentor.aprendizes_ids || []).filter(id => id !== fd.id);
+      logs.push(_logGestaoCF(escRef, `🎓 Mentoria concluída: ${mentor.nome} → ${aprendiz.nome}. ${_SKL_LABEL[skill]||skill} atingiu ${novoValAprendiz}.`));
+    } else {
+      logs.push(_logGestaoCF(escRef, `📚 ${aprendiz.nome} avançou em ${_SKL_LABEL[skill]||skill} com ${mentor.nome}: +${ganhoTotal} (${novosRestantes} mês(es) restantes).`));
+    }
+    proms.push(fd.ref.update(updAprendiz));
+    proms.push(mentor.ref.update(updMentor));
+  }
+  if (proms.length) await Promise.all(proms);
+  if (logs.length)  await Promise.all(logs);
+}
+
+// ════════════════════════════════════════════════════════
+// PROCESSAMENTO MENSAL: CONFLITOS
+// ════════════════════════════════════════════════════════
+async function _processarConflitosNPCsCF(escRef, fSnap, mesGlobal) {
+  const npcs = fSnap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }))
+    .filter(f => f.tipo === 'npc' && !f.burnout_npc && !f.em_ferias);
+  if (npcs.length < 2) return;
+
+  const npcMap = {};
+  for (const n of npcs) npcMap[n.id] = n;
+
+  const proms = [], logs = [];
+  const processados = new Set(); // evita double-process por par
+
+  for (const npc of npcs) {
+    const conflitos = npc.conflitos_ativos || [];
+    const novosConflitos = [];
+
+    for (const c of conflitos) {
+      if (processados.has(`${npc.id}_${c.com_id}`)) { novosConflitos.push(c); continue; }
+
+      const idadeConflito = mesGlobal - (c.desde_mes_total || mesGlobal);
+
+      if (c.em_mediacao) {
+        logs.push(_logGestaoCF(escRef, `✅ Conflito entre ${npc.nome} e ${c.com_nome} foi resolvido após mediação.`));
+        const outro = npcMap[c.com_id];
+        if (outro) {
+          proms.push(outro.ref.update({
+            conflitos_ativos: (outro.conflitos_ativos || []).filter(cc => cc.com_id !== npc.id),
+          }));
+        }
+        processados.add(`${c.com_id}_${npc.id}`);
+        continue;
+      }
+
+      if (c.tipo === 'estrutural' && idadeConflito >= 6) {
+        logs.push(_logGestaoCF(escRef, `🚪 ${npc.nome} saiu do escritório após conflito estrutural não resolvido por ${idadeConflito} meses.`));
+        proms.push(npc.ref.update({ ativo: false, saiu_em: new Date().toISOString(), motivo_saida: 'conflito_estrutural' }));
+        const outro = npcMap[c.com_id];
+        if (outro) {
+          proms.push(outro.ref.update({
+            conflitos_ativos: (outro.conflitos_ativos || []).filter(cc => cc.com_id !== npc.id),
+          }));
+        }
+        processados.add(`${c.com_id}_${npc.id}`);
+        continue;
+      }
+
+      if (c.tipo === 'leve' && idadeConflito >= 2) {
+        novosConflitos.push({ ...c, tipo: 'estrutural' });
+        logs.push(_logGestaoCF(escRef, `⚠️ Conflito entre ${npc.nome} e ${c.com_nome} escalou para estrutural após ${idadeConflito} meses.`));
+        // espelhar no outro
+        const outro = npcMap[c.com_id];
+        if (outro) {
+          const outroConflitos = (outro.conflitos_ativos || []).map(cc =>
+            cc.com_id === npc.id ? { ...cc, tipo: 'estrutural' } : cc
+          );
+          proms.push(outro.ref.update({ conflitos_ativos: outroConflitos }));
+        }
+      } else {
+        novosConflitos.push(c);
+      }
+      processados.add(`${c.com_id}_${npc.id}`);
+    }
+
+    if (novosConflitos.length !== conflitos.length ||
+        JSON.stringify(novosConflitos) !== JSON.stringify(conflitos)) {
+      proms.push(npc.ref.update({ conflitos_ativos: novosConflitos }));
+    }
+  }
+
+  // Gerar novos conflitos leves
+  const pairsProcessed = new Set();
+  for (let i = 0; i < npcs.length; i++) {
+    for (let j2 = i + 1; j2 < npcs.length; j2++) {
+      const a = npcs[i], b = npcs[j2];
+      const pairKey = [a.id, b.id].sort().join('_');
+      if (pairsProcessed.has(pairKey)) continue;
+      pairsProcessed.add(pairKey);
+
+      const jaTemConflito = (a.conflitos_ativos || []).some(c => c.com_id === b.id)
+        || (b.conflitos_ativos || []).some(c => c.com_id === a.id);
+      if (jaTemConflito) continue;
+
+      const afinA    = (a.afinidade_com_npcs || {})[b.id] ?? 50;
+      const afinB    = (b.afinidade_com_npcs || {})[a.id] ?? 50;
+      const afinMedia = (afinA + afinB) / 2;
+      const chance   = afinMedia < 25 ? 0.15 : afinMedia > 60 ? 0.03 : 0.07;
+      if (Math.random() > chance) continue;
+
+      const c    = { com_id: b.id, com_nome: b.nome, tipo: 'leve', desde_mes_total: mesGlobal, em_mediacao: false };
+      const cInv = { com_id: a.id, com_nome: a.nome, tipo: 'leve', desde_mes_total: mesGlobal, em_mediacao: false };
+      proms.push(a.ref.update({ conflitos_ativos: [...(a.conflitos_ativos || []), c] }));
+      proms.push(b.ref.update({ conflitos_ativos: [...(b.conflitos_ativos || []), cInv] }));
+      logs.push(_logGestaoCF(escRef, `😤 Desentendimento surgiu entre ${a.nome} e ${b.nome} — mediação disponível.`));
+    }
+  }
+
+  if (proms.length) await Promise.all(proms);
+  if (logs.length)  await Promise.all(logs);
+}
+
+// ════════════════════════════════════════════════════════
+// PROCESSAMENTO MENSAL: FÉRIAS
+// ════════════════════════════════════════════════════════
+async function _processarFeriasNPCsCF(escRef, fSnap, mesGlobal) {
+  const proms = [], logs = [];
+  for (const fd of fSnap.docs) {
+    const f = fd.data();
+    if (f.tipo !== 'npc') continue;
+
+    if (f.em_ferias) {
+      proms.push(fd.ref.update({ em_ferias: false, ultimas_ferias_mes_total: mesGlobal }));
+      logs.push(_logGestaoCF(escRef, `🏖️ ${f.nome} voltou das férias.`));
+      continue;
+    }
+
+    const ultimaFerias   = f.ultimas_ferias_mes_total ?? 0;
+    const mesesSemFerias = mesGlobal - ultimaFerias;
+    if (mesesSemFerias >= 12 && (f.meses_no_cargo || 0) >= 12) {
+      const novoStress = Math.min(100, (f.estresse || 0) + 20);
+      proms.push(fd.ref.update({ estresse: novoStress }));
+      logs.push(_logGestaoCF(escRef, `⚠️ ${f.nome} está há ${mesesSemFerias} meses sem férias — estresse +20.`));
+    }
+  }
+  if (proms.length) await Promise.all(proms);
+  if (logs.length)  await Promise.all(logs);
+}
+
+// ════════════════════════════════════════════════════════
+// PROCESSAMENTO MENSAL: TURNOVER
+// ════════════════════════════════════════════════════════
+async function _verificarTurnoverNPCsCF(db, escRef, uid, fSnap) {
+  const proms = [], logs = [];
+  for (const fd of fSnap.docs) {
+    const f = fd.data();
+    if (f.tipo !== 'npc' || f.ativo === false) continue;
+
+    const stressAlto      = (f.estresse || 0) >= 85;
+    const novosMesesStress = stressAlto ? (f.meses_stress_alto || 0) + 1 : 0;
+    const upd = { meses_stress_alto: novosMesesStress };
+
+    if (novosMesesStress >= 3 && !f.aviso_saida) {
+      upd.aviso_saida = true;
+      logs.push(_logGestaoCF(escRef, `🚨 ${f.nome} está há 3 meses com estresse muito alto — risco de saída!`));
+      proms.push(db.collection('jogadores').doc(uid).collection('inbox').add({
+        de: 'sistema',
+        assunto: `⚠️ ${f.nome} está pensando em sair`,
+        corpo: `${f.nome} (${(f.cargo_id || '').toUpperCase()}) está há 3 meses com estresse extremo.\nTome uma ação antes que seja tarde — promova, conceda férias ou resolva conflitos.`,
+        tipo: 'aviso_turnover', lida: false, criado_em: new Date().toISOString(),
+      }));
+    } else if (novosMesesStress >= 4 && f.aviso_saida) {
+      upd.ativo       = false;
+      upd.saiu_em     = new Date().toISOString();
+      upd.motivo_saida = 'estresse_extremo';
+      logs.push(_logGestaoCF(escRef, `🚪 ${f.nome} saiu do escritório devido a estresse extremo prolongado.`));
+    }
+    proms.push(fd.ref.update(upd));
+  }
+  if (proms.length) await Promise.all(proms);
+  if (logs.length)  await Promise.all(logs);
+}
+
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
@@ -1410,6 +1631,17 @@ async function _processarServicosMensalCF(db, uid, j) {
   const tier = esc.tier || 1;
 
   await _processarProgressoNPCsCF(db, escRef, esc.mes_global || 0);
+
+  try {
+    const fSnapFresh = await escRef.collection('funcionarios').get();
+    await _processarMentoriaNPCsCF(escRef, fSnapFresh);
+    await _processarConflitosNPCsCF(escRef, fSnapFresh, esc.mes_global || 0);
+    await _processarFeriasNPCsCF(escRef, fSnapFresh, esc.mes_global || 0);
+    await _verificarTurnoverNPCsCF(db, escRef, uid, fSnapFresh);
+  } catch (e) {
+    const logger = require('firebase-functions/logger');
+    logger.warn('Erro no processamento de dinâmica da equipe:', e.message);
+  }
 
   const oldOpSnap = await escRef.collection('oportunidades').where('status','==','disponivel').get();
   await Promise.all(oldOpSnap.docs.map(d => d.ref.delete()));
