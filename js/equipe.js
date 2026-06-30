@@ -1228,15 +1228,13 @@ window._executarMediacao = async function(funcId, conflitoIdx, escId) {
     return;
   }
 
-  const { updateDoc, doc: fdoc, FieldValue } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-
   const sucesso = tipo === 'estrutural' ? Math.random() < 0.3 : true;
 
   const updConflitos = (f.conflitos_ativos || []).map((c, idx) =>
     idx === conflitoIdx ? { ...c, em_mediacao: sucesso } : c
   );
 
-  const { updateDoc: updDoc } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+  const { updateDoc } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
   await updateDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId), { conflitos_ativos: updConflitos });
 
   // Espelhar no outro NPC
