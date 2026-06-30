@@ -474,9 +474,9 @@ const _DIARIO_ICONE = {
 async function _renderDiarioEquipe(escId) {
   try {
     const snap = await getDocs(query(
-      collection(db, 'escritorios', escId, 'log_equipe'),
+      collection(db, 'escritorios', escId, 'log_gestao'),
       orderBy('criado_em', 'desc'),
-      limit(60)
+      limit(80)
     ));
     if (snap.empty) {
       return `<div style="text-align:center;padding:2rem;color:var(--txt4);font-size:.78rem">
@@ -486,13 +486,13 @@ async function _renderDiarioEquipe(escId) {
     }
     return snap.docs.map(d => {
       const e    = d.data();
-      const icon = _DIARIO_ICONE[e.tipo] || '📝';
+      const msg  = e.msg || e.texto || '';
       const data = e.criado_em
         ? new Date(e.criado_em).toLocaleDateString('pt-BR', { day:'2-digit', month:'short' })
         : '';
       return `<div class="card" style="margin-bottom:.4rem;border-left:3px solid var(--navy-light)">
         <div style="display:flex;justify-content:space-between;align-items:start;gap:.5rem">
-          <div style="font-size:.78rem;color:var(--navy)">${icon} ${e.texto}</div>
+          <div style="font-size:.78rem;color:var(--navy)">${msg}</div>
           <span style="font-size:.6rem;color:var(--txt4);white-space:nowrap">${data}</span>
         </div>
       </div>`;
