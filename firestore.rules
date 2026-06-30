@@ -359,6 +359,16 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
+      match /log_equipe/{logId} {
+        allow read: if isAuth()
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+        allow create: if isAuth()
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+        allow update, delete: if false;
+      }
+
       allow delete: if false;
     }
 
