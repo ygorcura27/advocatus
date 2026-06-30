@@ -249,7 +249,7 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid) {
       burnoutRest = Math.max(0, burnoutRest - 1);
       if (burnoutRest === 0) {
         burnoutNPC = false;
-        logsBurn.push(_logGestaoCF(escRef,
+        logsBurn.push(_logEquipeCF(escRef,
           `✅ ${f.nome||'Membro'} se recuperou do burnout e voltou a trabalhar.`));
       }
     } else if (sobrecarg) {
@@ -258,7 +258,7 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid) {
         burnoutNPC  = true;
         burnoutRest = 3;
         novosMeses  = 0;
-        logsBurn.push(_logGestaoCF(escRef,
+        logsBurn.push(_logEquipeCF(escRef,
           `🔴 ${f.nome||'Membro'} entrou em burnout (3 meses sobrecarregado) — afastado por 3 meses.`));
       }
     } else {
@@ -341,7 +341,7 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid) {
         questiona_permanencia: false,
       }));
       rankProms.push(escRef.update({ caixa: FV.increment(5000) }));
-      rankLogs.push(_logGestaoCF(escRef,
+      rankLogs.push(_logEquipeCF(escRef,
         `🏆 ${r1.f.nome} ficou em 1º lugar este mês! +R$5.000 ao caixa · ${skLabel} +3.`));
       if (uid) rankProms.push(db.collection('jogadores').doc(uid).collection('inbox').add({
         de: 'sistema',
@@ -361,7 +361,7 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid) {
           questiona_permanencia: false,
         }));
         rankProms.push(escRef.update({ caixa: FV.increment(2000) }));
-        rankLogs.push(_logGestaoCF(escRef,
+        rankLogs.push(_logEquipeCF(escRef,
           `🥈 ${r2.f.nome} ficou em 2º lugar! +R$2.000 ao caixa · ${skLabel} +2.`));
       }
     }
@@ -375,7 +375,7 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid) {
           questiona_permanencia: false,
         }));
         rankProms.push(escRef.update({ caixa: FV.increment(500) }));
-        rankLogs.push(_logGestaoCF(escRef, `🥉 ${r3.f.nome} ficou em 3º lugar! +R$500 ao caixa.`));
+        rankLogs.push(_logEquipeCF(escRef, `🥉 ${r3.f.nome} ficou em 3º lugar! +R$500 ao caixa.`));
       }
     }
 
@@ -390,7 +390,7 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid) {
 
       if (streak >= 6) {
         updUlt.questiona_permanencia = true;
-        rankLogs.push(_logGestaoCF(escRef,
+        rankLogs.push(_logEquipeCF(escRef,
           `⚠️ ${rUlt.f.nome} está há ${streak} meses em último — questionando permanência no escritório.`));
         if (uid) rankProms.push(db.collection('jogadores').doc(uid).collection('inbox').add({
           de: 'sistema',
@@ -400,7 +400,7 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid) {
         }));
       } else if (streak >= 3) {
         updUlt.estresse = Math.min(100, (rUlt.f.estresse || 0) + 15);
-        rankLogs.push(_logGestaoCF(escRef,
+        rankLogs.push(_logEquipeCF(escRef,
           `⚠️ ${rUlt.f.nome} está há ${streak} meses em último lugar — aviso: +15 estresse.`));
       }
       rankProms.push(rUlt.ref.update(updUlt));
@@ -458,7 +458,7 @@ async function _processarMentoriaNPCsCF(db, escRef, fSnap, uid) {
       updAprendiz.skill_sendo_treinada = null;
       updAprendiz.meses_mentoria_restantes = 0;
       updMentor.aprendizes_ids = (mentor.aprendizes_ids || []).filter(id => id !== fd.id);
-      logs.push(_logGestaoCF(escRef, `🎓 Mentoria concluída: ${mentor.nome} → ${aprendiz.nome}. ${_SKL_LABEL[skill]||skill} atingiu ${novoValAprendiz}.`));
+      logs.push(_logEquipeCF(escRef, `🎓 Mentoria concluída: ${mentor.nome} → ${aprendiz.nome}. ${_SKL_LABEL[skill]||skill} atingiu ${novoValAprendiz}.`));
       proms.push(db.collection('jogadores').doc(uid).collection('inbox').add({
         de: 'sistema',
         assunto: `🎓 Mentoria concluída — ${aprendiz.nome}`,
@@ -466,7 +466,7 @@ async function _processarMentoriaNPCsCF(db, escRef, fSnap, uid) {
         tipo: 'mentoria_concluida', lida: false, criado_em: new Date().toISOString(),
       }));
     } else {
-      logs.push(_logGestaoCF(escRef, `📚 ${aprendiz.nome} avançou em ${_SKL_LABEL[skill]||skill} com ${mentor.nome}: +${ganhoTotal} (${novosRestantes} mês(es) restantes).`));
+      logs.push(_logEquipeCF(escRef, `📚 ${aprendiz.nome} avançou em ${_SKL_LABEL[skill]||skill} com ${mentor.nome}: +${ganhoTotal} (${novosRestantes} mês(es) restantes).`));
     }
     proms.push(fd.ref.update(updAprendiz));
     proms.push(mentor.ref.update(updMentor));
@@ -499,7 +499,7 @@ async function _processarConflitosNPCsCF(db, escRef, fSnap, mesGlobal, uid) {
       const idadeConflito = mesGlobal - (c.desde_mes_total || mesGlobal);
 
       if (c.em_mediacao) {
-        logs.push(_logGestaoCF(escRef, `✅ Conflito entre ${npc.nome} e ${c.com_nome} foi resolvido após mediação.`));
+        logs.push(_logEquipeCF(escRef, `✅ Conflito entre ${npc.nome} e ${c.com_nome} foi resolvido após mediação.`));
         const outro = npcMap[c.com_id];
         if (outro) {
           proms.push(outro.ref.update({
@@ -511,7 +511,7 @@ async function _processarConflitosNPCsCF(db, escRef, fSnap, mesGlobal, uid) {
       }
 
       if (c.tipo === 'estrutural' && idadeConflito >= 6) {
-        logs.push(_logGestaoCF(escRef, `🚪 ${npc.nome} saiu do escritório após conflito estrutural não resolvido por ${idadeConflito} meses.`));
+        logs.push(_logEquipeCF(escRef, `🚪 ${npc.nome} saiu do escritório após conflito estrutural não resolvido por ${idadeConflito} meses.`));
         proms.push(npc.ref.update({ ativo: false, saiu_em: new Date().toISOString(), motivo_saida: 'conflito_estrutural' }));
         proms.push(db.collection('jogadores').doc(uid).collection('inbox').add({
           de: 'sistema',
@@ -531,7 +531,7 @@ async function _processarConflitosNPCsCF(db, escRef, fSnap, mesGlobal, uid) {
 
       if (c.tipo === 'leve' && idadeConflito >= 2) {
         novosConflitos.push({ ...c, tipo: 'estrutural' });
-        logs.push(_logGestaoCF(escRef, `⚠️ Conflito entre ${npc.nome} e ${c.com_nome} escalou para estrutural após ${idadeConflito} meses.`));
+        logs.push(_logEquipeCF(escRef, `⚠️ Conflito entre ${npc.nome} e ${c.com_nome} escalou para estrutural após ${idadeConflito} meses.`));
         proms.push(db.collection('jogadores').doc(uid).collection('inbox').add({
           de: 'sistema',
           assunto: `⚠️ Conflito estrutural — ${npc.nome} × ${c.com_nome}`,
@@ -581,7 +581,7 @@ async function _processarConflitosNPCsCF(db, escRef, fSnap, mesGlobal, uid) {
       const cInv = { com_id: a.id, com_nome: a.nome, tipo: 'leve', desde_mes_total: mesGlobal, em_mediacao: false };
       proms.push(a.ref.update({ conflitos_ativos: [...(a.conflitos_ativos || []), c] }));
       proms.push(b.ref.update({ conflitos_ativos: [...(b.conflitos_ativos || []), cInv] }));
-      logs.push(_logGestaoCF(escRef, `😤 Desentendimento surgiu entre ${a.nome} e ${b.nome} — mediação disponível.`));
+      logs.push(_logEquipeCF(escRef, `😤 Desentendimento surgiu entre ${a.nome} e ${b.nome} — mediação disponível.`));
       proms.push(db.collection('jogadores').doc(uid).collection('inbox').add({
         de: 'sistema',
         assunto: `😤 Desentendimento — ${a.nome} × ${b.nome}`,
@@ -606,7 +606,7 @@ async function _processarFeriasNPCsCF(db, escRef, fSnap, mesGlobal, uid) {
 
     if (f.em_ferias) {
       proms.push(fd.ref.update({ em_ferias: false, ultimas_ferias_mes_total: mesGlobal }));
-      logs.push(_logGestaoCF(escRef, `🏖️ ${f.nome} voltou das férias.`));
+      logs.push(_logEquipeCF(escRef, `🏖️ ${f.nome} voltou das férias.`));
       continue;
     }
 
@@ -615,7 +615,7 @@ async function _processarFeriasNPCsCF(db, escRef, fSnap, mesGlobal, uid) {
     if (mesesSemFerias >= 12 && (f.meses_no_cargo || 0) >= 12) {
       const novoStress = Math.min(100, (f.estresse || 0) + 20);
       proms.push(fd.ref.update({ estresse: novoStress }));
-      logs.push(_logGestaoCF(escRef, `⚠️ ${f.nome} está há ${mesesSemFerias} meses sem férias — estresse +20.`));
+      logs.push(_logEquipeCF(escRef, `⚠️ ${f.nome} está há ${mesesSemFerias} meses sem férias — estresse +20.`));
       if (mesesSemFerias === 12) {
         proms.push(db.collection('jogadores').doc(uid).collection('inbox').add({
           de: 'sistema',
@@ -680,7 +680,7 @@ async function _processarEstudoNPCsCF(db, escRef, fSnap, uid) {
     // Log apenas em marcos de 10% (80% e 100% do cap)
     if (pctDepois > pctAntes && (pctDepois === 80 || pctDepois === 100)) {
       const marco = pctDepois === 100 ? 'atingiu o limite' : `atingiu ${pctDepois}% do cap`;
-      logs.push(_logGestaoCF(escRef,
+      logs.push(_logEquipeCF(escRef,
         `📖 ${f.nome} ${marco} em ${_SKL_LABEL[skill]||skill} pelo estudo autônomo.`));
       if (pctDepois >= 80 && uid) {
         proms.push(db.collection('jogadores').doc(uid).collection('inbox').add({
@@ -712,7 +712,7 @@ async function _verificarTurnoverNPCsCF(db, escRef, uid, fSnap) {
 
     if (novosMesesStress >= 3 && !f.aviso_saida) {
       upd.aviso_saida = true;
-      logs.push(_logGestaoCF(escRef, `🚨 ${f.nome} está há 3 meses com estresse muito alto — risco de saída!`));
+      logs.push(_logEquipeCF(escRef, `🚨 ${f.nome} está há 3 meses com estresse muito alto — risco de saída!`));
       proms.push(db.collection('jogadores').doc(uid).collection('inbox').add({
         de: 'sistema',
         assunto: `⚠️ ${f.nome} está pensando em sair`,
@@ -723,7 +723,7 @@ async function _verificarTurnoverNPCsCF(db, escRef, uid, fSnap) {
       upd.ativo       = false;
       upd.saiu_em     = new Date().toISOString();
       upd.motivo_saida = 'estresse_extremo';
-      logs.push(_logGestaoCF(escRef, `🚪 ${f.nome} saiu do escritório devido a estresse extremo prolongado.`));
+      logs.push(_logEquipeCF(escRef, `🚪 ${f.nome} saiu do escritório devido a estresse extremo prolongado.`));
     }
     proms.push(fd.ref.update(upd));
   }
@@ -1769,7 +1769,7 @@ async function _gestorAutoMentoriaCF(db, escRef, fSnap, uid) {
       skill_sendo_treinada: skill, meses_mentoria_restantes: duracao,
     }));
     mentor.aprendizes_ids = [...(mentor.aprendizes_ids||[]), aprendiz.id];
-    logs.push(_logGestaoCF(escRef, `🤖 Gestor iniciou mentoria: ${mentor.nome} → ${aprendiz.nome} (${_SKL_LABEL[skill]||skill}, ${duracao} meses).`));
+    logs.push(_logEquipeCF(escRef, `🤖 Gestor iniciou mentoria: ${mentor.nome} → ${aprendiz.nome} (${_SKL_LABEL[skill]||skill}, ${duracao} meses).`));
     proms.push(db.collection('jogadores').doc(uid).collection('inbox').add({
       de: 'sistema',
       assunto: `🎓 Gestor iniciou mentoria — ${aprendiz.nome}`,
@@ -1813,7 +1813,7 @@ async function _gestorAutoMediacaoLeveCF(db, escRef, fSnap, uid) {
         );
         proms.push(outro.ref.update({ conflitos_ativos: updOutro }));
       }
-      logs.push(_logGestaoCF(escRef, `🤖 Gestor mediou conflito leve entre ${npc.nome} e ${c.com_nome}.`));
+      logs.push(_logEquipeCF(escRef, `🤖 Gestor mediou conflito leve entre ${npc.nome} e ${c.com_nome}.`));
       proms.push(db.collection('jogadores').doc(uid).collection('inbox').add({
         de: 'sistema',
         assunto: `⚖️ Gestor mediou conflito — ${npc.nome} × ${c.com_nome}`,
@@ -1962,9 +1962,14 @@ async function _processarAutogestaoOportunidadesCF(db, escRef, esc) {
   }
 }
 
-// Diário da gestão — feed narrativo lido pelo painel "Histórico" do escritório.
+// Diário da gestão — processos: sentenças, designações, recursos.
 async function _logGestaoCF(escRef, texto) {
   await escRef.collection('log_gestao').add({ texto, criado_em: new Date().toISOString() });
+}
+
+// Diário da equipe — pessoas: mentoria, conflitos, férias, estudo, turnover, ranking.
+async function _logEquipeCF(escRef, texto) {
+  await escRef.collection('log_equipe').add({ texto, criado_em: new Date().toISOString() });
 }
 
 const _TIER_ORDER_CF     = { D:0, C:1, B:2, A:3, S:4 };
