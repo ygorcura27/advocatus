@@ -498,7 +498,8 @@ async function _renderDiarioEquipe(escId) {
       </div>`;
     }).join('');
   } catch(err) {
-    return `<div style="color:var(--txt4);font-size:.78rem;padding:1rem">Erro ao carregar diário.</div>`;
+    console.error('[Diário]', err);
+    return `<div style="color:var(--txt4);font-size:.78rem;padding:1rem">Erro ao carregar diário: ${err.message}</div>`;
   }
 }
 
