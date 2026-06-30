@@ -170,6 +170,14 @@ window.renderEquipe = async function(j, el) {
         📓 Diário
       </button>
     </div>
+    ${esc.gestor_id ? `
+    <div class="card" style="margin-bottom:1rem;padding:.7rem 1rem">
+      <div style="font-size:.78rem;font-weight:700;color:var(--navy);margin-bottom:.5rem">⚙️ Delegações ao Gestor</div>
+      ${_renderToggleGestor('📋 Delegar processos ao gestor', 'processos', esc.gestor_delega_processos !== false, escId)}
+      ${_renderToggleGestor('🎓 Delegar mentoria ao gestor', 'mentoria', !!esc.gestor_delega_mentoria, escId)}
+      ${_renderToggleGestor('⚖️ Delegar conflitos leves ao gestor', 'conflitos', !!esc.gestor_delega_conflitos, escId)}
+      <div style="font-size:.6rem;color:var(--txt4);margin-top:.4rem">⚠️ Conflitos estruturais sempre escalam ao dono, independente das delegações.</div>
+    </div>` : ''}
 
     <!-- Pane: Equipe -->
     <div class="equipe-tab-pane" data-tab="equipe" ${_activeEquipeTab==='diario'?'style="display:none"':''}>
@@ -932,6 +940,32 @@ function _skillLabel(k) {
   const m = { pesquisa:'Pesq', escrita:'Escr', argumentacao:'Arg', oratoria:'Orat', persuasao:'Pers', negociacao:'Neg', gestao:'Gest' };
   return m[k] || k;
 }
+
+function _renderToggleGestor(label, tipo, ativo, escId) {
+  const cor = ativo ? 'var(--verde2)' : 'var(--txt4)';
+  return `<div style="display:flex;align-items:center;justify-content:space-between;padding:.25rem 0;border-bottom:1px solid var(--bg2)">
+    <span style="font-size:.72rem;color:var(--txt2)">${label}</span>
+    <button onclick="window.toggleGestorDelegacao('${escId}','${tipo}')"
+      style="padding:.2rem .6rem;border-radius:20px;border:1px solid ${cor};background:${ativo?'var(--verde-bg)':'transparent'};color:${cor};font-size:.65rem;cursor:pointer">
+      ${ativo ? '✅ Ativo' : '○ Inativo'}
+    </button>
+  </div>`;
+}
+
+// ════════════════════════════════════════════════════════
+// TOGGLES DO GESTOR
+// ════════════════════════════════════════════════════════
+window.toggleGestorDelegacao = async function(escId, tipo) {
+  const escSnap = await getDoc(doc(db, 'escritorios', escId));
+  if (!escSnap.exists()) return;
+  const campo = `gestor_delega_${tipo}`;
+  const novoVal = !escSnap.data()[campo];
+  const { updateDoc } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+  await updateDoc(doc(db, 'escritorios', escId), { [campo]: novoVal });
+  const labels = { processos:'processos', mentoria:'mentoria', conflitos:'conflitos leves' };
+  toast(`${novoVal ? '✅' : '❌'} Delegação de ${labels[tipo]||tipo} ${novoVal ? 'ativada' : 'desativada'}.`, 'ok');
+  setTimeout(() => window.navTo && window.navTo('equipe', null), 400);
+};
 
 window._abrirConviteJogador = function(cargo_min, escId) {
   abrirModal('👤 Convidar Jogador',
