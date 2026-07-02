@@ -1007,13 +1007,31 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
   if (j.escritorio_proprio_id) {
     try {
       const escRefProprio = db.collection('escritorios').doc(j.escritorio_proprio_id);
-      await escRefProprio.update({ faturamento_mes_atual: 0, faturamento_recorrente_mes: 0 });
-      const funcSnap = await escRefProprio
-        .collection('funcionarios')
-        .get();
-      const resets = funcSnap.docs.map(d =>
-        d.ref.update({ acoes_mes_usadas: 0, acao_atual: null })
-      );
+      // Lê escritório antes do reset para processar sócio investidor (GDD §33)
+      const escSnapPre  = await escRefProprio.get();
+      const escUpdReset = { faturamento_mes_atual: 0, faturamento_recorrente_mes: 0 };
+      if (escSnapPre.exists) {
+        const escPre = escSnapPre.data();
+        const inv    = escPre.investidor;
+        if (inv?.ativo && (escPre.faturamento_mes_atual || 0) > 0) {
+          const pagamento   = Math.floor(escPre.faturamento_mes_atual * (inv.pct || 0.20));
+          const novosMeses  = (inv.meses_restantes || 1) - 1;
+          escUpdReset.caixa = Math.max(0, (escPre.caixa || 0) - pagamento);
+          escUpdReset.investidor = novosMeses <= 0 ? null : {
+            ...inv, meses_restantes: novosMeses, total_pago: (inv.total_pago || 0) + pagamento,
+          };
+          mensagens.push({
+            assunto: novosMeses <= 0 ? '🤝 Contrato Investidor Encerrado' : '🤝 Sócio Investidor',
+            corpo: novosMeses <= 0
+              ? `Contrato com ${inv.nome} cumprido! Total pago: R$${((inv.total_pago||0)+pagamento).toLocaleString('pt-BR')}.`
+              : `${Math.round((inv.pct||0.20)*100)}% do faturamento (R$${pagamento.toLocaleString('pt-BR')}) → ${inv.nome} · ${novosMeses} meses restantes.`,
+            tipo: novosMeses <= 0 ? 'positivo' : 'neutro',
+          });
+        }
+      }
+      await escRefProprio.update(escUpdReset);
+      const funcSnap = await escRefProprio.collection('funcionarios').get();
+      const resets   = funcSnap.docs.map(d => d.ref.update({ acoes_mes_usadas: 0, acao_atual: null }));
       await Promise.all(resets);
     } catch(e) {
       logger.warn('Erro ao resetar ações dos funcionários:', e.message);
@@ -1038,6 +1056,51 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
       corpo: `Saldo devedor: R$${lc.saldo.toLocaleString('pt-BR')} · Juros 2,5%: -R$${juros.toLocaleString('pt-BR')}.`,
       tipo: 'urgente',
     });
+  }
+
+  // ── Rendimentos de investimentos (GDD Seção 32) ──
+  const invData = j.investimentos;
+  if (invData) {
+    // Renda fixa: 0,8%/mês exato
+    if (invData.renda_fixa?.length) {
+      const rend = invData.renda_fixa.reduce((s, i) => s + Math.floor(i.valor_aplicado * (i.taxa_mensal || 0.008)), 0);
+      if (rend > 0) {
+        updates.dinheiro = (updates.dinheiro ?? j.dinheiro ?? 0) + rend;
+        mensagens.push({ assunto: '📈 Renda Fixa', corpo: `+R$${rend.toLocaleString('pt-BR')} de rendimentos este mês.`, tipo: 'positivo' });
+      }
+    }
+    // Fundos: taxa variável dentro do intervalo min/max
+    if (invData.fundos?.length) {
+      let fundoTotal = 0;
+      for (const fund of invData.fundos) {
+        const taxa = (fund.min || 0) + Math.random() * ((fund.max || 0.008) - (fund.min || 0));
+        fundoTotal += Math.floor(fund.valor_aplicado * taxa);
+      }
+      if (fundoTotal !== 0) {
+        updates.dinheiro = (updates.dinheiro ?? j.dinheiro ?? 0) + fundoTotal;
+        mensagens.push({ assunto: fundoTotal >= 0 ? '📈 Fundos' : '📉 Fundos', corpo: `${fundoTotal >= 0 ? '+' : ''}R$${Math.abs(fundoTotal).toLocaleString('pt-BR')} nos seus fundos este mês.`, tipo: fundoTotal >= 0 ? 'positivo' : 'negativo' });
+      }
+    }
+    // Imóvel renda: aluguel fixo mensal
+    if (invData.imovel_renda) {
+      const aluguel = invData.imovel_renda.aluguel_mensal || 0;
+      if (aluguel > 0) {
+        updates.dinheiro = (updates.dinheiro ?? j.dinheiro ?? 0) + aluguel;
+        mensagens.push({ assunto: '🏠 Aluguel Imóvel', corpo: `Seu imóvel gerou R$${aluguel.toLocaleString('pt-BR')} de aluguel este mês.`, tipo: 'positivo' });
+      }
+    }
+    // Firmas NPC: dividendos variáveis por volatilidade
+    if (invData.firma_npc?.length) {
+      let firmTotal = 0;
+      for (const part of invData.firma_npc) {
+        const fator = 1 + (Math.random() * 2 - 1) * (part.volatilidade || 0.20);
+        firmTotal += Math.floor(part.valor_investido * (part.pct_base || 0.009) * fator);
+      }
+      if (firmTotal !== 0) {
+        updates.dinheiro = (updates.dinheiro ?? j.dinheiro ?? 0) + firmTotal;
+        mensagens.push({ assunto: firmTotal >= 0 ? '🏢 Dividendos' : '🏢 Prejuízo Firma', corpo: `${firmTotal >= 0 ? '+' : ''}R$${Math.abs(firmTotal).toLocaleString('pt-BR')} das participações em firmas este mês.`, tipo: firmTotal >= 0 ? 'positivo' : 'negativo' });
+      }
+    }
   }
 
   const repAtual  = updates.reputacao ?? j.reputacao ?? 30;

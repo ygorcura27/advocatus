@@ -20,7 +20,8 @@ const {
   retirarPeticaoMercado,
 } = require('./peticoes');
 const { montarSetlist, resolverEventoJulgamento } = require('./setlist');
-const { anteciparHonorarios, contratarLinhaCredito, pagarLinhaCredito } = require('./financeiro');
+const { anteciparHonorarios, contratarLinhaCredito, pagarLinhaCredito,
+        contratarSocioInvestidor, aplicarInvestimento, resgatarInvestimento } = require('./financeiro');
 
 exports.avancarMes              = avancarMes;
 exports.processarSentenca       = processarSentenca;
@@ -51,3 +52,6 @@ exports.tickMensal               = tickMensal;
 exports.anteciparHonorarios      = anteciparHonorarios;
 exports.contratarLinhaCredito    = contratarLinhaCredito;
 exports.pagarLinhaCredito        = pagarLinhaCredito;
+exports.contratarSocioInvestidor = contratarSocioInvestidor;
+exports.aplicarInvestimento      = aplicarInvestimento;
+exports.resgatarInvestimento     = resgatarInvestimento;

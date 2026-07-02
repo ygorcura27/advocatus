@@ -2,11 +2,29 @@
 
 /**
  * FINANCEIRO AVANÇADO — Advocatus Online (GDD Seção 31-33)
- * Antecipação de honorários e linha de crédito.
+ * Antecipação de honorários, linha de crédito, sócio investidor, investimentos.
  */
 
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+
+// ════════════════════════════════════════════════════════
+// CONSTANTES ESTÁTICAS (espelhadas no frontend)
+// ════════════════════════════════════════════════════════
+const _INVESTIDORES_POOL = [
+  'João Paulo Capital Partners', 'Fundo Veritas Advocatus', 'BH Equity Legal',
+  'Capital Legal RJ', 'Fundo Âncora Jurídico', 'Partners Prime Legal',
+  'Rio Capital Management', 'Ventures Advocatus SP', 'Nova Era Investments',
+  'Torres & Filhos Capital',
+];
+
+const _FIRMAS_NPC = [
+  { id: 'alves_ferreira',      nome: 'Alves & Ferreira',    setor: 'civil',       min_inv: 30000, pct_base: 0.008, volatilidade: 0.15 },
+  { id: 'costa_tributario',    nome: 'Costa Tributário',    setor: 'tributario',  min_inv: 50000, pct_base: 0.012, volatilidade: 0.20 },
+  { id: 'pereira_criminal',    nome: 'Pereira & Criminal',  setor: 'criminal',    min_inv: 40000, pct_base: 0.010, volatilidade: 0.30 },
+  { id: 'melo_digital',        nome: 'Melo Digital Law',    setor: 'tech',        min_inv: 80000, pct_base: 0.015, volatilidade: 0.35 },
+  { id: 'ribeiro_trabalhista', nome: 'Ribeiro Trabalhista', setor: 'trabalhista', min_inv: 20000, pct_base: 0.007, volatilidade: 0.10 },
+];
 
 // ════════════════════════════════════════════════════════
 // ANTECIPAÇÃO DE HONORÁRIOS (GDD Seção 31)
@@ -160,4 +178,175 @@ exports.pagarLinhaCredito = onCall({ region: 'southamerica-east1' }, async (requ
   });
 
   return { ok: true, pago: pagamento, saldoRestante: novoSaldo };
+});
+
+// ════════════════════════════════════════════════════════
+// SÓCIO INVESTIDOR (GDD Seção 33)
+// Tier 3+, investidor aporta capital em troca de 20% dos honorários por 36 meses.
+// ════════════════════════════════════════════════════════
+exports.contratarSocioInvestidor = onCall({ region: 'southamerica-east1' }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
+  const uid = request.auth.uid;
+  const db  = getFirestore();
+
+  const jogRef  = db.collection('jogadores').doc(uid);
+  const jogSnap = await jogRef.get();
+  if (!jogSnap.exists) throw new HttpsError('not-found', 'Jogador não encontrado.');
+  const j = jogSnap.data();
+
+  if (!j.escritorio_proprio_id) throw new HttpsError('failed-precondition', 'Necessário ter escritório próprio.');
+
+  const escRef  = db.collection('escritorios').doc(j.escritorio_proprio_id);
+  const escSnap = await escRef.get();
+  if (!escSnap.exists) throw new HttpsError('not-found', 'Escritório não encontrado.');
+  const esc  = escSnap.data();
+  const tier = esc.tier || 1;
+
+  if (tier < 3) throw new HttpsError('failed-precondition', `Tier mínimo 3 para sócio investidor (atual: Tier ${tier}).`);
+  if (esc.investidor?.ativo) throw new HttpsError('already-exists', 'Já existe um sócio investidor ativo.');
+
+  const ranges = { 3: [80000, 200000], 4: [200000, 600000], 5: [600000, 2000000] };
+  const [rMin, rMax] = ranges[Math.min(tier, 5)] || ranges[5];
+  const capital = Math.floor(rMin + Math.random() * (rMax - rMin));
+  const nome    = _INVESTIDORES_POOL[Math.floor(Math.random() * _INVESTIDORES_POOL.length)];
+  const mesAtual = `${j.ano_pessoal || 1}-${String(j.mes_pessoal || 1).padStart(2, '0')}`;
+
+  await escRef.update({
+    caixa: (esc.caixa || 0) + capital,
+    investidor: {
+      ativo: true,
+      nome,
+      capital_aportado: capital,
+      pct: 0.20,
+      meses_restantes: 36,
+      meses_total: 36,
+      total_pago: 0,
+      contratado_em: mesAtual,
+    },
+  });
+
+  return {
+    ok: true, nome, capital,
+    msg: `${nome} aportou R$${capital.toLocaleString('pt-BR')} em troca de 20% dos honorários por 36 meses.`,
+  };
+});
+
+// ════════════════════════════════════════════════════════
+// APLICAR INVESTIMENTO (GDD Seção 32)
+// tipos: renda_fixa | fundo | imovel_renda | firma_npc
+// ════════════════════════════════════════════════════════
+exports.aplicarInvestimento = onCall({ region: 'southamerica-east1' }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
+  const uid = request.auth.uid;
+  const { tipo, valor, subtipo, firma_id } = request.data || {};
+  if (!tipo || !valor || valor <= 0) throw new HttpsError('invalid-argument', 'tipo e valor são obrigatórios.');
+
+  const db      = getFirestore();
+  const jogRef  = db.collection('jogadores').doc(uid);
+  const jogSnap = await jogRef.get();
+  if (!jogSnap.exists) throw new HttpsError('not-found', 'Jogador não encontrado.');
+  const j = jogSnap.data();
+
+  if ((j.dinheiro || 0) < valor) throw new HttpsError('failed-precondition', 'Saldo insuficiente.');
+
+  const inv  = j.investimentos || {};
+  const now  = `${j.ano_pessoal || 1}-${String(j.mes_pessoal || 1).padStart(2, '0')}`;
+  const id   = `${tipo}_${Date.now()}`;
+  const updates = { dinheiro: (j.dinheiro || 0) - valor };
+
+  if (tipo === 'renda_fixa') {
+    if (valor < 1000) throw new HttpsError('invalid-argument', 'Mínimo R$1.000 para renda fixa.');
+    updates['investimentos.renda_fixa'] = [
+      ...(inv.renda_fixa || []),
+      { id, valor_aplicado: valor, taxa_mensal: 0.008, aplicado_em: now },
+    ];
+
+  } else if (tipo === 'fundo') {
+    const taxas = {
+      conservador: { min: 0.004, max: 0.009 },
+      moderado:    { min: 0.002, max: 0.014 },
+      arrojado:    { min: -0.005, max: 0.020 },
+    };
+    if (!taxas[subtipo]) throw new HttpsError('invalid-argument', 'subtipo deve ser conservador, moderado ou arrojado.');
+    if (valor < 2000) throw new HttpsError('invalid-argument', 'Mínimo R$2.000 para fundos.');
+    updates['investimentos.fundos'] = [
+      ...(inv.fundos || []),
+      { id, subtipo, valor_aplicado: valor, ...taxas[subtipo], aplicado_em: now },
+    ];
+
+  } else if (tipo === 'imovel_renda') {
+    if (inv.imovel_renda) throw new HttpsError('already-exists', 'Já possui imóvel para renda.');
+    if (valor < 50000) throw new HttpsError('invalid-argument', 'Mínimo R$50.000 para imóvel.');
+    const aluguel = Math.floor(valor * (0.004 + Math.random() * 0.002));
+    updates['investimentos.imovel_renda'] = { id, valor_aplicado: valor, aluguel_mensal: aluguel, aplicado_em: now };
+
+  } else if (tipo === 'firma_npc') {
+    const firma = _FIRMAS_NPC.find(f => f.id === firma_id);
+    if (!firma) throw new HttpsError('not-found', 'Firma não encontrada.');
+    if (valor < firma.min_inv) throw new HttpsError('invalid-argument', `Mínimo R$${firma.min_inv.toLocaleString('pt-BR')} para ${firma.nome}.`);
+    updates['investimentos.firma_npc'] = [
+      ...(inv.firma_npc || []),
+      { id, firma_id, nome: firma.nome, setor: firma.setor, valor_investido: valor, pct_base: firma.pct_base, volatilidade: firma.volatilidade, aplicado_em: now },
+    ];
+
+  } else {
+    throw new HttpsError('invalid-argument', 'Tipo de investimento inválido.');
+  }
+
+  await jogRef.update(updates);
+  return { ok: true, msg: `R$${valor.toLocaleString('pt-BR')} aplicados em ${tipo.replace('_', ' ')}.` };
+});
+
+// ════════════════════════════════════════════════════════
+// RESGATAR INVESTIMENTO
+// ════════════════════════════════════════════════════════
+exports.resgatarInvestimento = onCall({ region: 'southamerica-east1' }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
+  const uid = request.auth.uid;
+  const { tipo, id } = request.data || {};
+  if (!tipo) throw new HttpsError('invalid-argument', 'tipo obrigatório.');
+
+  const db      = getFirestore();
+  const jogRef  = db.collection('jogadores').doc(uid);
+  const jogSnap = await jogRef.get();
+  if (!jogSnap.exists) throw new HttpsError('not-found', 'Jogador não encontrado.');
+  const j   = jogSnap.data();
+  const inv = j.investimentos || {};
+
+  let valorDevolvido = 0;
+  const updates = {};
+
+  if (tipo === 'renda_fixa') {
+    const lista = inv.renda_fixa || [];
+    const item  = lista.find(i => i.id === id);
+    if (!item) throw new HttpsError('not-found', 'Investimento não encontrado.');
+    valorDevolvido = item.valor_aplicado;
+    updates['investimentos.renda_fixa'] = lista.filter(i => i.id !== id);
+
+  } else if (tipo === 'fundo') {
+    const lista = inv.fundos || [];
+    const item  = lista.find(i => i.id === id);
+    if (!item) throw new HttpsError('not-found', 'Fundo não encontrado.');
+    valorDevolvido = item.valor_aplicado;
+    updates['investimentos.fundos'] = lista.filter(i => i.id !== id);
+
+  } else if (tipo === 'imovel_renda') {
+    if (!inv.imovel_renda) throw new HttpsError('not-found', 'Sem imóvel para renda.');
+    valorDevolvido = inv.imovel_renda.valor_aplicado;
+    updates['investimentos.imovel_renda'] = null;
+
+  } else if (tipo === 'firma_npc') {
+    const lista = inv.firma_npc || [];
+    const item  = lista.find(i => i.id === id);
+    if (!item) throw new HttpsError('not-found', 'Participação não encontrada.');
+    valorDevolvido = item.valor_investido;
+    updates['investimentos.firma_npc'] = lista.filter(i => i.id !== id);
+
+  } else {
+    throw new HttpsError('invalid-argument', 'Tipo inválido.');
+  }
+
+  updates.dinheiro = (j.dinheiro || 0) + valorDevolvido;
+  await jogRef.update(updates);
+  return { ok: true, valorDevolvido, msg: `R$${valorDevolvido.toLocaleString('pt-BR')} resgatados com sucesso.` };
 });
