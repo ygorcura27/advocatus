@@ -2692,18 +2692,23 @@ window.renderCarteiraProcessual = async function(el) {
           const resLabel  = { procedente:'Procedente', parcial:'Parcialmente Procedente', improcedente:'Improcedente' }[p.resultado_setlist] || p.resultado_setlist;
           const resCor    = p.resultado_setlist === 'procedente' ? 'var(--verde2)' : p.resultado_setlist === 'parcial' ? 'var(--amber)' : 'var(--verm2)';
           const fmt       = (v) => `R$${(v||0).toLocaleString('pt-BR')}`;
+          const ganhouSet = p.resultado_setlist !== 'improcedente';
+          const botoesSet = ganhouSet
+            ? `<button class="btn btn-sm btn-prim btn-block"
+                onclick="window.decidirRecursoSentencaProducao('${p.id}', false)">✅ Confirmar vitória</button>`
+            : `<div style="display:flex;gap:.5rem;margin-top:.6rem">
+                 <button class="btn btn-sm btn-prim" style="flex:1"
+                   onclick="window.decidirRecursoSentencaProducao('${p.id}', true)">⚖️ Recorrer</button>
+                 <button class="btn btn-sm btn-ghost" style="flex:1"
+                   onclick="window.decidirRecursoSentencaProducao('${p.id}', false)">Aceitar</button>
+               </div>`;
           return `
           <div class="card" style="margin-bottom:.6rem;border-left:3px solid ${resCor}">
             <div style="font-family:var(--font-mono);font-size:.6rem;color:var(--txt4)">${p.numero || '—'}</div>
             <div style="font-weight:700;font-size:.85rem">${p.autor || '—'} vs ${p.reu || '—'}</div>
             <div style="font-size:.72rem;color:${resCor};margin:.25rem 0">${resIcon} ${resLabel} · Nota ${p.nota_final||'—'}/26</div>
-            <div style="font-size:.68rem;color:var(--ardosia2)">Honorários pendentes: ${fmt(p.hon_pendente)}</div>
-            <div style="display:flex;gap:.5rem;margin-top:.6rem">
-              <button class="btn btn-sm btn-prim" style="flex:1"
-                onclick="window.decidirRecursoSentencaProducao('${p.id}', true)">⚖️ Recorrer</button>
-              <button class="btn btn-sm btn-ghost" style="flex:1"
-                onclick="window.decidirRecursoSentencaProducao('${p.id}', false)">Aceitar</button>
-            </div>
+            <div style="font-size:.68rem;color:var(--ardosia2)">${ganhouSet ? `Honorários a receber: ${fmt(p.hon_pendente)}` : 'Sem honorários'}</div>
+            <div style="margin-top:.6rem">${botoesSet}</div>
           </div>`;
         }
 
