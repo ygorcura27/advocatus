@@ -155,7 +155,7 @@ window.renderProcessosPool = async function(j, escId, el) {
       .map(d => ({ id: d.id, ...d.data() }))
       .sort((a, b) => (b.criado_mes || 0) - (a.criado_mes || 0));
 
-    const STATUSES_RECURSAL = ['recurso_pendente', 'aguardando_decisao_sentenca', 'aguardando_decisao_recurso'];
+    const STATUSES_RECURSAL = ['recurso_pendente', 'aguardando_decisao_sentenca', 'aguardando_decisao_recurso', 'aguardando_evento', 'pronto_para_sentenca'];
 
     const disponiveis  = todos.filter(p => p.status === 'disponivel');
     const emAndamento  = todos.filter(p => p.status === 'em_andamento');
@@ -171,7 +171,7 @@ window.renderProcessosPool = async function(j, escId, el) {
       const recSnap = await getDocs(query(
         collection(db, 'processos'),
         where('pool_escritorio_id', '==', escId),
-        where('status', 'in', ['recurso_pendente', 'aguardando_decisao_recurso', 'aguardando_decisao_sentenca'])
+        where('status', 'in', ['recurso_pendente', 'aguardando_decisao_recurso', 'aguardando_decisao_sentenca', 'aguardando_evento', 'pronto_para_sentenca'])
       ));
       recursais = recSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     } catch (e) { /* sem índice ainda — deixa vazio */ }

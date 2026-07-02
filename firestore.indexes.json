@@ -27,6 +27,14 @@
       ]
     },
     {
+      "collectionGroup": "processos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "pool_escritorio_id", "order": "ASCENDING" },
+        { "fieldPath": "status",             "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "jogadores",
       "queryScope": "COLLECTION",
       "fields": [
