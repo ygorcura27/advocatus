@@ -518,7 +518,11 @@ exports.emprestarPeticao = onCall({ region: 'southamerica-east1' }, async (reque
   if (pet.jogador_uid !== uid) throw new HttpsError('permission-denied', 'Você não é o autor desta petição.');
   if (pet.emprestada_para) throw new HttpsError('failed-precondition', 'Petição já emprestada.');
 
-  await petSnap.ref.update({ emprestada_para: npc_id, emprestada_em: new Date().toISOString() });
+  await petSnap.ref.update({
+    emprestada_para: npc_id,
+    emprestada_em:   new Date().toISOString(),
+    status:          'emprestada',
+  });
   return { ok: true };
 });
 
@@ -537,7 +541,7 @@ exports.liberarEmprestimo = onCall({ region: 'southamerica-east1' }, async (requ
   const pet = petSnap.data();
   if (pet.jogador_uid !== uid) throw new HttpsError('permission-denied', 'Você não é o autor desta petição.');
 
-  await petSnap.ref.update({ emprestada_para: null, emprestada_em: null });
+  await petSnap.ref.update({ emprestada_para: null, emprestada_em: null, status: 'pronta' });
   return { ok: true };
 });
 

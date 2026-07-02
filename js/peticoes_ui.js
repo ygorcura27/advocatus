@@ -258,7 +258,9 @@ function _cardPeticao(p) {
       </div>
 
       <div style="font-size:.72rem;color:var(--ardosia2);margin-bottom:.4rem">
-        Nota base: <b>${p.nota_base}/26</b> · Teto: ${p.teto_nota}/26
+        ${p.status === 'em_composicao' && p.mes_conclusao
+          ? `<span style="color:var(--ouro2)">⏳ Pronta no mês ${p.mes_conclusao}</span> · `
+          : ''}Nota base: <b>${p.nota_base}/26</b> · Teto: ${p.teto_nota}/26
         · ${'★'.repeat(Math.floor(p.nota_base/6))}${'☆'.repeat(5-Math.floor(p.nota_base/6))}
       </div>
 
