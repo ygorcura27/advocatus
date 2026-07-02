@@ -476,11 +476,32 @@ window.abrirDetalhePeticao = async function(peticaoId) {
 // ─── Empréstimo / Venda ───────────────────────────────────────────────────────
 
 window.abrirModalEmprestar = async function(peticaoId) {
-  const npcId = prompt('ID do NPC para emprestar a petição:');
-  if (!npcId) return;
+  const j = window.JOGADOR;
+  const escId = j?.escritorio_proprio_id;
+
+  if (!escId) {
+    toast('Você precisa ter um escritório para emprestar petições.', 'erro');
+    return;
+  }
+
+  // Carregar NPCs do escritório
+  const { collection: col2, getDocs: gds2, query: q2 } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+  const funcSnap = await gds2(q2(col2(db, 'escritorios', escId, 'funcionarios')));
+  const npcs = funcSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(f => !f.burnout_npc && !f.em_ferias);
+
+  if (npcs.length === 0) {
+    toast('Nenhum NPC disponível no escritório.', 'erro');
+    return;
+  }
+
+  const lista = npcs.map((f, i) => `${i + 1}. ${f.nome} (${f.cargo_id})`).join('\n');
+  const idx   = parseInt(prompt(`Emprestar para qual NPC?\n${lista}`), 10) - 1;
+  if (idx < 0 || idx >= npcs.length) return;
+
   try {
-    await httpsCallable(functions, 'emprestarPeticao')({ peticao_id: peticaoId, npc_id: npcId });
-    toast('Petição emprestada!', 'ok', 3000);
+    await httpsCallable(functions, 'emprestarPeticao')({ peticao_id: peticaoId, npc_id: npcs[idx].id });
+    toast(`Petição emprestada a ${npcs[idx].nome}!`, 'ok', 3000);
+    if (window.JOGADOR) window.renderPeticoes(window.JOGADOR, document.getElementById('main-content'));
   } catch(e) { toast('Erro: ' + e.message, 'erro'); }
 };
 
