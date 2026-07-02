@@ -24,6 +24,31 @@ const { getFirestore }       = require('firebase-admin/firestore');
 const { logger }             = require('firebase-functions');
 const banco = require('./shared/banco_juridico.js');
 
+// GDD §28-30 — deltas de satisfação por perfil e resultado (espelho de processar_sentenca.js)
+const _DELTA_SAT = {
+  conservador: { procedente:8,  parcial:4,  improcedente:-15 },
+  ansioso:     { procedente:12, parcial:3,  improcedente:-20 },
+  pragmatico:  { procedente:10, parcial:8,  improcedente:-10 },
+  exigente:    { procedente:18, parcial:-5, improcedente:-25 },
+  leal:        { procedente:6,  parcial:4,  improcedente:-6  },
+};
+
+async function _atualizarSatisfacaoClienteAcordao(db, p, resultado) {
+  const clienteNome = p.cliente_nome;
+  const escId = p.pool_escritorio_id || p.pool_proc_esc_id;
+  if (!clienteNome || !escId) return;
+  try {
+    const clSnap = await db.collection('escritorios').doc(escId)
+      .collection('clientes').where('nome', '==', clienteNome).limit(1).get();
+    if (clSnap.empty) return;
+    const cDoc = clSnap.docs[0];
+    const c = cDoc.data();
+    const deltas = _DELTA_SAT[c.perfil || 'pragmatico'] || _DELTA_SAT.pragmatico;
+    const novaConfianca = Math.max(0, Math.min(100, (c.confianca || 50) + (deltas[resultado] || 0)));
+    await cDoc.ref.update({ confianca: novaConfianca });
+  } catch (e) { /* silencioso */ }
+}
+
 const REP_CAP = {
   est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100, snm:100,
   jsub:55, jtit:70, dsb:85, mstj:100,
@@ -272,6 +297,7 @@ if (escritorioDoCaso) {
   if (transitouAgora) {
     const statusFinal = jogadorGanhouEsteJulgamento ? 'ganho' : 'perdido';
     await processoRef.update({ status: statusFinal, encerrado_mes: mesTotalPessoal(j) });
+    await _atualizarSatisfacaoClienteAcordao(db, p, jogadorGanhouEsteJulgamento ? 'procedente' : 'improcedente');
     // Atualizar pool subcol (quando processo veio de _assumirCasoPool)
     if (p.pool_proc_subcol_id && p.pool_proc_esc_id) {
       try {
@@ -358,6 +384,7 @@ exports.decidirProximaInstancia = onCall({ region: 'southamerica-east1' }, async
           .update({ status: 'concluido', resultado: 'improcedente', concluido_em: new Date().toISOString() });
       } catch(e) { logger.warn('Pool subcol decidir update:', e); }
     }
+    await _atualizarSatisfacaoClienteAcordao(db, p, 'improcedente');
     return { msg: 'Decisão aceita. Processo encerrado — trânsito em julgado.' };
   }
 
