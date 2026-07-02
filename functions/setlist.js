@@ -327,15 +327,21 @@ exports.montarSetlist = onCall({ region: 'southamerica-east1' }, async (request)
   const modEst       = modEstadoJogador(j);
   let nota_provisoria = calcularNotaProcesso(slotsCalculados, modEst);
   if (supervisaoAtiva) nota_provisoria = Math.min(26, nota_provisoria + 2);
-  const instancia    = normalizarInstancia(proc.instancia_atual || proc.instancia);
-  const evento       = gerarEventoJulgamento(nota_provisoria, instancia);
+  // Para recurso: usa instancia_seguinte (tribunal onde o recurso é julgado)
+  // Para 1ª instância: usa instancia (campo do processo inicial)
+  const instRaw   = proc.status === 'recurso_pendente'
+    ? proc.instancia_seguinte
+    : (proc.instancia_atual || proc.instancia);
+  const instancia = normalizarInstancia(instRaw);
+  const evento    = gerarEventoJulgamento(nota_provisoria, instancia);
 
   await procSnap.ref.update({
-    setlist:        slotsCalculados,
-    supervisao_ativa: supervisaoAtiva,
+    setlist:             slotsCalculados,
+    supervisao_ativa:    supervisaoAtiva,
     nota_provisoria,
-    evento_julgamento: evento,
-    status:         'aguardando_evento',
+    evento_julgamento:   evento,
+    setlist_instancia:   instRaw,   // instância onde este setlist é julgado (para XP)
+    status:              'aguardando_evento',
   });
 
   logger.info(`[SETLIST] ${uid} → ${processo_id}, nota_provisória=${nota_provisoria}, evento=${evento.categoria}`);

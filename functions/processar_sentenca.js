@@ -262,9 +262,10 @@ async function _processarSentencaSetlist(db, processoRef, jogadorRef, p, j, uid,
   const impactoEv    = (ev.impacto || 0) + (ev.segundo_evento?.impacto || 0);
   const posicao      = p.posicao || p.meu_lado || 'autor';
   const tipoCaso     = p.area || p.tipo || 'civil';
-  const _INST_MAP    = { '1grau':'trial', TJ:'appeals', TJRJ:'appeals', TJSP:'appeals', STJ:'circuit', TST:'circuit', STF:'supreme' };
-  const instRaw      = p.instancia_atual || p.instancia;
-  const instancia    = _INST_MAP[instRaw] || (instRaw && instRaw !== '1grau' ? 'appeals' : 'trial');
+  const _INST_MAP = { '1grau':'trial', TJ:'appeals', TJRJ:'appeals', TJSP:'appeals', STJ:'circuit', TST:'circuit', STF:'supreme' };
+  // Usa setlist_instancia gravado pelo montarSetlist; fallback para instancia/instancia_atual
+  const instRaw   = p.setlist_instancia || p.instancia_atual || p.instancia;
+  const instancia = _INST_MAP[instRaw] || (instRaw && instRaw !== '1grau' ? 'appeals' : 'trial');
 
   const ctx = {
     processos_concluidos: j.processos_concluidos || 0,
