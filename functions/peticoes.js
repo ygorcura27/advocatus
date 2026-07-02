@@ -606,13 +606,14 @@ exports.comprarPeticao = onCall({ region: 'southamerica-east1' }, async (request
     // Debitar comprador
     tx.update(jogRef, { dinheiro: (j.dinheiro || 0) - preco });
 
-    // Transferir propriedade
+    // Transferir propriedade (popularidade resetada para 60 ao trocar de dono)
     tx.update(petRef, {
-      jogador_uid:  uid,
-      no_mercado:   false,
+      jogador_uid:   uid,
+      no_mercado:    false,
       preco_mercado: 0,
-      comprada_em:  new Date().toISOString(),
-      comprada_de:  pet.jogador_uid,
+      popularidade:  60,
+      comprada_em:   new Date().toISOString(),
+      comprada_de:   pet.jogador_uid,
     });
   });
 
