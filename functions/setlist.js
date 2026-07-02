@@ -131,6 +131,13 @@ const IMPACTO_POR_INSTANCIA = {
   supreme: 25,
 };
 
+// Converte os nomes de instância do jogo para os do sistema de setlist
+function normalizarInstancia(inst) {
+  const MAP = { '1grau': 'trial', 'TJ': 'appeals', 'TJRJ': 'appeals', 'TJSP': 'appeals',
+    'STJ': 'circuit', 'TST': 'circuit', 'STF': 'supreme' };
+  return MAP[inst] || (inst && inst !== '1grau' ? 'appeals' : 'trial');
+}
+
 function sortearEvento(categoria) {
   const lista = categoria === 'oportunidade' ? EVENTOS_OPORTUNIDADE
     : categoria === 'complicacao' ? EVENTOS_COMPLICACAO
@@ -237,12 +244,30 @@ exports.montarSetlist = onCall({ region: 'southamerica-east1' }, async (request)
 
   const proc  = procSnap.data();
   const j     = jogSnap.data();
+
+  // Verificar autorização: advogado do processo ou membro do escritório
+  const isAdv = proc.advogado_uid === uid;
+  const isEsc = proc.pool_escritorio_id && proc.pool_escritorio_id === j.escritorio_proprio_id;
+  if (!isAdv && !isEsc) {
+    throw new HttpsError('permission-denied', 'Você não tem permissão para montar setlist neste processo.');
+  }
+  if (!j.oab) {
+    throw new HttpsError('failed-precondition', 'OAB necessária para usar o sistema de setlist.');
+  }
+
   const skJur = normalizarSkillsJur(j.skills_jur);
   const escId = j.pat?.escritorio || 'cw';
 
-  // Validar slot 1 = initial_filing
-  if (slots[0]?.tipo === 'peticao' && slots[0]?.acao_tipo === 'oral_argument') {
-    throw new HttpsError('invalid-argument', 'Slot 1 deve ser uma petição (initial_filing).');
+  // Validar tier e número máximo de slots
+  const tier     = proc.tier || 'D';
+  const maxSlots = SLOTS_POR_TIER[tier] || 4;
+  if (slots.length > maxSlots) {
+    throw new HttpsError('invalid-argument', `Tier ${tier} permite no máximo ${maxSlots} slots.`);
+  }
+
+  // Validar slot 1 deve ser petição (não ação processual)
+  if (slots[0]?.tipo !== 'peticao') {
+    throw new HttpsError('invalid-argument', 'Slot 1 deve ser uma Petição Inicial.');
   }
 
   // Calcular nota de cada slot
@@ -302,7 +327,7 @@ exports.montarSetlist = onCall({ region: 'southamerica-east1' }, async (request)
   const modEst       = modEstadoJogador(j);
   let nota_provisoria = calcularNotaProcesso(slotsCalculados, modEst);
   if (supervisaoAtiva) nota_provisoria = Math.min(26, nota_provisoria + 2);
-  const instancia    = proc.instancia_atual || 'trial';
+  const instancia    = normalizarInstancia(proc.instancia_atual || proc.instancia);
   const evento       = gerarEventoJulgamento(nota_provisoria, instancia);
 
   await procSnap.ref.update({

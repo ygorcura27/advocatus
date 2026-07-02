@@ -1965,7 +1965,16 @@ function _gerarProcessoCompleto(j, distribuidoPeloEscritorio = false) {
     criado_mes: mesG,
     encerrado_mes: null,
     recurso_pendente: false,
+    tier: _tierDoCaso(PROC.valor_causa),
   };
+}
+
+function _tierDoCaso(valor) {
+  if (valor >= 1000000) return 'S';
+  if (valor >=  200000) return 'A';
+  if (valor >=   50000) return 'B';
+  if (valor >=   10000) return 'C';
+  return 'D';
 }
 
 function mesTotalPessoalProc(j) {
@@ -2780,8 +2789,10 @@ window.jogarRecursoProducao = async function(procId) {
   const p = snap.data();
   RECURSO_ATIVO = { id: procId, ...p };
 
-  // GDD v4.1 — se o recurso ainda não tem setlist e jogador tem OAB, usa o novo fluxo
-  if (j.oab && !p.setlist) {
+  // GDD v4.1 — OAB: recurso pendente sempre usa novo fluxo de setlist (mesmo que já haja setlist anterior)
+  // Quando há um setlist existente no processo, trata-se de um RECURSO (nova sustentação).
+  // O CF montarSetlist sobrescreve o campo setlist com a nova peça recursal.
+  if (j.oab && p.status === 'recurso_pendente') {
     abrirModal(`📜 Recurso — Montar Setlist`,
       '<div id="modal-setlist-recurso" style="min-height:200px"><div style="padding:1rem;color:var(--ardosia2)">Carregando…</div></div>');
     setTimeout(() => {
