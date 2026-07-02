@@ -369,18 +369,28 @@ function renderEscritorio(j, el) {
       </div>`}
     </div>
 
-    <!-- Carteira processual solo -->
+    <!-- Carteira Processual para OAB (recursos, sentença pendente) -->
+    ${j.oab ? `<div id="carteira-processual-solo"><div style="font-size:.78rem;color:var(--ardosia);padding:.5rem 0">Carregando carteira...</div></div>` : ''}
+
+    <!-- Processos ativos -->
     <div class="secao-header"><div class="secao-titulo">📁 Meus Processos</div></div>
     <div id="solo-processos-lista">
       <div style="font-size:.78rem;color:var(--ardosia);padding:.5rem 0">Carregando casos...</div>
     </div>`;
 
+  if (j.oab) {
+    const elCarteira = el.querySelector('#carteira-processual-solo');
+    if (elCarteira && window.renderCarteiraProcessual) window.renderCarteiraProcessual(elCarteira);
+  }
   _carregarProcessosSolo(j);
 }
 
 async function _carregarProcessosSolo(j) {
   try {
-    const ATIVOS_STATUS = ['andamento','aguardando_evento','pronto_para_sentenca','aguardando_decisao_sentenca','recurso_pendente','aguardando_decisao_recurso'];
+    // OAB players: recurso/sentença cases handled by renderCarteiraProcessual above
+    const ATIVOS_STATUS = j.oab
+      ? ['andamento','aguardando_evento','pronto_para_sentenca']
+      : ['andamento','aguardando_evento','pronto_para_sentenca','aguardando_decisao_sentenca','recurso_pendente','aguardando_decisao_recurso'];
     const snapA = await getDocs(query(
       collection(db, 'processos'),
       where('advogado_uid', '==', j.uid),
