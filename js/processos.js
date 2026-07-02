@@ -2047,7 +2047,36 @@ window.abrirProcesso = async function(processoId) {
 };
 
 function _renderModalProcesso(id, p) {
-  const j   = window.JOGADOR;
+  const j = window.JOGADOR;
+
+  // GDD v4.1 — fluxo setlist
+  if (p.status === 'aguardando_evento' && p.evento_julgamento) {
+    abrirModal(`⚖️ ${p.tipo || 'Processo'} — Evento`, '<div id="modal-evento-content"><div style="padding:1rem;color:var(--ardosia2)">Carregando evento…</div></div>');
+    setTimeout(() => {
+      const el = document.getElementById('modal-evento-content');
+      if (el && window.renderEventoJulgamento) window.renderEventoJulgamento(id, el);
+    }, 50);
+    return;
+  }
+
+  if (p.status === 'pronto_para_sentenca') {
+    abrirModal(`⚖️ ${p.tipo || 'Processo'} — Sentença`,
+      `<div style="font-size:.85rem;color:var(--ardosia2);margin-bottom:1rem">Evento resolvido. A sentença está pronta para ser processada.</div>
+       <div style="font-size:.75rem;margin-bottom:1rem">Nota provisória do setlist: <b>${p.nota_provisoria || '—'}/26</b></div>
+       <button class="btn btn-prim btn-block" onclick="window.processarSentencaSetlist('${id}')">⚖️ Processar Sentença</button>`
+    );
+    return;
+  }
+
+  if (j.oab && !p.setlist && !p.progresso && p.status !== 'concluido' && p.status !== 'recurso_pendente') {
+    abrirModal(`📜 ${p.tipo || 'Processo'} — Montar Setlist`, '<div id="modal-setlist-content" style="min-height:200px"><div style="padding:1rem;color:var(--ardosia2)">Carregando…</div></div>');
+    setTimeout(() => {
+      const el = document.getElementById('modal-setlist-content');
+      if (el && window.renderSetlistBuilder) window.renderSetlistBuilder(id, j, el);
+    }, 50);
+    return;
+  }
+
   const cv  = p.convencimento || 38;
   const prog = p.progresso || 0;
   const cvColor = cv >= 58 ? 'var(--verde2)' : cv >= 38 ? 'var(--amber)' : 'var(--verm2)';
@@ -2354,6 +2383,22 @@ window.responderAudiencia = async function(procId, tipo) {
 //  - Reputação: ganha/perde a cada decisão, mesmo sabendo que pode ser
 //    revertida depois (reflete o abalo real ao cliente).
 //  - Dinheiro: só no TRÂNSITO EM JULGADO — fica "pendente" (hon_pendente)
+// GDD v4.1 — sentença via setlist (status pronto_para_sentenca)
+window.processarSentencaSetlist = async function(procId) {
+  fecharModal();
+  try {
+    const fn  = httpsCallable(window.FB_FUNCTIONS, 'processarSentenca');
+    const res = await fn({ processo_id: procId });
+    const d   = res.data;
+    const resLabel = { procedente: '✅ PROCEDENTE', parcial: '⚠️ PARCIALMENTE PROCEDENTE', improcedente: '❌ IMPROCEDENTE' };
+    toast(`${resLabel[d.resultado] || d.resultado} · Honorários: R$${(d.hon_pendente||0).toLocaleString('pt-BR')}`, 'ok', 7000);
+    window.dispatchEvent(new CustomEvent('gamestate:reload'));
+    setTimeout(() => window.dispatchEvent(new CustomEvent('nav:painel', { detail: 'processos' })), 300);
+  } catch(e) {
+    toast('Erro ao processar sentença: ' + (e.message || e), 'ko');
+  }
+};
+
 //    até a cadeia de recursos se esgotar, para nunca pagar honorários de
 //    uma vitória que pode ser cassada em recurso.
 // ════════════════════════════════════════════════════════

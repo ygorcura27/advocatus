@@ -50,6 +50,10 @@ function _renderizar() {
       }
       break;
     case 'equipe_dummy':       renderEquipe(j, main);        break;
+    case 'peticoes':
+      if (window.renderPeticoes) window.renderPeticoes(j, main);
+      else main.innerHTML = '<div class="card" style="color:var(--ardosia2)">Carregando petições...</div>';
+      break;
     case 'progressao':   renderProgressao(j, main);    break;
     case 'habilidades':  renderHabilidades(j, main);   break;
     case 'cursos':       renderCursos(j, main);        break;
@@ -1097,6 +1101,104 @@ function renderHabilidades(j, el) {
           </div>
         </div>`;
       }).join('')}
+    </div>
+
+    ${_renderSkillsJur(j)}`;
+}
+
+function _renderSkillsJur(j) {
+  const skJur  = j.skills_jur || {};
+  const oab    = j.oab || false;
+  const tentativas = j.bar_exam_tentativas || 0;
+  const score  = j.bar_exam_ultimo_score ?? null;
+
+  const BASE_SKILLS = [
+    { k: 'legal_drafting',   l: 'Legal Drafting',   w: 0.30 },
+    { k: 'legal_research',   l: 'Legal Research',   w: 0.30 },
+    { k: 'argumentation',    l: 'Argumentation',    w: 0.25 },
+    { k: 'oral_advocacy',    l: 'Oral Advocacy',    w: 0    },
+    { k: 'negotiation',      l: 'Negotiation',      w: 0    },
+    { k: 'procedure',        l: 'Procedure',        w: 0.15 },
+  ];
+  const DOC_SKILLS = [
+    { k: 'doc_initial_filing',      l: 'Initial Filing'      },
+    { k: 'doc_responsive_pleading', l: 'Responsive Pleading' },
+    { k: 'doc_motion',              l: 'Motion'              },
+    { k: 'doc_appellate_brief',     l: 'Appellate Brief'     },
+    { k: 'doc_supreme_brief',       l: 'Supreme Brief'       },
+    { k: 'doc_trial_brief',         l: 'Trial Brief'         },
+    { k: 'doc_evidence',            l: 'Evidence'            },
+    { k: 'doc_deposition',          l: 'Deposition'          },
+  ];
+  const AREA_SKILLS = [
+    { k: 'area_employment',  l: 'Trabalhista'   },
+    { k: 'area_tax',         l: 'Tributário'    },
+    { k: 'area_civil',       l: 'Cível'         },
+    { k: 'area_criminal',    l: 'Criminal'      },
+    { k: 'area_corporate',   l: 'Empresarial'   },
+    { k: 'area_immigration', l: 'Imigração'     },
+    { k: 'area_bankruptcy',  l: 'Rec. Judicial' },
+  ];
+
+  const previewScore = BASE_SKILLS.reduce((acc, sk) => acc + (skJur[sk.k]||0) * sk.w, 0).toFixed(1);
+
+  function skBar(val) {
+    const pct = Math.round(val / 50 * 100);
+    return `<div style="background:var(--borda2);border-radius:3px;height:5px;margin-top:.25rem">
+      <div style="width:${pct}%;height:100%;background:var(--azul1);border-radius:3px;transition:.3s"></div>
+    </div>`;
+  }
+  function skRow(sk) {
+    const val = skJur[sk.k] || 0;
+    return `<div style="display:flex;align-items:center;gap:.5rem;padding:.3rem 0;border-bottom:1px solid var(--borda1)">
+      <span style="flex:1;font-size:.78rem">${sk.l}</span>
+      <span style="font-size:.78rem;font-weight:600;min-width:2rem;text-align:right">${val}/50</span>
+      <div style="width:80px">${skBar(val)}</div>
+    </div>`;
+  }
+
+  return `
+    <div style="margin-top:1.5rem;border-top:1px solid var(--borda2);padding-top:1rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.8rem">
+        <div style="font-weight:600">Skills Jurídicas (OAB)</div>
+        ${oab
+          ? `<span style="font-size:.75rem;background:var(--verde1);color:#fff;padding:.2rem .6rem;border-radius:12px">OAB Aprovado ✓</span>`
+          : `<div style="display:flex;gap:.4rem">
+              <button class="btn btn-ghost btn-sm" onclick="window.matricularPrep && window.matricularPrep()">Bar Prep · R$3.000</button>
+              <button class="btn btn-prim btn-sm" onclick="window.tentarBarExam && window.tentarBarExam()">
+                Exame OAB${tentativas > 0 ? ` (${tentativas}ª tentativa)` : ''}
+              </button>
+            </div>`}
+      </div>
+      <div style="font-size:.72rem;color:var(--ardosia2);margin-bottom:.6rem">
+        Score estimado: <b>${previewScore}/50</b> · Aprovação: 32,5
+        ${score !== null ? ` · Última tentativa: ${score}` : ''}
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 1.5rem;margin-bottom:1rem">
+        ${BASE_SKILLS.map(sk => {
+          const val = skJur[sk.k] || 0;
+          return `<div style="display:flex;align-items:center;gap:.5rem;padding:.3rem 0;border-bottom:1px solid var(--borda1)">
+            <span style="flex:1;font-size:.78rem">${sk.l}${sk.w > 0 ? ` <span style="color:var(--ouro);font-size:.7rem">(${sk.w*100}%)</span>` : ''}</span>
+            <span style="font-size:.78rem;font-weight:600;min-width:2rem;text-align:right">${val}/50</span>
+            <div style="width:60px">${skBar(val)}</div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <details style="margin-bottom:.5rem">
+        <summary style="font-size:.76rem;color:var(--ardosia2);cursor:pointer;margin-bottom:.5rem">Tipos de Documento</summary>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 1.5rem">
+          ${DOC_SKILLS.map(skRow).join('')}
+        </div>
+      </details>
+
+      <details>
+        <summary style="font-size:.76rem;color:var(--ardosia2);cursor:pointer;margin-bottom:.5rem">Áreas do Direito</summary>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 1.5rem">
+          ${AREA_SKILLS.map(skRow).join('')}
+        </div>
+      </details>
     </div>`;
 }
 

@@ -1986,3 +1986,61 @@ a:hover { color: var(--navy); }
 .pa-bar-wrap { height: 7px; background: var(--bg2); border-radius: 4px; overflow: hidden; margin-bottom: .35rem; }
 .pa-bar-fill { height: 100%; background: linear-gradient(90deg, var(--ouro3), var(--ouro)); border-radius: 4px; transition: width .4s ease; }
 .pa-pct { font-size: .68rem; font-weight: 700; color: var(--ouro2); text-align: right; }
+
+/* ═══════════════════════════════════════════════════════════
+   PETIÇÕES — GDD v4.1
+   ═══════════════════════════════════════════════════════════ */
+.pet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: .85rem;
+}
+.pet-card {
+  cursor: pointer;
+  transition: box-shadow .15s, transform .1s;
+}
+.pet-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,.12);
+  transform: translateY(-1px);
+}
+
+/* Mini stat block */
+.stat-mini {
+  background: var(--fundo2);
+  border-radius: var(--r);
+  padding: .55rem .7rem;
+  text-align: center;
+}
+.stat-mini .sm-label {
+  font-size: .67rem;
+  color: var(--ardosia2);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin-bottom: .2rem;
+}
+.stat-mini .sm-val {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--txt);
+}
+
+/* Setlist builder slots */
+.setlist-slot {
+  transition: background .1s;
+}
+.setlist-slot:hover {
+  background: var(--fundo3, var(--borda1)) !important;
+}
+
+/* Badge inline */
+.badge {
+  display: inline-block;
+  padding: .15rem .5rem;
+  border-radius: 10px;
+  font-size: .68rem;
+  font-weight: 600;
+}
+
+/* Skills jurídicas — grid de barras */
+.skjur-label { font-size: .75rem; }
+.skjur-val   { font-size: .75rem; font-weight: 700; min-width: 2.5rem; text-align: right; }
