@@ -2068,6 +2068,21 @@ function _renderModalProcesso(id, p) {
     return;
   }
 
+  if (p.status === 'aguardando_decisao_sentenca') {
+    const res = p.resultado_setlist || 'improcedente';
+    const resLabel = { procedente:'🏆 PROCEDENTE', parcial:'⚖️ PARCIALMENTE PROCEDENTE', improcedente:'📋 IMPROCEDENTE' }[res] || res;
+    const fmt = (v) => `R$${(v||0).toLocaleString('pt-BR')}`;
+    abrirModal(`⚖️ ${p.tipo || 'Processo'} — Decisão Pendente`,
+      `<div style="font-size:.9rem;font-weight:600;margin-bottom:.8rem">${resLabel}</div>
+       <div style="font-size:.78rem;color:var(--ardosia2);margin-bottom:1rem">
+         Nota final: ${p.nota_final||'—'}/26 · Honorários pendentes: ${fmt(p.hon_pendente)}
+       </div>
+       <button class="btn btn-prim btn-block" onclick="window.decidirRecursoSentencaProducao('${id}', true)">⚖️ Recorrer</button>
+       <button class="btn btn-ghost btn-block" style="margin-top:.4rem" onclick="window.decidirRecursoSentencaProducao('${id}', false)">Aceitar e encerrar</button>`
+    );
+    return;
+  }
+
   if (j.oab && !p.setlist && !p.progresso && p.status !== 'concluido' && p.status !== 'recurso_pendente') {
     abrirModal(`📜 ${p.tipo || 'Processo'} — Montar Setlist`, '<div id="modal-setlist-content" style="min-height:200px"><div style="padding:1rem;color:var(--ardosia2)">Carregando…</div></div>');
     setTimeout(() => {
@@ -2742,7 +2757,21 @@ window.jogarRecursoProducao = async function(procId) {
   const j = window.JOGADOR;
   const snap = await getDoc(doc(db, 'processos', procId));
   if (!snap.exists()) { toast('Processo não encontrado.', 'ko'); return; }
-  RECURSO_ATIVO = { id: procId, ...snap.data() };
+  const p = snap.data();
+  RECURSO_ATIVO = { id: procId, ...p };
+
+  // GDD v4.1 — se o recurso ainda não tem setlist e jogador tem OAB, usa o novo fluxo
+  if (j.oab && !p.setlist) {
+    abrirModal(`📜 Recurso — Montar Setlist`,
+      '<div id="modal-setlist-recurso" style="min-height:200px"><div style="padding:1rem;color:var(--ardosia2)">Carregando…</div></div>');
+    setTimeout(() => {
+      const el = document.getElementById('modal-setlist-recurso');
+      if (el && window.renderSetlistBuilder) window.renderSetlistBuilder(procId, j, el);
+    }, 50);
+    return;
+  }
+
+  // Fluxo antigo (processos sem OAB ou legados)
 
   // ── TRAVA DE CAPACIDADE POSTULATÓRIA ──
   // Só se aplica quando É O JOGADOR quem precisa SUSTENTAR (recorrer ou
