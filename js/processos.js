@@ -2794,16 +2794,20 @@ window.jogarRecursoProducao = async function(procId) {
   const p = snap.data();
   RECURSO_ATIVO = { id: procId, ...p };
 
-  // GDD v4.1 — OAB: recurso pendente sempre usa novo fluxo de setlist (mesmo que já haja setlist anterior)
-  // Quando há um setlist existente no processo, trata-se de um RECURSO (nova sustentação).
-  // O CF montarSetlist sobrescreve o campo setlist com a nova peça recursal.
-  if (j.oab && p.status === 'recurso_pendente') {
-    abrirModal(`📜 Recurso — Montar Setlist`,
-      '<div id="modal-setlist-recurso" style="min-height:200px"><div style="padding:1rem;color:var(--ardosia2)">Carregando…</div></div>');
-    setTimeout(() => {
-      const el = document.getElementById('modal-setlist-recurso');
-      if (el && window.renderSetlistBuilder) window.renderSetlistBuilder(procId, j, el);
-    }, 50);
+  // GDD v4.1 — OAB: sempre usa fluxo setlist, nunca o fluxo de rodadas antigo.
+  // Se o status mudou (dados stale na UI), redireciona para a modal correta.
+  if (j.oab) {
+    if (p.status === 'recurso_pendente') {
+      abrirModal(`📜 Recurso — Montar Setlist`,
+        '<div id="modal-setlist-recurso" style="min-height:200px"><div style="padding:1rem;color:var(--ardosia2)">Carregando…</div></div>');
+      setTimeout(() => {
+        const el = document.getElementById('modal-setlist-recurso');
+        if (el && window.renderSetlistBuilder) window.renderSetlistBuilder(procId, j, el);
+      }, 50);
+    } else {
+      // Status mudou desde que a UI foi renderizada — abre modal atualizado
+      window.abrirProcesso && window.abrirProcesso(procId);
+    }
     return;
   }
 
