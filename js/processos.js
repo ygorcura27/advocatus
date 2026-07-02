@@ -2083,7 +2083,7 @@ function _renderModalProcesso(id, p) {
     return;
   }
 
-  if (j.oab && !p.setlist && !p.progresso && p.status !== 'concluido' && p.status !== 'recurso_pendente') {
+  if (j.oab && !p.setlist && !p.progresso && p.status !== 'concluido') {
     abrirModal(`📜 ${p.tipo || 'Processo'} — Montar Setlist`, '<div id="modal-setlist-content" style="min-height:200px"><div style="padding:1rem;color:var(--ardosia2)">Carregando…</div></div>');
     setTimeout(() => {
       const el = document.getElementById('modal-setlist-content');

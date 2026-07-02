@@ -1199,8 +1199,44 @@ function _renderSkillsJur(j) {
           ${AREA_SKILLS.map(skRow).join('')}
         </div>
       </details>
+
+      ${_mentoriaComposicaoBloco(j)}
     </div>`;
 }
+
+function _mentoriaComposicaoBloco(j) {
+  const ativa = j.mentoria_composicao_ativa || false;
+  return `
+    <div style="margin-top:.8rem;padding:.6rem;background:var(--fundo2);border-radius:6px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:.78rem;font-weight:600">Mentoria de Composição</div>
+        <div style="font-size:.7rem;color:var(--ardosia2)">
+          ${ativa
+            ? '+4 XP/mês em Legal Drafting e Legal Research · Sênior+ supervisionando'
+            : 'Ative para receber +4 XP/mês (requer NPC Sênior+ na equipe)'}
+        </div>
+      </div>
+      <button class="btn btn-sm ${ativa ? 'btn-prim' : 'btn-ghost'}"
+        onclick="window._toggleMentoriaComp(${ativa})">
+        ${ativa ? 'Ativo ✓' : 'Ativar'}
+      </button>
+    </div>`;
+}
+
+window._toggleMentoriaComp = async function(atualAtiva) {
+  const j = window.JOGADOR;
+  if (!j) return;
+  const novoValor = !atualAtiva;
+  try {
+    await updateDoc(doc(db, 'jogadores', j.uid), { mentoria_composicao_ativa: novoValor });
+    toast(novoValor
+      ? '✅ Mentoria de composição ativada! +4 XP/mês em Drafting e Research.'
+      : 'Mentoria de composição desativada.', 'ok', 3000);
+    window.dispatchEvent(new CustomEvent('gamestate:reload'));
+  } catch(e) {
+    toast('Erro: ' + e.message, 'erro');
+  }
+};
 
 // ════════════════════════════════════════════════════════
 // CURSOS
