@@ -569,12 +569,16 @@ exports.decidirRecursoSentenca = onCall({ region: 'southamerica-east1' }, async 
     throw new HttpsError('failed-precondition', 'Você ganhou — não há derrota para recorrer.');
   }
 
-  // Recorrer: abre a fase de recurso, com o JOGADOR como quem recorre —
-  // mesmo formato já usado no caminho automático (parte contrária).
+  // Recorrer: abre a fase de recurso, com o JOGADOR como quem recorre.
+  // Avança instancia_seguinte para a próxima instância na cadeia recursal,
+  // para que chamadas subsequentes a montarSetlist usem o tribunal correto.
+  const instAtualRecurso = p.setlist_instancia || p.instancia_atual || p.instancia;
+  const proxTribunal     = banco.tribunalRecursal(p, p.instancia_seguinte);
   const { dataDisponivel, prazoFinal } = banco.calcularPrazosRecurso(j.mes_pessoal || 0, j.ano_pessoal || 1);
   await processoRef.update({
     status: 'recurso_pendente',
-    instancia_atual: '1grau',
+    instancia_atual: instAtualRecurso,
+    instancia_seguinte: proxTribunal,
     quem_recorre: 'jogador',
     data_disponivel_recurso: dataDisponivel,
     prazo_final_recurso: prazoFinal,
@@ -588,5 +592,5 @@ exports.decidirRecursoSentenca = onCall({ region: 'southamerica-east1' }, async 
         .update({ status: 'recurso_pendente' });
     } catch (e) { logger.warn('Pool subcol recurso update (decidir):', e); }
   }
-  return { msg: `Recurso protocolado. Acesse a carteira processual para sustentar no ${p.instancia_seguinte}.` };
+  return { msg: `Recurso protocolado. Acesse a carteira processual para sustentar no ${proxTribunal}.` };
 });
