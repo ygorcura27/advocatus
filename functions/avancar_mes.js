@@ -22,6 +22,8 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getFirestore }       = require('firebase-admin/firestore');
 const { logger }             = require('firebase-functions');
+const _skillsJur             = require('./skills');
+const _peticoes              = require('./peticoes');
 
 const COOLDOWN_JANEIRO_MIN = 60;
 const ENERGIA_TOTAL        = 100;
@@ -922,14 +924,20 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
   const studyQueue = j.study_queue || [];
   const prontos    = studyQueue.filter(s2 => s2.mes_conclusao <= mesGlobal);
   const pendentes  = studyQueue.filter(s2 => s2.mes_conclusao > mesGlobal);
-  const newSkills  = { ...(j.skills || {}) };
+  const newSkills    = { ...(j.skills || {}) };
+  const newSkillsJur = _skillsJur.normalizarSkillsJur(j.skills_jur);
   for (const est of prontos) {
-    const cap = REP_CAP[j.cargo_id] || 55;
-    newSkills[est.skill] = Math.min(cap, (newSkills[est.skill] || 0) + est.ganho);
+    if (est.tipo === 'skills_jur') {
+      newSkillsJur[est.skill] = Math.max(0, Math.min(50, (newSkillsJur[est.skill] || 0) + est.ganho));
+    } else {
+      const cap = REP_CAP[j.cargo_id] || 55;
+      newSkills[est.skill] = Math.min(cap, (newSkills[est.skill] || 0) + est.ganho);
+    }
     mensagens.push({ assunto:`📚 Estudo concluído: ${est.skill_label}`, corpo:`+${est.ganho} em ${est.skill_label}.`, tipo:'positivo' });
   }
   if (prontos.length > 0) {
     updates.skills      = newSkills;
+    updates.skills_jur  = newSkillsJur;
     updates.study_queue = pendentes;
   }
 
@@ -1246,6 +1254,22 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
     } catch (e) {
       logger.warn('Erro ao verificar prazos recursais do pool:', e.message);
     }
+  }
+
+  // ── EVOLUÇÃO DE SKILLS DE COMPOSIÇÃO JURÍDICA (GDD v4.1 — Etapa 3) ──
+  try {
+    await _skillsJur.processarEvolucaoSkillsJurMensalCF(db, uid, j);
+  } catch (e) {
+    logger.warn('Erro ao evoluir skills de composição:', e.message);
+  }
+  // Resetar contador de petições compostas no mês
+  updates.peticoes_compostas_mes = 0;
+
+  // ── DECAIMENTO DE POPULARIDADE DAS PETIÇÕES (GDD v4.1 — Etapa 13) ──
+  try {
+    await _peticoes.processarDecaimentoPopularidade(db, uid);
+  } catch (e) {
+    logger.warn('Erro ao processar decaimento de popularidade:', e.message);
   }
 
   await _commit(db, uid, updates, mensagens, novoMes, novoAno);

@@ -20,6 +20,110 @@ const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getFirestore }       = require('firebase-admin/firestore');
 const { logger }             = require('firebase-functions');
 const banco = require('./shared/banco_juridico.js');
+const { aplicarXpPracticeArea } = require('./skills');
+const { atualizarFama }         = require('./peticoes');
+
+// ════════════════════════════════════════════════════════
+// SISTEMA NOVO (GDD v4.1 — Etapa 14) — Sentença Probabilística
+// Usado somente em processos com campo `setlist` (status pronto_para_sentenca).
+// O sistema antigo (recalcularConvencimento) permanece para processos legados.
+// ════════════════════════════════════════════════════════
+
+// Tabela GDD Seção 35 — nota 1–26 → { total, parcial, improc }
+const TABELA_SENTENCA = {
+   1: { total:0.02, parcial:0.16, improc:0.82 },
+   2: { total:0.03, parcial:0.17, improc:0.80 },
+   3: { total:0.03, parcial:0.19, improc:0.78 },
+   4: { total:0.04, parcial:0.20, improc:0.76 },
+   5: { total:0.04, parcial:0.22, improc:0.74 },
+   6: { total:0.05, parcial:0.23, improc:0.72 },
+   7: { total:0.05, parcial:0.25, improc:0.70 },
+   8: { total:0.06, parcial:0.26, improc:0.68 },
+   9: { total:0.06, parcial:0.28, improc:0.66 },
+  10: { total:0.07, parcial:0.29, improc:0.64 },
+  11: { total:0.08, parcial:0.30, improc:0.62 },
+  12: { total:0.09, parcial:0.32, improc:0.59 },
+  13: { total:0.10, parcial:0.33, improc:0.57 },
+  14: { total:0.11, parcial:0.34, improc:0.55 },
+  15: { total:0.12, parcial:0.36, improc:0.52 },
+  16: { total:0.13, parcial:0.37, improc:0.50 },
+  17: { total:0.14, parcial:0.38, improc:0.48 },
+  18: { total:0.15, parcial:0.39, improc:0.46 },
+  19: { total:0.16, parcial:0.40, improc:0.44 },
+  20: { total:0.18, parcial:0.42, improc:0.40 },
+  21: { total:0.20, parcial:0.42, improc:0.38 },
+  22: { total:0.22, parcial:0.42, improc:0.36 },
+  23: { total:0.24, parcial:0.43, improc:0.33 },
+  24: { total:0.26, parcial:0.43, improc:0.31 },
+  25: { total:0.28, parcial:0.43, improc:0.29 },
+  26: { total:0.30, parcial:0.45, improc:0.25 },
+};
+
+// Rookie bonus — GDD Seção 37.1
+function rookieBonus(processosConcluidos) {
+  if (processosConcluidos <= 10)  return 3;
+  if (processosConcluidos <= 20)  return 2;
+  if (processosConcluidos <= 30)  return 1;
+  return 0;
+}
+
+// Valor pct na procedência parcial — GDD Seção 36.4
+function sortearValorParcial(tipoCaso) {
+  const ranges = {
+    employment: [0.50, 0.70],
+    civil:      [0.40, 0.60],
+    tax:        [0.30, 0.50],
+    corporate:  [0.50, 0.80],
+  };
+  const [lo, hi] = ranges[tipoCaso] || [0.40, 0.65];
+  return lo + Math.random() * (hi - lo);
+}
+
+/**
+ * Determina a sentença via tabela probabilística — GDD Seção 37.3
+ * Roda SEMPRE no backend; Math.random() nunca no cliente.
+ */
+function determinarSentencaSetlist(nota, posicao, julgador, impactoEvento, ctx) {
+  let notaAjustada = Math.round(nota + (impactoEvento || 0));
+  notaAjustada += rookieBonus(ctx.processos_concluidos || 0);
+  if (ctx.supervisao_ativa) notaAjustada += 2;
+  notaAjustada = Math.max(1, Math.min(26, notaAjustada));
+
+  const base = { ...TABELA_SENTENCA[notaAjustada] };
+
+  // Modificador de posição — réu: -8% total / +8% improcedente
+  if (posicao === 'reu') {
+    base.total  = Math.max(0.01, base.total  - 0.08);
+    base.improc = Math.min(0.98, base.improc + 0.08);
+    // Normalizar
+    const soma = base.total + base.parcial + base.improc;
+    base.total  /= soma;
+    base.parcial /= soma;
+    base.improc  /= soma;
+  }
+
+  // Modificador de perfil do julgador — GDD Seção 36.2
+  if (julgador) {
+    let modJ = 0;
+    if (julgador.perfil === 'formalista' && ctx.alta_originalidade)   modJ += 0.05;
+    if (julgador.perfil === 'fiscal'     && ctx.tipo_caso === 'tax')   modJ -= 0.08;
+    if (julgador.perfil === 'garantista' && ctx.tipo_caso === 'criminal') modJ += 0.06;
+    base.total  = Math.max(0.01, base.total  + modJ);
+    base.improc = Math.max(0.01, base.improc - modJ);
+    const soma = base.total + base.parcial + base.improc;
+    base.total  /= soma;
+    base.parcial /= soma;
+    base.improc  /= soma;
+  }
+
+  const roll = Math.random();
+  if (roll < base.total) {
+    return { resultado: 'procedente', valor_pct: 1.00 };
+  } else if (roll < base.total + base.parcial) {
+    return { resultado: 'parcial', valor_pct: sortearValorParcial(ctx.tipo_caso || 'civil') };
+  }
+  return { resultado: 'improcedente', valor_pct: 0 };
+}
 
 const REP_CAP = {
   est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100, snm:100,
@@ -149,6 +253,96 @@ async function _finalizarProcessoDefinitivo(db, processoRef, jogadorRef, p, j, s
   }
 }
 
+// ─── Handler do novo sistema de setlist ─────────────────────────────────────
+
+async function _processarSentencaSetlist(db, processoRef, jogadorRef, p, j, uid, log, processoId) {
+  // Nota vem do Firestore — nunca do payload do cliente
+  const nota         = p.nota_provisoria || 1;
+  const ev           = p.evento_julgamento || {};
+  const impactoEv    = (ev.impacto || 0) + (ev.segundo_evento?.impacto || 0);
+  const posicao      = p.posicao || 'autor';
+  const tipoCaso     = p.area || p.tipo || 'civil';
+  const instancia    = p.instancia_atual || 'trial';
+
+  const ctx = {
+    processos_concluidos: j.processos_concluidos || 0,
+    supervisao_ativa:     p.supervisao_ativa || false,
+    tipo_caso:            tipoCaso,
+    alta_originalidade:   false,
+  };
+
+  const { resultado, valor_pct } = determinarSentencaSetlist(nota, posicao, p.juiz || null, impactoEv, ctx);
+
+  const cap = repCapDoCargo(j.cargo_id);
+  const rep = j.reputacao || 30;
+  const mesAtual = j.mes_global_pessoal || mesTotalPessoal(j);
+  const isSolo = !j.escritorio_empregado_id || j.escritorio_id === 'solo';
+
+  // Honorários — GDD Seção 4 (contingency 33% + 10% attorneys fees)
+  const valorBase = p.valor || 0;
+  const valorRecebido = Math.round(valorBase * valor_pct);
+  let honPotencial = 0;
+  if (resultado !== 'improcedente') {
+    const honPct = 0.33;
+    const attyFee = ['employment','civil'].includes(tipoCaso) ? 0.10 : 0;
+    honPotencial = Math.round(valorRecebido * (honPct + attyFee));
+  }
+
+  // Reputação
+  const favoravelAoJogador = resultado !== 'improcedente';
+  let repDelta = 0;
+  if (resultado === 'procedente') repDelta = Math.max(1, Math.floor((cap - rep) * 0.08));
+  else if (resultado === 'parcial') repDelta = Math.max(1, Math.floor((cap - rep) * 0.05));
+  else repDelta = -Math.max(1, Math.floor(rep * 0.05));
+
+  // XP — mantém a tabela do banco jurídico como referência
+  const scoreEquiv = resultado === 'procedente' ? 85 : resultado === 'parcial' ? 65 : 35;
+  const xpGanho    = banco.xpPorDecisao(instancia === 'trial' ? '1grau' : '2grau', scoreEquiv);
+
+  // Atualizar jogador
+  const updJog = {
+    reputacao:            Math.max(0, Math.min(cap, rep + repDelta)),
+    xp:                   (j.xp || 0) + xpGanho,
+    processos_concluidos: (j.processos_concluidos || 0) + 1,
+    derrotas_consecutivas: favoravelAoJogador ? 0 : (j.derrotas_consecutivas || 0) + 1,
+  };
+  if (favoravelAoJogador) { updJog.wins = (j.wins||0)+1; updJog.wins_ano = (j.wins_ano||0)+1; }
+  else { updJog.losses = (j.losses||0)+1; updJog.losses_ano = (j.losses_ano||0)+1; }
+
+  await jogadorRef.update(updJog);
+
+  // Honorários — ficam hon_pendente até trânsito em julgado
+  await processoRef.update({
+    status:          'aguardando_decisao_sentenca',
+    resultado_setlist: resultado,
+    valor_recebido:  valorRecebido,
+    hon_pendente:    honPotencial,
+    nota_final:      nota,
+    impacto_evento:  impactoEv,
+    repDelta,
+    encerrado_mes:   null,
+  });
+
+  // Atualizar fama das petições usadas
+  const peticoesUsadas = (p.setlist || [])
+    .filter(s2 => s2.tipo === 'peticao' && s2.peticao_id)
+    .map(s2 => s2.peticao_id);
+  await Promise.all(peticoesUsadas.map(pid => atualizarFama(db, pid, resultado, instancia)));
+
+  // XP de Practice Area
+  try { await aplicarXpPracticeArea(db, uid, tipoCaso, resultado); } catch(e) { log.warn('XP area:', e.message); }
+
+  log.info(`[SENTENCA SETLIST] ${uid} → ${p.titulo||processoId}, resultado=${resultado}, nota=${nota}, hon=${honPotencial}`);
+  return {
+    resultado,
+    valor_pct: Math.round(valor_pct * 100),
+    hon_pendente: honPotencial,
+    repDelta,
+    xpGanho,
+    aguardandoDecisaoDoJogador: true,
+  };
+}
+
 exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
 
@@ -170,6 +364,13 @@ exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (requ
   if (!(await autorizadoParaProcessar(db, p, uid, j))) {
     throw new HttpsError('permission-denied', 'Você não tem permissão para processar este processo (cargo insuficiente ou não pertence ao escritório do caso).');
   }
+
+  // ── NOVO CAMINHO: processo com setlist (GDD v4.1) ───────────────────────
+  if (p.setlist && p.status === 'pronto_para_sentenca') {
+    return _processarSentencaSetlist(db, processoRef, jogadorRef, p, j, uid, logger, processo_id);
+  }
+
+  // ── CAMINHO LEGADO: sistema de rodadas ───────────────────────────────────
   if (p.status !== 'andamento') throw new HttpsError('failed-precondition', 'Processo já encerrado ou em outra fase.');
   if ((p.rodada_audiencia || 0) < 3) throw new HttpsError('failed-precondition', 'Audiência ainda não foi concluída (3 rodadas).');
 

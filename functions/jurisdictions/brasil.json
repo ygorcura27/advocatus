@@ -1,0 +1,23 @@
+{
+  "id": "brasil",
+  "base_jurisdiction": "usa",
+  "locale": "pt-BR",
+  "currency": "BRL",
+  "currency_symbol": "R$",
+  "instancias": [
+    { "id": "trial",   "nome_local": "Vara / 1ª Instância" },
+    { "id": "appeals", "nome_local": "Tribunal (TJ/TRF/TRT)" },
+    { "id": "circuit", "nome_local": "STJ / TST" },
+    { "id": "supreme", "nome_local": "STF", "admissibilidade": "repercussao_geral" }
+  ],
+  "honorarios": {
+    "employment": { "modelo": "contingency", "pct_vitoria": 0.33, "attorneys_fees": 0.10 },
+    "tax":        { "modelo": "contingency", "pct_vitoria": 0.33, "attorneys_fees": 0.10 }
+  },
+  "bar_exam": {
+    "nome": "Exame da OAB",
+    "momento": "promocao"
+  },
+  "orgao_disciplinar": "OAB",
+  "admissibilidade_suprema": "repercussao_geral"
+}

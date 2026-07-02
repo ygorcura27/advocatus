@@ -1,0 +1,26 @@
+{
+  "id": "usa",
+  "locale": "en-US",
+  "currency": "USD",
+  "currency_symbol": "$",
+  "instancias": [
+    { "id": "trial",   "nome": "Trial Court",         "julgadores": 1, "xp_base": 20 },
+    { "id": "appeals", "nome": "Court of Appeals",    "julgadores": 3, "xp_base": 32 },
+    { "id": "circuit", "nome": "Federal Circuit Court","julgadores": 5, "xp_base": 50 },
+    { "id": "supreme", "nome": "Supreme Court",       "julgadores": 9, "xp_base": 70,
+      "admissibilidade": "certiorari", "maioria": 5 }
+  ],
+  "honorarios": {
+    "employment": { "modelo": "contingency",     "pct_vitoria": 0.33, "attorneys_fees": 0.10 },
+    "tax":        { "modelo": "retainer_hourly" },
+    "civil":      { "modelo": "contingency",     "pct_vitoria": 0.33, "attorneys_fees": 0.10 },
+    "criminal":   { "modelo": "flat_fee" },
+    "corporate":  { "modelo": "retainer_hourly" }
+  },
+  "bar_exam": {
+    "nome": "Bar Exam",
+    "momento": "pre_audiencia"
+  },
+  "orgao_disciplinar": "State Bar Association",
+  "admissibilidade_suprema": "certiorari"
+}

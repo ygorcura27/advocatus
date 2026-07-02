@@ -9,6 +9,16 @@ const { criarEscritorio, convidarSocio,
         responderConvite, distribuirLucros,
         aportarCapital }                    = require('./criar_escritorio');
 const { adminAction }                       = require('./admin');
+// GDD v4.1 — novas callables
+const { fazerBarExam, matricularBarPrep }   = require('./barexam');
+const {
+  componerPeticao, peticaoGenerica,
+  variarPeticao,
+  emprestarPeticao, liberarEmprestimo,
+  venderPeticao, comprarPeticao,
+} = require('./peticoes');
+const { montarSetlist, resolverEventoJulgamento } = require('./setlist');
+
 exports.avancarMes              = avancarMes;
 exports.processarSentenca       = processarSentenca;
 exports.decidirRecursoSentenca  = decidirRecursoSentenca;
@@ -20,3 +30,15 @@ exports.responderConvite        = responderConvite;
 exports.distribuirLucros        = distribuirLucros;
 exports.aportarCapital          = aportarCapital;
 exports.adminAction             = adminAction;
+// GDD v4.1
+exports.fazerBarExam             = fazerBarExam;
+exports.matricularBarPrep        = matricularBarPrep;
+exports.componerPeticao          = componerPeticao;
+exports.peticaoGenerica          = peticaoGenerica;
+exports.variarPeticao            = variarPeticao;
+exports.emprestarPeticao         = emprestarPeticao;
+exports.liberarEmprestimo        = liberarEmprestimo;
+exports.venderPeticao            = venderPeticao;
+exports.comprarPeticao           = comprarPeticao;
+exports.montarSetlist            = montarSetlist;
+exports.resolverEventoJulgamento = resolverEventoJulgamento;
