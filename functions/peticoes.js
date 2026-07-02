@@ -368,10 +368,11 @@ exports.peticaoGenerica = onCall({ region: 'southamerica-east1' }, async (reques
 
   const uid  = request.auth.uid;
   const db   = getFirestore();
-  const { document_type, practice_area, area_caso } = request.data || {};
+  const { practice_area, area_caso } = request.data || {};
+  const document_type = request.data?.document_type || 'initial_filing';
 
-  if (!document_type || !practice_area) {
-    throw new HttpsError('invalid-argument', 'document_type e practice_area são obrigatórios.');
+  if (!practice_area) {
+    throw new HttpsError('invalid-argument', 'practice_area é obrigatório.');
   }
 
   const snap = await db.collection('jogadores').doc(uid).get();
