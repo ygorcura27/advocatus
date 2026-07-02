@@ -20,6 +20,7 @@ const {
   retirarPeticaoMercado,
 } = require('./peticoes');
 const { montarSetlist, resolverEventoJulgamento } = require('./setlist');
+const { anteciparHonorarios, contratarLinhaCredito, pagarLinhaCredito } = require('./financeiro');
 
 exports.avancarMes              = avancarMes;
 exports.processarSentenca       = processarSentenca;
@@ -46,3 +47,7 @@ exports.montarSetlist            = montarSetlist;
 exports.resolverEventoJulgamento = resolverEventoJulgamento;
 exports.retirarPeticaoMercado    = retirarPeticaoMercado;
 exports.tickMensal               = tickMensal;
+// GDD Seção 31-33 — Financeiro Avançado
+exports.anteciparHonorarios      = anteciparHonorarios;
+exports.contratarLinhaCredito    = contratarLinhaCredito;
+exports.pagarLinhaCredito        = pagarLinhaCredito;

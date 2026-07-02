@@ -218,22 +218,38 @@ function _cardOportunidade(o, j, tier) {
     </div>`;
 }
 
+const _PERFIL_LABEL = {
+  conservador:'🛡️ Conservador', ansioso:'😰 Ansioso',
+  pragmatico:'🧮 Pragmático', exigente:'⭐ Exigente', leal:'🤝 Leal',
+};
+const _REDE_LABEL = { pequena:'rede pequena', media:'rede média', grande:'rede grande' };
+
 function _cardCliente(c, escId) {
-  const cor = c.confianca >= 70 ? 'var(--verde2)' : c.confianca >= 40 ? 'var(--amber)' : 'var(--verm2)';
+  const conf = c.confianca ?? 50;
+  const cor  = conf >= 70 ? 'var(--verde2)' : conf >= 40 ? 'var(--amber)' : 'var(--verm2)';
+  const perfilBadge = c.perfil
+    ? `<span style="font-size:.6rem;background:rgba(100,120,200,.12);color:var(--navy3);border-radius:3px;padding:.1rem .35rem;margin-left:.4rem">${_PERFIL_LABEL[c.perfil]||c.perfil}</span>`
+    : '';
+  const redeBadge = c.rede_tamanho
+    ? `<span style="font-size:.58rem;color:var(--txt4);margin-left:.3rem">${_REDE_LABEL[c.rede_tamanho]||''}</span>`
+    : '';
   return `
     <div class="card" style="margin-bottom:.5rem">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div style="flex:1;min-width:0">
           <div style="font-weight:700;font-size:.85rem;color:var(--navy)">${c.nome}</div>
-          <div style="font-size:.68rem;color:var(--txt3)">${c.tipo}${c.porte?` · ${c.porte}`:''} · Confiança: <b style="color:${cor}">${c.confianca}/100</b></div>
+          <div style="font-size:.68rem;color:var(--txt3);margin-top:.15rem">
+            ${c.tipo}${c.porte?` · ${c.porte}`:''}${perfilBadge}${redeBadge}
+          </div>
+          <div style="font-size:.68rem;margin-top:.2rem">Satisfação: <b style="color:${cor}">${conf}/100</b></div>
         </div>
-        <div style="text-align:right">
+        <div style="text-align:right;flex-shrink:0;margin-left:.6rem">
           ${c.recorrente
             ? `<div style="font-size:.78rem;font-weight:700;color:var(--verde2)">${_fmtK(c.valor_mensal)}/mês</div>
                <div style="font-size:.6rem;color:var(--verde2)">🔁 Recorrente</div>`
-            : c.confianca >= CONFIANCA_RECORRENTE_MIN
+            : conf >= CONFIANCA_RECORRENTE_MIN
               ? `<button class="btn btn-sm btn-prim" onclick="window.oferecerContratoRecorrente('${c.id}','${escId}')">Oferecer contrato fixo</button>`
-              : `<div style="font-size:.62rem;color:var(--txt4)">Confiança insuficiente</div>`}
+              : `<div style="font-size:.62rem;color:var(--txt4)">Satisfação insuficiente</div>`}
         </div>
       </div>
     </div>`;
@@ -358,6 +374,28 @@ async function _processarServicoConcluido(uid, escId, oportunidade, opId, fracao
   setTimeout(()=>window.navTo&&window.navTo('clientes',null), 700);
 }
 
+// GDD Seção 28-30 — perfis de cliente e rede de indicações
+const PERFIS_CLIENTE = ['conservador','ansioso','pragmatico','exigente','leal'];
+// pesos: pragmatico 35%, conservador 20%, exigente 20%, ansioso 15%, leal 10%
+const _PESO_PERFIL   = [0.20, 0.15, 0.35, 0.20, 0.10];
+
+function _sortearPerfil() {
+  const r = Math.random();
+  let acc = 0;
+  for (let i = 0; i < _PESO_PERFIL.length; i++) {
+    acc += _PESO_PERFIL[i];
+    if (r < acc) return PERFIS_CLIENTE[i];
+  }
+  return 'pragmatico';
+}
+
+function _redeTamanho(tipo, porte) {
+  if (tipo === 'PF') return 'pequena';
+  if (porte === 'grande' || porte === 'mega') return 'grande';
+  if (porte === 'media') return 'media';
+  return 'pequena';
+}
+
 async function _registrarCliente(escId, oportunidade) {
   const clSnap = await getDocs(query(
     collection(db,'escritorios',escId,'clientes'),
@@ -370,14 +408,17 @@ async function _registrarCliente(escId, oportunidade) {
       porte: oportunidade.cliente_porte || null,
       confianca: CONFIANCA_INICIAL + (oportunidade.confianca_gerada||0),
       recorrente: false, valor_mensal: 0,
+      perfil: _sortearPerfil(),
+      rede_tamanho: _redeTamanho(oportunidade.cliente_tipo, oportunidade.cliente_porte),
       criado_em: new Date().toISOString(),
     });
   } else {
     const cDoc = clSnap.docs[0];
     const c    = cDoc.data();
-    await updateDoc(doc(db,'escritorios',escId,'clientes',cDoc.id), {
-      confianca: Math.min(100, (c.confianca||50) + (oportunidade.confianca_gerada||0)),
-    });
+    const upd  = { confianca: Math.min(100, (c.confianca||50) + (oportunidade.confianca_gerada||0)) };
+    if (!c.perfil) upd.perfil = _sortearPerfil();
+    if (!c.rede_tamanho) upd.rede_tamanho = _redeTamanho(c.tipo||oportunidade.cliente_tipo, c.porte||oportunidade.cliente_porte);
+    await updateDoc(doc(db,'escritorios',escId,'clientes',cDoc.id), upd);
   }
 }
 

@@ -77,6 +77,10 @@ function _renderizar() {
       break;
     case 'balancete':    renderBalancete(j, main);      break;
     case 'inbox':        renderInbox(j, main);         break;
+    case 'financeiro':
+      if (window.renderFinanceiroAvancado) window.renderFinanceiroAvancado(j, main);
+      else main.innerHTML = '<div class="card" style="color:var(--txt3)">Carregando finanças...</div>';
+      break;
     default:             renderPerfil(j, main);
   }
 

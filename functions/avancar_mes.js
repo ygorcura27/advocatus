@@ -1026,6 +1026,20 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
   Object.assign(updates, finResult.updates);
   if (finResult.msg) mensagens.push(finResult.msg);
 
+  // ── Juros da linha de crédito (GDD Seção 32) ──
+  const lc = j.linha_credito;
+  if (lc && lc.saldo > 0) {
+    const juros = Math.ceil(lc.saldo * (lc.juros_pct || 0.025));
+    const novoSaldoLC = lc.saldo + juros;
+    updates.linha_credito = { ...lc, saldo: novoSaldoLC };
+    updates.dinheiro = (updates.dinheiro || j.dinheiro || 0) - juros;
+    if (juros > 0) mensagens.push({
+      assunto: '💳 Juros Linha de Crédito',
+      corpo: `Saldo devedor: R$${lc.saldo.toLocaleString('pt-BR')} · Juros 2,5%: -R$${juros.toLocaleString('pt-BR')}.`,
+      tipo: 'urgente',
+    });
+  }
+
   const repAtual  = updates.reputacao ?? j.reputacao ?? 30;
   const cargoIdx  = CARGO_IDX[j.cargo_id] || 0;
   const cap       = REP_CAP[j.cargo_id] || 55;
@@ -1928,6 +1942,9 @@ async function _processarServicosMensalCF(db, uid, j) {
     await escRef.collection('oportunidades').add({ ...op, status:'disponivel' });
   }
 
+  // Indicações automáticas por clientes com alta satisfação (GDD Seção 29)
+  try { await _processarIndicacoesClientesCF(escRef, tier, prestigioPct); } catch(e) { /* silencioso */ }
+
   await _processarAutogestaoOportunidadesCF(db, escRef, esc);
 
   if (esc.gestor_id && (esc.gestor_delega_processos !== false)) {
@@ -1998,19 +2015,74 @@ async function _processarAutogestaoOportunidadesCF(db, escRef, esc) {
       await escRef.collection('clientes').add({
         nome: op.cliente_nome, tipo: op.cliente_tipo, porte: op.cliente_porte||null,
         confianca: CONFIANCA_INICIAL_REL + (op.confianca_gerada||0),
-        recorrente:false, valor_mensal:0, criado_em:new Date().toISOString(),
+        recorrente:false, valor_mensal:0,
+        perfil: _sortearPerfilCF(),
+        rede_tamanho: _redeTamanhoCF(op.cliente_tipo, op.cliente_porte),
+        criado_em:new Date().toISOString(),
       });
     } else {
       const cDoc=clSnap.docs[0]; const c=cDoc.data();
-      await cDoc.ref.update({
-        confianca: Math.min(100,(c.confianca||50)+(op.confianca_gerada||0)),
-      });
+      const upd = { confianca: Math.min(100,(c.confianca||50)+(op.confianca_gerada||0)) };
+      if (!c.perfil) upd.perfil = _sortearPerfilCF();
+      if (!c.rede_tamanho) upd.rede_tamanho = _redeTamanhoCF(c.tipo||op.cliente_tipo, c.porte||op.cliente_porte);
+      await cDoc.ref.update(upd);
     }
   }
 
   if (caixaGanho > 0) {
     await escRef.update({ caixa: (esc.caixa||0) + caixaGanho });
   }
+}
+
+// ── GDD Seção 28-30: perfis de cliente e indicações automáticas ──────────────
+const _PERFIS_CF   = ['conservador','ansioso','pragmatico','exigente','leal'];
+const _PESOS_CF    = [0.20, 0.15, 0.35, 0.20, 0.10];
+
+function _sortearPerfilCF() {
+  const r = Math.random(); let acc = 0;
+  for (let i = 0; i < _PESOS_CF.length; i++) { acc += _PESOS_CF[i]; if (r < acc) return _PERFIS_CF[i]; }
+  return 'pragmatico';
+}
+
+function _redeTamanhoCF(tipo, porte) {
+  if (tipo === 'PF') return 'pequena';
+  if (porte === 'grande' || porte === 'mega') return 'grande';
+  if (porte === 'media') return 'media';
+  return 'pequena';
+}
+
+// Clientes com alta satisfação (confiança ≥ 80) geram indicações espontâneas
+// a cada mês conforme o tamanho da rede.
+async function _processarIndicacoesClientesCF(escRef, tier, prestigioPct) {
+  const altaSnap = await escRef.collection('clientes').where('confianca', '>=', 80).get();
+  if (altaSnap.empty) return;
+
+  const CHANCE = { pequena:0.15, media:0.25, grande:0.40 };
+  const proms  = [];
+
+  for (const cDoc of altaSnap.docs) {
+    const c = cDoc.data();
+    const chance = CHANCE[c.rede_tamanho || 'pequena'] || 0.15;
+    if (Math.random() > chance) continue;
+
+    const op = _gerarOportunidadeCF(tier, prestigioPct);
+    op.indicado_por   = c.nome;
+    op.cliente_nome   = _nomeIndicadoCF(c.nome);
+    proms.push(escRef.collection('oportunidades').add({ ...op, status:'disponivel' }));
+    proms.push(_logGestaoCF(escRef,
+      `🤝 ${c.nome} indicou um novo cliente: "${op.cliente_nome}" (${op.tipo}).`));
+    await cDoc.ref.update({ ultima_indicacao_mes: new Date().toISOString() });
+  }
+  if (proms.length) await Promise.all(proms);
+}
+
+function _nomeIndicadoCF(nomeIndicador) {
+  const PF = ['Dr. Luís Mendes','Ana Beatriz Costa','Rodrigo Faria','Isabela Pinto',
+              'Marcos Oliveira','Fernanda Lima','Paulo Sérgio Corrêa','Cláudia Ramos'];
+  const PJ = ['VR Engenharia','GrupoMax','Fortis Logística','InfoBrasil Ltda',
+              'Construtora Ágil','SulImport Com.','Pharma Plus','Delta Serviços'];
+  const pool = (Math.random() < 0.5 ? PF : PJ).filter(n => n !== nomeIndicador);
+  return pool[Math.floor(Math.random() * pool.length)] || 'Indicação de Cliente';
 }
 
 // Diário da gestão — processos: sentenças, designações, recursos.

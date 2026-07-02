@@ -23,6 +23,35 @@ const banco = require('./shared/banco_juridico.js');
 const { aplicarXpPracticeArea } = require('./skills');
 const { atualizarFama }         = require('./peticoes');
 
+// ── Perfis de cliente e deltas de satisfação — GDD Seção 28-30 ──
+const DELTA_SATISFACAO_PERFIL = {
+  conservador: { procedente:8,  parcial:4,  improcedente:-15 },
+  ansioso:     { procedente:12, parcial:3,  improcedente:-20 },
+  pragmatico:  { procedente:10, parcial:8,  improcedente:-10 },
+  exigente:    { procedente:18, parcial:-5, improcedente:-25 },
+  leal:        { procedente:6,  parcial:4,  improcedente:-6  },
+};
+
+// Atualiza satisfação (confiança) do cliente associado ao processo.
+// Silencioso — falha não quebra o fluxo principal.
+async function _atualizarSatisfacaoCliente(db, p, resultado) {
+  const clienteNome = p.cliente_nome;
+  const escId = p.pool_escritorio_id || p.pool_proc_esc_id;
+  if (!clienteNome || !escId) return;
+  try {
+    const clSnap = await db.collection('escritorios').doc(escId)
+      .collection('clientes').where('nome', '==', clienteNome).limit(1).get();
+    if (clSnap.empty) return;
+    const cDoc = clSnap.docs[0];
+    const c = cDoc.data();
+    const perfil = c.perfil || 'pragmatico';
+    const deltas = DELTA_SATISFACAO_PERFIL[perfil] || DELTA_SATISFACAO_PERFIL.pragmatico;
+    const delta  = deltas[resultado] || 0;
+    const novaConfianca = Math.max(0, Math.min(100, (c.confianca || 50) + delta));
+    await cDoc.ref.update({ confianca: novaConfianca });
+  } catch (e) { /* silencioso — clientes não são críticos */ }
+}
+
 // ════════════════════════════════════════════════════════
 // SISTEMA NOVO (GDD v4.1 — Etapa 14) — Sentença Probabilística
 // Usado somente em processos com campo `setlist` (status pronto_para_sentenca).
@@ -520,7 +549,10 @@ exports.decidirRecursoSentenca = onCall({ region: 'southamerica-east1' }, async 
     if (isSetlistFlow) {
       // Aceitar: encerrar com base no resultado já calculado
       const ganhou = p.resultado_setlist !== 'improcedente';
-      const hon    = ganhou ? (p.hon_pendente || 0) : 0;
+      // Descontar valor já antecipado (GDD Seção 31 — fatoração de recebíveis)
+      const honBruto      = ganhou ? (p.hon_pendente || 0) : 0;
+      const honAntecipado = p.hon_antecipado || 0;
+      const hon           = Math.max(0, honBruto - honAntecipado);
       const repDt  = p.repDelta || 0;
       const escritorioDoCaso = p.pool_escritorio_id || j.escritorio_proprio_id;
       if (ganhou && hon > 0) {
@@ -556,12 +588,14 @@ exports.decidirRecursoSentenca = onCall({ region: 'southamerica-east1' }, async 
             .update({ status:'concluido', resultado: p.resultado_setlist, valor_recebido: hon, concluido_em: new Date().toISOString() });
         } catch(e) { logger.warn('Pool subcol encerrar setlist:', e); }
       }
+      await _atualizarSatisfacaoCliente(db, p, ganhou ? p.resultado_setlist : 'improcedente');
       return { msg: ganhou ? `Vitória confirmada — R$${hon.toLocaleString('pt-BR')} em honorários recebidos.` : 'Derrota aceita. Processo encerrado.' };
     }
 
     // Fluxo legado: aceita a derrota
     const score = p.score_anterior;
     await _finalizarProcessoDefinitivo(db, processoRef, jogadorRef, p, j, score, false, 0, mesTotalPessoal(j), 0, logger);
+    await _atualizarSatisfacaoCliente(db, p, 'improcedente');
     return { msg: 'Decisão aceita. Processo encerrado — trânsito em julgado.' };
   }
 
