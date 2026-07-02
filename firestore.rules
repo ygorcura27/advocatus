@@ -381,6 +381,22 @@ service cloud.firestore {
     }
 
     // ══════════════════════════════════════════════════════
+    // PETIÇÕES (GDD v4.1)
+    // Criadas e atualizadas apenas por Cloud Functions (Admin SDK).
+    // Leitura: dono ou petição no mercado (no_mercado == true).
+    // Queries de listagem só devolvem docs onde jogador_uid==uid do
+    // requisitante — cada doc do resultado passa na regra de resource.data.
+    // ══════════════════════════════════════════════════════
+    match /peticoes/{peticaoId} {
+      allow read: if isAuth() && (
+        resource.data.jogador_uid == request.auth.uid
+        || resource.data.no_mercado == true
+      );
+      // Toda escrita vai por Cloud Function (Admin SDK ignora estas regras)
+      allow create, update, delete: if false;
+    }
+
+    // ══════════════════════════════════════════════════════
     // RANKINGS (somente leitura para jogadores)
     // ══════════════════════════════════════════════════════
     match /rankings/{tipo} {

@@ -33,6 +33,30 @@
         { "fieldPath": "reputacao",  "order": "DESCENDING" },
         { "fieldPath": "cargo_id",   "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "peticoes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "jogador_uid", "order": "ASCENDING" },
+        { "fieldPath": "criada_em",   "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "peticoes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "jogador_uid", "order": "ASCENDING" },
+        { "fieldPath": "status",      "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "peticoes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "no_mercado",  "order": "ASCENDING" },
+        { "fieldPath": "criada_em",   "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
