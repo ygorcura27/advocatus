@@ -2386,14 +2386,13 @@ window.responderAudiencia = async function(procId, tipo) {
 // GDD v4.1 — sentença via setlist (status pronto_para_sentenca)
 window.processarSentencaSetlist = async function(procId) {
   fecharModal();
+  toast('⏳ Calculando sentença...', 'neutro', 2000);
   try {
     const fn  = httpsCallable(window.FB_FUNCTIONS, 'processarSentenca');
     const res = await fn({ processo_id: procId });
     const d   = res.data;
-    const resLabel = { procedente: '✅ PROCEDENTE', parcial: '⚠️ PARCIALMENTE PROCEDENTE', improcedente: '❌ IMPROCEDENTE' };
-    toast(`${resLabel[d.resultado] || d.resultado} · Honorários: R$${(d.hon_pendente||0).toLocaleString('pt-BR')}`, 'ok', 7000);
+    _mostrarResultadoSentencaSetlist(d, procId);
     window.dispatchEvent(new CustomEvent('gamestate:reload'));
-    setTimeout(() => window.dispatchEvent(new CustomEvent('nav:painel', { detail: 'processos' })), 300);
   } catch(e) {
     toast('Erro ao processar sentença: ' + (e.message || e), 'ko');
   }
@@ -2430,6 +2429,61 @@ window.processarSentenca = async function(procId) {
     toast('Erro ao processar a sentença. Tente novamente.', 'ko');
   }
 };
+
+// ── Resultado de sentença para o fluxo setlist (GDD v4.1) ──────────────────
+function _mostrarResultadoSentencaSetlist(r, procId) {
+  const MAP = {
+    procedente:   { icon: '🏆', label: 'PROCEDENTE',              cor: 'var(--verde2)' },
+    parcial:      { icon: '⚖️', label: 'PARCIALMENTE PROCEDENTE', cor: 'var(--amber)'  },
+    improcedente: { icon: '📋', label: 'IMPROCEDENTE',             cor: 'var(--verm2)' },
+  };
+  const info = MAP[r.resultado] || { icon: '⚖️', label: r.resultado, cor: 'var(--txt3)' };
+  const fmt  = (v) => `R$${(v||0).toLocaleString('pt-BR')}`;
+
+  const botoesHtml = r.aguardandoDecisaoDoJogador
+    ? `<button class="btn btn-prim btn-block" style="margin-top:1rem"
+         onclick="window.decidirRecursoSentencaProducao('${procId}', true)">⚖️ Recorrer</button>
+       <button class="btn btn-ghost btn-block" style="margin-top:.4rem"
+         onclick="window.decidirRecursoSentencaProducao('${procId}', false)">Aceitar e encerrar</button>`
+    : `<button class="btn btn-prim btn-block" style="margin-top:1rem"
+         onclick="fecharModal();window.navTo&&window.navTo('processos',null)">Fechar</button>`;
+
+  abrirModal(`${info.icon} Sentença — Setlist`,
+    `<div style="text-align:center;margin-bottom:1rem">
+       <div style="font-size:2rem">${info.icon}</div>
+       <div style="font-size:1.1rem;font-weight:700;color:${info.cor}">${info.label}</div>
+       <div style="font-size:.75rem;color:var(--ardosia2);margin-top:.3rem">
+         ${r.valor_pct}% do valor da causa
+       </div>
+     </div>
+
+     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-bottom:1rem">
+       <div style="background:var(--fundo2);border-radius:6px;padding:.5rem;text-align:center">
+         <div style="font-size:.65rem;color:var(--ardosia2)">Nota Final</div>
+         <div style="font-weight:700">${r.nota_final || '—'}/26</div>
+       </div>
+       <div style="background:var(--fundo2);border-radius:6px;padding:.5rem;text-align:center">
+         <div style="font-size:.65rem;color:var(--ardosia2)">Honorários</div>
+         <div style="font-weight:700;font-size:.85rem">${fmt(r.hon_pendente)}</div>
+       </div>
+       <div style="background:var(--fundo2);border-radius:6px;padding:.5rem;text-align:center">
+         <div style="font-size:.65rem;color:var(--ardosia2)">Reputação</div>
+         <div style="font-weight:700;color:${r.repDelta>=0?'var(--verde2)':'var(--verm2)'}">${r.repDelta>=0?'+':''}${r.repDelta}</div>
+       </div>
+     </div>
+
+     <div style="font-size:.72rem;color:var(--ardosia2);margin-bottom:.3rem">XP: +${r.xpGanho}</div>
+
+     ${r.hon_pendente > 0
+       ? `<div style="font-size:.72rem;color:var(--ardosia2);background:var(--fundo2);border-radius:4px;padding:.5rem">
+            Os honorários (${fmt(r.hon_pendente)}) ficam <b>pendentes</b> até o trânsito em julgado.
+            Se recorrer e perder, o valor é mantido somente se ganhar em última instância.
+          </div>`
+       : ''}
+
+     ${botoesHtml}`
+  );
+}
 
 function _mostrarResultadoSentenca(r, procId) {
   const icons = { procedente:'🏆', parcial:'⚖️', improcedente:'📋', improcedente_agravada:'❌' };
@@ -2546,22 +2600,20 @@ window.renderCarteiraProcessual = async function(el) {
   const mesAtualTotal = mesTotalPessoalProc(j);
 
   // Casos INDIVIDUAIS do jogador (advogado_uid === uid).
+  const STATUS_CARTEIRA = ['recurso_pendente', 'aguardando_decisao_recurso', 'aguardando_decisao_sentenca'];
   const snapIndividual = await getDocs(query(
     collection(db, 'processos'),
     where('advogado_uid', '==', uid),
-    where('status', 'in', ['recurso_pendente', 'aguardando_decisao_recurso'])
+    where('status', 'in', STATUS_CARTEIRA)
   ));
 
-  // Casos do POOL do escritório (advogado_uid é null por design — sem
-  // este segundo bloco, recursos de casos colaborativos nunca apareciam
-  // em lugar nenhum, mesmo já estando em fase de recurso de fato).
   const escId = j.escritorio_proprio_id || (j.escritorio_empregado_id && j.escritorio_empregado_id !== 'solo' ? j.escritorio_empregado_id : null);
   let snapPool = { docs: [] };
   if (escId) {
     snapPool = await getDocs(query(
       collection(db, 'processos'),
       where('pool_escritorio_id', '==', escId),
-      where('status', 'in', ['recurso_pendente', 'aguardando_decisao_recurso'])
+      where('status', 'in', STATUS_CARTEIRA)
     ));
   }
 
@@ -2586,6 +2638,27 @@ window.renderCarteiraProcessual = async function(el) {
             <div style="display:flex;gap:.5rem;margin-top:.6rem">
               <button class="btn btn-sm btn-prim" style="flex:1" onclick="window.decidirRecursoSentencaProducao('${p.id}', true)">⚖️ Recorrer</button>
               <button class="btn btn-sm btn-ghost" style="flex:1" onclick="window.decidirRecursoSentencaProducao('${p.id}', false)">Aceitar derrota</button>
+            </div>
+          </div>`;
+        }
+
+        // GDD v4.1: sentença setlist processada, aguardando decisão do jogador
+        if (p.status === 'aguardando_decisao_sentenca') {
+          const resIcon   = { procedente:'🏆', parcial:'⚖️', improcedente:'📋' }[p.resultado_setlist] || '⚖️';
+          const resLabel  = { procedente:'Procedente', parcial:'Parcialmente Procedente', improcedente:'Improcedente' }[p.resultado_setlist] || p.resultado_setlist;
+          const resCor    = p.resultado_setlist === 'procedente' ? 'var(--verde2)' : p.resultado_setlist === 'parcial' ? 'var(--amber)' : 'var(--verm2)';
+          const fmt       = (v) => `R$${(v||0).toLocaleString('pt-BR')}`;
+          return `
+          <div class="card" style="margin-bottom:.6rem;border-left:3px solid ${resCor}">
+            <div style="font-family:var(--font-mono);font-size:.6rem;color:var(--txt4)">${p.numero || '—'}</div>
+            <div style="font-weight:700;font-size:.85rem">${p.autor || '—'} vs ${p.reu || '—'}</div>
+            <div style="font-size:.72rem;color:${resCor};margin:.25rem 0">${resIcon} ${resLabel} · Nota ${p.nota_final||'—'}/26</div>
+            <div style="font-size:.68rem;color:var(--ardosia2)">Honorários pendentes: ${fmt(p.hon_pendente)}</div>
+            <div style="display:flex;gap:.5rem;margin-top:.6rem">
+              <button class="btn btn-sm btn-prim" style="flex:1"
+                onclick="window.decidirRecursoSentencaProducao('${p.id}', true)">⚖️ Recorrer</button>
+              <button class="btn btn-sm btn-ghost" style="flex:1"
+                onclick="window.decidirRecursoSentencaProducao('${p.id}', false)">Aceitar</button>
             </div>
           </div>`;
         }
