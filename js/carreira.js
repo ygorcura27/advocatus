@@ -120,19 +120,27 @@ window.renderCarreiraProgressao = function(j, el) {
       </div>
     </div>
 
-    <!-- OAB -->
-    ${!j.oab && j.cargo_id !== 'est' && j.cargo_id !== 'ass' ? '' :
-      j.cargo_id === 'ass' && !j.oab ? `
+    <!-- OAB — sistema GDD v4.1 (skill-based) -->
+    ${j.cargo_id === 'ass' && !j.oab ? (() => {
+      const sk   = j.skills_jur || {};
+      const score = ((sk.legal_drafting||0)*0.30 + (sk.legal_research||0)*0.30
+                    + (sk.argumentation||0)*0.25 + (sk.procedure||0)*0.15).toFixed(1);
+      const pronto = parseFloat(score) >= 20; // preview: sugere ir estudar se baixo
+      return `
     <div class="card" style="border-color:rgba(184,146,42,.4)">
-      <div class="card-titulo">📋 Prova da OAB</div>
-      <div class="card-sub" style="margin-bottom:.75rem">
-        Requer: Argumentação ≥ 28 (${(j.skills||{}).argumentacao||0}) e Pesquisa ≥ 25 (${(j.skills||{}).pesquisa||0})
+      <div class="card-titulo">📋 Exame OAB <span style="font-size:.72rem;color:var(--ardosia2)">(GDD v4.1 — baseado em skills)</span></div>
+      <div class="card-sub" style="margin-bottom:.5rem">
+        Score estimado: <b>${score}/50</b> · Aprovação: 32,5
       </div>
-      <button class="btn btn-sec" onclick="window.iniciarOAB()"
-        ${((j.skills||{}).argumentacao||0)<28||((j.skills||{}).pesquisa||0)<25?'disabled':''}>
-        Realizar Prova da OAB
-      </button>
-    </div>` : ''}
+      <div style="font-size:.72rem;color:var(--ardosia2);margin-bottom:.75rem">
+        Desenvolva Legal Drafting, Legal Research, Argumentation e Procedure no painel de Petições.
+      </div>
+      <div style="display:flex;gap:.5rem">
+        <button class="btn btn-sec" onclick="window.navTo&&window.navTo('peticoes',null)">Ir para Petições →</button>
+        <button class="btn btn-prim" onclick="window.tentarBarExam&&window.tentarBarExam()">Fazer Exame</button>
+      </div>
+    </div>`;
+    })() : ''}
 
     <!-- Próxima promoção -->
     ${proximo ? `
