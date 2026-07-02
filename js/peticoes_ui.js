@@ -79,10 +79,14 @@ window.renderPeticoes = async function(j, el) {
     el.innerHTML = `
       <div class="secao-header">
         <div class="secao-titulo">📜 Petições</div>
-        <button class="btn btn-prim btn-sm" onclick="window.abrirModalCompor()">+ Compor</button>
+        <div style="display:flex;gap:.5rem">
+          <button class="btn btn-ghost btn-sm" onclick="window.renderMercadoPeticoes(window.JOGADOR, document.getElementById('main-content'))">🏪 Mercado</button>
+          <button class="btn btn-prim btn-sm" onclick="window.abrirModalCompor()">+ Compor</button>
+        </div>
       </div>
 
       ${!j.oab ? _bannerBarExam(j) : ''}
+      ${!j.oab ? _bannerPeticaoGenerica() : ''}
 
       ${peticoes.length === 0
         ? `<div class="card" style="text-align:center;color:var(--ardosia2);padding:2rem">
@@ -134,6 +138,104 @@ function _bannerBarExam(j) {
       </div>
     </div>`;
 }
+
+// ─── Banner Petição Genérica (para quem não tem OAB) ─────────────────────────
+
+function _bannerPeticaoGenerica() {
+  return `
+    <div class="card" style="border-left:3px solid var(--ardosia2);margin-bottom:1rem;font-size:.82rem">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <b>Petição Genérica</b>
+          <div style="font-size:.75rem;color:var(--ardosia2);margin-top:.2rem">
+            Sem OAB você pode usar petições genéricas em processos — nota base 10, teto 12.
+          </div>
+        </div>
+        <button class="btn btn-sm btn-ghost" onclick="window.usarPeticaoGenerica()">Usar Genérica</button>
+      </div>
+    </div>`;
+}
+
+window.usarPeticaoGenerica = async function() {
+  const area = prompt('Área do Direito:\n' + Object.entries(AREA_LABELS).map(([k,v],i)=>`${i+1}. ${v}`).join('\n') + '\n\nDigite o número:');
+  const idx = parseInt(area, 10) - 1;
+  const areas = Object.keys(AREA_LABELS);
+  if (idx < 0 || idx >= areas.length) return;
+  try {
+    const fn  = httpsCallable(functions, 'peticaoGenerica');
+    const res = await fn({ practice_area: areas[idx] });
+    toast(`✅ Petição genérica criada! Nota base: ${res.data.nota_base}/26 · Teto: 12`, 'ok', 4000);
+    if (window.JOGADOR) window.renderPeticoes(window.JOGADOR, document.getElementById('main-content'));
+  } catch(e) { toast('Erro: ' + (e.message || e), 'erro'); }
+};
+
+// ─── Mercado de Petições ──────────────────────────────────────────────────────
+
+window.renderMercadoPeticoes = async function(j, el) {
+  el.innerHTML = `<div style="padding:1.5rem;text-align:center;color:var(--ardosia)">Carregando mercado…</div>`;
+
+  try {
+    const snap = await getDocs(
+      query(collection(db, 'peticoes'),
+        where('no_mercado', '==', true),
+        orderBy('criada_em', 'desc'))
+    );
+
+    const peticoes = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(p => p.jogador_uid !== j.uid); // não comprar as próprias
+
+    el.innerHTML = `
+      <div class="secao-header">
+        <div class="secao-titulo">🏪 Mercado de Petições</div>
+        <button class="btn btn-ghost btn-sm" onclick="window.renderPeticoes(window.JOGADOR, document.getElementById('main-content'))">← Minhas Petições</button>
+      </div>
+
+      <div style="font-size:.75rem;color:var(--ardosia2);margin-bottom:1rem">
+        Compre petições compostas por outros advogados. A popularidade reseta ao comprar; fama e nota base são do criador.
+      </div>
+
+      ${peticoes.length === 0
+        ? `<div class="card" style="text-align:center;padding:2rem;color:var(--ardosia2)">Nenhuma petição no mercado agora.</div>`
+        : `<div class="pet-grid">${peticoes.map(p => _cardMercado(p, j)).join('')}</div>`}`;
+
+  } catch(e) {
+    el.innerHTML = `<div class="card" style="color:var(--erro)">Erro ao carregar mercado: ${e.message}</div>`;
+  }
+};
+
+function _cardMercado(p, j) {
+  const podeComprar = (j.dinheiro || 0) >= (p.preco_mercado || 0);
+  return `
+    <div class="card pet-card">
+      <div style="font-weight:600;font-size:.85rem;margin-bottom:.2rem">${p.nome}</div>
+      <div style="font-size:.72rem;color:var(--ardosia2);margin-bottom:.5rem">
+        ${DOC_LABELS[p.document_type]||p.document_type} · ${AREA_LABELS[p.practice_area]||p.practice_area}
+        · Geração ${p.geracao || 1}
+      </div>
+      <div style="font-size:.72rem;margin-bottom:.4rem">
+        Nota base: <b>${p.nota_base}/26</b> · Teto: ${p.teto_nota}/26
+        · Fama: ${p.fama||0}/100
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.6rem">
+        <span style="font-size:.85rem;font-weight:700;color:var(--ouro)">R$${(p.preco_mercado||0).toLocaleString('pt-BR')}</span>
+        <button class="btn btn-prim btn-sm" ${podeComprar?'':'disabled style="opacity:.5"'}
+          onclick="window.comprarPeticaoDeMercado('${p.id}','${p.nome}',${p.preco_mercado||0})">
+          Comprar
+        </button>
+      </div>
+      ${!podeComprar ? `<div style="font-size:.67rem;color:var(--ardosia2);margin-top:.3rem">Saldo insuficiente</div>` : ''}
+    </div>`;
+}
+
+window.comprarPeticaoDeMercado = async function(peticaoId, nome, preco) {
+  if (!confirm(`Comprar "${nome}" por R$${preco.toLocaleString('pt-BR')}?`)) return;
+  try {
+    await httpsCallable(functions, 'comprarPeticao')({ peticao_id: peticaoId });
+    toast(`✅ Petição "${nome}" adquirida! A popularidade foi resetada.`, 'ok', 4000);
+    if (window.JOGADOR) window.renderMercadoPeticoes(window.JOGADOR, document.getElementById('main-content'));
+  } catch(e) { toast('Erro: ' + (e.message || e), 'erro'); }
+};
 
 // ─── Card de petição ──────────────────────────────────────────────────────────
 
