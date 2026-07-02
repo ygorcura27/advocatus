@@ -3,6 +3,7 @@ const { initializeApp } = require('firebase-admin/app');
 initializeApp();
 // Apenas as functions essenciais para o jogo funcionar
 const { avancarMes }                        = require('./avancar_mes');
+const { tickMensal }                         = require('./tick_mensal');
 const { processarSentenca, decidirRecursoSentenca } = require('./processar_sentenca');
 const { processarAcordao, decidirProximaInstancia } = require('./processar_acordao');
 const { criarEscritorio, convidarSocio,
@@ -16,6 +17,7 @@ const {
   variarPeticao,
   emprestarPeticao, liberarEmprestimo,
   venderPeticao, comprarPeticao,
+  retirarPeticaoMercado,
 } = require('./peticoes');
 const { montarSetlist, resolverEventoJulgamento } = require('./setlist');
 
@@ -42,3 +44,5 @@ exports.venderPeticao            = venderPeticao;
 exports.comprarPeticao           = comprarPeticao;
 exports.montarSetlist            = montarSetlist;
 exports.resolverEventoJulgamento = resolverEventoJulgamento;
+exports.retirarPeticaoMercado    = retirarPeticaoMercado;
+exports.tickMensal               = tickMensal;

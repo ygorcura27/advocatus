@@ -615,6 +615,21 @@ exports.comprarPeticao = onCall({ region: 'southamerica-east1' }, async (request
   return { ok: true };
 });
 
+exports.retirarPeticaoMercado = onCall({ region: 'southamerica-east1' }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
+  const uid = request.auth.uid;
+  const db  = getFirestore();
+  const { peticao_id } = request.data || {};
+  if (!peticao_id) throw new HttpsError('invalid-argument', 'peticao_id obrigatório.');
+  const petSnap = await db.collection('peticoes').doc(peticao_id).get();
+  if (!petSnap.exists) throw new HttpsError('not-found', 'Petição não encontrada.');
+  const pet = petSnap.data();
+  if (pet.jogador_uid !== uid) throw new HttpsError('permission-denied', 'Você não é o autor.');
+  if (!pet.no_mercado) throw new HttpsError('failed-precondition', 'Petição não está no mercado.');
+  await petSnap.ref.update({ no_mercado: false, preco_mercado: 0 });
+  return { ok: true };
+});
+
 // ─── Internos exportados ─────────────────────────────────────────────────────
 
 module.exports = Object.assign(module.exports, {

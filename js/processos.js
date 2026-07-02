@@ -2069,16 +2069,27 @@ function _renderModalProcesso(id, p) {
   }
 
   if (p.status === 'aguardando_decisao_sentenca') {
-    const res = p.resultado_setlist || 'improcedente';
+    const res    = p.resultado_setlist || 'improcedente';
+    const ganhou = res !== 'improcedente';
+    const cores  = { procedente:'var(--verde2)', parcial:'var(--amber)', improcedente:'var(--verm2)' };
     const resLabel = { procedente:'🏆 PROCEDENTE', parcial:'⚖️ PARCIALMENTE PROCEDENTE', improcedente:'📋 IMPROCEDENTE' }[res] || res;
     const fmt = (v) => `R$${(v||0).toLocaleString('pt-BR')}`;
+    const botoesVitoria = `
+      <button class="btn btn-prim btn-block" style="margin-top:1rem"
+        onclick="window.decidirRecursoSentencaProducao('${id}', false)">
+        ✅ Confirmar vitória — receber honorários
+      </button>`;
+    const botoesDerrota = `
+      <button class="btn btn-prim btn-block" style="margin-top:1rem"
+        onclick="window.decidirRecursoSentencaProducao('${id}', true)">⚖️ Recorrer da decisão</button>
+      <button class="btn btn-ghost btn-block" style="margin-top:.4rem"
+        onclick="window.decidirRecursoSentencaProducao('${id}', false)">Aceitar derrota e encerrar</button>`;
     abrirModal(`⚖️ ${p.tipo || 'Processo'} — Decisão Pendente`,
-      `<div style="font-size:.9rem;font-weight:600;margin-bottom:.8rem">${resLabel}</div>
+      `<div style="font-size:.95rem;font-weight:700;color:${cores[res] || 'inherit'};margin-bottom:.8rem">${resLabel}</div>
        <div style="font-size:.78rem;color:var(--ardosia2);margin-bottom:1rem">
-         Nota final: ${p.nota_final||'—'}/26 · Honorários pendentes: ${fmt(p.hon_pendente)}
+         Nota final: ${p.nota_final||'—'}/26 · ${ganhou ? `Honorários a receber: ${fmt(p.hon_pendente)}` : 'Sem honorários'}
        </div>
-       <button class="btn btn-prim btn-block" onclick="window.decidirRecursoSentencaProducao('${id}', true)">⚖️ Recorrer</button>
-       <button class="btn btn-ghost btn-block" style="margin-top:.4rem" onclick="window.decidirRecursoSentencaProducao('${id}', false)">Aceitar e encerrar</button>`
+       ${ganhou ? botoesVitoria : botoesDerrota}`
     );
     return;
   }
@@ -2455,11 +2466,20 @@ function _mostrarResultadoSentencaSetlist(r, procId) {
   const info = MAP[r.resultado] || { icon: '⚖️', label: r.resultado, cor: 'var(--txt3)' };
   const fmt  = (v) => `R$${(v||0).toLocaleString('pt-BR')}`;
 
+  const ganhou = r.resultado === 'procedente' || r.resultado === 'parcial';
   const botoesHtml = r.aguardandoDecisaoDoJogador
-    ? `<button class="btn btn-prim btn-block" style="margin-top:1rem"
-         onclick="window.decidirRecursoSentencaProducao('${procId}', true)">⚖️ Recorrer</button>
-       <button class="btn btn-ghost btn-block" style="margin-top:.4rem"
-         onclick="window.decidirRecursoSentencaProducao('${procId}', false)">Aceitar e encerrar</button>`
+    ? ganhou
+      ? `<button class="btn btn-prim btn-block" style="margin-top:1rem"
+           onclick="window.decidirRecursoSentencaProducao('${procId}', false)">
+           ✅ Confirmar vitória e aguardar trânsito
+         </button>
+         <button class="btn btn-ghost btn-block" style="margin-top:.4rem;font-size:.75rem"
+           title="Rare: force encerramento sem aguardar possível recurso adverso"
+           onclick="window.decidirRecursoSentencaProducao('${procId}', false)">Encerrar imediatamente</button>`
+      : `<button class="btn btn-prim btn-block" style="margin-top:1rem"
+           onclick="window.decidirRecursoSentencaProducao('${procId}', true)">⚖️ Recorrer da decisão</button>
+         <button class="btn btn-ghost btn-block" style="margin-top:.4rem"
+           onclick="window.decidirRecursoSentencaProducao('${procId}', false)">Aceitar derrota e encerrar</button>`
     : `<button class="btn btn-prim btn-block" style="margin-top:1rem"
          onclick="fecharModal();window.navTo&&window.navTo('processos',null)">Fechar</button>`;
 

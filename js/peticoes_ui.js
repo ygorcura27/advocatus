@@ -286,6 +286,12 @@ function _cardPeticao(p) {
         ${p.status === 'pronta' && !p.no_mercado
           ? `<button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();window.abrirModalVender('${p.id}')">Vender</button>`
           : ''}
+        ${p.status === 'emprestada'
+          ? `<button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();window.liberarEmprestimoPeticao('${p.id}')">Liberar Empréstimo</button>`
+          : ''}
+        ${p.no_mercado
+          ? `<button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();window.retirarMercado('${p.id}')">Retirar do Mercado</button>`
+          : ''}
       </div>
     </div>`;
 }
@@ -473,6 +479,24 @@ window.abrirModalEmprestar = async function(peticaoId) {
   try {
     await httpsCallable(functions, 'emprestarPeticao')({ peticao_id: peticaoId, npc_id: npcId });
     toast('Petição emprestada!', 'ok', 3000);
+  } catch(e) { toast('Erro: ' + e.message, 'erro'); }
+};
+
+window.liberarEmprestimoPeticao = async function(peticaoId) {
+  if (!confirm('Devolver esta petição do NPC emprestado?')) return;
+  try {
+    await httpsCallable(functions, 'liberarEmprestimo')({ peticao_id: peticaoId });
+    toast('Petição devolvida!', 'ok', 3000);
+    if (window.JOGADOR) window.renderPeticoes(window.JOGADOR, document.getElementById('main-content'));
+  } catch(e) { toast('Erro: ' + e.message, 'erro'); }
+};
+
+window.retirarMercado = async function(peticaoId) {
+  if (!confirm('Retirar esta petição do mercado?')) return;
+  try {
+    await httpsCallable(functions, 'retirarPeticaoMercado')({ peticao_id: peticaoId });
+    toast('Petição retirada do mercado.', 'ok', 3000);
+    if (window.JOGADOR) window.renderPeticoes(window.JOGADOR, document.getElementById('main-content'));
   } catch(e) { toast('Erro: ' + e.message, 'erro'); }
 };
 

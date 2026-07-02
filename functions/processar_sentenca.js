@@ -260,7 +260,7 @@ async function _processarSentencaSetlist(db, processoRef, jogadorRef, p, j, uid,
   const nota         = p.nota_provisoria || 1;
   const ev           = p.evento_julgamento || {};
   const impactoEv    = (ev.impacto || 0) + (ev.segundo_evento?.impacto || 0);
-  const posicao      = p.posicao || 'autor';
+  const posicao      = p.posicao || p.meu_lado || 'autor';
   const tipoCaso     = p.area || p.tipo || 'civil';
   const instancia    = p.instancia_atual || 'trial';
 
@@ -511,12 +511,59 @@ exports.decidirRecursoSentenca = onCall({ region: 'southamerica-east1' }, async 
     throw new HttpsError('failed-precondition', 'Este processo não está aguardando decisão de recurso.');
   }
 
+  // ── Fluxo setlist (GDD v4.1): resultado já determinado, hon em espera ───────
+  const isSetlistFlow = !!(p.setlist && p.resultado_setlist);
   if (!recorrer) {
-    // Aceita a derrota — encerra definitivamente, igual ao caminho
-    // "não favorável e sem recurso" da sentença original.
+    if (isSetlistFlow) {
+      // Aceitar: encerrar com base no resultado já calculado
+      const ganhou = p.resultado_setlist !== 'improcedente';
+      const hon    = ganhou ? (p.hon_pendente || 0) : 0;
+      const repDt  = p.repDelta || 0;
+      const escritorioDoCaso = p.pool_escritorio_id || j.escritorio_proprio_id;
+      if (ganhou && hon > 0) {
+        if (escritorioDoCaso) {
+          const escRef  = db.collection('escritorios').doc(escritorioDoCaso);
+          const escSnap = await escRef.get();
+          if (escSnap.exists) await escRef.update({ caixa: (escSnap.data().caixa||0) + hon });
+        } else {
+          await jogadorRef.update({
+            dinheiro:       (j.dinheiro||0) + hon,
+            honorarios_mes: (j.honorarios_mes||0) + hon,
+          });
+        }
+      }
+      if (!ganhou && repDt < 0 && escritorioDoCaso) {
+        try {
+          const escRef  = db.collection('escritorios').doc(escritorioDoCaso);
+          const escSnap = await escRef.get();
+          if (escSnap.exists)
+            await escRef.update({ prestigio: Math.max(0, (escSnap.data().prestigio||10) - Math.ceil(Math.abs(repDt)*0.5)) });
+        } catch(e) { logger.warn('Rep escritório setlist:', e); }
+      }
+      await processoRef.update({
+        status:               ganhou ? 'ganho' : 'perdido',
+        encerrado_mes:        mesTotalPessoal(j),
+        hon_total_acumulado:  hon,
+        hon_pendente:         0,
+      });
+      if (p.pool_proc_subcol_id && p.pool_proc_esc_id) {
+        try {
+          await db.collection('escritorios').doc(p.pool_proc_esc_id)
+            .collection('processos_pool').doc(p.pool_proc_subcol_id)
+            .update({ status:'concluido', resultado: p.resultado_setlist, valor_recebido: hon, concluido_em: new Date().toISOString() });
+        } catch(e) { logger.warn('Pool subcol encerrar setlist:', e); }
+      }
+      return { msg: ganhou ? `Vitória confirmada — R$${hon.toLocaleString('pt-BR')} em honorários recebidos.` : 'Derrota aceita. Processo encerrado.' };
+    }
+
+    // Fluxo legado: aceita a derrota
     const score = p.score_anterior;
     await _finalizarProcessoDefinitivo(db, processoRef, jogadorRef, p, j, score, false, 0, mesTotalPessoal(j), 0, logger);
     return { msg: 'Decisão aceita. Processo encerrado — trânsito em julgado.' };
+  }
+
+  if (isSetlistFlow && p.resultado_setlist !== 'improcedente') {
+    throw new HttpsError('failed-precondition', 'Você ganhou — não há derrota para recorrer.');
   }
 
   // Recorrer: abre a fase de recurso, com o JOGADOR como quem recorre —

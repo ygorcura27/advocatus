@@ -353,23 +353,100 @@ function renderEscritorio(j, el) {
   // Advocacia solo — sem escritório formal ainda
   el.innerHTML = `
     <div class="secao-header">
-      <div class="secao-titulo">🏢 Escritório</div>
+      <div class="secao-titulo">🏢 Advocacia Solo</div>
+      <button class="btn btn-sm btn-prim" onclick="window.novoProcesso && window.novoProcesso()">+ Novo caso</button>
     </div>
-    <div class="card" style="text-align:center;padding:2rem">
-      <div style="font-size:2rem;margin-bottom:.6rem">⚖️</div>
-      <div class="card-titulo">Advocacia Solo</div>
-      <div class="card-sub" style="margin-top:.4rem;max-width:360px;margin-inline:auto">
-        Você atua como advogado autônomo. Seus honorários são 30% do valor da causa + sucumbência por instância.
-        Para criar um escritório formal, você precisa ter OAB aprovada e ser Advogado Júnior ou superior.
+    <div class="card" style="text-align:center;padding:1.2rem 2rem;margin-bottom:1rem">
+      <div style="font-size:.85rem;color:var(--ardosia2);margin-bottom:.5rem">
+        Advogado autônomo · Honorários: 33% + sucumbência por instância
       </div>
       ${j.oab && ['jnr','pln','snr','asc','soc','snm'].includes(j.cargo_id) ? `
-      <button class="btn btn-sec" style="margin-top:1.2rem" onclick="window.criarEscritorio && window.criarEscritorio()">
+      <button class="btn btn-sec btn-sm" onclick="window.criarEscritorio && window.criarEscritorio()">
         Criar Escritório Formal
       </button>` : `
-      <div style="font-size:.75rem;color:var(--ardosia);margin-top:1rem">
-        ${!j.oab ? 'Requer OAB aprovada' : 'Requer Advogado Júnior ou superior'}
+      <div style="font-size:.73rem;color:var(--ardosia)">
+        ${!j.oab ? 'Crie um escritório após aprovar a OAB' : 'Requer Advogado Júnior ou superior para criar escritório'}
       </div>`}
+    </div>
+
+    <!-- Carteira processual solo -->
+    <div class="secao-header"><div class="secao-titulo">📁 Meus Processos</div></div>
+    <div id="solo-processos-lista">
+      <div style="font-size:.78rem;color:var(--ardosia);padding:.5rem 0">Carregando casos...</div>
     </div>`;
+
+  _carregarProcessosSolo(j);
+}
+
+async function _carregarProcessosSolo(j) {
+  try {
+    const ATIVOS_STATUS = ['andamento','aguardando_evento','pronto_para_sentenca','aguardando_decisao_sentenca','recurso_pendente','aguardando_decisao_recurso'];
+    const snapA = await getDocs(query(
+      collection(db, 'processos'),
+      where('advogado_uid', '==', j.uid),
+      where('status', 'in', ATIVOS_STATUS),
+      orderBy('criado_mes', 'desc'),
+      limit(20)
+    ));
+    const snapE = await getDocs(query(
+      collection(db, 'processos'),
+      where('advogado_uid', '==', j.uid),
+      where('status', 'in', ['ganho','perdido']),
+      orderBy('encerrado_mes', 'desc'),
+      limit(5)
+    ));
+
+    const el = document.getElementById('solo-processos-lista');
+    if (!el) return;
+
+    const STATUS_LABEL = {
+      andamento: { l: 'Em andamento', c: 'var(--azul1)' },
+      aguardando_evento: { l: '⚡ Evento pendente', c: 'var(--ouro2)' },
+      pronto_para_sentenca: { l: '⚖️ Aguardando sentença', c: 'var(--amber)' },
+      aguardando_decisao_sentenca: { l: '📋 Decisão pendente', c: 'var(--amber)' },
+      recurso_pendente: { l: '📬 Recurso pendente', c: 'var(--roxo)' },
+      aguardando_decisao_recurso: { l: '📋 Decisão recursal', c: 'var(--roxo)' },
+      ganho: { l: '✅ Ganho', c: 'var(--verde2)' },
+      perdido: { l: '❌ Perdido', c: 'var(--verm2)' },
+    };
+
+    const fmt = (v) => `R$${(v||0).toLocaleString('pt-BR')}`;
+    const renderCard = (id, p) => {
+      const st = STATUS_LABEL[p.status] || { l: p.status, c: 'inherit' };
+      return `<div class="proc-card" onclick="window.abrirProcesso && window.abrirProcesso('${id}')" style="margin-bottom:.4rem">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div style="font-size:.72rem;color:var(--ardosia2)">${p.numero || '—'}</div>
+            <div style="font-size:.83rem;font-weight:600;margin:.15rem 0">${p.tipo || p.area || '—'}</div>
+            <div style="font-size:.72rem;color:var(--ardosia2)">${p.autor||'—'} vs ${p.reu||'—'}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:.75rem;font-weight:600">${fmt(p.valor)}</div>
+            <div style="font-size:.7rem;color:${st.c};margin-top:.2rem">${st.l}</div>
+          </div>
+        </div>
+      </div>`;
+    };
+
+    const ativos = snapA.docs.map(d => renderCard(d.id, d.data()));
+    const encerrados = snapE.docs.map(d => renderCard(d.id, d.data()));
+
+    if (ativos.length === 0 && encerrados.length === 0) {
+      el.innerHTML = `<div style="font-size:.78rem;color:var(--ardosia);padding:.5rem 0">
+        Nenhum processo ativo. Clique em "+ Novo caso" para começar.
+      </div>`;
+      return;
+    }
+
+    el.innerHTML = ativos.join('') +
+      (encerrados.length ? `
+        <div class="secao-header" style="margin-top:1rem"><div class="secao-titulo" style="font-size:.78rem">Últimos encerrados</div></div>
+        ${encerrados.join('')}` : '');
+  } catch(e) {
+    console.error('[SOLO PROCESSOS]', e);
+    const el = document.getElementById('solo-processos-lista');
+    if (el) el.innerHTML = `<div style="font-size:.78rem;color:var(--erro)">Erro ao carregar: ${e.message}</div>`;
+  }
 }
 
 async function _carregarEscritorioProprio(escId, j) {
