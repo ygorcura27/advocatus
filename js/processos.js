@@ -29,6 +29,11 @@ import { httpsCallable }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
 import { db } from './firebase-init.js';
 import './equipe_minima.js';
+import {
+  PERFIL_TRIBUNAL, CADEIA_INSTANCIAS, ENTES_TRIBUTARIOS_ESTADUAIS,
+  XP_BASE_INSTANCIA, RANK_INSTANCIA_2GRAU, RANK_INSTANCIA_SUPERIOR,
+  tribunalRecursal, ehTopoDaCadeia, xpPorDecisao,
+} from './jurisdicao.js';
 
 // ════════════════════════════════════════════════════════
 // CONSTANTES DE PRODUÇÃO (mantidas do processos.js original)
@@ -86,8 +91,7 @@ window._creditarXpParcialInstrucao = async function(procId, p, j) {
 // ── Instância MÁXIMA que cada faixa de cargo pode sustentar EM RECURSO.
 // Est/Ass (idx 0-1): não recorrem. Júnior (idx 2): até 2º grau (TJ/TRF/TRT).
 // Pleno (idx 3): até Tribunal Superior (STJ/TST). Sênior+ (idx 4+): até STF.
-const RANK_INSTANCIA_2GRAU = ['TJ','TRF','TRT'];
-const RANK_INSTANCIA_SUPERIOR = ['STJ','TST'];
+// RANK_INSTANCIA_2GRAU e RANK_INSTANCIA_SUPERIOR vêm de jurisdicao.js
 
 function instanciaMaximaParaCargo(cargoId){
   const idx = CARGO_IDX[cargoId] ?? 0;
@@ -1640,59 +1644,8 @@ function somarMeses(m, a, delta){
 // usando window.JOGADOR.cargo_id e a subcoleção real de funcionarios do
 // Firestore, em vez de variáveis simuladas fixas.)
 
-// ════════════════════════════════════════════════
-// PERFIS DE TRIBUNAL (tendências ocultas)
-// ════════════════════════════════════════════════
-const PERFIL_TRIBUNAL={
-  'TJ':  { nome:'Tribunal de Justiça', tendencia:'documental', desc:'mais sensível à prova documental', votos:3 },
-  'TRF': { nome:'Tribunal Regional Federal', tendencia:'tecnica', desc:'mais técnico e formalista', votos:3 },
-  'TRT': { nome:'Tribunal Regional do Trabalho', tendencia:'trabalhador', desc:'mais favorável ao trabalhador', votos:3 },
-  'STJ': { nome:'Superior Tribunal de Justiça', tendencia:'jurisprudencia', desc:'foco em jurisprudência consolidada', votos:5 },
-  'TST': { nome:'Tribunal Superior do Trabalho', tendencia:'trabalhador', desc:'uniformiza jurisprudência trabalhista', votos:5 },
-  'STF': { nome:'Supremo Tribunal Federal', tendencia:'constitucional', desc:'foco em matéria constitucional', votos:5 },
-};
-
-// ── CADEIA DE INSTÂNCIAS POR ORIGEM DO PROCESSO ──
-// tributário estadual/municipal (ISS, IPVA, ITBI, ITCMD, ICMS): Just. Estadual → TJ → STJ → STF
-// tributário federal (IRPF, IRPJ, IPI, PIS/COFINS, CSLL, IOF, II, ITR): Just. Federal → TRF → STJ → STF
-// trabalhista: Vara do Trabalho → TRT → TST → STF (NUNCA passa por STJ)
-// cível/consumidor: Justiça Comum/Juizado → TJ → STJ → STF
-const CADEIA_INSTANCIAS = {
-  tj_padrao:    ['1grau','TJ','STJ','STF'],
-  trf_padrao:   ['1grau','TRF','STJ','STF'],
-  trabalhista:  ['1grau','TRT','TST','STF'],
-};
-
-// Entes tributários cuja origem é Justiça Estadual (cai na cadeia tj_padrao)
-const ENTES_TRIBUTARIOS_ESTADUAIS = ['Estado do RJ', 'Município do Rio de Janeiro'];
-
-function _cadeiaDoProcesso(proc){
-  if (proc.area === 'trabalhista') return CADEIA_INSTANCIAS.trabalhista;
-  if (proc.area === 'tributario') {
-    // O ente tributante pode estar no AUTOR (Execução Fiscal, onde o
-    // Fisco executa o contribuinte) ou no RÉU (demais conflitos, onde o
-    // contribuinte aciona o Fisco) — checar os dois lados.
-    const entePresente = ENTES_TRIBUTARIOS_ESTADUAIS.includes(proc.reu) || ENTES_TRIBUTARIOS_ESTADUAIS.includes(proc.autor);
-    return entePresente ? CADEIA_INSTANCIAS.tj_padrao : CADEIA_INSTANCIAS.trf_padrao;
-  }
-  // cível/consumidor e demais áreas futuras
-  return CADEIA_INSTANCIAS.tj_padrao;
-}
-
-// Retorna o próximo tribunal na cadeia do PROCESSO (não só da área), dado a
-// instância atual. instanciaAtual: '1grau' | 'TJ' | 'TRF' | 'TRT' | 'STJ' | 'TST'.
-// Precisa do PROC completo (não só area) porque tributário bifurca por ente.
-function tribunalRecursal(proc, instanciaAtual){
-  const cadeia = _cadeiaDoProcesso(proc);
-  const idx = cadeia.indexOf(instanciaAtual);
-  if (idx === -1 || idx >= cadeia.length - 1) return cadeia[cadeia.length - 1]; // já no topo
-  return cadeia[idx + 1];
-}
-
-// É o topo da cadeia (STF sempre, pela regra: lá não há mais recurso)?
-function ehTopoDaCadeia(proc, instanciaAtual){
-  return instanciaAtual === 'STF';
-}
+// PERFIL_TRIBUNAL, CADEIA_INSTANCIAS, ENTES_TRIBUTARIOS_ESTADUAIS,
+// tribunalRecursal, ehTopoDaCadeia — importados de jurisdicao.js
 
 
 // ════════════════════════════════════════════════
@@ -1723,15 +1676,7 @@ function decidirRecurso(score){
   return Math.random() < classif.chanceRecurso;
 }
 
-// ════════════════════════════════════════════════
-// XP POR INSTÂNCIA — escala conforme sobe na cadeia, para desincentivar
-// "girar" muitos processos fracos em vez de levar um caso até o fim.
-// ════════════════════════════════════════════════
-const XP_BASE_INSTANCIA = { '1grau':20, 'TJ':32, 'TRF':32, 'TRT':32, 'STJ':50, 'TST':50, 'STF':70 };
-function xpPorDecisao(instancia, score){
-  const base = XP_BASE_INSTANCIA[instancia] || 20;
-  return Math.round(base + score*0.15);
-}
+// XP_BASE_INSTANCIA, xpPorDecisao — importados de jurisdicao.js
 const ESTRATEGIAS_RECURSO_DEFESA=[
   { id:'defender_provas', nome:'Defender as Provas', desc:'Reforça a valoração do conjunto probatório já produzido.', afeta:'prova_documental' },
   { id:'defender_jurisprudencia', nome:'Defender a Jurisprudência', desc:'Sustenta que a decisão segue entendimento consolidado dos tribunais.', afeta:'jurisprudencia' },
