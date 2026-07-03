@@ -600,14 +600,29 @@ window._abrirPerfilFuncionario = async function(escId, funcId) {
   const npcDisp   = (window.NPC_ENERGIA_MES || 100) - (f.energia_npc_usada_mes || 0);
   const avatarSrc = _avatarSrc(f);
 
-  // Skills jurídicas (novo sistema)
-  const skJur = f.skills_jur || {};
-  const temSkJur = Object.values(skJur).some(v => v > 0);
+  // Se for o jogador atual, pega skills_jur do documento do jogador
+  const j = window.JOGADOR;
+  const uid = j?.uid || window.JOGADOR_UID;
+  const isJogador = f.uid === uid || funcId === uid;
 
-  // Skills tradicionais (sistema antigo / NPCs)
+  // NPC: mapeia skills antigas para skills_jur aproximadas se não tiver skills_jur
   const skTrad = f.skills || {};
   const cargoCapTrad = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 }[f.cargo_id] || 50;
-  const temSkTrad = Object.values(skTrad).some(v => v > 0);
+  let skJur = isJogador ? (j?.skills_jur || {}) : (f.skills_jur || {});
+  if (!isJogador && Object.keys(skJur).length === 0 && Object.keys(skTrad).length > 0) {
+    // Aproximação: converte skills antigas para o formato skills_jur
+    const cap = cargoCapTrad;
+    skJur = {
+      legal_drafting:   Math.round((skTrad.escrita_juridica || 0) / cap * 50),
+      legal_research:   Math.round((skTrad.pesquisa          || 0) / cap * 50),
+      argumentation:    Math.round((skTrad.argumentacao       || 0) / cap * 50),
+      oral_advocacy:    Math.round((skTrad.oratoria           || 0) / cap * 50),
+      negotiation:      Math.round((skTrad.negociacao || skTrad.persuasao || 0) / cap * 50),
+      procedure:        Math.round((skTrad.gestao             || 0) / cap * 50),
+    };
+  }
+  const temSkJur = Object.keys(skJur).length > 0;
+  const temSkTrad = false; // sempre usar skJur (mapeado ou real)
 
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem';
