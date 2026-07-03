@@ -556,7 +556,7 @@ window._confirmarDelegacao = async function(escId, opId, valor, funcId, cargoId,
 const _SKILL_JUR_LABEL = {
   legal_drafting:'Redação Jurídica', legal_research:'Pesquisa Jurídica',
   argumentation:'Argumentação', oral_advocacy:'Sustentação Oral',
-  negotiation:'Negociação', procedure:'Litigância',
+  negotiation:'Negociação', procedure:'Litigância', gestao:'Gestão',
 };
 const _DOC_LABEL = {
   doc_initial_filing:'Petição Inicial', doc_responsive_pleading:'Contestação',
@@ -620,14 +620,12 @@ window._abrirPerfilFuncionario = async function(escId, funcId) {
       argumentation:  sk(skTrad.argumentacao),
       oral_advocacy:  sk(skTrad.oratoria),
       negotiation:    sk(skTrad.negociacao || skTrad.persuasao),
+      gestao:         sk(skTrad.gestao),
       // procedure não tem equivalente no sistema antigo
     };
   }
   const temSkJur  = Object.keys(skJur).length > 0;
   const temSkTrad = false;
-  // gestao é habilidade de gestão do escritório — exibida separadamente
-  const gestao        = isJogador ? (j?.skills?.gestao ?? j?.gestao ?? null) : (skTrad.gestao ?? null);
-  const gestaoNetworking = isJogador ? null : (skTrad.networking ?? null);
 
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem';
@@ -675,14 +673,7 @@ window._abrirPerfilFuncionario = async function(escId, funcId) {
             .map(([k,l]) => _skRowPerfil(l, skTrad[k]||0, cargoCapTrad)).join('')}
         ` : ''}
 
-        ${(gestao != null || gestaoNetworking != null) ? `
-        <div style="margin-top:.9rem;padding-top:.9rem;border-top:1px solid #eee">
-          <div style="font-size:.72rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem">Gestão do Escritório</div>
-          ${gestao != null ? _skRowPerfil('Gestão', gestao, cargoCapTrad) : ''}
-          ${gestaoNetworking != null ? _skRowPerfil('Networking', gestaoNetworking, cargoCapTrad) : ''}
-        </div>` : ''}
-
-        ${!temSkJur && !temSkTrad && gestao == null ? `
+        ${!temSkJur && !temSkTrad ? `
         <div style="text-align:center;padding:1rem 0;font-size:.78rem;color:#888">Nenhuma skill registrada.</div>
         ` : ''}
       </div>

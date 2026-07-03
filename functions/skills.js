@@ -98,6 +98,7 @@ function defaultSkillsJur() {
     oral_advocacy:  0,
     negotiation:    0,
     procedure:      0,
+    gestao:         0,
     // Document Type Mastery — 8 skills (Etapa 5)
     doc_initial_filing: 0,
     doc_responsive:     0,
