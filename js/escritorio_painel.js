@@ -577,15 +577,15 @@ const _SKILL_TRAD_LABEL = {
 
 function _skBarPerfil(val, max) {
   const pct = Math.round(Math.min(100, (val / max) * 100));
-  return `<div style="flex:1;height:4px;background:var(--borda2);border-radius:2px">
-    <div style="width:${pct}%;height:100%;background:var(--navy3);border-radius:2px"></div>
+  return `<div style="flex:1;height:4px;background:#e0e0e0;border-radius:2px">
+    <div style="width:${pct}%;height:100%;background:#1B2A4A;border-radius:2px"></div>
   </div>`;
 }
 function _skRowPerfil(label, val, max) {
   return `<div style="display:flex;align-items:center;gap:.5rem;padding:.2rem 0">
-    <span style="flex:0 0 140px;font-size:.73rem;color:var(--txt2)">${label}</span>
+    <span style="flex:0 0 140px;font-size:.73rem;color:#444">${label}</span>
     ${_skBarPerfil(val, max)}
-    <span style="font-size:.72rem;font-weight:600;min-width:36px;text-align:right">${val}/${max}</span>
+    <span style="font-size:.72rem;font-weight:600;min-width:36px;text-align:right;color:#111">${val}/${max}</span>
   </div>`;
 }
 
@@ -612,55 +612,51 @@ window._abrirPerfilFuncionario = async function(escId, funcId) {
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem';
   overlay.innerHTML = `
-    <div style="background:var(--fundo1,#1a1a2e);border-radius:10px;width:100%;max-width:440px;max-height:88vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.5)">
+    <div style="background:#fff;border:2px solid #111;border-radius:10px;width:100%;max-width:440px;max-height:88vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.4);color:#111">
       <!-- Header -->
-      <div style="display:flex;align-items:center;gap:.9rem;padding:1.2rem 1.2rem .8rem;border-bottom:1px solid var(--borda2)">
+      <div style="display:flex;align-items:center;gap:.9rem;padding:1.2rem 1.2rem .8rem;border-bottom:1px solid #ddd">
         <img src="${avatarSrc}" alt="${nome}"
           onerror="window._svgNpcFallback(this,'${nome.replace(/'/g,"\\'")}');"
           style="width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0">
         <div style="flex:1;min-width:0">
-          <div style="font-weight:700;font-size:.95rem">${nome}</div>
-          <div style="font-size:.75rem;color:var(--ardosia2)">${cargo} · ${esp}</div>
+          <div style="font-weight:700;font-size:.95rem;color:#111">${nome}</div>
+          <div style="font-size:.75rem;color:#555">${cargo} · ${esp}</div>
           <div style="display:flex;gap:.4rem;margin-top:.3rem;flex-wrap:wrap">
             ${emBurnout
-              ? `<span style="font-size:.65rem;background:var(--verm2);color:#fff;padding:.15rem .5rem;border-radius:10px">Burnout</span>`
-              : `<span style="font-size:.65rem;background:var(--fundo2);padding:.15rem .5rem;border-radius:10px">⚡ ${npcDisp}/100</span>`}
+              ? `<span style="font-size:.65rem;background:#c0392b;color:#fff;padding:.15rem .5rem;border-radius:10px">Burnout</span>`
+              : `<span style="font-size:.65rem;background:#f0f0f0;color:#333;padding:.15rem .5rem;border-radius:10px">⚡ ${npcDisp}/100</span>`}
           </div>
         </div>
         <button onclick="this.closest('[style*=fixed]').remove()"
-          style="background:transparent;border:none;font-size:1.2rem;cursor:pointer;color:var(--ardosia2);align-self:flex-start">✕</button>
+          style="background:transparent;border:none;font-size:1.2rem;cursor:pointer;color:#888;align-self:flex-start">✕</button>
       </div>
 
       <div style="padding:.9rem 1.2rem">
 
         ${temSkJur ? `
-        <!-- Skills Jurídicas -->
-        <div style="font-size:.72rem;font-weight:700;color:var(--ardosia2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem">Skills Jurídicas</div>
+        <div style="font-size:.72rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem">Skills Jurídicas</div>
         ${Object.entries(_SKILL_JUR_LABEL).map(([k,l]) => _skRowPerfil(l, skJur[k]||0, 50)).join('')}
 
-        <!-- Tipos de Documento -->
         <details style="margin-top:.6rem">
-          <summary style="font-size:.72rem;color:var(--ardosia2);cursor:pointer;margin-bottom:.3rem">Tipos de Documento</summary>
+          <summary style="font-size:.72rem;color:#555;cursor:pointer;margin-bottom:.3rem">Tipos de Documento</summary>
           ${Object.entries(_DOC_LABEL).map(([k,l]) => _skRowPerfil(l, skJur[k]||0, 50)).join('')}
         </details>
 
-        <!-- Áreas do Direito -->
         <details style="margin-top:.4rem">
-          <summary style="font-size:.72rem;color:var(--ardosia2);cursor:pointer;margin-bottom:.3rem">Áreas do Direito</summary>
+          <summary style="font-size:.72rem;color:#555;cursor:pointer;margin-bottom:.3rem">Áreas do Direito</summary>
           ${Object.entries(_AREA_JUR_LABEL).map(([k,l]) => _skRowPerfil(l, skJur[k]||0, 50)).join('')}
         </details>
         ` : ''}
 
         ${temSkTrad ? `
-        <!-- Skills tradicionais (NPCs) -->
-        <div style="font-size:.72rem;font-weight:700;color:var(--ardosia2);text-transform:uppercase;letter-spacing:.06em;margin-top:${temSkJur?'1rem':0};margin-bottom:.4rem">Habilidades</div>
+        <div style="font-size:.72rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-top:${temSkJur?'1rem':0};margin-bottom:.4rem">Habilidades</div>
         ${Object.entries(_SKILL_TRAD_LABEL)
             .filter(([k]) => skTrad[k] != null)
             .map(([k,l]) => _skRowPerfil(l, skTrad[k]||0, cargoCapTrad)).join('')}
         ` : ''}
 
         ${!temSkJur && !temSkTrad ? `
-        <div style="text-align:center;padding:1rem 0;font-size:.78rem;color:var(--ardosia2)">Nenhuma skill registrada.</div>
+        <div style="text-align:center;padding:1rem 0;font-size:.78rem;color:#888">Nenhuma skill registrada.</div>
         ` : ''}
       </div>
     </div>`;
