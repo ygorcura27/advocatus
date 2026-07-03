@@ -610,15 +610,17 @@ window._abrirPerfilFuncionario = async function(escId, funcId) {
   const cargoCapTrad = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 }[f.cargo_id] || 50;
   let skJur = isJogador ? (j?.skills_jur || {}) : (f.skills_jur || {});
   if (!isJogador && Object.keys(skJur).length === 0 && Object.keys(skTrad).length > 0) {
-    // Aproximação: converte skills antigas para o formato skills_jur
+    // Converte skills antigas (sistema NPC) para o formato skills_jur
+    // NPCs usam 'escrita' (não 'escrita_juridica') e cap proporcional ao cargo
     const cap = cargoCapTrad;
+    const sk  = v => Math.round((v || 0) / cap * 50);
     skJur = {
-      legal_drafting:   Math.round((skTrad.escrita_juridica || 0) / cap * 50),
-      legal_research:   Math.round((skTrad.pesquisa          || 0) / cap * 50),
-      argumentation:    Math.round((skTrad.argumentacao       || 0) / cap * 50),
-      oral_advocacy:    Math.round((skTrad.oratoria           || 0) / cap * 50),
-      negotiation:      Math.round((skTrad.negociacao || skTrad.persuasao || 0) / cap * 50),
-      procedure:        Math.round((skTrad.gestao             || 0) / cap * 50),
+      legal_drafting: sk(skTrad.escrita_juridica || skTrad.escrita),
+      legal_research: sk((skTrad.pesquisa || 0) + (skTrad.legislacao || 0)),
+      argumentation:  sk(skTrad.argumentacao),
+      oral_advocacy:  sk(skTrad.oratoria),
+      negotiation:    sk(skTrad.negociacao || skTrad.persuasao),
+      procedure:      sk(skTrad.gestao),
     };
   }
   const temSkJur = Object.keys(skJur).length > 0;
