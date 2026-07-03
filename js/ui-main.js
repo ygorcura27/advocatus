@@ -1212,7 +1212,7 @@ function _renderSkillsJur(j) {
     { k: 'argumentation',    l: 'Argumentação',       w: 0.25 },
     { k: 'oral_advocacy',    l: 'Sustentação Oral',   w: 0    },
     { k: 'negotiation',      l: 'Negociação',         w: 0    },
-    { k: 'procedure',        l: 'Processo Civil',     w: 0.15 },
+    { k: 'procedure',        l: 'Litigância',         w: 0.15 },
   ];
   const DOC_SKILLS = [
     { k: 'doc_initial_filing',      l: 'Petição Inicial'         },

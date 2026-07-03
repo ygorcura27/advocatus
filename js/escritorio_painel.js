@@ -556,7 +556,7 @@ window._confirmarDelegacao = async function(escId, opId, valor, funcId, cargoId,
 const _SKILL_JUR_LABEL = {
   legal_drafting:'Redação Jurídica', legal_research:'Pesquisa Jurídica',
   argumentation:'Argumentação', oral_advocacy:'Sustentação Oral',
-  negotiation:'Negociação', procedure:'Processo Civil',
+  negotiation:'Negociação', procedure:'Litigância',
 };
 const _DOC_LABEL = {
   doc_initial_filing:'Petição Inicial', doc_responsive_pleading:'Contestação',
