@@ -629,8 +629,15 @@ window._contratarNPC = async function(cargo_min, escId) {
 
   try {
     const ref = await addDoc(collection(db, 'escritorios', escId, 'funcionarios'), funcionario);
+    // +2 gestao por contratar um funcionário
+    const uid = j?.uid || window.JOGADOR_UID;
+    const gestaoAtual = (j?.skills_jur?.gestao || 0);
+    await updateDoc(doc(db, 'jogadores', uid), {
+      'skills_jur.gestao': Math.min(50, gestaoAtual + 2),
+    });
+    if (window.JOGADOR?.skills_jur) window.JOGADOR.skills_jur.gestao = Math.min(50, gestaoAtual + 2);
     fecharModal();
-    toast(`✅ ${nome} (${ci.l}) contratado! Salário: R$ ${ci.sal.toLocaleString('pt-BR')}/mês`, 'ok', 5000);
+    toast(`✅ ${nome} (${ci.l}) contratado! Salário: R$ ${ci.sal.toLocaleString('pt-BR')}/mês · +2 Gestão`, 'ok', 5000);
     // Recarregar equipe
     setTimeout(() => window.navTo && window.navTo('equipe', null), 600);
   } catch(err) {
@@ -875,11 +882,20 @@ window._confirmarDesignar = async function(funcId, procId, escId) {
     mes_energia:           mesAtual,
   });
 
+  // +1 gestao por delegar processo
+  const gestaoAtual = (j?.skills_jur?.gestao || 0);
+  if (gestaoAtual < 50) {
+    await updateDoc(doc(db, 'jogadores', uid), {
+      'skills_jur.gestao': Math.min(50, gestaoAtual + 1),
+    });
+    if (window.JOGADOR?.skills_jur) window.JOGADOR.skills_jur.gestao = Math.min(50, gestaoAtual + 1);
+  }
+
   fecharModal();
   if (chegou100) {
-    toast(`✅ ${f.nome} concluiu a instrução! Processo pronto para sua sentença.`, 'ok', 6000);
+    toast(`✅ ${f.nome} concluiu a instrução! Processo pronto para sua sentença. +1 Gestão`, 'ok', 6000);
   } else if (sucesso) {
-    toast(`📈 ${f.nome} avançou o processo para ${progressoAlvo}%.`, 'ok', 4000);
+    toast(`📈 ${f.nome} avançou o processo para ${progressoAlvo}%. +1 Gestão`, 'ok', 4000);
   } else {
     toast(`⚠️ ${f.nome} teve dificuldades — processo avançou apenas para ${progressoAlvo}%.`, 'neutro', 4000);
   }

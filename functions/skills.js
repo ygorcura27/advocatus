@@ -163,28 +163,33 @@ async function concederBarExamBonus(db, uid) {
 async function processarEvolucaoSkillsJurMensalCF(db, uid, jogadorData) {
   const j = jogadorData;
 
-  // Petições compostas no mês (incrementadas em peticoes.js ao compor)
   const peticoesCompostas = j.peticoes_compostas_mes || 0;
-
-  // Mentoria ativa de NPC sênior (campo setado pelo sistema de equipe)
-  const mentoriaAtiva = j.mentoria_composicao_ativa || false;
-
-  if (peticoesCompostas === 0 && !mentoriaAtiva) return;
+  const mentoriaAtiva     = j.mentoria_composicao_ativa || false;
+  const temEscritorio     = !!j.escritorio_proprio_id;
 
   const atual = normalizarSkillsJur(j.skills_jur);
+  const upd   = {};
 
-  const ganhoBase      = peticoesCompostas;          // +1 por petição composta
-  const ganhoMentoria  = mentoriaAtiva ? 4 : 0;     // +4 se mentoria ativa
-  const ganhoTotal     = ganhoBase + ganhoMentoria;
+  // legal_drafting + legal_research: +1/petição composta, +4/mês com mentoria
+  const ganhoJur = peticoesCompostas + (mentoriaAtiva ? 4 : 0);
+  if (ganhoJur > 0) {
+    const novoLD = capSkill(atual.legal_drafting + ganhoJur);
+    const novoLR = capSkill(atual.legal_research + ganhoJur);
+    if (novoLD !== atual.legal_drafting) upd['skills_jur.legal_drafting'] = novoLD;
+    if (novoLR !== atual.legal_research) upd['skills_jur.legal_research'] = novoLR;
+  }
 
-  if (ganhoTotal === 0) return;
-
-  const novoLD = capSkill(atual.legal_drafting + ganhoTotal);
-  const novoLR = capSkill(atual.legal_research + ganhoTotal);
-
-  const upd = {};
-  if (novoLD !== atual.legal_drafting) upd['skills_jur.legal_drafting'] = novoLD;
-  if (novoLR !== atual.legal_research) upd['skills_jur.legal_research'] = novoLR;
+  // gestao: +1/mês por ter escritório próprio com equipe (passivo de gestão)
+  // cap em +3/mês mesmo que tenha equipe grande
+  if (temEscritorio) {
+    const escSnap = await db.collection('escritorios').doc(j.escritorio_proprio_id).collection('funcionarios').limit(5).get();
+    const numNpcs = escSnap.docs.filter(d => d.data().tipo === 'npc' && !d.data().burnout_npc).length;
+    if (numNpcs > 0) {
+      const ganhoGestao = Math.min(3, numNpcs); // +1 por NPC ativo, max 3/mês
+      const novoGestao  = capSkill(atual.gestao + ganhoGestao);
+      if (novoGestao !== atual.gestao) upd['skills_jur.gestao'] = novoGestao;
+    }
+  }
 
   if (Object.keys(upd).length > 0) {
     await db.collection('jogadores').doc(uid).update(upd);
