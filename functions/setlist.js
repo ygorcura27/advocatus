@@ -324,6 +324,25 @@ exports.montarSetlist = onCall({ region: 'southamerica-east1' }, async (request)
     }
   }
 
+  // XP para skills de ação processual (argumentation, oral_advocacy, negotiation, procedure)
+  const skXpAcao = {};
+  for (const slot of slotsCalculados) {
+    if (slot.tipo === 'acao_processual' && slot.acao_tipo) {
+      const campo = SKILL_ACAO[slot.acao_tipo];
+      if (campo) skXpAcao[campo] = (skXpAcao[campo] || 0) + 1;
+    }
+  }
+  if (Object.keys(skXpAcao).length > 0) {
+    const skJurUpd = {};
+    for (const [campo, xp] of Object.entries(skXpAcao)) {
+      const novo = Math.min(50, (skJur[campo] || 0) + xp);
+      if (novo !== (skJur[campo] || 0)) skJurUpd[`skills_jur.${campo}`] = novo;
+    }
+    if (Object.keys(skJurUpd).length > 0) {
+      await db.collection('jogadores').doc(uid).update(skJurUpd);
+    }
+  }
+
   const modEst       = modEstadoJogador(j);
   let nota_provisoria = calcularNotaProcesso(slotsCalculados, modEst);
   if (supervisaoAtiva) nota_provisoria = Math.min(26, nota_provisoria + 2);
@@ -404,6 +423,19 @@ exports.resolverEventoJulgamento = onCall({ region: 'southamerica-east1' }, asyn
       escolha_feita: segundo_evento_escolha || null,
       impacto:       segundo_evento_escolha ? impacto2 : null,
     };
+  }
+
+  // XP para skill da escolha no evento
+  const XP_ESCOLHA_SKILL = {
+    capitalizar:   'argumentation',
+    suporte:       'procedure',
+    propor_acordo: 'negotiation',
+    combater:      'argumentation',
+  };
+  const skillEscolha = XP_ESCOLHA_SKILL[escolha];
+  if (skillEscolha) {
+    const atual = (normalizarSkillsJur(j.skills_jur))[skillEscolha] || 0;
+    await jogSnap.ref.update({ [`skills_jur.${skillEscolha}`]: Math.min(50, atual + 1) });
   }
 
   await procSnap.ref.update({

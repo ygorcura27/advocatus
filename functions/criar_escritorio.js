@@ -58,6 +58,7 @@ exports.criarEscritorio = onCall({ region: 'southamerica-east1' }, async (reques
     prestigio:             0,
     caixa:                 0,
     especialidade_principal: especialidade_principal || j.especialidade || 'civil',
+    areas_atuacao:           [ especialidade_principal || j.especialidade || 'civil' ],
     bairro_sede:           bairro_sede || 'Centro',
     zona_sede:             zona_sede   || 'centro',
     equipe:                [],

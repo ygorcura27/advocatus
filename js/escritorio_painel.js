@@ -3,7 +3,8 @@
  * Equipe, Clientes Corporativos e Oportunidades do mês.
  */
 
-import { collection, query, where, orderBy, limit, getDocs, doc, deleteDoc }
+import { collection, query, where, orderBy, limit, getDocs, doc, deleteDoc,
+  getDoc, updateDoc, arrayUnion, arrayRemove }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { db } from './firebase-init.js';
 
@@ -181,6 +182,7 @@ window.renderEquipePainel = async function(j, escId, el) {
           <div class="esc-membro-prod-val" style="color:${eficColor}">${efic}%</div>
         </div>` : ''}
         <div class="esc-membro-acoes">
+          <button class="esc-membro-btn" title="Ver perfil" onclick="window._abrirPerfilFuncionario('${escId}','${func.id}')">👤</button>
           <button class="esc-membro-btn${temProc?' em-proc':''}${emBurnout?' em-proc':''}"
             title="${emBurnout?'Em burnout':'Designar processo'}"
             onclick="${emBurnout
@@ -545,4 +547,220 @@ window._confirmarDelegacao = async function(escId, opId, valor, funcId, cargoId,
     console.error('[DELEGAR OP]', e);
     toast('Erro ao delegar oportunidade.', 'ko');
   }
+};
+
+// ════════════════════════════════════════════════════════
+// PERFIL DO FUNCIONÁRIO
+// ════════════════════════════════════════════════════════
+
+const _SKILL_JUR_LABEL = {
+  legal_drafting:'Redação Jurídica', legal_research:'Pesquisa Jurídica',
+  argumentation:'Argumentação', oral_advocacy:'Sustentação Oral',
+  negotiation:'Negociação', procedure:'Processo Civil',
+};
+const _DOC_LABEL = {
+  doc_initial_filing:'Petição Inicial', doc_responsive_pleading:'Contestação',
+  doc_motion:'Requerimento', doc_appellate_brief:'Razões de Apelação',
+  doc_supreme_brief:'Razões de Rec. Especial', doc_trial_brief:'Memoriais',
+  doc_evidence:'Prova Documental', doc_deposition:'Depoimento',
+};
+const _AREA_JUR_LABEL = {
+  area_employment:'Trabalhista', area_tax:'Tributário', area_civil:'Cível',
+  area_criminal:'Criminal', area_corporate:'Empresarial',
+  area_immigration:'Imigração', area_bankruptcy:'Rec. Judicial',
+};
+const _SKILL_TRAD_LABEL = {
+  escrita_juridica:'Escrita Jurídica', pesquisa:'Pesquisa', oratoria:'Oratória',
+  persuasao:'Persuasão', argumentacao:'Argumentação', negociacao:'Negociação',
+  gestao:'Gestão', networking:'Networking',
+};
+
+function _skBarPerfil(val, max) {
+  const pct = Math.round(Math.min(100, (val / max) * 100));
+  return `<div style="flex:1;height:4px;background:var(--borda2);border-radius:2px">
+    <div style="width:${pct}%;height:100%;background:var(--azul1);border-radius:2px"></div>
+  </div>`;
+}
+function _skRowPerfil(label, val, max) {
+  return `<div style="display:flex;align-items:center;gap:.5rem;padding:.2rem 0">
+    <span style="flex:0 0 140px;font-size:.73rem;color:var(--txt2)">${label}</span>
+    ${_skBarPerfil(val, max)}
+    <span style="font-size:.72rem;font-weight:600;min-width:36px;text-align:right">${val}/${max}</span>
+  </div>`;
+}
+
+window._abrirPerfilFuncionario = async function(escId, funcId) {
+  const snap = await getDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId));
+  if (!snap.exists()) { toast('Funcionário não encontrado.', 'ko'); return; }
+  const f    = snap.data();
+  const nome = f.nome || f.name || 'Funcionário';
+  const cargo     = CARGO_INFO[f.cargo_id]?.l || f.cargo_id || '—';
+  const esp       = ESP_LABEL[f.especialidade] || f.especialidade || '—';
+  const emBurnout = !!f.burnout_npc;
+  const npcDisp   = (window.NPC_ENERGIA_MES || 100) - (f.energia_npc_usada_mes || 0);
+  const avatarSrc = _avatarSrc(f);
+
+  // Skills jurídicas (novo sistema)
+  const skJur = f.skills_jur || {};
+  const temSkJur = Object.values(skJur).some(v => v > 0);
+
+  // Skills tradicionais (sistema antigo / NPCs)
+  const skTrad = f.skills || {};
+  const cargoCapTrad = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 }[f.cargo_id] || 50;
+  const temSkTrad = Object.values(skTrad).some(v => v > 0);
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem';
+  overlay.innerHTML = `
+    <div style="background:var(--fundo1,#1a1a2e);border-radius:10px;width:100%;max-width:440px;max-height:88vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.5)">
+      <!-- Header -->
+      <div style="display:flex;align-items:center;gap:.9rem;padding:1.2rem 1.2rem .8rem;border-bottom:1px solid var(--borda2)">
+        <img src="${avatarSrc}" alt="${nome}"
+          onerror="window._svgNpcFallback(this,'${nome.replace(/'/g,"\\'")}');"
+          style="width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:.95rem">${nome}</div>
+          <div style="font-size:.75rem;color:var(--ardosia2)">${cargo} · ${esp}</div>
+          <div style="display:flex;gap:.4rem;margin-top:.3rem;flex-wrap:wrap">
+            ${emBurnout
+              ? `<span style="font-size:.65rem;background:var(--verm2);color:#fff;padding:.15rem .5rem;border-radius:10px">Burnout</span>`
+              : `<span style="font-size:.65rem;background:var(--fundo2);padding:.15rem .5rem;border-radius:10px">⚡ ${npcDisp}/100</span>`}
+          </div>
+        </div>
+        <button onclick="this.closest('[style*=fixed]').remove()"
+          style="background:transparent;border:none;font-size:1.2rem;cursor:pointer;color:var(--ardosia2);align-self:flex-start">✕</button>
+      </div>
+
+      <div style="padding:.9rem 1.2rem">
+
+        ${temSkJur ? `
+        <!-- Skills Jurídicas -->
+        <div style="font-size:.72rem;font-weight:700;color:var(--ardosia2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem">Skills Jurídicas</div>
+        ${Object.entries(_SKILL_JUR_LABEL).map(([k,l]) => _skRowPerfil(l, skJur[k]||0, 50)).join('')}
+
+        <!-- Tipos de Documento -->
+        <details style="margin-top:.6rem">
+          <summary style="font-size:.72rem;color:var(--ardosia2);cursor:pointer;margin-bottom:.3rem">Tipos de Documento</summary>
+          ${Object.entries(_DOC_LABEL).map(([k,l]) => _skRowPerfil(l, skJur[k]||0, 50)).join('')}
+        </details>
+
+        <!-- Áreas do Direito -->
+        <details style="margin-top:.4rem">
+          <summary style="font-size:.72rem;color:var(--ardosia2);cursor:pointer;margin-bottom:.3rem">Áreas do Direito</summary>
+          ${Object.entries(_AREA_JUR_LABEL).map(([k,l]) => _skRowPerfil(l, skJur[k]||0, 50)).join('')}
+        </details>
+        ` : ''}
+
+        ${temSkTrad ? `
+        <!-- Skills tradicionais (NPCs) -->
+        <div style="font-size:.72rem;font-weight:700;color:var(--ardosia2);text-transform:uppercase;letter-spacing:.06em;margin-top:${temSkJur?'1rem':0};margin-bottom:.4rem">Habilidades</div>
+        ${Object.entries(_SKILL_TRAD_LABEL)
+            .filter(([k]) => skTrad[k] != null)
+            .map(([k,l]) => _skRowPerfil(l, skTrad[k]||0, cargoCapTrad)).join('')}
+        ` : ''}
+
+        ${!temSkJur && !temSkTrad ? `
+        <div style="text-align:center;padding:1rem 0;font-size:.78rem;color:var(--ardosia2)">Nenhuma skill registrada.</div>
+        ` : ''}
+      </div>
+    </div>`;
+
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+};
+
+// ════════════════════════════════════════════════════════
+// ESPECIALIZAÇÕES DO ESCRITÓRIO
+// Máx de áreas por tier: 1→1, 2→2, 3→3, 4→4, 5→todas
+// ════════════════════════════════════════════════════════
+
+const TODAS_AREAS = [
+  { k:'civil',         l:'Cível'          },
+  { k:'tributario',    l:'Tributário'      },
+  { k:'trabalhista',   l:'Trabalhista'     },
+  { k:'criminal',      l:'Criminal'        },
+  { k:'empresarial',   l:'Empresarial'     },
+  { k:'societario',    l:'Societário'      },
+  { k:'consumidor',    l:'Consumidor'      },
+  { k:'familia',       l:'Família'         },
+  { k:'imobiliario',   l:'Imobiliário'     },
+  { k:'contencioso',   l:'Contencioso'     },
+  { k:'ambiental',     l:'Ambiental'       },
+  { k:'administrativo',l:'Administrativo'  },
+];
+const MAX_AREAS_TIER = { 1:1, 2:2, 3:3, 4:4, 5:99 };
+
+window.renderEspecializacoesEsc = async function(escId, el) {
+  const j = window.JOGADOR;
+  if (!j || !escId) return;
+
+  const escSnap = await getDoc(doc(db, 'escritorios', escId));
+  if (!escSnap.exists()) return;
+  const esc = escSnap.data();
+
+  const tier   = esc.tier || esc.nivel || 1;
+  const maxAr  = MAX_AREAS_TIER[tier] ?? 1;
+  const areas  = esc.areas_atuacao?.length
+    ? esc.areas_atuacao
+    : [esc.especialidade_principal || j.especialidade || 'civil'];
+  const isSocio = (esc.socios_uids || []).includes(j.uid || window.JOGADOR_UID);
+
+  function renderizar() {
+    const podeAdicionar = isSocio && areas.length < maxAr;
+    const podeRemover   = isSocio && areas.length > 1;
+    const disponíveis   = TODAS_AREAS.filter(a => !areas.includes(a.k));
+
+    el.innerHTML = `
+      <div style="margin-top:1.2rem;border-top:1px solid var(--borda2);padding-top:1rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem">
+          <div style="font-weight:600;font-size:.88rem">Especializações</div>
+          <span style="font-size:.7rem;color:var(--ardosia2)">Tier ${tier} · ${areas.length}/${maxAr === 99 ? 'ilimitado' : maxAr} área(s)</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.6rem">
+          ${areas.map(a => {
+            const lbl = TODAS_AREAS.find(x => x.k === a)?.l || a;
+            return `<span style="display:inline-flex;align-items:center;gap:.3rem;background:var(--azul1);color:#fff;font-size:.72rem;padding:.2rem .6rem;border-radius:12px">
+              ${lbl}
+              ${podeRemover ? `<button onclick="window._removerAreaEsc('${escId}','${a}')" style="background:transparent;border:none;color:rgba(255,255,255,.7);cursor:pointer;font-size:.75rem;padding:0;line-height:1">✕</button>` : ''}
+            </span>`;
+          }).join('')}
+        </div>
+        ${podeAdicionar && disponíveis.length > 0 ? `
+          <select id="_sel-nova-area" style="font-size:.78rem;padding:.3rem .5rem;border:1px solid var(--borda2);border-radius:4px;background:var(--fundo2);color:inherit;margin-right:.4rem">
+            <option value="">Escolher área…</option>
+            ${disponíveis.map(a => `<option value="${a.k}">${a.l}</option>`).join('')}
+          </select>
+          <button onclick="window._adicionarAreaEsc('${escId}')" style="font-size:.78rem;padding:.3rem .7rem;border:1px solid var(--azul1);border-radius:4px;background:transparent;color:var(--azul1);cursor:pointer">+ Adicionar</button>
+        ` : !podeAdicionar && isSocio ? `
+          <div style="font-size:.72rem;color:var(--ardosia2)">
+            ${maxAr === 99 ? 'Todas as áreas disponíveis.' : `Máximo de áreas para Tier ${tier} atingido. Faça upgrade para desbloquear mais.`}
+          </div>
+        ` : ''}
+      </div>`;
+  }
+
+  renderizar();
+};
+
+window._adicionarAreaEsc = async function(escId) {
+  const sel = document.getElementById('_sel-nova-area');
+  if (!sel?.value) { toast('Selecione uma área.', 'ko'); return; }
+  const novaArea = sel.value;
+  try {
+    await updateDoc(doc(db, 'escritorios', escId), { areas_atuacao: arrayUnion(novaArea) });
+    toast(`✅ ${TODAS_AREAS.find(a=>a.k===novaArea)?.l||novaArea} adicionado às especializações.`, 'ok');
+    const el = document.getElementById('esc-especializacoes-bloco');
+    if (el) window.renderEspecializacoesEsc(escId, el);
+  } catch(e) { toast('Erro ao adicionar área.', 'ko'); }
+};
+
+window._removerAreaEsc = async function(escId, area) {
+  const lbl = TODAS_AREAS.find(a=>a.k===area)?.l || area;
+  if (!confirm(`Remover "${lbl}" das especializações? Casos desta área em andamento não são afetados.`)) return;
+  try {
+    await updateDoc(doc(db, 'escritorios', escId), { areas_atuacao: arrayRemove(area) });
+    toast(`${lbl} removido das especializações.`, 'ok');
+    const el = document.getElementById('esc-especializacoes-bloco');
+    if (el) window.renderEspecializacoesEsc(escId, el);
+  } catch(e) { toast('Erro ao remover área.', 'ko'); }
 };

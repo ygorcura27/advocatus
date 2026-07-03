@@ -1861,13 +1861,44 @@ function _areaBancoParaEspecialidade(especialidade){
   return 'consumidor'; // civil, empresarial, criminal, etc. — fallback genérico
 }
 
+const AREA_PROC_LABEL = {
+  civil:'Cível', tributario:'Tributário', trabalhista:'Trabalhista',
+  criminal:'Criminal', empresarial:'Empresarial', societario:'Societário',
+  consumidor:'Consumidor', familia:'Família', imobiliario:'Imobiliário',
+  contencioso:'Contencioso', ambiental:'Ambiental', administrativo:'Administrativo',
+};
+
+function _escolherAreaPool(areas) {
+  if (!areas || areas.length === 0) return Promise.resolve('civil');
+  if (areas.length === 1) return Promise.resolve(areas[0]);
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center';
+    overlay.innerHTML = `
+      <div style="background:var(--fundo1,#1a1a2e);border-radius:8px;padding:1.5rem;max-width:320px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.4)">
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.3rem">Selecionar Área</div>
+        <div style="font-size:.75rem;color:var(--ardosia2);margin-bottom:1rem">Qual área do Direito para este caso?</div>
+        <div style="display:flex;flex-direction:column;gap:.4rem">
+          ${areas.map(a => `<button data-area="${a}" style="padding:.55rem .9rem;border:1px solid var(--borda2);border-radius:6px;background:transparent;cursor:pointer;text-align:left;font-size:.84rem;color:inherit">${AREA_PROC_LABEL[a]||a}</button>`).join('')}
+        </div>
+        <button class="_cancel-area" style="margin-top:.8rem;width:100%;padding:.35rem;border:none;background:transparent;color:var(--ardosia2);cursor:pointer;font-size:.75rem">Cancelar</button>
+      </div>`;
+    overlay.querySelectorAll('[data-area]').forEach(btn => {
+      btn.onclick = () => { overlay.remove(); resolve(btn.dataset.area); };
+    });
+    overlay.querySelector('._cancel-area').onclick = () => { overlay.remove(); resolve(null); };
+    document.body.appendChild(overlay);
+  });
+}
+
 // ════════════════════════════════════════════════════════
 // NOVO PROCESSO — gera o caso jurídico completo (estrutura determinística
 // do motor v8 + persistência em Firestore), substituindo o antigo
 // _gerarProcesso (sorteio solto de tipo/autor/réu sem tese/prova).
 // ════════════════════════════════════════════════════════
-function _gerarProcessoCompleto(j, distribuidoPeloEscritorio = false) {
-  const areaBanco = _areaBancoParaEspecialidade(j.especialidade || 'civil');
+function _gerarProcessoCompleto(j, distribuidoPeloEscritorio = false, areaEscolhida = null) {
+  const area = areaEscolhida || j.especialidade || 'civil';
+  const areaBanco = _areaBancoParaEspecialidade(area);
   const PROC = gerarProcesso(areaBanco, 'media');
   const TXT  = gerarTextoLocal(PROC);
 
@@ -1877,7 +1908,7 @@ function _gerarProcessoCompleto(j, distribuidoPeloEscritorio = false) {
     tipo: PROC.conflito.nome,
     autor: TXT.autor_nome,
     reu: TXT.reu_nome,
-    area: j.especialidade || 'civil',           // especialidade do PERSONAGEM (compat. com o resto do jogo)
+    area: area,           // área escolhida (compat. com o resto do jogo)
     area_banco: areaBanco,                       // área usada no banco jurídico (pode diferir da especialidade)
     tribunal: PROC.tribunal,
     instancia: '1grau',                          // agora NOMEADA, não numérica — ver tribunalRecursal()
@@ -3317,7 +3348,11 @@ window.novoProcessoPoolEmpregado = async function() {
     return;
   }
 
-  const proc = _gerarProcessoCompleto(j);
+  const areas = esc.areas_atuacao?.length ? esc.areas_atuacao : [esc.especialidade_principal || j.especialidade || 'civil'];
+  const areaEscolhida = await _escolherAreaPool(areas);
+  if (!areaEscolhida) return;
+
+  const proc = _gerarProcessoCompleto(j, false, areaEscolhida);
   proc.pool_escritorio_id = j.escritorio_empregado_id;
   proc.escritorio_nome_etiqueta = esc.nome || j.escritorio_nome || null;
   proc.distribuido_pelo_escritorio = true;
@@ -3331,7 +3366,7 @@ window.novoProcessoPoolEmpregado = async function() {
       processos_novos_mes: usados + 1,
       energia_usada_mes: (j.energia_usada_mes||0) + ENERGIA_CAPTAR_CASO_POOL,
     });
-    toast(`📁 Caso captado para o escritório: ${proc.tipo} (${usados+1}/${limite} este mês)`, 'ok', 4000);
+    toast(`📁 Caso captado: ${AREA_PROC_LABEL[areaEscolhida]||areaEscolhida} — ${proc.tipo} (${usados+1}/${limite} este mês)`, 'ok', 4000);
     setTimeout(() => window.navTo && window.navTo('processos', null), 400);
   } catch (err) { toast('Erro ao captar caso para o escritório.', 'ko'); console.error(err); }
 };
@@ -3387,7 +3422,11 @@ window.novoProcessoPool = async function() {
     toast(`🔒 Fila do escritório cheia (${abertosSnap.size}/${limiteAbertos} casos abertos). Conclua casos antes de captar novos.`, 'ko', 6000);
     return;
   }
-  const proc = _gerarProcessoCompleto(j);
+  const areas = esc.areas_atuacao?.length ? esc.areas_atuacao : [esc.especialidade_principal || j.especialidade || 'civil'];
+  const areaEscolhida = await _escolherAreaPool(areas);
+  if (!areaEscolhida) return; // usuário cancelou
+
+  const proc = _gerarProcessoCompleto(j, false, areaEscolhida);
   proc.pool_escritorio_id = j.escritorio_proprio_id;
   proc.escritorio_nome_etiqueta = esc.nome || j.escritorio_nome || null;
   proc.distribuido_pelo_escritorio = true;
@@ -3398,7 +3437,7 @@ window.novoProcessoPool = async function() {
     await addDoc(collection(db, 'processos'), proc);
     await updateDoc(doc(db, 'escritorios', j.escritorio_proprio_id), { pool_casos_criados_mes: usadosMes + 1 });
     await updateDoc(doc(db, 'jogadores', uid), { energia_usada_mes: (j.energia_usada_mes||0) + ENERGIA_CAPTAR_CASO_POOL });
-    toast(`📁 Caso captado para o escritório: ${proc.tipo} (${usadosMes+1}/${limiteMes} este mês)`, 'ok', 4000);
+    toast(`📁 Caso captado: ${AREA_PROC_LABEL[areaEscolhida]||areaEscolhida} — ${proc.tipo} (${usadosMes+1}/${limiteMes} este mês)`, 'ok', 4000);
     setTimeout(() => window.navTo && window.navTo('processos', null), 400);
   } catch (err) { toast('Erro ao captar caso para o escritório.', 'ko'); console.error(err); }
 };

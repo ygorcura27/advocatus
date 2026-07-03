@@ -515,12 +515,12 @@ async function _carregarEscritorioProprio(escId, j) {
         </div>
         ${_escAcoesRapidas(j, esc)}
       `;
-      
+
       // Carregar KPIs de forma assíncrona
       const kpisHtml = await _escKpis(esc, j);
       const kpisEl = document.getElementById('esc-kpis-placeholder');
       if (kpisEl) kpisEl.innerHTML = kpisHtml;
-      
+
       const elEquipe = document.getElementById('esc-equipe-embed');
       if (elEquipe && window.renderEquipePainel) window.renderEquipePainel(j, escId, elEquipe);
       const elClientes = document.getElementById('esc-clientes-embed');
@@ -531,6 +531,8 @@ async function _carregarEscritorioProprio(escId, j) {
       if (elWorkspace) _renderWorkspacePainel(j, elWorkspace);
       const elProcessos = document.getElementById('esc-processos-bloco');
       if (elProcessos && window.renderProcessosPool) window.renderProcessosPool(j, escId, elProcessos);
+      const elEspec = document.getElementById('esc-especializacoes-bloco');
+      if (elEspec && window.renderEspecializacoesEsc) window.renderEspecializacoesEsc(escId, elEspec);
     }
   } catch (e) {
     console.error('Erro ao carregar escritório próprio:', e);
@@ -1062,6 +1064,7 @@ function _escSocietarioCard(esc, j) {
     <button class="btn btn-sec btn-sm btn-block" style="margin-top:.6rem" onclick="window.navTo('equipe',null)">
       Ver detalhes
     </button>
+    <div id="esc-especializacoes-bloco"></div>
   </div>`;
 }
 
@@ -1204,22 +1207,22 @@ function _renderSkillsJur(j) {
   const score  = j.bar_exam_ultimo_score ?? null;
 
   const BASE_SKILLS = [
-    { k: 'legal_drafting',   l: 'Legal Drafting',   w: 0.30 },
-    { k: 'legal_research',   l: 'Legal Research',   w: 0.30 },
-    { k: 'argumentation',    l: 'Argumentation',    w: 0.25 },
-    { k: 'oral_advocacy',    l: 'Oral Advocacy',    w: 0    },
-    { k: 'negotiation',      l: 'Negotiation',      w: 0    },
-    { k: 'procedure',        l: 'Procedure',        w: 0.15 },
+    { k: 'legal_drafting',   l: 'Redação Jurídica',  w: 0.30 },
+    { k: 'legal_research',   l: 'Pesquisa Jurídica', w: 0.30 },
+    { k: 'argumentation',    l: 'Argumentação',       w: 0.25 },
+    { k: 'oral_advocacy',    l: 'Sustentação Oral',   w: 0    },
+    { k: 'negotiation',      l: 'Negociação',         w: 0    },
+    { k: 'procedure',        l: 'Processo Civil',     w: 0.15 },
   ];
   const DOC_SKILLS = [
-    { k: 'doc_initial_filing',      l: 'Initial Filing'      },
-    { k: 'doc_responsive_pleading', l: 'Responsive Pleading' },
-    { k: 'doc_motion',              l: 'Motion'              },
-    { k: 'doc_appellate_brief',     l: 'Appellate Brief'     },
-    { k: 'doc_supreme_brief',       l: 'Supreme Brief'       },
-    { k: 'doc_trial_brief',         l: 'Trial Brief'         },
-    { k: 'doc_evidence',            l: 'Evidence'            },
-    { k: 'doc_deposition',          l: 'Deposition'          },
+    { k: 'doc_initial_filing',      l: 'Petição Inicial'         },
+    { k: 'doc_responsive_pleading', l: 'Contestação'             },
+    { k: 'doc_motion',              l: 'Requerimento'            },
+    { k: 'doc_appellate_brief',     l: 'Razões de Apelação'      },
+    { k: 'doc_supreme_brief',       l: 'Razões de Rec. Especial' },
+    { k: 'doc_trial_brief',         l: 'Memoriais'               },
+    { k: 'doc_evidence',            l: 'Prova Documental'        },
+    { k: 'doc_deposition',          l: 'Depoimento'              },
   ];
   const AREA_SKILLS = [
     { k: 'area_employment',  l: 'Trabalhista'   },
@@ -1232,6 +1235,7 @@ function _renderSkillsJur(j) {
   ];
 
   const previewScore = BASE_SKILLS.reduce((acc, sk) => acc + (skJur[sk.k]||0) * sk.w, 0).toFixed(1);
+  const queue = j.study_queue || [];
 
   function skBar(val) {
     const pct = Math.round(val / 50 * 100);
@@ -1239,12 +1243,19 @@ function _renderSkillsJur(j) {
       <div style="width:${pct}%;height:100%;background:var(--azul1);border-radius:3px;transition:.3s"></div>
     </div>`;
   }
+  function skEstudarBtn(sk, val) {
+    if (val >= 50) return `<span style="font-size:.65rem;color:var(--verde1);min-width:44px;text-align:center">MAX</span>`;
+    if (queue.some(q => q.skill === sk.k)) return `<span style="font-size:.65rem;color:var(--ardosia2);min-width:44px;text-align:center">⏳</span>`;
+    return `<button style="font-size:.65rem;padding:.15rem .35rem;border:1px solid var(--borda2);border-radius:3px;background:transparent;cursor:pointer;color:var(--azul1);min-width:44px"
+      onclick="window.estudarSkillJur && window.estudarSkillJur('${sk.k}','${sk.l}')">📖 +3</button>`;
+  }
   function skRow(sk) {
     const val = skJur[sk.k] || 0;
     return `<div style="display:flex;align-items:center;gap:.5rem;padding:.3rem 0;border-bottom:1px solid var(--borda1)">
       <span style="flex:1;font-size:.78rem">${sk.l}</span>
       <span style="font-size:.78rem;font-weight:600;min-width:2rem;text-align:right">${val}/50</span>
-      <div style="width:80px">${skBar(val)}</div>
+      <div style="width:60px">${skBar(val)}</div>
+      ${skEstudarBtn(sk, val)}
     </div>`;
   }
 
@@ -1273,6 +1284,7 @@ function _renderSkillsJur(j) {
             <span style="flex:1;font-size:.78rem">${sk.l}${sk.w > 0 ? ` <span style="color:var(--ouro);font-size:.7rem">(${sk.w*100}%)</span>` : ''}</span>
             <span style="font-size:.78rem;font-weight:600;min-width:2rem;text-align:right">${val}/50</span>
             <div style="width:60px">${skBar(val)}</div>
+            ${skEstudarBtn(sk, val)}
           </div>`;
         }).join('')}
       </div>

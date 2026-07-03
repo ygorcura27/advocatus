@@ -416,6 +416,9 @@ function _cardFuncionario(f, escId, energiaDisp, procCount = {}, mesGlobal = 0) 
             <button class="btn btn-sm btn-sec" onclick="window.concederFerias('${f.id}','${escId}','${f.nome.replace(/'/g,"\\'")}')">
               🏖️ Férias
             </button>` : ''}
+          <button class="btn btn-sm btn-sec" onclick="window._abrirPerfilFuncionario('${escId}','${f.id}')">
+            👤 Perfil
+          </button>
           <button class="btn btn-sm btn-ghost btn-danger"
             onclick="window.demitirFuncionario('${f.id}','${escId}','${f.nome}')">
             Demitir

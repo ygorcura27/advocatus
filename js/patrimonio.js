@@ -492,10 +492,24 @@ window.venderItem = async function(id) {
 window.estudarSkill = async function(sk, skLabel) {
   const j   = window.JOGADOR;
   const uid = j.uid || window.JOGADOR_UID;
-  if ((j.dinheiro||0)<400) { toast('Saldo insuficiente. Estudar custa R$400.','ko'); return; }
-  if ((j.study_queue||[]).some(s=>s.skill===sk)) { toast('Já há um estudo desta skill em andamento.','ko'); return; }
+  if ((j.dinheiro||0) < 500) { toast('Saldo insuficiente. Estudar custa R$500.','ko'); return; }
+  if ((j.study_queue||[]).some(s => s.skill === sk)) { toast('Já há um estudo desta skill em andamento.','ko'); return; }
   const novaFila = [...(j.study_queue||[]), { skill:sk, skill_label:skLabel, ganho:3, mes_conclusao:(window.SERVER?.mes_global||1)+1 }];
-  await _salvar(uid, { dinheiro:(j.dinheiro||0)-500, study_queue:novaFila });
+  await _salvar(uid, { dinheiro:(j.dinheiro||0) - 500, study_queue:novaFila });
+  toast(`📖 Estudando ${skLabel} — resultado em 1 mês!`, 'ok');
+};
+
+window.estudarSkillJur = async function(sk, skLabel) {
+  const j   = window.JOGADOR;
+  const uid = j.uid || window.JOGADOR_UID;
+  if ((j.dinheiro||0) < 500) { toast('Saldo insuficiente. Estudar custa R$500.','ko'); return; }
+  if ((j.study_queue||[]).some(s => s.skill === sk)) { toast('Já há um estudo desta skill em andamento.','ko'); return; }
+  const novaFila = [...(j.study_queue||[]), {
+    skill: sk, skill_label: skLabel, ganho: 3,
+    tipo: 'skills_jur',
+    mes_conclusao: (window.SERVER?.mes_global || 1) + 1,
+  }];
+  await _salvar(uid, { dinheiro:(j.dinheiro||0) - 500, study_queue: novaFila });
   toast(`📖 Estudando ${skLabel} — resultado em 1 mês!`, 'ok');
 };
 
