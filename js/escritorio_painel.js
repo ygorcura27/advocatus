@@ -578,7 +578,7 @@ const _SKILL_TRAD_LABEL = {
 function _skBarPerfil(val, max) {
   const pct = Math.round(Math.min(100, (val / max) * 100));
   return `<div style="flex:1;height:4px;background:var(--borda2);border-radius:2px">
-    <div style="width:${pct}%;height:100%;background:var(--azul1);border-radius:2px"></div>
+    <div style="width:${pct}%;height:100%;background:var(--navy3);border-radius:2px"></div>
   </div>`;
 }
 function _skRowPerfil(label, val, max) {
@@ -719,7 +719,7 @@ window.renderEspecializacoesEsc = async function(escId, el) {
         <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.6rem">
           ${areas.map(a => {
             const lbl = TODAS_AREAS.find(x => x.k === a)?.l || a;
-            return `<span style="display:inline-flex;align-items:center;gap:.3rem;background:var(--azul1);color:#fff;font-size:.72rem;padding:.2rem .6rem;border-radius:12px">
+            return `<span style="display:inline-flex;align-items:center;gap:.3rem;background:var(--navy3);color:#fff;font-size:.72rem;padding:.2rem .6rem;border-radius:12px">
               ${lbl}
               ${podeRemover ? `<button onclick="window._removerAreaEsc('${escId}','${a}')" style="background:transparent;border:none;color:rgba(255,255,255,.7);cursor:pointer;font-size:.75rem;padding:0;line-height:1">✕</button>` : ''}
             </span>`;
@@ -730,7 +730,7 @@ window.renderEspecializacoesEsc = async function(escId, el) {
             <option value="">Escolher área…</option>
             ${disponíveis.map(a => `<option value="${a.k}">${a.l}</option>`).join('')}
           </select>
-          <button onclick="window._adicionarAreaEsc('${escId}')" style="font-size:.78rem;padding:.3rem .7rem;border:1px solid var(--azul1);border-radius:4px;background:transparent;color:var(--azul1);cursor:pointer">+ Adicionar</button>
+          <button onclick="window._adicionarAreaEsc('${escId}')" style="font-size:.78rem;padding:.3rem .7rem;border:1px solid var(--navy3);border-radius:4px;background:transparent;color:var(--navy3);cursor:pointer">+ Adicionar</button>
         ` : !podeAdicionar && isSocio ? `
           <div style="font-size:.72rem;color:var(--ardosia2)">
             ${maxAr === 99 ? 'Todas as áreas disponíveis.' : `Máximo de áreas para Tier ${tier} atingido. Faça upgrade para desbloquear mais.`}
