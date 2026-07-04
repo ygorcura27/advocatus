@@ -1150,11 +1150,12 @@ function renderProgressao(j, el) {
 // HABILIDADES
 // ════════════════════════════════════════════════════════
 function renderHabilidades(j, el) {
-  const cap     = window.REP_CAP[j.cargo_id] || 55;
-  const skills  = j.skills || {};
-  const queue   = j.study_queue || [];
-  const SKDEF   = _getSkills();
-  const vaga    = j.vaga_tipo || 'contencioso';
+  const cap    = window.REP_CAP[j.cargo_id] || 55;
+  const skills = j.skills || {};
+  const skJur  = j.skills_jur || {};
+  const queue  = j.study_queue || [];
+  const SKDEF  = _getSkills();
+  const vaga   = j.vaga_tipo || 'contencioso';
   const TIPO_SK = {
     contencioso:  ['oratoria','argumentacao','persuasao','pesquisa'],
     peticionante: ['escrita','argumentacao','pesquisa','negociacao'],
@@ -1162,151 +1163,141 @@ function renderHabilidades(j, el) {
     societario:   ['negociacao','networking','gestao','argumentacao'],
   };
   const prioridades = TIPO_SK[vaga] || TIPO_SK.contencioso;
+  const oab         = j.oab || false;
+  const tentativas  = j.bar_exam_tentativas || 0;
+  const score       = j.bar_exam_ultimo_score ?? null;
+
+  const BASE_SKILLS = [
+    { k: 'legal_drafting',   l: 'Redação Jurídica',   w: 0.30 },
+    { k: 'legal_research',   l: 'Pesquisa Jurídica',  w: 0.30 },
+    { k: 'argumentation',    l: 'Argumentação',        w: 0.25 },
+    { k: 'oral_advocacy',    l: 'Sustentação Oral',    w: 0    },
+    { k: 'negotiation',      l: 'Negociação',          w: 0    },
+    { k: 'procedure',        l: 'Litigância',          w: 0.15 },
+    { k: 'gestao',           l: 'Gestão',              w: 0    },
+  ];
+  const DOC_SKILLS = [
+    { k: 'doc_initial_filing',      l: 'Petição Inicial'          },
+    { k: 'doc_responsive_pleading', l: 'Contestação'              },
+    { k: 'doc_motion',              l: 'Requerimento'             },
+    { k: 'doc_appellate_brief',     l: 'Razões de Apelação'       },
+    { k: 'doc_supreme_brief',       l: 'Razões de Rec. Especial'  },
+    { k: 'doc_trial_brief',         l: 'Memoriais'                },
+    { k: 'doc_evidence',            l: 'Prova Documental'         },
+    { k: 'doc_deposition',          l: 'Depoimento'               },
+  ];
+  const AREA_SKILLS = [
+    { k: 'area_employment',  l: 'Trabalhista'    },
+    { k: 'area_tax',         l: 'Tributário'     },
+    { k: 'area_civil',       l: 'Cível'          },
+    { k: 'area_criminal',    l: 'Criminal'       },
+    { k: 'area_corporate',   l: 'Empresarial'    },
+    { k: 'area_immigration', l: 'Imigração'      },
+    { k: 'area_bankruptcy',  l: 'Rec. Judicial'  },
+  ];
+
+  const capJur = Math.round(50 * (1 + (j.posgrad_bonus_skill || 0)));
+  const previewScore = BASE_SKILLS.reduce((a, s) => a + (skJur[s.k]||0) * s.w, 0).toFixed(1);
+
+  function skBar(val, capV) {
+    const pct = Math.min(100, Math.round(val / capV * 100));
+    return `<div class="sk-bar"><div class="sk-bar-fill" style="width:${pct}%"></div></div>`;
+  }
+
+  function skRowGeral(sk) {
+    const val     = skills[sk.k] || 0;
+    const isPrior = prioridades.includes(sk.k);
+    const emEst   = queue.some(q => q.skill === sk.k);
+    return `<tr class="sk-row">
+      <td class="sk-nome">${isPrior ? '<span class="sk-prior">⭐</span>' : ''} ${sk.l}</td>
+      <td class="sk-nivel">
+        <span class="sk-num">${val}<span class="sk-cap">/${cap}</span></span>
+        ${skBar(val, cap)}
+      </td>
+      <td class="sk-acao">
+        ${emEst
+          ? `<span class="sk-pendente">⏳</span>`
+          : `<button class="sk-btn" onclick="window.estudarSkill && window.estudarSkill('${sk.k}','${sk.l}')">📖 +3</button>`}
+      </td>
+    </tr>`;
+  }
+
+  function skRowJur(sk, src) {
+    const val   = src[sk.k] || 0;
+    const emEst = queue.some(q => q.skill === sk.k);
+    const isCap = val >= capJur;
+    const label = sk.l + (sk.w > 0 ? ` <span class="sk-peso">(${sk.w*100}%)</span>` : '');
+    return `<tr class="sk-row">
+      <td class="sk-nome">${label}</td>
+      <td class="sk-nivel">
+        <span class="sk-num">${val}<span class="sk-cap">/${capJur}</span></span>
+        ${skBar(val, capJur)}
+      </td>
+      <td class="sk-acao">
+        ${isCap
+          ? `<span class="sk-max">MAX</span>`
+          : emEst
+            ? `<span class="sk-pendente">⏳</span>`
+            : `<button class="sk-btn" onclick="window.estudarSkillJur && window.estudarSkillJur('${sk.k}','${sk.l}')">📖 +3</button>`}
+      </td>
+    </tr>`;
+  }
+
+  const didatica = j.didatica_academica || 0;
+  const emEstDid = queue.some(q => q.skill === 'didatica_academica');
 
   el.innerHTML = `
     <div class="secao-header">
       <div class="secao-titulo">⚡ Habilidades</div>
-      <span class="secao-badge">Cap: ${cap} · Vaga: ${_vagaLabel(vaga)}</span>
-    </div>
-    <div style="font-size:.73rem;color:var(--ardosia2);margin-bottom:1rem">
-      Skills marcadas com ⭐ são prioritárias para sua vaga atual. Estudar custa R$400 e demora 1 mês.
-    </div>
-    <div class="skills-grid">
-      ${SKDEF.map(sk => {
-        const val     = skills[sk.k] || 0;
-        const isPrior = prioridades.includes(sk.k);
-        const emEst   = queue.some(q => q.skill === sk.k);
-        const pct     = Math.round(val/cap*100);
-        return `
-        <div class="skill-banner-card" style="background-image:url('img/habilidades/${sk.k}.png');${isPrior?'box-shadow:0 0 0 2px var(--ouro2), var(--sombra2);':''}">
-          ${isPrior ? `<span class="skill-banner-estrela">⭐</span>` : ''}
-          <div class="skill-banner-rodape">
-            <div style="display:flex;justify-content:flex-end;align-items:baseline;margin-bottom:.3rem">
-              <span class="skill-banner-val">${val}<span class="skill-banner-val-cap">/${cap}</span></span>
-            </div>
-            <div class="skill-bar" style="margin-bottom:.5rem">
-              <div class="skill-fill ${isPrior?'destaque':''}" style="width:${pct}%"></div>
-            </div>
-            ${emEst
-              ? `<div class="skill-banner-pendente">⏳ Estudo em andamento — resultado no próximo mês</div>`
-              : `<button class="skill-banner-btn" onclick="window.estudarSkill && window.estudarSkill('${sk.k}','${sk.l}')">
-                  📖 Estudar +3 · R$400 · 1 mês
-                </button>`}
-          </div>
-        </div>`;
-      }).join('')}
+      <span class="secao-badge">Cap geral: ${cap} · Vaga: ${_vagaLabel(vaga)}</span>
     </div>
 
-    ${_renderSkillsJur(j)}`;
+    <table class="skills-table">
+      <thead>
+        <tr><th class="sk-th-nome">Habilidade</th><th class="sk-th-nivel">Nível</th><th></th></tr>
+      </thead>
+      <tbody>
+
+        <tr class="sk-categoria"><td colspan="3">Habilidades Gerais</td></tr>
+        ${SKDEF.map(skRowGeral).join('')}
+
+        <tr class="sk-categoria">
+          <td colspan="3">Skills Jurídicas — Base
+            <span class="sk-oab-badge ${oab ? 'ok' : ''}">${oab ? 'OAB ✓' : 'OAB pendente'}</span>
+            <span class="sk-score">Score: ${previewScore}/50 · Aprovação: 32,5${score !== null ? ` · Última: ${score}` : ''}</span>
+          </td>
+        </tr>
+        ${BASE_SKILLS.map(sk => skRowJur(sk, skJur)).join('')}
+        ${!oab ? `<tr class="sk-row"><td colspan="2" class="sk-nome" style="color:var(--ardosia2)">Exame OAB</td>
+          <td class="sk-acao" style="white-space:nowrap">
+            <button class="sk-btn" onclick="window.matricularPrep && window.matricularPrep()">Bar Prep</button>
+            <button class="sk-btn sk-btn-prim" onclick="window.tentarBarExam && window.tentarBarExam()">Fazer Exame${tentativas>0?` (${tentativas}ª)`:''}</button>
+          </td></tr>` : ''}
+
+        <tr class="sk-categoria"><td colspan="3">Tipos de Documento</td></tr>
+        ${DOC_SKILLS.map(sk => skRowJur(sk, skJur)).join('')}
+
+        <tr class="sk-categoria"><td colspan="3">Áreas do Direito</td></tr>
+        ${AREA_SKILLS.map(sk => skRowJur(sk, skJur)).join('')}
+
+        <tr class="sk-categoria"><td colspan="3">Acadêmico</td></tr>
+        <tr class="sk-row">
+          <td class="sk-nome">Didática Acadêmica</td>
+          <td class="sk-nivel">
+            <span class="sk-num">${didatica}<span class="sk-cap">/50</span></span>
+            ${skBar(didatica, 50)}
+          </td>
+          <td class="sk-acao">
+            ${didatica >= 50 ? `<span class="sk-max">MAX</span>` : emEstDid ? `<span class="sk-pendente">⏳</span>` : '—'}
+          </td>
+        </tr>
+
+      </tbody>
+    </table>
+
+    ${_mentoriaComposicaoBloco(j)}`;
 }
 
-function _renderSkillsJur(j) {
-  const skJur  = j.skills_jur || {};
-  const oab    = j.oab || false;
-  const tentativas = j.bar_exam_tentativas || 0;
-  const score  = j.bar_exam_ultimo_score ?? null;
-
-  const BASE_SKILLS = [
-    { k: 'legal_drafting',   l: 'Redação Jurídica',  w: 0.30 },
-    { k: 'legal_research',   l: 'Pesquisa Jurídica', w: 0.30 },
-    { k: 'argumentation',    l: 'Argumentação',       w: 0.25 },
-    { k: 'oral_advocacy',    l: 'Sustentação Oral',   w: 0    },
-    { k: 'negotiation',      l: 'Negociação',         w: 0    },
-    { k: 'procedure',        l: 'Litigância',         w: 0.15 },
-    { k: 'gestao',           l: 'Gestão',             w: 0    },
-  ];
-  const DOC_SKILLS = [
-    { k: 'doc_initial_filing',      l: 'Petição Inicial'         },
-    { k: 'doc_responsive_pleading', l: 'Contestação'             },
-    { k: 'doc_motion',              l: 'Requerimento'            },
-    { k: 'doc_appellate_brief',     l: 'Razões de Apelação'      },
-    { k: 'doc_supreme_brief',       l: 'Razões de Rec. Especial' },
-    { k: 'doc_trial_brief',         l: 'Memoriais'               },
-    { k: 'doc_evidence',            l: 'Prova Documental'        },
-    { k: 'doc_deposition',          l: 'Depoimento'              },
-  ];
-  const AREA_SKILLS = [
-    { k: 'area_employment',  l: 'Trabalhista'   },
-    { k: 'area_tax',         l: 'Tributário'    },
-    { k: 'area_civil',       l: 'Cível'         },
-    { k: 'area_criminal',    l: 'Criminal'      },
-    { k: 'area_corporate',   l: 'Empresarial'   },
-    { k: 'area_immigration', l: 'Imigração'     },
-    { k: 'area_bankruptcy',  l: 'Rec. Judicial' },
-  ];
-
-  const previewScore = BASE_SKILLS.reduce((acc, sk) => acc + (skJur[sk.k]||0) * sk.w, 0).toFixed(1);
-  const queue = j.study_queue || [];
-
-  function skBar(val) {
-    const pct = Math.round(val / 50 * 100);
-    return `<div style="background:var(--borda2);border-radius:3px;height:5px;margin-top:.25rem">
-      <div style="width:${pct}%;height:100%;background:var(--azul1);border-radius:3px;transition:.3s"></div>
-    </div>`;
-  }
-  function skEstudarBtn(sk, val) {
-    if (val >= 50) return `<span style="font-size:.65rem;color:var(--verde1);min-width:44px;text-align:center">MAX</span>`;
-    if (queue.some(q => q.skill === sk.k)) return `<span style="font-size:.65rem;color:var(--ardosia2);min-width:44px;text-align:center">⏳</span>`;
-    return `<button style="font-size:.65rem;padding:.15rem .35rem;border:1px solid var(--borda2);border-radius:3px;background:transparent;cursor:pointer;color:var(--azul1);min-width:44px"
-      onclick="window.estudarSkillJur && window.estudarSkillJur('${sk.k}','${sk.l}')">📖 +3</button>`;
-  }
-  function skRow(sk) {
-    const val = skJur[sk.k] || 0;
-    return `<div style="display:flex;align-items:center;gap:.5rem;padding:.3rem 0;border-bottom:1px solid var(--borda1)">
-      <span style="flex:1;font-size:.78rem">${sk.l}</span>
-      <span style="font-size:.78rem;font-weight:600;min-width:2rem;text-align:right">${val}/50</span>
-      <div style="width:60px">${skBar(val)}</div>
-      ${skEstudarBtn(sk, val)}
-    </div>`;
-  }
-
-  return `
-    <div style="margin-top:1.5rem;border-top:1px solid var(--borda2);padding-top:1rem">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.8rem">
-        <div style="font-weight:600">Skills Jurídicas (OAB)</div>
-        ${oab
-          ? `<span style="font-size:.75rem;background:var(--verde1);color:#fff;padding:.2rem .6rem;border-radius:12px">OAB Aprovado ✓</span>`
-          : `<div style="display:flex;gap:.4rem">
-              <button class="btn btn-ghost btn-sm" onclick="window.matricularPrep && window.matricularPrep()">Bar Prep · R$3.000</button>
-              <button class="btn btn-prim btn-sm" onclick="window.tentarBarExam && window.tentarBarExam()">
-                Exame OAB${tentativas > 0 ? ` (${tentativas}ª tentativa)` : ''}
-              </button>
-            </div>`}
-      </div>
-      <div style="font-size:.72rem;color:var(--ardosia2);margin-bottom:.6rem">
-        Score estimado: <b>${previewScore}/50</b> · Aprovação: 32,5
-        ${score !== null ? ` · Última tentativa: ${score}` : ''}
-      </div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 1.5rem;margin-bottom:1rem">
-        ${BASE_SKILLS.map(sk => {
-          const val = skJur[sk.k] || 0;
-          return `<div style="display:flex;align-items:center;gap:.5rem;padding:.3rem 0;border-bottom:1px solid var(--borda1)">
-            <span style="flex:1;font-size:.78rem">${sk.l}${sk.w > 0 ? ` <span style="color:var(--ouro);font-size:.7rem">(${sk.w*100}%)</span>` : ''}</span>
-            <span style="font-size:.78rem;font-weight:600;min-width:2rem;text-align:right">${val}/50</span>
-            <div style="width:60px">${skBar(val)}</div>
-            ${skEstudarBtn(sk, val)}
-          </div>`;
-        }).join('')}
-      </div>
-
-      <details style="margin-bottom:.5rem">
-        <summary style="font-size:.76rem;color:var(--ardosia2);cursor:pointer;margin-bottom:.5rem">Tipos de Documento</summary>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 1.5rem">
-          ${DOC_SKILLS.map(skRow).join('')}
-        </div>
-      </details>
-
-      <details>
-        <summary style="font-size:.76rem;color:var(--ardosia2);cursor:pointer;margin-bottom:.5rem">Áreas do Direito</summary>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 1.5rem">
-          ${AREA_SKILLS.map(skRow).join('')}
-        </div>
-      </details>
-
-      ${_mentoriaComposicaoBloco(j)}
-    </div>`;
-}
 
 function _mentoriaComposicaoBloco(j) {
   const ativa = j.mentoria_composicao_ativa || false;
