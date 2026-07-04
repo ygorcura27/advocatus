@@ -19,6 +19,7 @@ const {
   venderPeticao, comprarPeticao,
   retirarPeticaoMercado,
   adicionarCoAutor,
+  contratarParecerista,
 } = require('./peticoes');
 const { montarSetlist, resolverEventoJulgamento } = require('./setlist');
 // GDD v5.1 — Petições Genéricas Globais
@@ -53,6 +54,7 @@ exports.montarSetlist            = montarSetlist;
 exports.resolverEventoJulgamento = resolverEventoJulgamento;
 exports.retirarPeticaoMercado    = retirarPeticaoMercado;
 exports.adicionarCoAutor         = adicionarCoAutor;
+exports.contratarParecerista     = contratarParecerista;
 exports.obterPeticaoGenerica     = obterPeticaoGenerica;
 exports.buscarPerfil             = buscarPerfil;
 exports.tickMensal               = tickMensal;

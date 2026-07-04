@@ -602,6 +602,81 @@ function fatorTempoPorGeracao(geracao) {
   return geracao <= 1 ? 1.0 : geracao === 2 ? 0.50 : geracao === 3 ? 0.40 : 0.30;
 }
 
+// ─── Callable: contratarParecerista (GDD v5.1 §12) ───────────────────────────
+
+const TIERS_PARECERISTA = {
+  1: { label: 'Iniciante',   custo: 2000,  nota_teto: 8  },
+  2: { label: 'Especialista', custo: 5000, nota_teto: 14 },
+  3: { label: 'Renomado',    custo: 12000, nota_teto: 20 },
+  4: { label: 'Luminária',   custo: 30000, nota_teto: 26 },
+};
+
+exports.contratarParecerista = onCall({ region: 'southamerica-east1' }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
+
+  const uid = request.auth.uid;
+  const db  = getFirestore();
+  const { tier, practice_area } = request.data || {};
+
+  const tierNum = parseInt(tier, 10);
+  const config  = TIERS_PARECERISTA[tierNum];
+  if (!config) throw new HttpsError('invalid-argument', 'Tier inválido. Use 1, 2, 3 ou 4.');
+  if (!practice_area) throw new HttpsError('invalid-argument', 'practice_area obrigatório.');
+
+  const snap = await db.collection('jogadores').doc(uid).get();
+  if (!snap.exists) throw new HttpsError('not-found', 'Jogador não encontrado.');
+
+  const j = snap.data();
+  if ((j.caixa || 0) < config.custo) {
+    throw new HttpsError('failed-precondition',
+      `Saldo insuficiente. Custo: R$${config.custo.toLocaleString('pt-BR')}. Saldo: R$${(j.caixa||0).toLocaleString('pt-BR')}.`);
+  }
+
+  const notaBase = Math.round(config.nota_teto * 0.75);
+  const novaPeticao = {
+    jogador_uid:      uid,
+    autores:          [{ uid, contribuicao_pct: 100 }],
+    titulo:           `Parecer ${config.label} — ${practice_area}`,
+    nome:             `Parecer ${config.label} — ${practice_area}`,
+    titulo_travado:   true,
+    document_type:    'legal_opinion',
+    practice_area,
+    estilo_escrita:   'legalista',
+    tese_central:     null,
+    geracao:          1,
+    peticao_base_id:  null,
+    nota_teto:        config.nota_teto,
+    nota_argumentacao: Math.round(config.nota_teto * 0.8),
+    nota_redacao:     Math.round(config.nota_teto * 0.7),
+    tier_argumentacao: getTierLabel(Math.round(config.nota_teto * 0.8)),
+    tier_redacao:     getTierLabel(Math.round(config.nota_teto * 0.7)),
+    fama:             0,
+    fama_teto_desbloqueado: 39,
+    popularidade:     0,
+    decaimento_ativo: false,
+    usos_total:       0,
+    vitorias:         0,
+    derrotas:         0,
+    vitorias_por_instancia: {},
+    ultimo_uso:       null,
+    processos_usada:  [],
+    status:           'pronta',
+    transferivel:     false,   // Parecerista não pode ser vendido nem emprestado
+    parecerista_tier: tierNum,
+    custo_contratacao: config.custo,
+    generica:         false,
+    criada_em:        new Date().toISOString(),
+  };
+
+  const ref = await db.collection('peticoes').add(novaPeticao);
+  await db.collection('jogadores').doc(uid).update({
+    caixa: FieldValue.increment(-config.custo),
+  });
+
+  logger.info(`[PARECERISTA] ${uid} contratou tier ${tierNum} (${practice_area}) por R$${config.custo}`);
+  return { ok: true, peticao_id: ref.id, nota_teto: config.nota_teto, custo: config.custo };
+});
+
 exports.variarPeticao = onCall({ region: 'southamerica-east1' }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
 
@@ -696,6 +771,7 @@ exports.emprestarPeticao = onCall({ region: 'southamerica-east1' }, async (reque
 
   const pet = petSnap.data();
   if (pet.jogador_uid !== uid) throw new HttpsError('permission-denied', 'Você não é o autor desta petição.');
+  if (pet.transferivel === false) throw new HttpsError('failed-precondition', 'Parecer contratado não pode ser emprestado.');
   if (pet.emprestada_para) throw new HttpsError('failed-precondition', 'Petição já emprestada.');
 
   await petSnap.ref.update({
@@ -743,6 +819,7 @@ exports.venderPeticao = onCall({ region: 'southamerica-east1' }, async (request)
 
   const pet = petSnap.data();
   if (pet.jogador_uid !== uid) throw new HttpsError('permission-denied', 'Você não é o autor desta petição.');
+  if (pet.transferivel === false) throw new HttpsError('failed-precondition', 'Parecer contratado não pode ser vendido.');
   if (pet.no_mercado) throw new HttpsError('failed-precondition', 'Petição já está no mercado.');
 
   await petSnap.ref.update({ no_mercado: true, preco_mercado: preco, publicada_em: new Date().toISOString() });
