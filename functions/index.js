@@ -30,6 +30,8 @@ const { buscarPerfil }  = require('./perfis');
 const { obterCharts }           = require('./charts');
 // GDD v5.1 — Imprensa Jurídica (§15)
 const { obterNoticiasImprensa } = require('./imprensa');
+// GDD v5.1 — Tese Central (§16)
+const { listarTeses }           = require('./teses');
 const { anteciparHonorarios, contratarLinhaCredito, pagarLinhaCredito,
         contratarSocioInvestidor, aplicarInvestimento, resgatarInvestimento } = require('./financeiro');
 
@@ -63,6 +65,7 @@ exports.obterPeticaoGenerica     = obterPeticaoGenerica;
 exports.buscarPerfil             = buscarPerfil;
 exports.obterCharts              = obterCharts;
 exports.obterNoticiasImprensa    = obterNoticiasImprensa;
+exports.listarTeses              = listarTeses;
 exports.tickMensal               = tickMensal;
 // GDD Seção 31-33 — Financeiro Avançado
 exports.anteciparHonorarios      = anteciparHonorarios;

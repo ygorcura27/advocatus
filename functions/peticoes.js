@@ -24,6 +24,7 @@ const {
   normalizarSkillsJur,
   aplicarXpDocType,
 } = require('./skills');
+const { verificarOriginalidadeTese, listarTesesPorArea } = require('./teses');
 
 // ─── Estilos de escrita (GDD v5.1 — 3º seletor) ─────────────────────────────
 
@@ -919,9 +920,17 @@ async function finalizarPeticoesPendentes(db, uid, jogador, mesAtual) {
 
     // Petições do novo sistema têm nota_teto null — calcular agora
     if (p.nota_teto === null || p.nota_teto === undefined) {
-      const { nota_argumentacao, nota_redacao, nota_teto } = calcularNotaTeto(
+      const { nota_argumentacao, nota_redacao, nota_teto: tetoBase } = calcularNotaTeto(
         skJur, p.document_type, p.practice_area, jogador
       );
+
+      // Modificador de Tese Central (GDD v5.1 §16) — aplicado na finalização
+      const db2 = d.ref.firestore;
+      const { original, penalidade, mod_tese } = await verificarOriginalidadeTese(
+        db2, p.tese_central || null, p.practice_area, uid, mesAtual
+      );
+      const nota_teto = Math.max(1, Math.round(tetoBase * mod_tese));
+
       proms.push(d.ref.update({
         status:            'pronta',
         nota_teto,
@@ -930,11 +939,16 @@ async function finalizarPeticoesPendentes(db, uid, jogador, mesAtual) {
         tier_argumentacao: getTierLabel(skJur.legal_drafting),
         tier_redacao:      getTierLabel(skJur.legal_research),
         finalizada_em:     new Date().toISOString(),
+        tese_original:     original,
+        tese_penalidade:   penalidade,
+        mod_tese,
         // nota_base e teto_nota mantidos para compatibilidade com setlist de NPC
         nota_base:         nota_teto,
         teto_nota:         nota_teto,
+        // salva mes_global de início (necessário para detecção futura)
+        mes_global_inicio: p.mes_conclusao ? p.mes_conclusao - 1 : mesAtual - 1,
       }));
-      finalizadas.push({ id: d.id, nome: p.titulo || p.nome, nota_teto });
+      finalizadas.push({ id: d.id, nome: p.titulo || p.nome, nota_teto, tese_original: original });
     } else {
       // Petição v4.1 (nota_teto já definido ou não é sistema novo) — só muda status
       proms.push(d.ref.update({ status: 'pronta' }));
