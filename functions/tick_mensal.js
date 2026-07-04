@@ -19,6 +19,7 @@
 const { onSchedule }    = require('firebase-functions/v2/scheduler');
 const { getFirestore }  = require('firebase-admin/firestore');
 const { logger }        = require('firebase-functions');
+const { processarPremiosAnuais, zerarContadoresAnuais } = require('./premios_anuais');
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -179,6 +180,16 @@ exports.tickMensal = onSchedule({
 
   // ── 4. Gerar eventos globais ──
   await gerarEventoGlobal(db, mesAtual, anoAtual, mesGlobal);
+
+  // ── 5. Prêmios Anuais (GDD v5.1 §13) — apenas em Janeiro ──
+  if (isJaneiro && anoAtual > 1) {
+    try {
+      await processarPremiosAnuais(db, anoAtual - 1);
+      await zerarContadoresAnuais(db);
+    } catch (e) {
+      logger.error('[PREMIOS] Falha ao processar prêmios anuais:', e.message);
+    }
+  }
 
   logger.info('[TICK] Tick mensal concluído');
 });
