@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perfil — Advocatus Online</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Playfair+Display:ital,wght@0,700;1,400;1,600&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<style>
+.profile-wrap {
+  max-width: 700px;
+  margin: 3rem auto;
+  padding: 0 1rem;
+}
+.profile-card {
+  background: var(--papel);
+  border: 1px solid var(--ardosia3);
+  border-radius: 8px;
+  padding: 2rem;
+}
+.profile-header {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--ardosia3);
+}
+.profile-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--ardosia2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+.profile-id {
+  font-family: 'Courier Prime', monospace;
+  font-size: .75rem;
+  color: var(--ardosia2);
+  letter-spacing: .05em;
+}
+.profile-nome {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--tinta);
+  margin: .25rem 0;
+}
+.profile-cargo {
+  font-size: .85rem;
+  color: var(--ardosia);
+}
+.badge-intercambio {
+  font-size: 1.2rem;
+  margin-left: .3rem;
+}
+.profile-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.stat-box {
+  background: var(--couro);
+  border-radius: 6px;
+  padding: .75rem 1rem;
+  text-align: center;
+}
+.stat-val {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--tinta);
+  display: block;
+}
+.stat-lbl {
+  font-size: .7rem;
+  color: var(--ardosia2);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.section-title {
+  font-size: .75rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ardosia2);
+  margin: 1.5rem 0 .75rem;
+  border-top: 1px solid var(--ardosia3);
+  padding-top: 1rem;
+}
+.premios-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+}
+.premio-badge {
+  background: var(--ouro, #c9a96e);
+  color: #fff;
+  border-radius: 20px;
+  padding: .25rem .6rem;
+  font-size: .72rem;
+  font-weight: 600;
+}
+.not-found {
+  text-align: center;
+  padding: 4rem 1rem;
+  color: var(--ardosia2);
+}
+.back-link {
+  display: inline-block;
+  margin-bottom: 1.5rem;
+  font-size: .85rem;
+  color: var(--ardosia);
+  text-decoration: none;
+}
+.back-link:hover { text-decoration: underline; }
+.loading {
+  text-align: center;
+  padding: 4rem;
+  color: var(--ardosia2);
+  font-style: italic;
+}
+</style>
+</head>
+<body>
+<div class="profile-wrap">
+  <a href="jogo.html" class="back-link">← Voltar ao jogo</a>
+  <div id="profile-content" class="loading">Carregando perfil...</div>
+</div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
+import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { firebaseConfig } from './js/firebase-init.js';
+
+const app   = initializeApp(firebaseConfig);
+const auth  = getAuth(app);
+const fns   = getFunctions(app, 'southamerica-east1');
+
+// Lê o profile_id da URL: /profile/1000042 ou ?id=1000042
+function _profileIdFromUrl() {
+  const path = window.location.pathname;
+  const match = path.match(/\/profile\/(\d{7,})/);
+  if (match) return match[1];
+  const params = new URLSearchParams(window.location.search);
+  return params.get('id') || null;
+}
+
+const profileId = _profileIdFromUrl();
+const el = document.getElementById('profile-content');
+
+if (!profileId) {
+  el.innerHTML = '<div class="not-found"><h2>ID inválido</h2><p>URL deve conter um profile_id de 7 dígitos.</p></div>';
+} else {
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+      el.innerHTML = '<div class="not-found"><h2>Login necessário</h2><p>Faça login para ver perfis.</p></div>';
+      return;
+    }
+
+    try {
+      const fn  = httpsCallable(fns, 'buscarPerfil');
+      const res = await fn({ profile_id: profileId });
+      const d   = res.data;
+      _renderPerfil(d);
+    } catch (e) {
+      el.innerHTML = `<div class="not-found"><h2>Perfil não encontrado</h2><p>O personagem #${profileId} não existe.</p></div>`;
+    }
+  });
+}
+
+const CARGO_LABELS = {
+  est:'Estagiário', ass:'Assistente', jnr:'Advogado Júnior', pln:'Pleno', snr:'Sênior',
+  asc:'Associate', soc:'Sócio', snm:'Sócio-Nomeado',
+  jsub:'Juiz Substituto', jtit:'Juiz Titular', dsb:'Desembargador', mstj:'Ministro STJ',
+  padj:'Procurador Adjunto', prom:'Promotor', pjus:'Procurador de Justiça', pgj:'PGJ',
+  dadj:'Defensor Adjunto', def:'Defensor', dch:'Defensor-Chefe', dge:'DGE',
+};
+
+function _renderPerfil(d) {
+  const cargo  = CARGO_LABELS[d.cargo_id] || d.cargo_id || '—';
+  const badges = d.badges || [];
+  const premios = d.premios ? Object.keys(d.premios) : [];
+
+  el.innerHTML = `
+    <div class="profile-card">
+      <div class="profile-header">
+        <div class="profile-avatar">⚖️</div>
+        <div>
+          <div class="profile-id">#${d.profile_id}</div>
+          <div class="profile-nome">
+            ${d.nome || '—'}
+            ${d.intercambio_badge ? `<span class="badge-intercambio">${d.intercambio_badge}</span>` : ''}
+          </div>
+          <div class="profile-cargo">${cargo}${d.escritorio_nome ? ` · ${d.escritorio_nome}` : ''}</div>
+          <div style="font-size:.75rem;color:var(--ardosia2);margin-top:.2rem">${d.especialidade || ''}</div>
+        </div>
+      </div>
+
+      <div class="profile-stats">
+        <div class="stat-box">
+          <span class="stat-val">${d.reputacao || 0}</span>
+          <span class="stat-lbl">Reputação</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-val">${d.fama_total || 0}</span>
+          <span class="stat-lbl">Fama</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-val">${d.tipo === 'npc' ? '🤖' : '👤'}</span>
+          <span class="stat-lbl">Tipo</span>
+        </div>
+      </div>
+
+      ${premios.length > 0 ? `
+        <div class="section-title">Prêmios</div>
+        <div class="premios-list">
+          ${premios.map(p => `<span class="premio-badge">${p.replace(/_\d+$/, '').replace(/_/g,' ')}</span>`).join('')}
+        </div>` : ''
+      }
+    </div>
+  `;
+}
+</script>
+</body>
+</html>
