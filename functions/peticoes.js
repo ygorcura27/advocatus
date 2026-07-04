@@ -25,42 +25,57 @@ const {
   aplicarXpDocType,
 } = require('./skills');
 
-// ─── Tempo de composição por tipo e cargo (dias) ────────────────────────────
-// GDD Seção 10 — null = indisponível para o cargo
-const TEMPO_COMPOSICAO = {
-  //                         est  jnr  ass  snr  asc+
-  initial_filing:         [   2,   1,   1,   1,   0 ],
-  responsive_pleading:    [   3,   2,   1,   1,   0 ],
-  motion:                 [   2,   1,   1,   0,   0 ],
-  appellate_brief:        [null,   3,   2,   1,   0 ],
-  supreme_brief:          [null,null,   3,   2,   1 ],
-  trial_brief:            [   2,   1,   1,   0,   0 ],
-  evidence:               [   2,   2,   1,   1,   0 ],
-  deposition:             [   2,   2,   1,   1,   0 ],
+// ─── Estilos de escrita (GDD v5.1 — 3º seletor) ─────────────────────────────
+
+const ESTILOS_ESCRITA = ['inovadora', 'jurisprudencial', 'legalista', 'agressiva'];
+
+const ESTILO_LABELS = {
+  inovadora:       'Inovadora',
+  jurisprudencial: 'Jurisprudencial',
+  legalista:       'Legalista',
+  agressiva:       'Agressiva',
 };
 
-const CARGO_TEMPO_IDX = {
-  est:0, ass:0, jnr:1, pln:2, snr:3, asc:4, soc:4, snm:4,
-  jsub:1, jtit:3, dsb:4, mstj:4,
-  padj:1, prom:3, pjus:4, pgj:4,
-  dadj:1, def:3, dch:4, dge:4,
+// Mapeamento estilo → campo reacoes do julgador (GDD v5.1 §2.1)
+const ESTILO_REACAO = {
+  inovadora:       'doutrinário',
+  jurisprudencial: 'jurisprudencial',
+  legalista:       'fatual',
+  agressiva:       'constitucional',
 };
 
-function calcularTempoComposicao(docType, cargoId, skillsJur, npcAjudando) {
-  const idx   = CARGO_TEMPO_IDX[cargoId] ?? 0;
-  const tabela = TEMPO_COMPOSICAO[docType];
-  if (!tabela) return 1;
-  let dias = tabela[idx];
-  if (dias === null) return null; // indisponível
+// ─── Labels de tipo e ramo (para gerar nome automático server-side) ──────────
 
-  // Modificadores de redução
-  const ld = (skillsJur || {}).legal_drafting || 0;
-  const dt = (skillsJur || {})[`doc_${docType}`] || 0;
-  if (ld  >= 31) dias = Math.max(0, dias - 1);
-  if (dt  >= 31) dias = Math.max(0, dias - 1);
-  if (npcAjudando) dias = Math.max(0, dias - 1);
+const DOC_LABELS_CURTO = {
+  initial_filing:      'Inicial',
+  responsive_pleading: 'Contestação',
+  motion:              'Requerimento',
+  appellate_brief:     'Apelação',
+  supreme_brief:       'Memorial',
+  trial_brief:         'Alegações Finais',
+  evidence:            'Instrução',
+  deposition:          'Depoimento',
+};
 
-  return dias;
+const AREA_LABELS_CURTO = {
+  employment:  'Trabalhista',
+  tax:         'Tributário',
+  civil:       'Cível',
+  criminal:    'Criminal',
+  corporate:   'Empresarial',
+  immigration: 'Imigração',
+  bankruptcy:  'Recuperação Jud.',
+};
+
+// ─── Escala qualitativa de tiers (GDD v5.1 §5) ───────────────────────────────
+
+function getTierLabel(skill) {
+  if (skill >= 42) return 'LENDÁRIA';
+  if (skill >= 34) return 'Renomada';
+  if (skill >= 27) return 'Contundente';
+  if (skill >= 18) return 'Convincente';
+  if (skill >= 9)  return 'Aceitável';
+  return 'Iniciante';
 }
 
 // ─── Bônus de fama (aditivo, pós-multiplicadores) ───────────────────────────
@@ -86,6 +101,50 @@ function modPopularidade(pop) {
   if (pop >= 6)  return 0.78;
   if (pop >= 1)  return 0.65;
   return 0.50;
+}
+
+// ─── Nota Teto: calculada na finalização (GDD v5.1 §6) ──────────────────────
+
+/**
+ * Calcula nota_teto, nota_argumentacao e nota_redacao usando as skills do
+ * jogador NO MOMENTO DA FINALIZAÇÃO. Estes valores travam permanentemente.
+ */
+function calcularNotaTeto(skJur, docType, practiceArea, jogador) {
+  const s = normalizarSkillsJur(skJur);
+
+  // Argumentação: Legal Drafting como dimensão dominante
+  const tetoDrafting = calcTetoLegalDrafting(s.legal_drafting);
+  const fatorLD = 0.50 + (s.legal_drafting / 50) * 0.45;
+  const nota_argumentacao = Math.max(1, Math.min(tetoDrafting, Math.round(tetoDrafting * fatorLD)));
+
+  // Redação: Legal Research como dimensão moduladora
+  const tetoLR   = calcTetoLegalDrafting(s.legal_research);
+  const fatorLR  = 0.50 + (s.legal_research / 50) * 0.45;
+  const nota_redacao = Math.max(1, Math.min(tetoLR, Math.round(tetoLR * fatorLR)));
+
+  // Combinação com Document Type, Practice Area e estado mental na finalização
+  const modDT  = calcModDocumentType(s[`doc_${docType}`] || 0);
+  const modPA  = calcModPracticeArea(s[`area_${practiceArea}`] || 0);
+  const modEst = modEstadoJogador(jogador || {});
+
+  const raw = (nota_argumentacao * 0.65 + nota_redacao * 0.35) * modDT * modPA * modEst;
+  const nota_teto = Math.max(1, Math.min(26, Math.round(raw)));
+
+  return { nota_argumentacao, nota_redacao, nota_teto };
+}
+
+// ─── Nota Efetiva: dinâmica, capped pela nota_teto (GDD v5.1 §7) ─────────────
+
+/**
+ * Calcula a nota efetiva de uma petição v5.1 (com nota_teto definida).
+ * nota_efetiva = min(nota_teto, round(nota_teto × modPop) + bonusFama)
+ */
+function calcularNotaEfetiva(peticao) {
+  const notaTeto = peticao.nota_teto ?? peticao.teto_nota ?? 12;
+  const modPop   = modPopularidade(peticao.popularidade ?? 0);
+  const bFama    = bonusFama(peticao.fama ?? 0);
+  const raw      = Math.round(notaTeto * modPop) + bFama;
+  return Math.max(1, Math.min(notaTeto, raw));
 }
 
 // ─── Modificador de estado do jogador ───────────────────────────────────────
@@ -286,79 +345,95 @@ async function processarDecaimentoPopularidade(db, jogadorUid) {
   await Promise.all(proms);
 }
 
-// ─── Callable: componerPeticao (Etapa 7) ─────────────────────────────────────
+// ─── Callable: componerPeticao (GDD v5.1 — Confecção de Peças) ───────────────
 
 exports.componerPeticao = onCall({ region: 'southamerica-east1' }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
 
   const uid  = request.auth.uid;
   const db   = getFirestore();
-  const { document_type, practice_area, nome, npc_ajudando } = request.data || {};
+  const {
+    document_type,
+    practice_area,
+    estilo_escrita,
+    tese_central,
+    titulo,       // nome customizado (editável até 1º uso)
+  } = request.data || {};
 
   if (!document_type || !practice_area) {
     throw new HttpsError('invalid-argument', 'document_type e practice_area são obrigatórios.');
   }
 
+  const estiloValido = estilo_escrita && ESTILOS_ESCRITA.includes(estilo_escrita)
+    ? estilo_escrita
+    : 'legalista';
+
   const snap = await db.collection('jogadores').doc(uid).get();
   if (!snap.exists) throw new HttpsError('not-found', 'Jogador não encontrado.');
 
-  const j      = snap.data();
-  const skJur  = normalizarSkillsJur(j.skills_jur);
+  const j     = snap.data();
+  const skJur = normalizarSkillsJur(j.skills_jur);
 
   if (!j.oab) {
-    throw new HttpsError('failed-precondition', 'OAB/Bar Exam necessário para compor petições.');
+    throw new HttpsError('failed-precondition', 'OAB/Bar Exam necessário para confeccionar petições.');
   }
 
-  // Verificar se o tipo está disponível para o cargo
-  const diasBase = calcularTempoComposicao(document_type, j.cargo_id, skJur, !!npc_ajudando);
-  if (diasBase === null) {
-    throw new HttpsError('failed-precondition',
-      `Tipo "${document_type}" não disponível para seu cargo atual.`);
-  }
+  // Confecção leva sempre 1 mês (GDD v5.1 §6)
+  const mesGlobal    = j.mes_global_pessoal || 0;
+  const mesConclusao = mesGlobal + 1;
 
-  // Nota base gerada pela composição — determinada pelo Legal Drafting
-  const teto     = calcTetoLegalDrafting(skJur.legal_drafting);
-  // Nota base é proporcional ao skill de Legal Drafting (50% a 95% do teto)
-  const fatorBase = 0.50 + (skJur.legal_drafting / 50) * 0.45;
-  const nota_base = Math.max(1, Math.min(teto, Math.round(teto * fatorBase)));
-
-  const mesGlobal  = j.mes_global_pessoal || 0;
-  const mesConclusao = mesGlobal + Math.ceil(diasBase / 30) + (diasBase > 0 ? 1 : 0);
+  // Nome automático: {Tipo} - {Ramo} - {Estilo} - "Nome temporário" (GDD v5.1 §3)
+  const nomeAuto = [
+    DOC_LABELS_CURTO[document_type]  || document_type,
+    AREA_LABELS_CURTO[practice_area] || practice_area,
+    ESTILO_LABELS[estiloValido],
+    '"Nome temporário"',
+  ].join(' - ');
 
   const novaPeticao = {
-    jogador_uid:   uid,
-    nome:          nome || `${document_type.replace(/_/g,' ')} — ${practice_area}`,
+    jogador_uid:      uid,
+    titulo:           titulo || nomeAuto,
+    nome:             titulo || nomeAuto,   // alias para compat com UI existente
+    titulo_travado:   false,
     document_type,
     practice_area,
-    geracao:       1,
-    peticao_base_id: null,
-    nota_base,
-    teto_nota:     teto,
-    fama:          0,
+    estilo_escrita:   estiloValido,
+    tese_central:     tese_central || null,
+    geracao:          1,
+    peticao_base_id:  null,
+    // nota_teto e dimensões são calculados na finalização (mês N+1) com as skills daquele momento
+    nota_teto:        null,
+    nota_argumentacao: null,
+    nota_redacao:     null,
+    tier_argumentacao: null,
+    tier_redacao:     null,
+    // Campos de fama/pop herdados do sistema v4.1 (inalterados)
+    fama:             0,
     fama_teto_desbloqueado: 39,
-    popularidade:  0,
+    popularidade:     0,
     decaimento_ativo: false,
-    usos_total:    0,
-    vitorias:      0,
-    derrotas:      0,
-    ultimo_uso:    null,
-    processos_usada: [],
-    status:        diasBase === 0 ? 'pronta' : 'em_composicao',
-    mes_conclusao: mesConclusao,
-    criada_em:     new Date().toISOString(),
-    generica:      false,
+    usos_total:       0,
+    vitorias:         0,
+    derrotas:         0,
+    vitorias_por_instancia: {},
+    ultimo_uso:       null,
+    processos_usada:  [],
+    status:           'em_composicao',
+    mes_conclusao:    mesConclusao,
+    criada_em:        new Date().toISOString(),
+    generica:         false,
   };
 
   const ref = await db.collection('peticoes').add(novaPeticao);
 
-  // XP de composição (+1 Legal Drafting e Legal Research, +1 Doc Type)
+  // XP de início de confecção (+1 Doc Type como antes)
   await db.collection('jogadores').doc(uid).update({
     peticoes_compostas_mes: FieldValue.increment(1),
   });
   await aplicarXpDocType(db, uid, document_type, false);
 
-  logger.info(`[COMPOR] ${uid} → ${document_type}/${practice_area}, nota_base=${nota_base}`);
-  return { ok: true, peticao_id: ref.id, nota_base, dias: diasBase, mes_conclusao: mesConclusao };
+  logger.info(`[CONFECCIONAR] ${uid} → ${document_type}/${practice_area}/${estiloValido}, finaliza mês ${mesConclusao}`);
+  return { ok: true, peticao_id: ref.id, mes_conclusao: mesConclusao, dias: 30 };
 });
 
 // ─── Callable: peticaoGenerica (Etapa 8) ─────────────────────────────────────
@@ -636,13 +711,70 @@ exports.retirarPeticaoMercado = onCall({ region: 'southamerica-east1' }, async (
   return { ok: true };
 });
 
+// ─── Finalização de petições em composição (GDD v5.1 §6) ─────────────────────
+
+/**
+ * Finaliza petições em em_composicao cujo mes_conclusao <= mesAtual.
+ * Calcula nota_teto usando as skills do jogador NESTE MOMENTO.
+ * Chamado por avancar_mes.js.
+ *
+ * @returns {Array} lista de { id, nome, nota_teto } finalizadas
+ */
+async function finalizarPeticoesPendentes(db, uid, jogador, mesAtual) {
+  const snap = await db.collection('peticoes')
+    .where('jogador_uid', '==', uid)
+    .where('status', '==', 'em_composicao')
+    .get();
+
+  if (snap.empty) return [];
+
+  const skJur   = normalizarSkillsJur(jogador.skills_jur);
+  const finalizadas = [];
+  const proms   = [];
+
+  for (const d of snap.docs) {
+    const p = d.data();
+    if ((p.mes_conclusao || 9999) > mesAtual) continue;
+
+    // Petições do novo sistema têm nota_teto null — calcular agora
+    if (p.nota_teto === null || p.nota_teto === undefined) {
+      const { nota_argumentacao, nota_redacao, nota_teto } = calcularNotaTeto(
+        skJur, p.document_type, p.practice_area, jogador
+      );
+      proms.push(d.ref.update({
+        status:            'pronta',
+        nota_teto,
+        nota_argumentacao,
+        nota_redacao,
+        tier_argumentacao: getTierLabel(skJur.legal_drafting),
+        tier_redacao:      getTierLabel(skJur.legal_research),
+        finalizada_em:     new Date().toISOString(),
+        // nota_base e teto_nota mantidos para compatibilidade com setlist de NPC
+        nota_base:         nota_teto,
+        teto_nota:         nota_teto,
+      }));
+      finalizadas.push({ id: d.id, nome: p.titulo || p.nome, nota_teto });
+    } else {
+      // Petição v4.1 (nota_teto já definido ou não é sistema novo) — só muda status
+      proms.push(d.ref.update({ status: 'pronta' }));
+      finalizadas.push({ id: d.id, nome: p.titulo || p.nome, nota_teto: p.teto_nota || 0 });
+    }
+  }
+
+  await Promise.all(proms);
+  return finalizadas;
+}
+
 // ─── Internos exportados ─────────────────────────────────────────────────────
 
 module.exports = Object.assign(module.exports, {
   calcularNotaPeticao,
+  calcularNotaEfetiva,
+  finalizarPeticoesPendentes,
   atualizarFama,
   processarDecaimentoPopularidade,
   modEstadoJogador,
   bonusFama,
   modPopularidade,
+  ESTILO_REACAO,
 });

@@ -33,6 +33,20 @@ const AREA_LABELS = {
   bankruptcy:  'Recuperação Judicial',
 };
 
+const ESTILO_LABELS = {
+  inovadora:       'Inovadora',
+  jurisprudencial: 'Jurisprudencial',
+  legalista:       'Legalista',
+  agressiva:       'Agressiva',
+};
+
+const ESTILO_DESC = {
+  inovadora:       'Bônus vs julgadores doutrinários, penalidade vs fiscais/pragmáticos',
+  jurisprudencial: 'Bônus vs julgadores que valorizam precedentes',
+  legalista:       'Bônus vs julgadores faturais, padrão conservador',
+  agressiva:       'Bônus vs julgadores constitucionalistas, risco alto',
+};
+
 const ACAO_LABELS = {
   preliminary_hearing:   'Audiência Preliminar',
   expert_witness:        'Prova Pericial',
@@ -81,7 +95,7 @@ window.renderPeticoes = async function(j, el) {
         <div class="secao-titulo">📜 Petições</div>
         <div style="display:flex;gap:.5rem">
           <button class="btn btn-ghost btn-sm" onclick="window.renderMercadoPeticoes(window.JOGADOR, document.getElementById('main-content'))">🏪 Mercado</button>
-          <button class="btn btn-prim btn-sm" onclick="window.abrirModalCompor()">+ Compor</button>
+          <button class="btn btn-prim btn-sm" onclick="window.abrirModalCompor()">+ Confeccionar</button>
         </div>
       </div>
 
@@ -239,29 +253,50 @@ window.comprarPeticaoDeMercado = async function(peticaoId, nome, preco) {
 
 // ─── Card de petição ──────────────────────────────────────────────────────────
 
+function _calcNotaEfetiva(p) {
+  const notaTeto = p.nota_teto ?? p.teto_nota ?? 12;
+  const pop = p.popularidade ?? 0;
+  const fama = p.fama ?? 0;
+  let modPop = pop >= 86 ? 1.20 : pop >= 71 ? 1.10 : pop >= 51 ? 1.05
+    : pop >= 31 ? 1.00 : pop >= 16 ? 0.90 : pop >= 6 ? 0.78 : pop >= 1 ? 0.65 : 0.50;
+  let bFama = fama >= 100 ? 6 : fama >= 95 ? 5 : fama >= 85 ? 4
+    : fama >= 75 ? 3 : fama >= 60 ? 2 : fama >= 40 ? 1 : 0;
+  const raw = Math.round(notaTeto * modPop) + bFama;
+  return Math.max(1, Math.min(notaTeto, raw));
+}
+
 function _cardPeticao(p) {
   const gerLabel = p.geracao > 1 ? ` <span style="color:var(--ardosia2);font-size:.7rem">v${p.geracao}</span>` : '';
   const statusBadge = p.status === 'em_composicao'
-    ? `<span class="badge" style="background:var(--laranja1);color:#fff">⏳ Compondo</span>`
+    ? `<span class="badge" style="background:var(--laranja1);color:#fff">⏳ Confeccionando</span>`
     : p.generica
     ? `<span class="badge" style="background:var(--ardosia2);color:#fff">Genérica</span>`
     : `<span class="badge" style="background:var(--verde1);color:#fff">Pronta</span>`;
+
+  const temNotaTeto  = p.nota_teto != null;
+  const notaEfetiva  = temNotaTeto ? _calcNotaEfetiva(p) : (p.nota_base || 1);
+  const notaTeto     = p.nota_teto ?? p.teto_nota ?? 12;
+  const estiloLabel  = p.estilo_escrita ? (ESTILO_LABELS[p.estilo_escrita] || p.estilo_escrita) : null;
 
   return `
     <div class="card pet-card" onclick="window.abrirDetalhePeticao('${p.id}')">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.5rem">
         <div>
-          <div style="font-weight:600;font-size:.85rem">${p.nome}${gerLabel}</div>
-          <div style="font-size:.72rem;color:var(--ardosia2)">${DOC_LABELS[p.document_type]||p.document_type} · ${AREA_LABELS[p.practice_area]||p.practice_area}</div>
+          <div style="font-weight:600;font-size:.85rem">${p.titulo || p.nome}${gerLabel}</div>
+          <div style="font-size:.72rem;color:var(--ardosia2)">${DOC_LABELS[p.document_type]||p.document_type} · ${AREA_LABELS[p.practice_area]||p.practice_area}${estiloLabel ? ` · ${estiloLabel}` : ''}</div>
         </div>
         ${statusBadge}
       </div>
 
       <div style="font-size:.72rem;color:var(--ardosia2);margin-bottom:.4rem">
         ${p.status === 'em_composicao' && p.mes_conclusao
-          ? `<span style="color:var(--ouro2)">⏳ Pronta no mês ${p.mes_conclusao}</span> · `
-          : ''}Nota base: <b>${p.nota_base}/26</b> · Teto: ${p.teto_nota}/26
-        · ${'★'.repeat(Math.floor(p.nota_base/6))}${'☆'.repeat(5-Math.floor(p.nota_base/6))}
+          ? `<span style="color:var(--ouro2)">⏳ Finaliza no mês ${p.mes_conclusao}</span>`
+          : temNotaTeto
+          ? `Efetiva: <b>${notaEfetiva}/26</b> · Teto: ${notaTeto}/26`
+          : `Nota base: <b>${p.nota_base}/26</b> · Teto: ${p.teto_nota}/26`}
+        ${p.tier_argumentacao
+          ? ` · <span style="color:var(--ardosia2)">Arg. ${p.tier_argumentacao} · Red. ${p.tier_redacao}</span>`
+          : ''}
       </div>
 
       <div style="margin-bottom:.3rem">
@@ -321,52 +356,94 @@ function _popCor(pop) {
 function _modalComporHTML() {
   return `
     <div id="modal-compor" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;display:none;align-items:center;justify-content:center">
-      <div class="card" style="width:400px;max-width:95vw;max-height:90vh;overflow-y:auto">
+      <div class="card" style="width:420px;max-width:95vw;max-height:90vh;overflow-y:auto">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-          <b>Compor Petição</b>
+          <b>Confeccionar Petição</b>
           <button class="btn btn-sm btn-ghost" onclick="document.getElementById('modal-compor').style.display='none'">✕</button>
         </div>
 
-        <label style="font-size:.78rem;color:var(--ardosia2)">Tipo de Documento</label>
+        <div style="font-size:.72rem;color:var(--ardosia2);margin-bottom:1rem;background:var(--fundo2);padding:.5rem .75rem;border-radius:4px">
+          Os 3 primeiros seletores travam ao iniciar a confecção e não podem ser alterados.<br>
+          O título pode ser editado até o primeiro uso em processo.
+        </div>
+
+        <label style="font-size:.78rem;color:var(--ardosia2)">Tipo de Petição <span style="color:var(--ardosia3)">— trava</span></label>
         <select id="compor-tipo" class="input-select" style="margin-bottom:.8rem;width:100%">
           ${Object.entries(DOC_LABELS).map(([k,v]) => `<option value="${k}">${v}</option>`).join('')}
         </select>
 
-        <label style="font-size:.78rem;color:var(--ardosia2)">Área do Direito</label>
+        <label style="font-size:.78rem;color:var(--ardosia2)">Ramo do Direito <span style="color:var(--ardosia3)">— trava</span></label>
         <select id="compor-area" class="input-select" style="margin-bottom:.8rem;width:100%">
           ${Object.entries(AREA_LABELS).map(([k,v]) => `<option value="${k}">${v}</option>`).join('')}
         </select>
 
-        <label style="font-size:.78rem;color:var(--ardosia2)">Nome (opcional)</label>
-        <input id="compor-nome" class="input-text" style="margin-bottom:1rem;width:100%" placeholder="Ex: Tese de Vínculo Empregatício">
+        <label style="font-size:.78rem;color:var(--ardosia2)">Estilo de Escrita <span style="color:var(--ardosia3)">— trava</span></label>
+        <select id="compor-estilo" class="input-select" style="margin-bottom:.3rem;width:100%" onchange="window._atualizarDescEstilo()">
+          ${Object.entries(ESTILO_LABELS).map(([k,v]) => `<option value="${k}">${v}</option>`).join('')}
+        </select>
+        <div id="compor-estilo-desc" style="font-size:.7rem;color:var(--ardosia2);margin-bottom:.8rem">${ESTILO_DESC['inovadora']}</div>
 
-        <button class="btn btn-prim btn-block" onclick="window.confirmarCompor()">Compor</button>
+        <label style="font-size:.78rem;color:var(--ardosia2)">Título (editável até o 1º uso)</label>
+        <input id="compor-nome" class="input-text" style="margin-bottom:.3rem;width:100%" placeholder="Deixe em branco para nome automático">
+        <div style="font-size:.68rem;color:var(--ardosia3);margin-bottom:1rem" id="compor-nome-auto"></div>
+
+        <div style="font-size:.72rem;color:var(--ardosia2);margin-bottom:1rem">
+          ⏱ A confecção leva <b>1 mês</b>. A nota teto é calculada com suas skills no momento da finalização.
+        </div>
+
+        <button class="btn btn-prim btn-block" onclick="window.confirmarCompor()">Iniciar Confecção</button>
       </div>
     </div>`;
 }
 
 window.abrirModalCompor = function() {
   const m = document.getElementById('modal-compor');
-  if (m) m.style.display = 'flex';
+  if (m) {
+    m.style.display = 'flex';
+    window._atualizarDescEstilo();
+    window._atualizarNomeAuto();
+  }
+};
+
+window._atualizarDescEstilo = function() {
+  const estilo = document.getElementById('compor-estilo')?.value;
+  const el     = document.getElementById('compor-estilo-desc');
+  if (el && estilo) el.textContent = ESTILO_DESC[estilo] || '';
+  window._atualizarNomeAuto();
+};
+
+window._atualizarNomeAuto = function() {
+  const tipo   = document.getElementById('compor-tipo')?.value;
+  const area   = document.getElementById('compor-area')?.value;
+  const estilo = document.getElementById('compor-estilo')?.value;
+  const titulo = document.getElementById('compor-nome')?.value?.trim();
+  const el     = document.getElementById('compor-nome-auto');
+  if (!el) return;
+  if (titulo) { el.textContent = ''; return; }
+  const tipoLabel   = { initial_filing:'Inicial', responsive_pleading:'Contestação', motion:'Requerimento', appellate_brief:'Apelação', supreme_brief:'Memorial', trial_brief:'Alegações Finais', evidence:'Instrução', deposition:'Depoimento' };
+  const areaLabel   = { employment:'Trabalhista', tax:'Tributário', civil:'Cível', criminal:'Criminal', corporate:'Empresarial', immigration:'Imigração', bankruptcy:'Recuperação Jud.' };
+  const estiloLabel = { inovadora:'Inovadora', jurisprudencial:'Jurisprudencial', legalista:'Legalista', agressiva:'Agressiva' };
+  if (tipo && area && estilo) {
+    el.textContent = `Nome automático: ${tipoLabel[tipo]||tipo} - ${areaLabel[area]||area} - ${estiloLabel[estilo]} - "Nome temporário"`;
+  }
 };
 
 window.confirmarCompor = async function() {
-  const tipo = document.getElementById('compor-tipo')?.value;
-  const area = document.getElementById('compor-area')?.value;
-  const nome = document.getElementById('compor-nome')?.value || '';
+  const tipo   = document.getElementById('compor-tipo')?.value;
+  const area   = document.getElementById('compor-area')?.value;
+  const estilo = document.getElementById('compor-estilo')?.value;
+  const titulo = document.getElementById('compor-nome')?.value?.trim() || '';
   if (!tipo || !area) return;
 
   try {
     const fn  = httpsCallable(functions, 'componerPeticao');
-    const res = await fn({ document_type: tipo, practice_area: area, nome });
+    const res = await fn({ document_type: tipo, practice_area: area, estilo_escrita: estilo, titulo });
     const d   = res.data;
     document.getElementById('modal-compor').style.display = 'none';
-    toast(d.dias === 0
-      ? `✅ Petição "${nome||tipo}" composta! Nota base: ${d.nota_base}/26`
-      : `📝 Composição iniciada — pronta em ~${d.dias} dias (mês ${d.mes_conclusao})`, 'ok', 5000);
+    toast(`📝 Confecção iniciada — petição pronta no mês ${d.mes_conclusao}. A nota teto será calculada com suas skills daquele momento.`, 'ok', 6000);
     if (window.JOGADOR) window.renderPeticoes(window.JOGADOR, document.getElementById('main-content'));
   } catch(e) {
-    toast('Erro ao compor: ' + (e.message || e), 'erro');
+    toast('Erro ao iniciar confecção: ' + (e.message || e), 'erro');
   }
 };
 
@@ -426,14 +503,25 @@ window.abrirDetalhePeticao = async function(peticaoId) {
         ${p.geracao > 1 ? ` · Geração ${p.geracao} (variação)` : ' · Original'}
       </div>
 
+      ${p.nota_teto != null ? `
+        <div style="background:var(--fundo2);border-radius:6px;padding:.6rem .75rem;margin-bottom:.8rem;font-size:.78rem">
+          <div style="display:flex;justify-content:space-between;margin-bottom:.2rem">
+            <span>Argumentação: <b>${p.tier_argumentacao||'—'}</b></span>
+            <span>Redação: <b>${p.tier_redacao||'—'}</b></span>
+          </div>
+          <div style="font-size:.7rem;color:var(--ardosia2);font-style:italic">
+            "A argumentação é ${p.tier_argumentacao||'—'} e a redação é ${p.tier_redacao||'—'}."
+          </div>
+        </div>` : ''}
+
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:1rem">
         <div class="stat-mini">
-          <div class="sm-label">Nota Base</div>
-          <div class="sm-val">${p.nota_base}/26</div>
+          <div class="sm-label">${p.nota_teto != null ? 'Nota Efetiva' : 'Nota Base'}</div>
+          <div class="sm-val">${p.nota_teto != null ? _calcNotaEfetiva(p) : (p.nota_base||1)}/26</div>
         </div>
         <div class="stat-mini">
           <div class="sm-label">Teto</div>
-          <div class="sm-val">${p.teto_nota}/26</div>
+          <div class="sm-val">${p.nota_teto ?? p.teto_nota ?? 12}/26</div>
         </div>
         <div class="stat-mini">
           <div class="sm-label">Potencial</div>

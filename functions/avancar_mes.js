@@ -1342,31 +1342,19 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
   // Resetar contador de petições compostas no mês
   updates.peticoes_compostas_mes = 0;
 
-  // ── CONCLUIR PETIÇÕES EM COMPOSIÇÃO (GDD v4.1 — Etapa 7) ──
+  // ── CONCLUIR PETIÇÕES EM CONFECÇÃO (GDD v5.1 §6 — finaliza com nota_teto) ──
   try {
-    const petSnap = await db.collection('peticoes')
-      .where('jogador_uid', '==', uid)
-      .where('status', '==', 'em_composicao')
-      .get();
-    const batch = db.batch();
-    let concluidas = 0;
-    for (const petDoc of petSnap.docs) {
-      const pet = petDoc.data();
-      if ((pet.mes_conclusao || 9999) <= mesGlobal) {
-        batch.update(petDoc.ref, { status: 'pronta' });
-        concluidas++;
-      }
-    }
-    if (concluidas > 0) {
-      await batch.commit();
+    const finalizadas = await _peticoes.finalizarPeticoesPendentes(db, uid, j, mesGlobal);
+    if (finalizadas.length > 0) {
+      const nomes = finalizadas.map(p => `"${p.nome}" (teto ${p.nota_teto || '?'}/26)`).join(', ');
       mensagens.push({
-        assunto: `📜 ${concluidas} petição${concluidas > 1 ? 'ões concluídas' : ' concluída'}!`,
-        corpo:   `${concluidas} petição${concluidas > 1 ? 'ões estão prontas' : ' está pronta'} para uso no setlist.`,
+        assunto: `📜 ${finalizadas.length} petição${finalizadas.length > 1 ? 'ões finalizadas' : ' finalizada'}!`,
+        corpo:   `${nomes} — pronta${finalizadas.length > 1 ? 's' : ''} para uso no setlist.`,
         tipo: 'positivo',
       });
     }
   } catch (e) {
-    logger.warn('Erro ao concluir petições em composição:', e.message);
+    logger.warn('Erro ao finalizar petições em confecção:', e.message);
   }
 
   // ── DECAIMENTO DE POPULARIDADE DAS PETIÇÕES (GDD v4.1 — Etapa 13) ──

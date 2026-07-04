@@ -14,7 +14,7 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getFirestore }       = require('firebase-admin/firestore');
 const { logger }             = require('firebase-functions');
-const { calcularNotaPeticao, modEstadoJogador } = require('./peticoes');
+const { calcularNotaPeticao, calcularNotaEfetiva, modEstadoJogador } = require('./peticoes');
 const { normalizarSkillsJur } = require('./skills');
 
 // ─── Slots por tier ──────────────────────────────────────────────────────────
@@ -280,7 +280,11 @@ exports.montarSetlist = onCall({ region: 'southamerica-east1' }, async (request)
       const petSnap = await db.collection('peticoes').doc(slot.peticao_id).get();
       if (!petSnap.exists) throw new HttpsError('not-found', `Petição ${slot.peticao_id} não encontrada.`);
       const pet = { ...petSnap.data(), area_caso: proc.area || proc.tipo };
-      nota_slot = calcularNotaPeticao(pet, skJur, j, escId);
+      // v5.1: petições com nota_teto usam calcularNotaEfetiva (skills travadas na finalização)
+      // v4.1: petições sem nota_teto usam calcularNotaPeticao (skills atuais do jogador)
+      nota_slot = pet.nota_teto != null
+        ? calcularNotaEfetiva(pet)
+        : calcularNotaPeticao(pet, skJur, j, escId);
 
       // Teto hard para genéricas
       if (pet.generica) nota_slot = Math.min(12, nota_slot);
