@@ -88,6 +88,31 @@ const TABELA_SENTENCA = {
   26: { total:0.30, parcial:0.45, improc:0.25 },
 };
 
+// Mapeamento estilo_escrita → campo reacoes do julgador (GDD v5.1 §2.1)
+const ESTILO_REACAO_MAP = {
+  inovadora:       'doutrinário',
+  jurisprudencial: 'jurisprudencial',
+  legalista:       'fatual',
+  agressiva:       'constitucional',
+};
+
+/**
+ * Aplica bônus/penalidade do estilo de escrita da peça com base nas reações do julgador.
+ * +3 se o estilo bate com a reação dominante; -2 se é o oposto; 0 se sem info.
+ */
+function modificadorEstilo(estiloEscrita, julgador) {
+  if (!estiloEscrita || !julgador?.reacoes) return 0;
+  const reacaoAlvo = ESTILO_REACAO_MAP[estiloEscrita];
+  if (!reacaoAlvo) return 0;
+  const reacoes = julgador.reacoes;
+  const valorAlvo = reacoes[reacaoAlvo] ?? 0;
+  const maxValor  = Math.max(...Object.values(reacoes), 0);
+  if (maxValor <= 0) return 0;
+  if (valorAlvo === maxValor) return 3;  // estilo bate com a reação mais forte
+  if (valorAlvo <= maxValor * 0.35) return -2;  // estilo é oposto ao que o julgador valoriza
+  return 0;
+}
+
 // Rookie bonus — GDD Seção 37.1
 function rookieBonus(processosConcluidos) {
   if (processosConcluidos <= 10)  return 3;
@@ -303,7 +328,11 @@ async function _processarSentencaSetlist(db, processoRef, jogadorRef, p, j, uid,
     alta_originalidade:   false,
   };
 
-  const { resultado, valor_pct } = determinarSentencaSetlist(nota, posicao, p.juiz || null, impactoEv, ctx);
+  // Modificador de estilo de escrita × reações do julgador (GDD v5.1 §2.1)
+  const modEstilo = modificadorEstilo(p.estilo_principal || null, p.juiz || null);
+  const notaComEstilo = Math.max(1, Math.min(26, nota + modEstilo));
+
+  const { resultado, valor_pct } = determinarSentencaSetlist(notaComEstilo, posicao, p.juiz || null, impactoEv, ctx);
 
   const cap = repCapDoCargo(j.cargo_id);
   const rep = j.reputacao || 30;
@@ -349,7 +378,8 @@ async function _processarSentencaSetlist(db, processoRef, jogadorRef, p, j, uid,
     resultado_setlist: resultado,
     valor_recebido:  valorRecebido,
     hon_pendente:    honPotencial,
-    nota_final:      nota,
+    nota_final:      notaComEstilo,
+    mod_estilo:      modEstilo,
     impacto_evento:  impactoEv,
     repDelta,
     encerrado_mes:   null,

@@ -24,6 +24,8 @@ const { getFirestore }       = require('firebase-admin/firestore');
 const { logger }             = require('firebase-functions');
 const _skillsJur             = require('./skills');
 const _peticoes              = require('./peticoes');
+const _genericas             = require('./peticoes_genericas');
+const _perfis                = require('./perfis');
 
 const COOLDOWN_JANEIRO_MIN = 60;
 const ENERGIA_TOTAL        = 100;
@@ -880,6 +882,15 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
   const j = jogadorSnap.data();
   const s = serverSnap.exists ? serverSnap.data() : {};
 
+  // ── PROFILE_ID (GDD v5.1 §39-40) — atribuição lazy na primeira execução ──
+  if (!j.profile_id) {
+    try {
+      await _perfis.atribuirProfileIdJogador(db, uid);
+    } catch (e) {
+      logger.warn('[PROFILE_ID] Erro ao atribuir profile_id:', e.message);
+    }
+  }
+
   const mesAtualJogador = j.mes_pessoal !== undefined ? j.mes_pessoal : 0;
   if (mesAtualJogador === 0 && j.janeiro_bloqueado_ate) {
     const bloqueadoAte = new Date(j.janeiro_bloqueado_ate).getTime();
@@ -1362,6 +1373,18 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
     await _peticoes.processarDecaimentoPopularidade(db, uid);
   } catch (e) {
     logger.warn('Erro ao processar decaimento de popularidade:', e.message);
+  }
+
+  // ── DECAIMENTO DAS GENÉRICAS GLOBAIS (GDD v5.1 §9) ──
+  // Só roda uma vez por "avanço de mês real" — evita processar N vezes
+  // por causa de múltiplos jogadores. O tick_mensal.js é o lugar ideal
+  // quando migrar para relógio global; por ora chama aqui mas é idempotente.
+  try {
+    // Inicializa as genéricas se não existirem (lazy, idempotente)
+    await _genericas.inicializarGenericas(db);
+    await _genericas.processarDecaimentoGenericas(db);
+  } catch (e) {
+    logger.warn('Erro ao processar genéricas globais:', e.message);
   }
 
   await _commit(db, uid, updates, mensagens, novoMes, novoAno);

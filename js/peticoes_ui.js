@@ -160,26 +160,22 @@ function _bannerPeticaoGenerica() {
     <div class="card" style="border-left:3px solid var(--ardosia2);margin-bottom:1rem;font-size:.82rem">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div>
-          <b>Petição Genérica</b>
+          <b>Petição Genérica do Servidor</b>
           <div style="font-size:.75rem;color:var(--ardosia2);margin-top:.2rem">
-            Sem OAB você pode usar petições genéricas em processos — nota base 10, teto 12.
+            Sem OAB você usa as petições genéricas globais — teto fixo 12, nota efetiva varia com uso do servidor inteiro.
           </div>
         </div>
-        <button class="btn btn-sm btn-ghost" onclick="window.usarPeticaoGenerica()">Usar Genérica</button>
+        <button class="btn btn-sm btn-ghost" onclick="window.verEstadoGenerica()">Ver Estado</button>
       </div>
     </div>`;
 }
 
-window.usarPeticaoGenerica = async function() {
-  const area = prompt('Área do Direito:\n' + Object.entries(AREA_LABELS).map(([k,v],i)=>`${i+1}. ${v}`).join('\n') + '\n\nDigite o número:');
-  const idx = parseInt(area, 10) - 1;
-  const areas = Object.keys(AREA_LABELS);
-  if (idx < 0 || idx >= areas.length) return;
+window.verEstadoGenerica = async function() {
   try {
-    const fn  = httpsCallable(functions, 'peticaoGenerica');
-    const res = await fn({ practice_area: areas[idx] });
-    toast(`✅ Petição genérica criada! Nota base: ${res.data.nota_base}/26 · Teto: 12`, 'ok', 4000);
-    if (window.JOGADOR) window.renderPeticoes(window.JOGADOR, document.getElementById('main-content'));
+    const fn  = httpsCallable(functions, 'obterPeticaoGenerica');
+    const res = await fn({ practice_area: 'civil' });
+    const d   = res.data;
+    toast(`Genérica global — Nota efetiva: ${d.nota_efetiva}/12 · Fama: ${d.fama||0}/100 · Popularidade: ${d.popularidade||0}/100 · Total de usos: ${d.usos_total||0}`, 'ok', 6000);
   } catch(e) { toast('Erro: ' + (e.message || e), 'erro'); }
 };
 

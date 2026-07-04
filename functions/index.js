@@ -20,6 +20,10 @@ const {
   retirarPeticaoMercado,
 } = require('./peticoes');
 const { montarSetlist, resolverEventoJulgamento } = require('./setlist');
+// GDD v5.1 — Petições Genéricas Globais
+const { obterPeticaoGenerica } = require('./peticoes_genericas');
+// GDD v5.1 — Identificação única de personagens (profile_id §39-40)
+const { buscarPerfil } = require('./perfis');
 const { anteciparHonorarios, contratarLinhaCredito, pagarLinhaCredito,
         contratarSocioInvestidor, aplicarInvestimento, resgatarInvestimento } = require('./financeiro');
 
@@ -47,6 +51,8 @@ exports.comprarPeticao           = comprarPeticao;
 exports.montarSetlist            = montarSetlist;
 exports.resolverEventoJulgamento = resolverEventoJulgamento;
 exports.retirarPeticaoMercado    = retirarPeticaoMercado;
+exports.obterPeticaoGenerica     = obterPeticaoGenerica;
+exports.buscarPerfil             = buscarPerfil;
 exports.tickMensal               = tickMensal;
 // GDD Seção 31-33 — Financeiro Avançado
 exports.anteciparHonorarios      = anteciparHonorarios;

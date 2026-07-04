@@ -358,12 +358,21 @@ exports.montarSetlist = onCall({ region: 'southamerica-east1' }, async (request)
   const instancia = normalizarInstancia(instRaw);
   const evento    = gerarEventoJulgamento(nota_provisoria, instancia);
 
+  // Estilo da petição do slot 1 para modificador de julgador (GDD v5.1 §2.1)
+  const slot1 = slotsCalculados.find(s => s.tipo === 'peticao' && s.peticao_id);
+  let estiloPrincipal = null;
+  if (slot1?.peticao_id) {
+    const petS1 = await db.collection('peticoes').doc(slot1.peticao_id).get();
+    if (petS1.exists) estiloPrincipal = petS1.data().estilo_escrita || null;
+  }
+
   await procSnap.ref.update({
     setlist:             slotsCalculados,
     supervisao_ativa:    supervisaoAtiva,
     nota_provisoria,
     evento_julgamento:   evento,
-    setlist_instancia:   instRaw,   // instância onde este setlist é julgado (para XP)
+    setlist_instancia:   instRaw,
+    estilo_principal:    estiloPrincipal,
     status:              'aguardando_evento',
   });
 
