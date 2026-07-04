@@ -1390,6 +1390,34 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
     logger.warn('Erro ao processar genéricas globais:', e.message);
   }
 
+  // ── SEGURO MALPRACTICE — cobrança mensal (GDD v5.1 §28) ──
+  if (j.malpractice_tier && j.malpractice_custo_mensal > 0) {
+    updates.caixa = (updates.caixa || (j.caixa || 0)) - j.malpractice_custo_mensal;
+  }
+
+  // ── INTERCÂMBIO — verificar conclusão (GDD v5.1 §26) ──
+  if (j.intercambio_ativo && j.intercambio_mes_conclusao <= mesGlobal) {
+    const destinos = {
+      eua: { bonus_rep: 5, bonus_area: 'corporate' },
+      uk:  { bonus_rep: 5, bonus_area: 'civil' },
+      europa: { bonus_rep: 4, bonus_area: 'employment' },
+      asia:   { bonus_rep: 8, bonus_area: 'tax' },
+    };
+    const dOpt = destinos[j.intercambio_destino] || { bonus_rep: 4, bonus_area: null };
+    updates.intercambio_ativo      = false;
+    updates.intercambio_concluido  = j.intercambio_destino;
+    updates.reputacao              = Math.min(100, (j.reputacao || 30) + dOpt.bonus_rep);
+    if (dOpt.bonus_area) {
+      const skJurAtual = _skillsJur.normalizarSkillsJur(j.skills_jur);
+      updates.skills_jur = { ...skJurAtual, [dOpt.bonus_area]: Math.min(55, (skJurAtual[dOpt.bonus_area] || 0) + 3) };
+    }
+    mensagens.push({
+      assunto: `${j.intercambio_badge || '🌍'} Intercâmbio concluído!`,
+      corpo:   `Seu período no ${j.intercambio_destino?.toUpperCase()} terminou. +${dOpt.bonus_rep} Rep e +3 em ${dOpt.bonus_area || 'skills'}.`,
+      tipo:    'positivo',
+    });
+  }
+
   await _commit(db, uid, updates, mensagens, novoMes, novoAno);
 
   logger.info(`[AVANÇAR] ${uid} → ${MESES[novoMes]}, Ano ${novoAno}`);

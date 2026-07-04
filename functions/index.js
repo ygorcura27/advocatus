@@ -39,6 +39,15 @@ const {
   darAula,
   submeterDissertacao,
 } = require('./posgraduacao');
+// GDD v5.1 — Sistemas Sociais §25-30
+const {
+  participarMootCourt,
+  iniciarIntercambio,
+  gravarPodcast,
+  contratarSeguroMalpractice,
+  abrirCasoProBono,
+  registrarAlumni,
+} = require('./sistemas_sociais');
 const { anteciparHonorarios, contratarLinhaCredito, pagarLinhaCredito,
         contratarSocioInvestidor, aplicarInvestimento, resgatarInvestimento } = require('./financeiro');
 
@@ -77,6 +86,12 @@ exports.matricularPosGraduacao   = matricularPosGraduacao;
 exports.compararecerAula         = compararecerAula;
 exports.darAula                  = darAula;
 exports.submeterDissertacao      = submeterDissertacao;
+exports.participarMootCourt      = participarMootCourt;
+exports.iniciarIntercambio       = iniciarIntercambio;
+exports.gravarPodcast            = gravarPodcast;
+exports.contratarSeguroMalpractice = contratarSeguroMalpractice;
+exports.abrirCasoProBono         = abrirCasoProBono;
+exports.registrarAlumni          = registrarAlumni;
 exports.tickMensal               = tickMensal;
 // GDD Seção 31-33 — Financeiro Avançado
 exports.anteciparHonorarios      = anteciparHonorarios;

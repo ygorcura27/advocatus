@@ -356,9 +356,24 @@ async function _processarSentencaSetlist(db, processoRef, jogadorRef, p, j, uid,
   else if (resultado === 'parcial') repDelta = Math.max(1, Math.floor((cap - rep) * 0.05));
   else repDelta = -Math.max(1, Math.floor(rep * 0.05));
 
+  // Pro Bono: Rep 2-3x mais rápida (GDD v5.1 §29)
+  if (p.pro_bono && repDelta > 0) {
+    repDelta = Math.round(repDelta * (p.multiplier_rep || 2.5));
+  }
+
   // XP — mantém a tabela do banco jurídico como referência
   const scoreEquiv = resultado === 'procedente' ? 85 : resultado === 'parcial' ? 65 : 35;
   const xpGanho    = banco.xpPorDecisao(instancia === 'trial' ? '1grau' : '2grau', scoreEquiv);
+
+  // Sinistro de Malpractice — nota < 8 com derrota (GDD v5.1 §28)
+  let malpracticeIndenizacao = 0;
+  if (!favoravelAoJogador && notaComEstilo < 8 && j.malpractice_tier) {
+    const coberturas = { basico: 0.30, intermediario: 0.50, amplo: 0.70 };
+    const pctCob = coberturas[j.malpractice_tier] || 0;
+    const valorCaso = p.valor || 0;
+    malpracticeIndenizacao = Math.round(valorCaso * pctCob * 0.10);
+    log.info(`[MALPRACTICE] Sinistro: ${uid}, indenizacao=${malpracticeIndenizacao}`);
+  }
 
   // Atualizar jogador
   const updJog = {
@@ -367,6 +382,7 @@ async function _processarSentencaSetlist(db, processoRef, jogadorRef, p, j, uid,
     processos_concluidos: (j.processos_concluidos || 0) + 1,
     derrotas_consecutivas: favoravelAoJogador ? 0 : (j.derrotas_consecutivas || 0) + 1,
   };
+  if (malpracticeIndenizacao > 0) updJog.caixa = (j.caixa || 0) + malpracticeIndenizacao;
   if (favoravelAoJogador) { updJog.wins = (j.wins||0)+1; updJog.wins_ano = (j.wins_ano||0)+1; }
   else { updJog.losses = (j.losses||0)+1; updJog.losses_ano = (j.losses_ano||0)+1; }
 
