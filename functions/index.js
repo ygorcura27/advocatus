@@ -32,6 +32,13 @@ const { obterCharts }           = require('./charts');
 const { obterNoticiasImprensa } = require('./imprensa');
 // GDD v5.1 — Tese Central (§16)
 const { listarTeses }           = require('./teses');
+// GDD v5.1 — Pós-Graduação §17-24
+const {
+  matricularPosGraduacao,
+  compararecerAula,
+  darAula,
+  submeterDissertacao,
+} = require('./posgraduacao');
 const { anteciparHonorarios, contratarLinhaCredito, pagarLinhaCredito,
         contratarSocioInvestidor, aplicarInvestimento, resgatarInvestimento } = require('./financeiro');
 
@@ -66,6 +73,10 @@ exports.buscarPerfil             = buscarPerfil;
 exports.obterCharts              = obterCharts;
 exports.obterNoticiasImprensa    = obterNoticiasImprensa;
 exports.listarTeses              = listarTeses;
+exports.matricularPosGraduacao   = matricularPosGraduacao;
+exports.compararecerAula         = compararecerAula;
+exports.darAula                  = darAula;
+exports.submeterDissertacao      = submeterDissertacao;
 exports.tickMensal               = tickMensal;
 // GDD Seção 31-33 — Financeiro Avançado
 exports.anteciparHonorarios      = anteciparHonorarios;

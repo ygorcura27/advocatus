@@ -939,7 +939,10 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
   const newSkillsJur = _skillsJur.normalizarSkillsJur(j.skills_jur);
   for (const est of prontos) {
     if (est.tipo === 'skills_jur') {
-      newSkillsJur[est.skill] = Math.max(0, Math.min(50, (newSkillsJur[est.skill] || 0) + est.ganho));
+      // Teto de skill 0-50, estendido por bonus de pós-graduação (GDD v5.1 §20)
+      const bonusPosGrad = j.posgrad_bonus_skill || 0;
+      const capSkillJur  = Math.round(50 * (1 + bonusPosGrad));
+      newSkillsJur[est.skill] = Math.max(0, Math.min(capSkillJur, (newSkillsJur[est.skill] || 0) + est.ganho));
     } else {
       const cap = REP_CAP[j.cargo_id] || 55;
       newSkills[est.skill] = Math.min(cap, (newSkills[est.skill] || 0) + est.ganho);
