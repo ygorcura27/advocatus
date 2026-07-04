@@ -25,6 +25,7 @@ const {
   aplicarXpDocType,
 } = require('./skills');
 const { verificarOriginalidadeTese, listarTesesPorArea } = require('./teses');
+const { registrarCopiaVendida } = require('./artigos_livros');
 
 // ─── Estilos de escrita (GDD v5.1 — 3º seletor) ─────────────────────────────
 
@@ -864,16 +865,32 @@ exports.comprarPeticao = onCall({ region: 'southamerica-east1' }, async (request
     // Debitar comprador
     tx.update(jogRef, { dinheiro: (j.dinheiro || 0) - preco });
 
-    // Transferir propriedade (popularidade resetada para 60 ao trocar de dono)
-    tx.update(petRef, {
-      jogador_uid:   uid,
-      no_mercado:    false,
-      preco_mercado: 0,
-      popularidade:  60,
-      comprada_em:   new Date().toISOString(),
-      comprada_de:   pet.jogador_uid,
-    });
+    // Livro: venda de cópia — mantém o dono e permanece no mercado (royalties via avancar_mes)
+    if (pet.categoria === 'livro') {
+      tx.update(jogRef, { dinheiro: (j.dinheiro || 0) - preco });
+      if (vendedorSnap.exists) {
+        tx.update(vendedorRef, { dinheiro: (vendedorSnap.data().dinheiro || 0) + preco });
+      }
+      // registrarCopiaVendida é chamado fora da transaction (sem impacto em atomicidade)
+    } else {
+      // Transferir propriedade (popularidade resetada para 60 ao trocar de dono)
+      tx.update(petRef, {
+        jogador_uid:   uid,
+        no_mercado:    false,
+        preco_mercado: 0,
+        popularidade:  60,
+        comprada_em:   new Date().toISOString(),
+        comprada_de:   pet.jogador_uid,
+      });
+    }
   });
+
+  // Registra cópia vendida para livros — categoria capturada dentro da transaction via closure
+  // A transaction já leu petSnap, mas o valor é local; usamos uma segunda leitura leve
+  const _petCheck = await petRef.get();
+  if (_petCheck.data()?.categoria === 'livro') {
+    await registrarCopiaVendida(db, peticao_id);
+  }
 
   return { ok: true };
 });

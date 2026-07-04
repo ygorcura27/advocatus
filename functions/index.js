@@ -48,6 +48,13 @@ const {
   abrirCasoProBono,
   registrarAlumni,
 } = require('./sistemas_sociais');
+// GDD v5.1 — Artigos e Livros §31-34
+const {
+  confeccionarObra,
+  publicarLivro,
+  citarObra,
+  obterObrasPublicas,
+} = require('./artigos_livros');
 const { anteciparHonorarios, contratarLinhaCredito, pagarLinhaCredito,
         contratarSocioInvestidor, aplicarInvestimento, resgatarInvestimento } = require('./financeiro');
 
@@ -92,6 +99,10 @@ exports.gravarPodcast            = gravarPodcast;
 exports.contratarSeguroMalpractice = contratarSeguroMalpractice;
 exports.abrirCasoProBono         = abrirCasoProBono;
 exports.registrarAlumni          = registrarAlumni;
+exports.confeccionarObra         = confeccionarObra;
+exports.publicarLivro            = publicarLivro;
+exports.citarObra                = citarObra;
+exports.obterObrasPublicas       = obterObrasPublicas;
 exports.tickMensal               = tickMensal;
 // GDD Seção 31-33 — Financeiro Avançado
 exports.anteciparHonorarios      = anteciparHonorarios;

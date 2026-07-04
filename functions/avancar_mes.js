@@ -26,6 +26,7 @@ const _skillsJur             = require('./skills');
 const _peticoes              = require('./peticoes');
 const _genericas             = require('./peticoes_genericas');
 const _perfis                = require('./perfis');
+const { processarRoyaltiesLivros } = require('./artigos_livros');
 
 const COOLDOWN_JANEIRO_MIN = 60;
 const ENERGIA_TOTAL        = 100;
@@ -1416,6 +1417,20 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
       corpo:   `Seu período no ${j.intercambio_destino?.toUpperCase()} terminou. +${dOpt.bonus_rep} Rep e +3 em ${dOpt.bonus_area || 'skills'}.`,
       tipo:    'positivo',
     });
+  }
+
+  // ── ROYALTIES DE LIVROS (GDD v5.1 §31-34) ──
+  try {
+    const royalties = await processarRoyaltiesLivros(db, uid, mesGlobal);
+    if (royalties > 0) {
+      mensagens.push({
+        assunto: '📗 Royalties recebidos',
+        corpo:   `Você recebeu R$${royalties.toLocaleString('pt-BR')} em royalties de livros este mês.`,
+        tipo:    'positivo',
+      });
+    }
+  } catch (e) {
+    logger.warn('[ROYALTIES] Erro ao processar royalties:', e.message);
   }
 
   await _commit(db, uid, updates, mensagens, novoMes, novoAno);
