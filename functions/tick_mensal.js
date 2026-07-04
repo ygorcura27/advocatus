@@ -609,9 +609,11 @@ async function atualizarRankings(db) {
   const categorias = [
     { id: 'reputacao',  campo: 'reputacao',           label: 'Reputação' },
     { id: 'dinheiro',   campo: 'dinheiro',             label: 'Patrimônio' },
+    { id: 'wins',       campo: 'wins',                 label: 'Vitórias' },
     { id: 'networking', campo: 'networking',           label: 'Networking' },
-    { id: 'academico',  campo: 'prestigio_academico',  label: 'Prestígio Acadêmico' },
   ];
+
+  const mesGlobal = (await db.collection('config').doc('server').get()).data()?.mes_global || 0;
 
   for (const cat of categorias) {
     try {
@@ -625,10 +627,11 @@ async function atualizarRankings(db) {
         return {
           pos:           i + 1,
           uid:           d.uid,
+          profile_id:    d.profile_id || null,
           nome:          d.nome_personagem || d.nome || '—',
           valor:         d[cat.campo] || 0,
           cargo_id:      d.cargo_id || 'est',
-          escritorio_id: d.escritorio_id || null,
+          escritorio_nome: d.escritorio_nome || null,
           especialidade: d.especialidade || '—',
         };
       });
@@ -636,8 +639,9 @@ async function atualizarRankings(db) {
       await db.collection('rankings').doc(cat.id).set({
         tipo:           cat.id,
         label:          cat.label,
+        top10:          top.slice(0, 10),  // Charts do servidor (GDD v5.1 §14)
         top100:         top,
-        atualizado_mes: (await db.collection('config').doc('server').get()).data()?.mes_global || 0,
+        atualizado_mes: mesGlobal,
         atualizado_em:  new Date().toISOString(),
       });
     } catch (err) {

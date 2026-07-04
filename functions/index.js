@@ -25,7 +25,9 @@ const { montarSetlist, resolverEventoJulgamento } = require('./setlist');
 // GDD v5.1 — Petições Genéricas Globais
 const { obterPeticaoGenerica } = require('./peticoes_genericas');
 // GDD v5.1 — Identificação única de personagens (profile_id §39-40)
-const { buscarPerfil } = require('./perfis');
+const { buscarPerfil }  = require('./perfis');
+// GDD v5.1 — Charts do servidor (§14)
+const { obterCharts }   = require('./charts');
 const { anteciparHonorarios, contratarLinhaCredito, pagarLinhaCredito,
         contratarSocioInvestidor, aplicarInvestimento, resgatarInvestimento } = require('./financeiro');
 
@@ -57,6 +59,7 @@ exports.adicionarCoAutor         = adicionarCoAutor;
 exports.contratarParecerista     = contratarParecerista;
 exports.obterPeticaoGenerica     = obterPeticaoGenerica;
 exports.buscarPerfil             = buscarPerfil;
+exports.obterCharts              = obterCharts;
 exports.tickMensal               = tickMensal;
 // GDD Seção 31-33 — Financeiro Avançado
 exports.anteciparHonorarios      = anteciparHonorarios;
