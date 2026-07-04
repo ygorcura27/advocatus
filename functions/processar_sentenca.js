@@ -385,11 +385,13 @@ async function _processarSentencaSetlist(db, processoRef, jogadorRef, p, j, uid,
     encerrado_mes:   null,
   });
 
-  // Atualizar fama das petições usadas
+  // Atualizar fama das petições usadas (co-autoria: repDelta distribuído proporcionalmente)
   const peticoesUsadas = (p.setlist || [])
     .filter(s2 => s2.tipo === 'peticao' && s2.peticao_id)
     .map(s2 => s2.peticao_id);
-  await Promise.all(peticoesUsadas.map(pid => atualizarFama(db, pid, resultado, instancia)));
+  await Promise.all(peticoesUsadas.map(pid =>
+    atualizarFama(db, pid, resultado, instancia, { repDelta, primaryUid: uid })
+  ));
 
   // XP de Practice Area
   try { await aplicarXpPracticeArea(db, uid, tipoCaso, resultado); } catch(e) { log.warn('XP area:', e.message); }

@@ -210,6 +210,16 @@ function calcularNotaPeticao(peticao, skJur, jogador, escId) {
   return Math.max(1, Math.min(26, Math.round(resultado)));
 }
 
+// ─── Cap de reputação por cargo (mesma tabela de processar_sentenca) ─────────
+
+const REP_CAP_PET = {
+  est:30, jnr:40, pln:50, snr:60, asc:70, soc:80, snm:90,
+  jsub:40, jtit:55, dsb:35, mstj:45,
+  padj:35, prom:45, pjus:55, pgj:65,
+  dadj:55, def:70, dch:85, dge:100,
+};
+function repCapDoCargo(cargoId) { return REP_CAP_PET[cargoId] || 55; }
+
 // ─── Fama: crescimento com teto por instância ────────────────────────────────
 
 const MULT_INSTANCIA = { trial: 1.0, appeals: 1.5, circuit: 2.5, supreme: 4.0 };
@@ -280,7 +290,7 @@ function calcularDeltaPopularidade(pop, resultado) {
  * Atualiza fama e popularidade da petição após uso num processo.
  * Fama só sobe; popularidade tem ganho E decaimento por uso.
  */
-async function atualizarFama(db, peticaoId, resultado, instancia) {
+async function atualizarFama(db, peticaoId, resultado, instancia, opts = {}) {
   const ref  = db.collection('peticoes').doc(peticaoId);
   const snap = await ref.get();
   if (!snap.exists) return;
@@ -319,6 +329,30 @@ async function atualizarFama(db, peticaoId, resultado, instancia) {
     usos_total:              FieldValue.increment(1),
     ultimo_uso:              new Date().toISOString(),
   });
+
+  // ── Co-autoria: distribui repDelta proporcional aos co-autores (GDD v5.1 §11) ──
+  const { repDelta, primaryUid } = opts;
+  if (repDelta && primaryUid && Array.isArray(p.autores) && p.autores.length > 1) {
+    const coautores = p.autores.filter(a => a.uid !== primaryUid);
+    await Promise.all(coautores.map(async (a) => {
+      if (!a.uid || !a.contribuicao_pct) return;
+      const coRep = Math.floor(Math.abs(repDelta) * (a.contribuicao_pct / 100));
+      if (coRep <= 0) return;
+      try {
+        const coSnap = await db.collection('jogadores').doc(a.uid).get();
+        if (!coSnap.exists) return;
+        const coDados = coSnap.data();
+        const coCap   = repCapDoCargo(coDados.cargo_id);
+        const coRepAtual = coDados.reputacao || 30;
+        const coRepNova  = repDelta > 0
+          ? Math.min(coCap, coRepAtual + coRep)
+          : Math.max(0, coRepAtual - coRep);
+        await db.collection('jogadores').doc(a.uid).update({ reputacao: coRepNova });
+      } catch (e) {
+        logger.warn(`[CO-AUTORIA] Erro ao distribuir rep para ${a.uid}:`, e.message);
+      }
+    }));
+  }
 }
 
 // ─── Popularidade: decaimento mensal ─────────────────────────────────────────
@@ -392,6 +426,7 @@ exports.componerPeticao = onCall({ region: 'southamerica-east1' }, async (reques
 
   const novaPeticao = {
     jogador_uid:      uid,
+    autores:          [{ uid, contribuicao_pct: 100 }],  // co-autoria GDD v5.1
     titulo:           titulo || nomeAuto,
     nome:             titulo || nomeAuto,   // alias para compat com UI existente
     titulo_travado:   false,
@@ -434,6 +469,75 @@ exports.componerPeticao = onCall({ region: 'southamerica-east1' }, async (reques
 
   logger.info(`[CONFECCIONAR] ${uid} → ${document_type}/${practice_area}/${estiloValido}, finaliza mês ${mesConclusao}`);
   return { ok: true, peticao_id: ref.id, mes_conclusao: mesConclusao, dias: 30 };
+});
+
+// ─── Callable: adicionarCoAutor (GDD v5.1 §11) ───────────────────────────────
+
+exports.adicionarCoAutor = onCall({ region: 'southamerica-east1' }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
+
+  const uid = request.auth.uid;
+  const db  = getFirestore();
+  const { peticao_id, coautor_uid, contribuicao_pct } = request.data || {};
+
+  if (!peticao_id || !coautor_uid || !contribuicao_pct) {
+    throw new HttpsError('invalid-argument', 'peticao_id, coautor_uid e contribuicao_pct são obrigatórios.');
+  }
+  if (coautor_uid === uid) {
+    throw new HttpsError('invalid-argument', 'Você já é o autor principal.');
+  }
+  const pct = Number(contribuicao_pct);
+  if (!Number.isInteger(pct) || pct < 5 || pct > 49) {
+    throw new HttpsError('invalid-argument', 'contribuicao_pct deve ser um inteiro entre 5 e 49.');
+  }
+
+  const petRef  = db.collection('peticoes').doc(peticao_id);
+  const petSnap = await petRef.get();
+  if (!petSnap.exists) throw new HttpsError('not-found', 'Petição não encontrada.');
+
+  const pet = petSnap.data();
+  if (pet.jogador_uid !== uid) {
+    throw new HttpsError('permission-denied', 'Apenas o autor principal pode adicionar co-autores.');
+  }
+  if (pet.status !== 'em_composicao') {
+    throw new HttpsError('failed-precondition', 'Só é possível adicionar co-autores enquanto a petição está em confecção.');
+  }
+
+  // Verifica que o co-autor existe e pertence ao mesmo escritório
+  const coSnap = await db.collection('jogadores').doc(coautor_uid).get();
+  if (!coSnap.exists) throw new HttpsError('not-found', 'Co-autor não encontrado.');
+
+  const coJogador = coSnap.data();
+  const escPrimario = (await db.collection('jogadores').doc(uid).get()).data();
+  const mesmoEscritorioEmpregado = escPrimario.escritorio_empregado_id &&
+    escPrimario.escritorio_empregado_id === coJogador.escritorio_empregado_id;
+  const mesmoEscritorioProprio   = escPrimario.escritorio_proprio_id &&
+    (escPrimario.escritorio_proprio_id === coJogador.escritorio_empregado_id ||
+     escPrimario.escritorio_proprio_id === coJogador.escritorio_proprio_id);
+  if (!mesmoEscritorioEmpregado && !mesmoEscritorioProprio) {
+    throw new HttpsError('failed-precondition', 'Co-autor deve pertencer ao mesmo escritório.');
+  }
+
+  // Recalcula percentuais — não pode ultrapassar 100%
+  const autoresAtuais = Array.isArray(pet.autores) ? pet.autores : [{ uid, contribuicao_pct: 100 }];
+  const jaExiste = autoresAtuais.find(a => a.uid === coautor_uid);
+  if (jaExiste) throw new HttpsError('already-exists', 'Co-autor já adicionado a esta petição.');
+
+  const totalJaCedido = autoresAtuais.filter(a => a.uid !== uid)
+    .reduce((s, a) => s + (a.contribuicao_pct || 0), 0);
+  if (totalJaCedido + pct > 70) {
+    throw new HttpsError('failed-precondition', `Máximo de 70% pode ser cedido a co-autores (já cedidos: ${totalJaCedido}%).`);
+  }
+
+  const novoAutores = autoresAtuais.map(a =>
+    a.uid === uid ? { ...a, contribuicao_pct: a.contribuicao_pct - pct } : a
+  );
+  novoAutores.push({ uid: coautor_uid, contribuicao_pct: pct });
+
+  await petRef.update({ autores: novoAutores });
+
+  logger.info(`[CO-AUTORIA] ${uid} adicionou ${coautor_uid} (${pct}%) em petição ${peticao_id}`);
+  return { ok: true, autores: novoAutores };
 });
 
 // ─── Callable: peticaoGenerica (Etapa 8) ─────────────────────────────────────
