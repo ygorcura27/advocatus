@@ -910,6 +910,66 @@ exports.retirarPeticaoMercado = onCall({ region: 'southamerica-east1' }, async (
   return { ok: true };
 });
 
+// ─── Repertório do Escritório (GDD v5.1 — pool compartilhado de petições) ────
+
+exports.adicionarPeticaoRepertorio = onCall({ region: 'southamerica-east1' }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
+  const uid = request.auth.uid;
+  const db  = getFirestore();
+  const { peticao_id } = request.data || {};
+  if (!peticao_id) throw new HttpsError('invalid-argument', 'peticao_id obrigatório.');
+
+  const [petSnap, jogSnap] = await Promise.all([
+    db.collection('peticoes').doc(peticao_id).get(),
+    db.collection('jogadores').doc(uid).get(),
+  ]);
+  if (!petSnap.exists) throw new HttpsError('not-found', 'Petição não encontrada.');
+  if (!jogSnap.exists) throw new HttpsError('not-found', 'Jogador não encontrado.');
+
+  const pet = petSnap.data();
+  const jog = jogSnap.data();
+  const escId = jog.escritorio_proprio_id || jog.escritorio_empregado_id;
+
+  if (pet.jogador_uid !== uid) throw new HttpsError('permission-denied', 'Você não é o autor desta petição.');
+  if (pet.status !== 'pronta') throw new HttpsError('failed-precondition', 'Só petições prontas podem ser adicionadas ao repertório.');
+  if (!escId) throw new HttpsError('failed-precondition', 'Você precisa fazer parte de um escritório.');
+  if (pet.no_repertorio) throw new HttpsError('failed-precondition', 'Petição já está no repertório do escritório.');
+
+  await petSnap.ref.update({
+    no_repertorio: true,
+    escritorio_id: escId,
+    adicionado_repertorio_em: new Date().toISOString(),
+  });
+  return { ok: true, escritorio_id: escId };
+});
+
+exports.removerPeticaoRepertorio = onCall({ region: 'southamerica-east1' }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
+  const uid = request.auth.uid;
+  const db  = getFirestore();
+  const { peticao_id } = request.data || {};
+  if (!peticao_id) throw new HttpsError('invalid-argument', 'peticao_id obrigatório.');
+
+  const petSnap = await db.collection('peticoes').doc(peticao_id).get();
+  if (!petSnap.exists) throw new HttpsError('not-found', 'Petição não encontrada.');
+  const pet = petSnap.data();
+
+  const jogSnap = await db.collection('jogadores').doc(uid).get();
+  const jog = jogSnap.exists ? jogSnap.data() : {};
+  const meuEscId = jog.escritorio_proprio_id || jog.escritorio_empregado_id;
+  const ehDono = jog.escritorio_proprio_id && jog.escritorio_proprio_id === pet.escritorio_id;
+
+  if (pet.jogador_uid !== uid && !ehDono) {
+    throw new HttpsError('permission-denied', 'Só o autor ou o dono do escritório podem remover do repertório.');
+  }
+  if (!pet.no_repertorio || pet.escritorio_id !== meuEscId) {
+    throw new HttpsError('failed-precondition', 'Petição não está no repertório do seu escritório.');
+  }
+
+  await petSnap.ref.update({ no_repertorio: false });
+  return { ok: true };
+});
+
 // ─── Finalização de petições em composição (GDD v5.1 §6) ─────────────────────
 
 /**

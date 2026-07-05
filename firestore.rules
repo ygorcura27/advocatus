@@ -391,6 +391,18 @@ service cloud.firestore {
       allow read: if isAuth() && (
         resource.data.jogador_uid == request.auth.uid
         || resource.data.no_mercado == true
+        || (
+          resource.data.no_repertorio == true
+          && resource.data.escritorio_id != null
+          && (
+            isDono(get(/databases/$(database)/documents/escritorios/$(resource.data.escritorio_id)).data)
+            || isSocio(get(/databases/$(database)/documents/escritorios/$(resource.data.escritorio_id)).data)
+            || (
+              'funcionarios_uids' in get(/databases/$(database)/documents/escritorios/$(resource.data.escritorio_id)).data
+              && request.auth.uid in get(/databases/$(database)/documents/escritorios/$(resource.data.escritorio_id)).data.funcionarios_uids
+            )
+          )
+        )
       );
       // Toda escrita vai por Cloud Function (Admin SDK ignora estas regras)
       allow create, update, delete: if false;

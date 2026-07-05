@@ -72,6 +72,8 @@ function _renderSidebarLateral(painel) {
     nav.innerHTML = _perfilSideMenu(true);
   } else if (painel === 'escritorio') {
     nav.innerHTML = _escSideMenu('visao-geral', true);
+  } else if (painel === 'repertorio') {
+    nav.innerHTML = _escSideMenu('repertorio', true);
   } else if (painel === 'patrimonio' && window._patSideMenu) {
     nav.innerHTML = window._patSideMenu('visao-geral', true);
   } else if (painel === 'equipe' && window._equipeSideMenu) {
@@ -112,6 +114,10 @@ function _renderizar() {
     case 'peticoes':
       if (window.renderPeticoes) window.renderPeticoes(j, main);
       else main.innerHTML = '<div class="card" style="color:var(--ardosia2)">Carregando petições...</div>';
+      break;
+    case 'repertorio':
+      if (window.renderRepertorioEscritorio) window.renderRepertorioEscritorio(j, main);
+      else main.innerHTML = '<div class="card" style="color:var(--ardosia2)">Carregando repertório...</div>';
       break;
     case 'progressao':   renderProgressao(j, main);    break;
     case 'habilidades':  renderHabilidades(j, main);   break;
@@ -961,6 +967,10 @@ function _escSideMenu(ativo, semWrapper) {
       { id: 'clientes',       label: 'Clientes',       fn: "window.navTo('clientes',null)" },
       { id: 'oportunidades',  label: 'Oportunidades',  fn: "document.getElementById('esc-oportunidades-bloco')?.scrollIntoView({behavior:'smooth'})" },
       { id: 'processos',      label: 'Processos',      fn: "document.getElementById('esc-processos-bloco')?.scrollIntoView({behavior:'smooth'})" },
+    ]},
+    { titulo: 'Petições', links: [
+      { id: 'minhas-peticoes', label: 'Minhas Petições',           fn: "window.navTo('peticoes',null)" },
+      { id: 'repertorio',      label: 'Repertório do Escritório',  fn: "window.navTo('repertorio',null)" },
     ]},
     { titulo: 'Sócios', links: [
       { id: 'societario', label: 'Estrutura Societária', fn: "document.querySelector('.esc-donut-wrap')?.scrollIntoView({behavior:'smooth'})" },

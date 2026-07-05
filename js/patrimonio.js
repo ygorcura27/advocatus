@@ -456,7 +456,7 @@ window.renderLoja = function(j, el) {
       body = `<div style="font-size:.65rem;color:var(--ardosia)">Saldo insuficiente</div>`;
     }
 
-    return _card(it.img, it.n, it.n, body, jatem&&!isCong || usadoAno);
+    return _card(it.img, it.n, it.n, body, jatem&&!isCong || usadoAno, false);
   }
 
   el.innerHTML = `

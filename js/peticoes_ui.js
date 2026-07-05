@@ -89,27 +89,50 @@ window.renderPeticoes = async function(j, el) {
     );
 
     const peticoes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const emComposicao = peticoes.filter(p => p.status === 'em_composicao');
+    const prontasParaAdicionar = peticoes.filter(p => p.status === 'pronta' && !p.no_repertorio);
+    const temEscritorio = !!(j.escritorio_proprio_id || j.escritorio_empregado_id);
 
     el.innerHTML = `
       <div class="secao-header">
-        <div class="secao-titulo">📜 Petições</div>
+        <div class="secao-titulo">📜 Minhas Petições</div>
         <div style="display:flex;gap:.5rem">
+          ${temEscritorio ? `<button class="btn btn-ghost btn-sm" onclick="window.navTo('repertorio',null)">📚 Repertório do Escritório</button>` : ''}
           <button class="btn btn-ghost btn-sm" onclick="window.renderMercadoPeticoes(window.JOGADOR, document.getElementById('main-content'))">🏪 Mercado</button>
-          <button class="btn btn-prim btn-sm" onclick="window.abrirModalCompor()">+ Confeccionar</button>
         </div>
       </div>
 
       ${!j.oab ? _bannerBarExam(j) : ''}
       ${!j.oab ? _bannerPeticaoGenerica() : ''}
 
-      ${peticoes.length === 0
+      <div class="local-info-card" style="margin-bottom:1.2rem">
+        <div class="local-info-titulo">Compondo Petição</div>
+        <div class="local-info-desc" style="margin-bottom:0;padding-bottom:0;border-bottom:none">
+          Toda petição pronta pode virar a base de trabalho de todo o escritório — assim que finalizada, você escolhe se
+          quer adicioná-la ao repertório compartilhado. Você pode confeccionar novas petições a qualquer momento.
+        </div>
+        ${emComposicao.length
+          ? emComposicao.map(p => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-top:1px solid var(--borda-sub);margin-top:.6rem">
+              <div>
+                <div style="font-weight:600;font-size:.82rem;color:var(--navy)">${p.titulo || p.nome}</div>
+                <div style="font-size:.7rem;color:var(--txt3)">${DOC_LABELS[p.document_type]||p.document_type} · ${AREA_LABELS[p.practice_area]||p.practice_area}</div>
+              </div>
+              <span style="font-size:.72rem;color:var(--ouro2);font-weight:600">⏳ Finaliza no mês ${p.mes_conclusao}</span>
+            </div>`).join('')
+          : ''}
+        <button class="btn btn-prim btn-sm" style="margin-top:.8rem" onclick="window.abrirModalCompor()">+ Confeccionar Nova Petição</button>
+      </div>
+
+      <div class="secao-header">
+        <div class="secao-titulo" style="font-size:.88rem">Petições Prontas — ainda não adicionadas ao repertório</div>
+      </div>
+
+      ${prontasParaAdicionar.length === 0
         ? `<div class="card" style="text-align:center;color:var(--ardosia2);padding:2rem">
-            Nenhuma petição composta ainda.<br>
-            <button class="btn btn-ghost btn-sm" style="margin-top:1rem" onclick="window.abrirModalCompor()">
-              Compor primeira petição
-            </button>
+            Nenhuma petição pronta aguardando repertório no momento.
           </div>`
-        : `<div class="pet-grid">${peticoes.map(_cardPeticao).join('')}</div>`
+        : `<div class="pet-grid">${prontasParaAdicionar.map(_cardPeticao).join('')}</div>`
       }
 
       ${_modalComporHTML()}
@@ -247,6 +270,107 @@ window.comprarPeticaoDeMercado = async function(peticaoId, nome, preco) {
   } catch(e) { toast('Erro: ' + (e.message || e), 'erro'); }
 };
 
+// ─── Repertório do Escritório (Telas 1/4 — estilo "Repertório do artista") ───
+
+window.renderRepertorioEscritorio = async function(j, el) {
+  const escId = j.escritorio_proprio_id || j.escritorio_empregado_id;
+  if (!escId) {
+    el.innerHTML = `<div class="card" style="text-align:center;padding:2rem;color:var(--txt3)">
+      Você precisa fazer parte de um escritório para ter um repertório de petições.
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = `<div style="padding:1.5rem;text-align:center;color:var(--ardosia)">Carregando repertório…</div>`;
+
+  try {
+    const snap = await getDocs(
+      query(collection(db, 'peticoes'),
+        where('no_repertorio', '==', true),
+        where('escritorio_id', '==', escId))
+    );
+    const todas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    window._repertorioCache = todas;
+    _renderRepertorioTabela(todas, 'todas', 'todos');
+  } catch(e) {
+    el.innerHTML = `<div class="card" style="color:var(--erro)">Erro ao carregar repertório: ${e.message}</div>`;
+  }
+
+  function _renderRepertorioTabela(lista, filtroArea, filtroTipo) {
+    const areas = ['todas', ...Object.keys(AREA_LABELS)];
+    const tipos = ['todos', ...Object.keys(DOC_LABELS)];
+    const filtradas = lista.filter(p =>
+      (filtroArea === 'todas' || p.practice_area === filtroArea) &&
+      (filtroTipo === 'todos' || p.document_type === filtroTipo));
+
+    el.innerHTML = `
+      <div class="secao-header">
+        <div class="secao-titulo">📚 Repertório de Petições — Escritório</div>
+        <button class="btn btn-ghost btn-sm" onclick="window.navTo('peticoes',null)">← Minhas Petições</button>
+      </div>
+
+      <div class="esc-card-bloco" style="margin-bottom:1rem">
+        <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:center">
+          <select id="rep-filtro-area" style="font-size:.78rem;padding:.35rem .6rem;border-radius:var(--r);border:var(--borda);background:var(--surface);color:var(--txt)">
+            ${areas.map(a => `<option value="${a}" ${a===filtroArea?'selected':''}>${a==='todas'?'Todas as áreas':AREA_LABELS[a]}</option>`).join('')}
+          </select>
+          <select id="rep-filtro-tipo" style="font-size:.78rem;padding:.35rem .6rem;border-radius:var(--r);border:var(--borda);background:var(--surface);color:var(--txt)">
+            ${tipos.map(t => `<option value="${t}" ${t===filtroTipo?'selected':''}>${t==='todos'?'Todos os tipos':DOC_LABELS[t]}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+
+      ${filtradas.length === 0
+        ? `<div class="card" style="text-align:center;padding:2rem;color:var(--txt3)">Nenhuma petição no repertório com esse filtro.</div>`
+        : `<table class="ranking-tabela" style="margin-bottom:1rem">
+            <thead>
+              <tr>
+                <th style="width:26px"><input type="checkbox" id="rep-sel-todas"></th>
+                <th>Petição</th>
+                <th>Área</th>
+                <th>Tipo</th>
+                <th class="val-col">Nota Efetiva</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filtradas.map(p => `
+                <tr>
+                  <td><input type="checkbox" class="rep-sel-item" value="${p.id}"></td>
+                  <td style="cursor:pointer;color:var(--navy3);font-weight:600" onclick="window.renderPeticaoDetalhe('${p.id}', window.JOGADOR, document.getElementById('main-content'))">${p.titulo || p.nome}</td>
+                  <td>${AREA_LABELS[p.practice_area]||p.practice_area}</td>
+                  <td>${DOC_LABELS[p.document_type]||p.document_type}</td>
+                  <td class="val-col">${p.nota_teto != null ? _calcNotaEfetiva(p) : (p.nota_base||1)}/26</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+          <button class="btn btn-sm btn-ghost" onclick="window._descartarSelecionadasRepertorio()">Descartar selecionadas</button>`
+      }`;
+
+    document.getElementById('rep-filtro-area')?.addEventListener('change', (e) => {
+      _renderRepertorioTabela(window._repertorioCache, e.target.value, document.getElementById('rep-filtro-tipo').value);
+    });
+    document.getElementById('rep-filtro-tipo')?.addEventListener('change', (e) => {
+      _renderRepertorioTabela(window._repertorioCache, document.getElementById('rep-filtro-area').value, e.target.value);
+    });
+    document.getElementById('rep-sel-todas')?.addEventListener('change', (e) => {
+      document.querySelectorAll('.rep-sel-item').forEach(cb => { cb.checked = e.target.checked; });
+    });
+
+    window._descartarSelecionadasRepertorio = async function() {
+      const ids = [...document.querySelectorAll('.rep-sel-item:checked')].map(cb => cb.value);
+      if (ids.length === 0) { toast('Selecione ao menos uma petição.', 'erro'); return; }
+      if (!confirm(`Remover ${ids.length} petição(ões) do repertório do escritório?`)) return;
+      try {
+        for (const id of ids) {
+          await httpsCallable(functions, 'removerPeticaoRepertorio')({ peticao_id: id });
+        }
+        toast('Petições removidas do repertório.', 'ok', 3000);
+        window.renderRepertorioEscritorio(window.JOGADOR, document.getElementById('main-content'));
+      } catch(e) { toast('Erro: ' + (e.message || e), 'erro'); }
+    };
+  }
+};
+
 // ─── Card de petição ──────────────────────────────────────────────────────────
 
 function _calcNotaEfetiva(p) {
@@ -275,7 +399,7 @@ function _cardPeticao(p) {
   const estiloLabel  = p.estilo_escrita ? (ESTILO_LABELS[p.estilo_escrita] || p.estilo_escrita) : null;
 
   return `
-    <div class="card pet-card" onclick="window.abrirDetalhePeticao('${p.id}')">
+    <div class="card pet-card" onclick="window.renderPeticaoDetalhe('${p.id}', window.JOGADOR, document.getElementById('main-content'))">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.5rem">
         <div>
           <div style="font-weight:600;font-size:.85rem">${p.titulo || p.nome}${gerLabel}</div>
@@ -346,6 +470,78 @@ function _popCor(pop) {
   if (pop >= 16) return 'var(--laranja1)';
   return 'var(--erro)';
 }
+
+// ─── Página de detalhe de uma petição (Tela 3 — estilo página de música do Popmundo) ──
+
+window.renderPeticaoDetalhe = async function(peticaoId, j, el) {
+  el.innerHTML = `<div style="padding:1.5rem;text-align:center;color:var(--ardosia)">Carregando petição…</div>`;
+  try {
+    const petSnap = await getDoc(doc(db, 'peticoes', peticaoId));
+    if (!petSnap.exists()) { el.innerHTML = '<div class="card">Petição não encontrada.</div>'; return; }
+    const p = petSnap.data();
+
+    const temNotaTeto = p.nota_teto != null;
+    const notaEfetiva = temNotaTeto ? _calcNotaEfetiva(p) : (p.nota_base || 1);
+    const notaTeto    = p.nota_teto ?? p.teto_nota ?? 12;
+    const souAutor    = p.jogador_uid === (j.uid || window.JOGADOR_UID);
+    const podeAdicionar = souAutor && p.status === 'pronta' && !p.no_repertorio && (j.escritorio_proprio_id || j.escritorio_empregado_id);
+    const estiloLabel = p.estilo_escrita ? (ESTILO_LABELS[p.estilo_escrita] || p.estilo_escrita) : null;
+
+    el.innerHTML = `
+      <div style="margin-bottom:.8rem"><button class="btn btn-ghost btn-sm" onclick="window.renderPeticoes(window.JOGADOR, document.getElementById('main-content'))">← Minhas Petições</button></div>
+
+      <div class="local-info-card">
+        <div class="local-info-titulo">${p.titulo || p.nome}</div>
+        <div class="local-info-desc">
+          ${DOC_LABELS[p.document_type]||p.document_type} elaborada${estiloLabel ? ` em estilo ${estiloLabel}` : ''}.
+          ${p.tese_central ? `Tese central: <b>${p.tese_central}</b>.` : ''}
+          ${p.geracao > 1 ? ` Esta é a variação de geração ${p.geracao}.` : ''}
+        </div>
+        <div class="local-info-linha"><span class="local-info-label">Área do Direito</span><span class="local-info-valor">${AREA_LABELS[p.practice_area]||p.practice_area}</span></div>
+        ${estiloLabel ? `<div class="local-info-linha"><span class="local-info-label">Estilo de Escrita</span><span class="local-info-valor">${estiloLabel}</span></div>` : ''}
+        <div class="local-info-linha"><span class="local-info-label">${temNotaTeto ? 'Nota Efetiva' : 'Nota Base'}</span><span class="local-info-valor">${notaEfetiva}/26</span></div>
+        <div class="local-info-linha"><span class="local-info-label">Nota Teto</span><span class="local-info-valor">${notaTeto}/26</span></div>
+        ${p.tier_argumentacao ? `<div class="local-info-linha"><span class="local-info-label">Argumentação / Redação</span><span class="local-info-valor">${p.tier_argumentacao} / ${p.tier_redacao||'—'}</span></div>` : ''}
+        <div class="local-info-linha"><span class="local-info-label">Status</span><span class="local-info-valor">${p.status === 'em_composicao' ? '⏳ Em composição' : p.no_repertorio ? '📚 No repertório do escritório' : p.no_mercado ? '🏪 No mercado' : '✓ Pronta'}</span></div>
+        <div class="local-info-linha"><span class="local-info-label">Usos / Vitórias</span><span class="local-info-valor">${p.usos_total||0} / ${p.vitorias||0}</span></div>
+      </div>
+
+      <div class="esc-card-bloco" style="margin-bottom:1.1rem">
+        <div class="secao-header" style="margin-bottom:.6rem"><div class="secao-titulo" style="font-size:.85rem">Fama e Popularidade</div></div>
+        <div style="margin-bottom:.6rem">
+          <div style="font-size:.72rem;display:flex;justify-content:space-between;margin-bottom:.2rem">
+            <span>Fama ${p.fama||0}/100</span><span>Teto: ${p.fama_teto_desbloqueado||39}</span>
+          </div>
+          ${barHTML(p.fama||0, 100, 'var(--ouro)')}
+        </div>
+        <div>
+          <div style="font-size:.72rem;display:flex;justify-content:space-between;margin-bottom:.2rem">
+            <span>Popularidade ${p.popularidade||0}/100</span>
+            <span style="color:${(p.popularidade||0)<16?'var(--erro)':'inherit'}">${_popLabel(p.popularidade||0)}</span>
+          </div>
+          ${barHTML(p.popularidade||0, 100, _popCor(p.popularidade||0))}
+        </div>
+      </div>
+
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+        ${podeAdicionar ? `<button class="btn btn-prim btn-sm" onclick="window.adicionarAoRepertorio('${peticaoId}')">📚 Adicionar ao Repertório do Escritório</button>` : ''}
+        ${souAutor && !p.generica && p.status === 'pronta' ? `<button class="btn btn-ghost btn-sm" onclick="window.abrirModalVariar('${peticaoId}')">Variar</button>` : ''}
+        ${souAutor && p.status === 'pronta' ? `<button class="btn btn-ghost btn-sm" onclick="window.abrirModalEmprestar('${peticaoId}')">Emprestar a NPC</button>` : ''}
+        ${souAutor && p.status === 'pronta' && !p.no_mercado ? `<button class="btn btn-ghost btn-sm" onclick="window.abrirModalVender('${peticaoId}')">Vender</button>` : ''}
+      </div>`;
+  } catch(e) {
+    el.innerHTML = `<div class="card" style="color:var(--erro)">Erro: ${e.message}</div>`;
+  }
+};
+
+window.adicionarAoRepertorio = async function(peticaoId) {
+  if (!confirm('Adicionar esta petição ao repertório compartilhado do escritório? Qualquer sócio ou membro poderá usá-la para montar setlists de processos.')) return;
+  try {
+    await httpsCallable(functions, 'adicionarPeticaoRepertorio')({ peticao_id: peticaoId });
+    toast('📚 Petição adicionada ao repertório do escritório!', 'ok', 4000);
+    if (window.JOGADOR) window.renderPeticaoDetalhe(peticaoId, window.JOGADOR, document.getElementById('main-content'));
+  } catch(e) { toast('Erro: ' + (e.message || e), 'erro'); }
+};
 
 // ─── Modal Compor ─────────────────────────────────────────────────────────────
 
@@ -660,11 +856,14 @@ window.matricularPrep = async function() {
 window.renderSetlistBuilder = async function(processoId, j, containerEl) {
   containerEl.innerHTML = '<div style="padding:1rem;color:var(--ardosia2)">Carregando setlist…</div>';
 
+  const escId = j.escritorio_proprio_id || j.escritorio_empregado_id;
+  const peticoesQuery = escId
+    ? query(collection(db, 'peticoes'), where('no_repertorio', '==', true), where('escritorio_id', '==', escId))
+    : query(collection(db, 'peticoes'), where('jogador_uid', '==', j.uid), where('status', '==', 'pronta'));
+
   const [procSnap, petSnap] = await Promise.all([
     getDoc(doc(db, 'processos', processoId)),
-    getDocs(query(collection(db, 'peticoes'),
-      where('jogador_uid', '==', j.uid),
-      where('status', '==', 'pronta'))),
+    getDocs(peticoesQuery),
   ]);
 
   if (!procSnap.exists()) { containerEl.innerHTML = '<div>Processo não encontrado.</div>'; return; }
@@ -679,31 +878,61 @@ window.renderSetlistBuilder = async function(processoId, j, containerEl) {
     slot: i + 1, tipo: null, peticao_id: null, acao_tipo: null
   }));
 
+  function _linhaSlot(s, i) {
+    const podeSubir = i > 0;
+    const podeDescer = i < slots.length - 1;
+    const setas = `
+      <button class="btn-setlist-seta" ${podeSubir?'':'disabled'} onclick="window._slotMover(${i},-1)" title="Subir">↑</button>
+      <button class="btn-setlist-seta" ${podeDescer?'':'disabled'} onclick="window._slotMover(${i},1)" title="Descer">↓</button>`;
+
+    if (s.tipo === 'peticao' && s.peticao_id) {
+      const pet = peticoes.find(p => p.id === s.peticao_id);
+      const nota = pet ? (pet.nota_teto != null ? _calcNotaEfetiva(pet) : (pet.nota_base||1)) : 0;
+      const notaTeto = pet ? (pet.nota_teto ?? pet.teto_nota ?? 12) : 26;
+      return `
+      <div class="setlist-slot">
+        <div class="setlist-slot-num">${i+1}</div>
+        <div class="setlist-slot-corpo">
+          <div class="setlist-slot-titulo">${pet?.titulo || pet?.nome || 'Petição'}</div>
+          <div class="setlist-slot-bar-wrap"><div class="setlist-slot-bar-fill" style="width:${Math.round(nota/notaTeto*100)}%"></div></div>
+        </div>
+        <div class="setlist-slot-acoes">${setas}<button class="btn-setlist-seta" onclick="window._slotRemover(${i})">✕</button></div>
+      </div>`;
+    }
+    if (s.tipo === 'acao_processual' && s.acao_tipo) {
+      return `
+      <div class="setlist-slot">
+        <div class="setlist-slot-num">${i+1}</div>
+        <div class="setlist-slot-corpo">
+          <div class="setlist-slot-titulo">${ACAO_LABELS[s.acao_tipo] || s.acao_tipo}</div>
+          <div style="font-size:.68rem;color:var(--txt4)">Ação processual</div>
+        </div>
+        <div class="setlist-slot-acoes">${setas}<button class="btn-setlist-seta" onclick="window._slotRemover(${i})">✕</button></div>
+      </div>`;
+    }
+    return `
+      <div class="setlist-slot setlist-slot-vazio">
+        <div class="setlist-slot-num">${i+1}</div>
+        <div class="setlist-slot-corpo" style="display:flex;gap:.4rem;flex-wrap:wrap">
+          <button class="btn btn-sm btn-ghost" onclick="window._slotAddPet(${i})">+ Adicionar Petição</button>
+          <button class="btn btn-sm btn-ghost" onclick="window._slotAddAcao(${i})">+ Adicionar Ação Processual</button>
+        </div>
+      </div>`;
+  }
+
   function _renderBuilder() {
     containerEl.innerHTML = `
       <div style="margin-bottom:1rem">
         <b>Setlist do Processo</b>
         <span style="font-size:.75rem;color:var(--ardosia2);margin-left:.5rem">Tier ${tier} · ${maxSlots} slots · ${proc.titulo || 'Processo'}</span>
+        ${escId ? `<div style="font-size:.68rem;color:var(--txt4);margin-top:.2rem">Petições disponíveis vêm do repertório do escritório.</div>` : ''}
       </div>
 
-      <div style="display:flex;flex-direction:column;gap:.5rem;margin-bottom:1rem">
-        ${slots.map((s, i) => `
-          <div class="setlist-slot" style="display:flex;gap:.5rem;align-items:center;background:var(--fundo2);border-radius:6px;padding:.5rem">
-            <div style="font-size:.72rem;color:var(--ardosia2);min-width:1.2rem">${i+1}</div>
-            ${s.tipo === 'peticao' && s.peticao_id
-              ? `<div style="flex:1;font-size:.78rem"><b>${peticoes.find(p=>p.id===s.peticao_id)?.nome || 'Petição'}</b></div>
-                 <button class="btn btn-sm btn-ghost" onclick="window._slotRemover(${i})">✕</button>`
-              : s.tipo === 'acao_processual' && s.acao_tipo
-              ? `<div style="flex:1;font-size:.78rem"><b>${ACAO_LABELS[s.acao_tipo] || s.acao_tipo}</b></div>
-                 <button class="btn btn-sm btn-ghost" onclick="window._slotRemover(${i})">✕</button>`
-              : `<div style="flex:1;display:flex;gap:.4rem;flex-wrap:wrap">
-                  <button class="btn btn-sm btn-ghost" onclick="window._slotAddPet(${i})">+ Petição</button>
-                  <button class="btn btn-sm btn-ghost" onclick="window._slotAddAcao(${i})">+ Ação</button>
-                </div>`}
-          </div>`).join('')}
+      <div class="setlist-lista">
+        ${slots.map((s, i) => _linhaSlot(s, i)).join('')}
       </div>
 
-      <button class="btn btn-prim btn-block" onclick="window._confirmarSetlist('${processoId}')">
+      <button class="btn btn-prim btn-block" style="margin-top:1rem" onclick="window._confirmarSetlist('${processoId}')">
         Montar Setlist e Avançar
       </button>`;
 
@@ -713,9 +942,17 @@ window.renderSetlistBuilder = async function(processoId, j, containerEl) {
       _renderBuilder();
     };
 
+    window._slotMover = (i, dir) => {
+      const j2 = i + dir;
+      if (j2 < 0 || j2 >= slots.length) return;
+      [slots[i], slots[j2]] = [slots[j2], slots[i]];
+      slots.forEach((s, idx) => { s.slot = idx + 1; });
+      _renderBuilder();
+    };
+
     window._slotAddPet = (i) => {
       const lista = peticoes.map(p =>
-        `${p.nome} [${DOC_LABELS[p.document_type]||p.document_type}] base:${p.nota_base}`
+        `${p.titulo || p.nome} [${DOC_LABELS[p.document_type]||p.document_type}]`
       );
       const idx = lista.length === 0
         ? -1

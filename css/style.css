@@ -2217,6 +2217,27 @@ a:hover { color: var(--navy); }
   color: var(--txt);
 }
 
+/* ── Setlist (estilo Popmundo: lista numerada com reordenar) ── */
+.setlist-lista { display: flex; flex-direction: column; gap: .5rem; }
+.setlist-slot {
+  display: flex; align-items: center; gap: .6rem;
+  background: var(--surface); border: var(--borda); border-radius: var(--r);
+  padding: .55rem .7rem;
+}
+.setlist-slot-vazio { border-style: dashed; }
+.setlist-slot-num { font-family: var(--font-mono); font-size: .72rem; color: var(--txt4); min-width: 1.4rem; text-align: center; flex-shrink: 0; }
+.setlist-slot-corpo { flex: 1; min-width: 0; }
+.setlist-slot-titulo { font-size: .82rem; font-weight: 600; color: var(--navy); margin-bottom: .25rem; }
+.setlist-slot-bar-wrap { height: 6px; background: var(--bg2); border-radius: 3px; overflow: hidden; }
+.setlist-slot-bar-fill { height: 100%; background: linear-gradient(90deg, var(--navy3), var(--ouro2)); border-radius: 3px; }
+.setlist-slot-acoes { display: flex; gap: .25rem; flex-shrink: 0; }
+.btn-setlist-seta {
+  background: var(--bg2); border: 1px solid var(--borda-sub); border-radius: var(--r);
+  color: var(--txt2); font-size: .72rem; padding: .2rem .45rem; cursor: pointer; transition: all .15s;
+}
+.btn-setlist-seta:hover:not(:disabled) { background: var(--navy-light); color: var(--navy); }
+.btn-setlist-seta:disabled { opacity: .35; cursor: not-allowed; }
+
 /* Setlist builder slots */
 .setlist-slot {
   transition: background .1s;
