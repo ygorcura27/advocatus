@@ -275,10 +275,11 @@ function _perfilSideMenu(semWrapper) {
       { label: 'Investimentos', fn: "window.navTo('financeiro',null)" },
     ]},
     { titulo: 'Social', links: [
-      { label: 'Vagas',      fn: "window.navTo('vagas',null)" },
-      { label: 'Rankings',   fn: "window.navTo('ranking',null)" },
-      { label: 'Mensagens',  fn: "window.navTo('inbox',null)" },
-      { label: 'Loja',       fn: "window.navTo('loja',null)" },
+      { label: 'Vagas',        fn: "window.navTo('vagas',null)" },
+      { label: 'Rankings',     fn: "window.navTo('ranking',null)" },
+      { label: 'Mensagens',    fn: "window.navTo('inbox',null)" },
+      { label: 'Loja',         fn: "window.navTo('loja',null)" },
+      { label: 'Vida Pessoal', fn: "window.navTo('vida_pessoal',null)" },
     ]},
   ];
   const grupos = GRUPOS.map(g => `
