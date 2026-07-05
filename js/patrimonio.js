@@ -114,9 +114,9 @@ function _carroEhProprío(j, id) {
   return false;
 }
 
-// ── helper: monta um card com imagem + corpo ──────────────
-function _card(img, alt, nome, bodyHtml, ativo) {
-  const imgEl = img
+// ── helper: monta um card com imagem + corpo (ou só texto, se mostrarImagem=false) ──
+function _card(img, alt, nome, bodyHtml, ativo, mostrarImagem = true) {
+  const imgEl = !mostrarImagem ? '' : img
     ? `<img class="pc-img" src="${img}" alt="${alt}" loading="lazy">`
     : `<div class="pc-icon">🏠</div>`;
   return `<div class="pat-card${ativo?' ativo':''}">
@@ -125,6 +125,52 @@ function _card(img, alt, nome, bodyHtml, ativo) {
       <div class="pc-nome">${nome}</div>
       ${bodyHtml}
     </div>
+  </div>`;
+}
+
+// Menu lateral categorizado do Patrimônio (mesmo padrão do Escritório: grupos de links)
+window._patSideMenu = _patSideMenu;
+function _patSideMenu(ativo, semWrapper) {
+  const GRUPOS = [
+    { titulo: 'Patrimônio', links: [
+      { id: 'visao-geral', label: 'Visão Geral', fn: "window.navTo('patrimonio',null)" },
+    ]},
+    { titulo: 'Moradia', links: [
+      { id: 'moradia', label: 'Ver Opções', fn: "document.getElementById('pat-moradia-secao')?.scrollIntoView({behavior:'smooth'})" },
+    ]},
+    { titulo: 'Transporte', links: [
+      { id: 'transporte', label: 'Ver Opções', fn: "document.getElementById('pat-transporte-secao')?.scrollIntoView({behavior:'smooth'})" },
+    ]},
+    { titulo: 'Escritório', links: [
+      { id: 'escritorio', label: 'Espaço de Trabalho', fn: "window.navTo('escritorio',null)" },
+    ]},
+  ];
+  const grupos = GRUPOS.map(g => `
+      <div class="nav-grupo">
+        <div class="nav-grupo-titulo">${g.titulo}</div>
+        ${g.links.map(l => `<div class="nav-item${l.id===ativo?' ativo':''}" onclick="${l.fn}">${l.label}</div>`).join('')}
+      </div>`).join('');
+  return semWrapper ? grupos : `<aside class="esc-side-menu">${grupos}</aside>`;
+}
+
+// Card "Informações básicas" da moradia atual (estilo página "Local" do Popmundo — só texto)
+function _moradiaInfoCard(mor, propria, alug, deslocamento) {
+  const ZONA_L = ZONAS[mor.zona]?.l || mor.zona || '—';
+  return `
+  <div class="local-info-card">
+    <div class="local-info-titulo">${mor.l}</div>
+    <div class="local-info-desc">${
+      mor.pais ? 'A casa dos seus pais. Sem custo, mas sem prestígio — advogados de carreira precisam de moradia própria.'
+      : propria ? 'Este imóvel é seu. Você pode vendê-lo a qualquer momento por 60% do valor de compra.'
+      : 'Você está alugando este imóvel. O aluguel é descontado automaticamente todo mês.'
+    }</div>
+    <div class="local-info-linha"><span class="local-info-label">Bairro</span><span class="local-info-valor">${mor.bairro||'—'}</span></div>
+    <div class="local-info-linha"><span class="local-info-label">Zona</span><span class="local-info-valor">${ZONA_L}</span></div>
+    <div class="local-info-linha"><span class="local-info-label">Situação</span><span class="local-info-valor">${mor.pais?'Com os pais':propria?'Casa própria':'Aluguel'}</span></div>
+    ${!mor.pais ? `<div class="local-info-linha"><span class="local-info-label">Valor do imóvel</span><span class="local-info-valor">${fmt(mor.v)}</span></div>` : ''}
+    ${!propria && !mor.pais ? `<div class="local-info-linha"><span class="local-info-label">Aluguel/mês</span><span class="local-info-valor">${fmt(alug)}</span></div>` : ''}
+    <div class="local-info-linha"><span class="local-info-label">Deslocamento até o escritório</span><span class="local-info-valor">${deslocamento>0?fmt(deslocamento)+'/mês':'Sem custo'}</span></div>
+    <div class="local-info-linha"><span class="local-info-label">Nível de perigo</span><span class="local-info-valor">${'⚠️'.repeat(mor.perigo||0) || 'Nenhum'}</span></div>
   </div>`;
 }
 
@@ -158,27 +204,28 @@ window.renderPatrimonio = function(j, el) {
   const saldoLiq   = (j.renda_calculada||0) - despTotal - custoVida;
 
   el.innerHTML = `
-    <div class="secao-header">
-      <div class="secao-titulo">🏠 Patrimônio</div>
-      <span class="secao-badge">Rep de patrimônio: +${_calcRepPat(j)}</span>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-bottom:1.2rem">
-      ${_card4('💰','Saldo',fmt(j.dinheiro||0),'money')}
-      ${_card4('📈','Renda',fmt(j.renda_calculada||0),'money')}
-      ${_card4('💸','Despesas',fmt(despTotal),'danger')}
-      ${_card4('🍽️','Custo vida',fmt(custoVida),'danger')}
-      ${_card4('🚇','Deslocamento',fmt(deslocamento),deslocamento>0?'danger':'')}
-      ${_card4('📊','Saldo líq.',fmt(saldoLiq),saldoLiq>=0?'money':'danger')}
-    </div>
+        <div class="secao-header">
+          <div class="secao-titulo">🏠 Patrimônio</div>
+          <span class="secao-badge">Rep de patrimônio: +${_calcRepPat(j)}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-bottom:1.2rem">
+          ${_card4('💰','Saldo',fmt(j.dinheiro||0),'money')}
+          ${_card4('📈','Renda',fmt(j.renda_calculada||0),'money')}
+          ${_card4('💸','Despesas',fmt(despTotal),'danger')}
+          ${_card4('🍽️','Custo vida',fmt(custoVida),'danger')}
+          ${_card4('🚇','Deslocamento',fmt(deslocamento),deslocamento>0?'danger':'')}
+          ${_card4('📊','Saldo líq.',fmt(saldoLiq),saldoLiq>=0?'money':'danger')}
+        </div>
 
-    <!-- MORADIA -->
-    <div class="secao-header" style="margin-top:.5rem">
-      <div class="secao-titulo">🏠 Moradia</div>
-      <span class="secao-badge">${compradaMor?'Casa própria':morId==='pais'?'Com os pais':'Aluguel'}</span>
-    </div>
-    ${j.prazo_sair_pais > 0 ? `<div style="background:rgba(139,38,53,.12);border:1px solid rgba(200,80,80,.35);border-radius:2px;padding:.6rem;margin-bottom:.6rem;font-size:.75rem;color:var(--verm3)">⚠️ Advogado(a) precisa de moradia própria! Prazo: ${Math.max(0,3-j.prazo_sair_pais)} mês(es) restante(s).</div>`:''}
-    <div class="grid-cards" style="margin-bottom:1.2rem">
-      ${MORADIAS.filter(m => m.pais ? (j.ci<=2||!j.oab) : true).map(m => {
+        <!-- MORADIA -->
+        <div class="secao-header" id="pat-moradia-secao" style="margin-top:.5rem">
+          <div class="secao-titulo">🏠 Moradia</div>
+          <span class="secao-badge">${compradaMor?'Casa própria':morId==='pais'?'Com os pais':'Aluguel'}</span>
+        </div>
+        ${_moradiaInfoCard(mor, !!compradaMor, despAlug, deslocamento)}
+        ${j.prazo_sair_pais > 0 ? `<div style="background:rgba(139,38,53,.12);border:1px solid rgba(200,80,80,.35);border-radius:2px;padding:.6rem;margin-bottom:.6rem;font-size:.75rem;color:var(--verm3)">⚠️ Advogado(a) precisa de moradia própria! Prazo: ${Math.max(0,3-j.prazo_sair_pais)} mês(es) restante(s).</div>`:''}
+        <div class="grid-cards" style="margin-bottom:1.2rem">
+          ${MORADIAS.filter(m => m.pais ? (j.ci<=2||!j.oab) : true).map(m => {
         const isAt    = m.id === morId;
         const alug    = m.pais ? 0 : calcAluguel(m.v);
         const propria = j.moradias_compradas?.[m.id];
@@ -196,13 +243,13 @@ window.renderPatrimonio = function(j, el) {
           body = `<button class="btn btn-sm btn-ghost" onclick="window.escolherMoradia('${m.id}','aluguel')">Alugar ${fmt(alug)}/mês</button>
             ${(j.dinheiro||0)>=m.v?`<button class="btn btn-sm btn-sec" onclick="window.escolherMoradia('${m.id}','compra')">Comprar ${fmt(m.v)}</button>`:''}`;
         }
-        return _card(m.img, m.l, m.l, body, isAt);
+        return _card(m.img, m.l, m.l, body, isAt, false);
       }).join('')}
-    </div>
+        </div>
 
-    <!-- TRANSPORTE -->
-    <div class="secao-header"><div class="secao-titulo">🚗 Transporte</div></div>
-    <div class="grid-cards" style="margin-bottom:1.2rem">
+        <!-- TRANSPORTE -->
+        <div class="secao-header" id="pat-transporte-secao"><div class="secao-titulo">🚗 Transporte</div></div>
+        <div class="grid-cards" style="margin-bottom:1.2rem">
       ${CARROS.map(cr => {
         const isAt    = cr.id === carId;
         const proprio = _carroEhProprío(j, cr.id);
@@ -232,9 +279,9 @@ window.renderPatrimonio = function(j, el) {
                  <button class="btn btn-sm btn-ghost" onclick="window.escolherCarro('${cr.id}','fin48')">48× ${fmt(p48)}/mês</button>`
               : `<div style="font-size:.6rem;color:var(--verm3)">Financiamento bloqueado (Serasa)</div>`}`;
         }
-        return _card(cr.img, cr.l, cr.l, body, isAt);
+        return _card(cr.img, cr.l, cr.l, body, isAt, false);
       }).join('')}
-    </div>`;
+        </div>`;
 };
 
 // ════════════════════════════════════════════════════════

@@ -24,12 +24,71 @@ window.addEventListener('gamestate:ready', () => {
   _renderizar();
 });
 
+// Menu lateral fixo (fallback) — cobre toda navegação que ainda não tem
+// menu contextual próprio (Petições, Habilidades, Cursos, Concurso,
+// Financeiro, Loja, Vida Pessoal, Vagas, Rankings, Mensagens).
+function _navLateralPadrao(painel) {
+  const ativo = (id) => id === painel ? ' ativo' : '';
+  return `
+    <div class="nav-grupo">
+      <div class="nav-grupo-titulo">Carreira</div>
+      <div class="nav-item${ativo('perfil')}" onclick="navTo('perfil',this)"><span class="ni-icon">⚖️</span> Meu Perfil</div>
+      <div class="nav-item${ativo('escritorio')}" onclick="navTo('escritorio',this)"><span class="ni-icon">🏢</span> Escritório</div>
+      <div class="nav-item${ativo('progressao')}" onclick="navTo('progressao',this)"><span class="ni-icon">📈</span> Progressão</div>
+    </div>
+    <div class="nav-grupo">
+      <div class="nav-grupo-titulo">Desenvolvimento</div>
+      <div class="nav-item${ativo('peticoes')}" onclick="navTo('peticoes',this)"><span class="ni-icon">📜</span> Petições</div>
+      <div class="nav-item${ativo('habilidades')}" onclick="navTo('habilidades',this)"><span class="ni-icon">⚡</span> Habilidades</div>
+      <div class="nav-item${ativo('cursos')}" onclick="navTo('cursos',this)"><span class="ni-icon">🎓</span> Cursos & Pós</div>
+      <div class="nav-item${ativo('concurso')}" onclick="navTo('concurso',this)"><span class="ni-icon">🔨</span> Concurso Público</div>
+    </div>
+    <div class="nav-grupo">
+      <div class="nav-grupo-titulo">Vida</div>
+      <div class="nav-item${ativo('patrimonio')}" onclick="navTo('patrimonio',this)"><span class="ni-icon">🏠</span> Patrimônio</div>
+      <div class="nav-item${ativo('financeiro')}" onclick="navTo('financeiro',this)"><span class="ni-icon">💳</span> Finanças Avançadas</div>
+      <div class="nav-item${ativo('loja')}" onclick="navTo('loja',this)"><span class="ni-icon">🛍️</span> Loja</div>
+      <div class="nav-item${ativo('vida_pessoal')}" onclick="navTo('vida_pessoal',this)"><span class="ni-icon">👤</span> Vida Pessoal</div>
+    </div>
+    <div class="nav-grupo">
+      <div class="nav-grupo-titulo">Social</div>
+      <div class="nav-item${ativo('vagas')}" onclick="navTo('vagas',this)"><span class="ni-icon">📋</span> Vagas</div>
+      <div class="nav-item${ativo('ranking')}" onclick="navTo('ranking',this)"><span class="ni-icon">🏆</span> Rankings</div>
+      <div class="nav-item${ativo('inbox')}" onclick="navTo('inbox',this)">
+        <span class="ni-icon">📬</span> Mensagens
+        <span class="ni-badge" id="badge-inbox-nav" style="display:none">0</span>
+      </div>
+    </div>`;
+}
+
+// Popula o menu lateral esquerdo de acordo com a categoria ativa — contextual
+// para Perfil/Escritório/Patrimônio/Equipe (que já têm menu próprio), com
+// fallback pro menu completo de sempre nas demais páginas.
+function _renderSidebarLateral(painel) {
+  const nav = document.getElementById('nav-lateral-dynamic');
+  if (!nav) return;
+
+  if (painel === 'perfil') {
+    nav.innerHTML = _perfilSideMenu(true);
+  } else if (painel === 'escritorio') {
+    nav.innerHTML = _escSideMenu('visao-geral', true);
+  } else if (painel === 'patrimonio' && window._patSideMenu) {
+    nav.innerHTML = window._patSideMenu('visao-geral', true);
+  } else if (painel === 'equipe' && window._equipeSideMenu) {
+    nav.innerHTML = window._equipeSideMenu(true);
+  } else {
+    nav.innerHTML = _navLateralPadrao(painel);
+  }
+}
+
 function _renderizar() {
   const j = window.JOGADOR;
   if (!j) return;
 
   const main = document.getElementById('main-content');
   if (!main) return;
+
+  _renderSidebarLateral(_painelAtivo);
 
   switch (_painelAtivo) {
     case 'perfil':       renderPerfil(j, main);       break;
@@ -106,75 +165,106 @@ function renderPerfil(j, el) {
     : `<div class="profile-photo">⚖️</div>`;
 
   el.innerHTML = `
-    <div class="profile-hero">
-      ${fotoHtml}
-      <div>
-        <div class="profile-hero-nome">${j.nome_personagem || '—'}</div>
-        <div class="profile-hero-titulo">${label} · ${esp} · Rio de Janeiro</div>
-        <div class="profile-hero-meta">
-          <span class="meta-tag">📅 ${j.anos_carreira || 0} anos de carreira</span>
-          <span class="meta-tag">⚖️ ${total} casos no total</span>
-          <span class="meta-tag">✅ ${aprov}% de aproveitamento</span>
-          <span class="meta-tag">🏢 ${escNome}</span>
-          <span class="meta-tag">👤 ${j.idade || 22} anos · Geração ${j.geracao || 1}</span>
+        <div class="profile-hero">
+          ${fotoHtml}
+          <div>
+            <div class="profile-hero-nome">${j.nome_personagem || '—'}</div>
+            <div class="profile-hero-titulo">${label} · ${esp} · Rio de Janeiro</div>
+            <div class="profile-hero-meta">
+              <span class="meta-tag">📅 ${j.anos_carreira || 0} anos de carreira</span>
+              <span class="meta-tag">⚖️ ${total} casos no total</span>
+              <span class="meta-tag">✅ ${aprov}% de aproveitamento</span>
+              <span class="meta-tag">🏢 ${escNome}</span>
+              <span class="meta-tag">👤 ${j.idade || 22} anos · Geração ${j.geracao || 1}</span>
+            </div>
+          </div>
+          <div class="hero-badges">
+            <span class="badge-pill badge-cargo">${label}</span>
+            <span class="badge-pill badge-esp">${esp}</span>
+            ${j.oab ? '<span class="badge-pill badge-oab">OAB ✓</span>' : ''}
+            ${j.no_serasa ? '<span class="badge-pill" style="background:rgba(122,32,32,.25);color:var(--verm3);border:1px solid rgba(200,80,80,.35)">🚨 Serasa</span>' : ''}
+          </div>
         </div>
-      </div>
-      <div class="hero-badges">
-        <span class="badge-pill badge-cargo">${label}</span>
-        <span class="badge-pill badge-esp">${esp}</span>
-        ${j.oab ? '<span class="badge-pill badge-oab">OAB ✓</span>' : ''}
-        ${j.no_serasa ? '<span class="badge-pill" style="background:rgba(122,32,32,.25);color:var(--verm3);border:1px solid rgba(200,80,80,.35)">🚨 Serasa</span>' : ''}
-      </div>
-    </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:.5rem;margin-bottom:1.2rem">
-      ${_miniStatCard('💰','Saldo', _fmtExt(j.dinheiro||0),'money')}
-      ${_miniStatCard('📈','Renda/mês', _fmtExt(j.renda_calculada||0),'money')}
-      ${_miniStatCard('💸','Despesas', _fmtExt(j.despesas_calculadas||0),'danger')}
-      ${_miniStatCardRep('🏅','Reputação', j.reputacao||0, cap)}
-    </div>
-
-    <!-- Energia do mês -->
-    ${(() => {
-      const energiaUsada = j.energia_usada_mes||0;
-      const energiaDisp  = Math.max(0, 100 - energiaUsada);
-      const corE = energiaDisp > 50 ? 'var(--verde2)' : energiaDisp > 20 ? 'var(--amber)' : 'var(--verm2)';
-      return `<div style="margin-bottom:1rem;padding:.75rem;background:var(--surface2);border:var(--borda-sub);border-radius:var(--r)">
-        <div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--txt3);margin-bottom:.3rem">
-          <span>⚡ Energia do mês</span>
-          <span style="font-weight:700;color:${corE}">${energiaDisp}/100</span>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:.5rem;margin-bottom:1.2rem">
+          ${_miniStatCard('💰','Saldo', _fmtExt(j.dinheiro||0),'money')}
+          ${_miniStatCard('📈','Renda/mês', _fmtExt(j.renda_calculada||0),'money')}
+          ${_miniStatCard('💸','Despesas', _fmtExt(j.despesas_calculadas||0),'danger')}
+          ${_miniStatCardRep('🏅','Reputação', j.reputacao||0, cap)}
         </div>
-        <div style="height:8px;background:var(--bg2);border-radius:4px;overflow:hidden">
-          <div style="height:100%;width:${energiaDisp}%;background:${corE};border-radius:4px;transition:width .4s"></div>
-        </div>
-        <div style="font-size:.62rem;color:var(--txt4);margin-top:.25rem">
-          Pesquisa -5⚡ · Petição -10⚡ · Diligência -15⚡ · Audiência -20⚡
-        </div>
-      </div>`;
-    })()}
 
-    <!-- Atributos -->
-    <div class="secao-header">
-      <div class="secao-titulo">📊 Atributos</div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-bottom:1.2rem">
-      ${_attrRow('🧠','Saúde Mental', j.saude_mental||80, 'azul')}
-      ${_attrRow('⚡','Disposição', j.disposicao||80, 'ouro')}
-      ${_attrRow('🌐','Networking', j.networking||10, 'verde')}
-      ${_attrRow('🎓','Prestígio Acadêmico', j.prestigio_academico||0, 'roxo')}
-    </div>
+        <!-- Energia do mês -->
+        ${(() => {
+          const energiaUsada = j.energia_usada_mes||0;
+          const energiaDisp  = Math.max(0, 100 - energiaUsada);
+          const corE = energiaDisp > 50 ? 'var(--verde2)' : energiaDisp > 20 ? 'var(--amber)' : 'var(--verm2)';
+          return `<div style="margin-bottom:1rem;padding:.75rem;background:var(--surface2);border:var(--borda-sub);border-radius:var(--r)">
+            <div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--txt3);margin-bottom:.3rem">
+              <span>⚡ Energia do mês</span>
+              <span style="font-weight:700;color:${corE}">${energiaDisp}/100</span>
+            </div>
+            <div style="height:8px;background:var(--bg2);border-radius:4px;overflow:hidden">
+              <div style="height:100%;width:${energiaDisp}%;background:${corE};border-radius:4px;transition:width .4s"></div>
+            </div>
+            <div style="font-size:.62rem;color:var(--txt4);margin-top:.25rem">
+              Pesquisa -5⚡ · Petição -10⚡ · Diligência -15⚡ · Audiência -20⚡
+            </div>
+          </div>`;
+        })()}
 
-    <!-- Feed de atividade recente -->
-    <div class="secao-header">
-      <div class="secao-titulo">📋 Atividade Recente</div>
-      <span class="secao-badge">${_calJogador(j)}</span>
-    </div>
-    <div id="feed-atividade">
-      <div style="font-size:.78rem;color:var(--ardosia);padding:.5rem 0">Carregando feed...</div>
-    </div>`;
+        <!-- Atributos -->
+        <div class="secao-header" id="perfil-atributos-secao">
+          <div class="secao-titulo">📊 Atributos</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-bottom:1.2rem">
+          ${_attrRow('🧠','Saúde Mental', j.saude_mental||80, 'azul')}
+          ${_attrRow('⚡','Disposição', j.disposicao||80, 'ouro')}
+          ${_attrRow('🌐','Networking', j.networking||10, 'verde')}
+          ${_attrRow('🎓','Prestígio Acadêmico', j.prestigio_academico||0, 'roxo')}
+        </div>
+
+        <!-- Feed de atividade recente -->
+        <div class="secao-header" id="perfil-atividade-secao">
+          <div class="secao-titulo">📋 Atividade Recente</div>
+          <span class="secao-badge">${_calJogador(j)}</span>
+        </div>
+        <div id="feed-atividade">
+          <div style="font-size:.78rem;color:var(--ardosia);padding:.5rem 0">Carregando feed...</div>
+        </div>`;
 
   // Carregar feed do inbox assincronamente
   _carregarFeedAtividade(j.uid);
+}
+
+// Menu lateral contextual do Perfil — sub-seções da própria página +
+// grupos de Carreira/Social (mesma navegação de sempre, agora reorganizada).
+function _perfilSideMenu(semWrapper) {
+  const GRUPOS = [
+    { titulo: 'Perfil', links: [
+      { label: 'Visão Geral',      fn: "window.scrollTo({top:0,behavior:'smooth'})" },
+      { label: 'Atributos',        fn: "document.getElementById('perfil-atributos-secao')?.scrollIntoView({behavior:'smooth'})" },
+      { label: 'Atividade Recente',fn: "document.getElementById('perfil-atividade-secao')?.scrollIntoView({behavior:'smooth'})" },
+    ]},
+    { titulo: 'Carreira & Atividade', links: [
+      { label: 'Progressão',        fn: "window.navTo('progressao',null)" },
+      { label: 'Petições',          fn: "window.navTo('peticoes',null)" },
+      { label: 'Habilidades',       fn: "window.navTo('habilidades',null)" },
+      { label: 'Cursos & Pós',      fn: "window.navTo('cursos',null)" },
+      { label: 'Concurso Público',  fn: "window.navTo('concurso',null)" },
+    ]},
+    { titulo: 'Social', links: [
+      { label: 'Vagas',      fn: "window.navTo('vagas',null)" },
+      { label: 'Rankings',   fn: "window.navTo('ranking',null)" },
+      { label: 'Mensagens',  fn: "window.navTo('inbox',null)" },
+      { label: 'Loja',       fn: "window.navTo('loja',null)" },
+    ]},
+  ];
+  const grupos = GRUPOS.map(g => `
+      <div class="nav-grupo">
+        <div class="nav-grupo-titulo">${g.titulo}</div>
+        ${g.links.map(l => `<div class="nav-item" onclick="${l.fn}">${l.label}</div>`).join('')}
+      </div>`).join('');
+  return semWrapper ? grupos : `<aside class="esc-side-menu">${grupos}</aside>`;
 }
 
 async function _carregarFeedAtividade(uid) {
@@ -340,7 +430,9 @@ function renderEscritorio(j, el) {
   if (j.escritorio_proprio_id) {
     el.innerHTML = `
       ${_escHero(j, null)}
-      ${_escKpis(null, j)}
+      ${_escStatRow(null, j)}
+      ${_escAtividadeCard()}
+      ${_escKpisPlaceholder()}
       <div class="esc-grid-3">
         ${_escEquipeCard()}
         ${_escClientesCard()}
@@ -478,30 +570,9 @@ async function _carregarEscritorioProprio(escId, j) {
     if (main) {
       main.innerHTML = `
         ${_escHero(j, esc)}
-        <div id="esc-kpis-placeholder">
-          <div class="esc-kpis">
-            <div class="esc-kpi-card">
-              <div class="esc-kpi-label">Receita do mês</div>
-              <div class="esc-kpi-valor">—</div>
-              <div class="esc-kpi-delta flat">carregando...</div>
-            </div>
-            <div class="esc-kpi-card">
-              <div class="esc-kpi-label">Despesas do mês</div>
-              <div class="esc-kpi-valor">—</div>
-              <div class="esc-kpi-delta flat">carregando...</div>
-            </div>
-            <div class="esc-kpi-card">
-              <div class="esc-kpi-label">Lucro líquido</div>
-              <div class="esc-kpi-valor">—</div>
-              <div class="esc-kpi-delta flat">carregando...</div>
-            </div>
-            <div class="esc-kpi-card">
-              <div class="esc-kpi-label">Caixa disponível</div>
-              <div class="esc-kpi-valor">—</div>
-              <div class="esc-kpi-delta flat">carregando...</div>
-            </div>
-          </div>
-        </div>
+        ${_escStatRow(esc, j)}
+        ${_escAtividadeCard()}
+        <div id="esc-kpis-placeholder">${_escKpisPlaceholder()}</div>
         <div class="esc-grid-3">
           ${_escEquipeCard()}
           ${_escClientesCard()}
@@ -521,6 +592,10 @@ async function _carregarEscritorioProprio(escId, j) {
       const kpisEl = document.getElementById('esc-kpis-placeholder');
       if (kpisEl) kpisEl.innerHTML = kpisHtml;
 
+      _escCarregarRankPos(escId);
+
+      const elAtividade = document.getElementById('esc-atividade-embed');
+      if (elAtividade && window.renderAtividadeEscritorioPainel) window.renderAtividadeEscritorioPainel(escId, elAtividade);
       const elEquipe = document.getElementById('esc-equipe-embed');
       if (elEquipe && window.renderEquipePainel) window.renderEquipePainel(j, escId, elEquipe);
       const elClientes = document.getElementById('esc-clientes-embed');
@@ -679,7 +754,6 @@ function _renderWorkspacePainel(j, el) {
                  ? `<div class="pc-ativo">✓ Atual</div>`
                  : `<button class="btn btn-sm btn-ghost" onclick="window.escolherEscritorioPat('${e.id}')">Escolher</button>`;
                return `<div class="pat-card${isAt?' ativo':''}">
-                 <img class="pc-img" src="${e.img}" alt="${e.l}" loading="lazy">
                  <div class="pat-card-body">
                    <div class="pc-nome">${e.l}</div>
                    ${e.cm > 0
@@ -726,6 +800,7 @@ async function _renderEscritorioFuncionario(j, el, escId) {
 
   el.innerHTML = `
     ${_escHero(j, null)}
+    ${_escAtividadeCard()}
     <div class="esc-grid-3">
       <div class="esc-card-bloco">
         <div class="secao-header" style="margin-bottom:.8rem">
@@ -758,6 +833,8 @@ async function _renderEscritorioFuncionario(j, el, escId) {
     <div id="esc-processos-bloco"></div>
     <div id="esc-oportunidades-bloco"></div>`;
 
+  const elAtividade = document.getElementById('esc-atividade-embed');
+  if (elAtividade && window.renderAtividadeEscritorioPainel) window.renderAtividadeEscritorioPainel(escId, elAtividade);
   const elEquipe = document.getElementById('esc-equipe-embed');
   if (elEquipe && window.renderEquipePainel) window.renderEquipePainel(j, escId, elEquipe);
   const elClientes = document.getElementById('esc-clientes-embed');
@@ -867,6 +944,50 @@ function _espLabel2(esp) {
 // Clientes / Societário / Ações Rápidas)
 // ════════════════════════════════════════════════════════
 
+// Menu lateral categorizado do Escritório (estilo Popmundo: grupos de links)
+function _escSideMenu(ativo, semWrapper) {
+  const GRUPOS = [
+    { titulo: 'Escritório', links: [
+      { id: 'visao-geral',      label: 'Visão Geral',           fn: "window.navTo('escritorio',null)" },
+      { id: 'balancete',        label: 'Balancete',             fn: "window.navTo('balancete',null)" },
+      { id: 'especializacoes',  label: 'Especializações',       fn: "document.getElementById('esc-especializacoes-bloco')?.scrollIntoView({behavior:'smooth'})" },
+      { id: 'workspace',        label: 'Espaço de Trabalho',    fn: "document.getElementById('esc-workspace-bloco')?.scrollIntoView({behavior:'smooth'})" },
+    ]},
+    { titulo: 'Equipe', links: [
+      { id: 'equipe',    label: 'Ver Equipe',   fn: "window.navTo('equipe',null)" },
+      { id: 'contratar', label: 'Contratar',    fn: "window.navTo('equipe',null)" },
+    ]},
+    { titulo: 'Negócios', links: [
+      { id: 'clientes',       label: 'Clientes',       fn: "window.navTo('clientes',null)" },
+      { id: 'oportunidades',  label: 'Oportunidades',  fn: "document.getElementById('esc-oportunidades-bloco')?.scrollIntoView({behavior:'smooth'})" },
+      { id: 'processos',      label: 'Processos',      fn: "document.getElementById('esc-processos-bloco')?.scrollIntoView({behavior:'smooth'})" },
+    ]},
+    { titulo: 'Sócios', links: [
+      { id: 'societario', label: 'Estrutura Societária', fn: "document.querySelector('.esc-donut-wrap')?.scrollIntoView({behavior:'smooth'})" },
+    ]},
+  ];
+  const grupos = GRUPOS.map(g => `
+      <div class="nav-grupo">
+        <div class="nav-grupo-titulo">${g.titulo}</div>
+        ${g.links.map(l => `<div class="nav-item${l.id===ativo?' ativo':''}" onclick="${l.fn}">${l.label}</div>`).join('')}
+      </div>`).join('');
+  return semWrapper ? grupos : `<aside class="esc-side-menu">${grupos}</aside>`;
+}
+
+// Card de "Atividade Recente" do escritório (diário compacto, topo da visão geral)
+function _escAtividadeCard() {
+  return `
+  <div class="esc-card-bloco" style="margin-bottom:1.1rem">
+    <div class="secao-header" style="margin-bottom:.6rem">
+      <div class="secao-titulo">Atividade Recente</div>
+      <a href="#" class="esc-ver-todos" onclick="window.navTo('equipe',null);return false">Ver diário completo</a>
+    </div>
+    <div id="esc-atividade-embed">
+      <div style="font-size:.78rem;color:var(--txt3);padding:.5rem 0">Carregando atividade...</div>
+    </div>
+  </div>`;
+}
+
 function _escHero(j, esc) {
   const escNome = (esc && esc.nome) || j.escritorio_nome || 'Advocacia Solo';
   const esp     = _espLabel2((esc && (esc.especialidade_principal||esc.especialidade)) || j.escritorio_esp || j.especialidade);
@@ -895,6 +1016,76 @@ function _escHero(j, esc) {
         <span>⚖️ ${totalCasos} processo${totalCasos===1?'':'s'} ativo${totalCasos===1?'':'s'}</span>
       </div>
       <div class="esc-hero-prestigio">Prestígio ${prestigio}</div>
+    </div>
+  </div>`;
+}
+
+// Linha de estatísticas do Escritório (estilo Popmundo: gênero+ranking / dinheiro / imóvel)
+const ESC_PAT_NOME = { home:'Home Office', cw:'Coworking Jurídico', sal:'Sala Própria', esm:'Escritório Médio', esp:'Escritório Premium' };
+
+function _escStatRow(esc, j) {
+  const esp = _espLabel2((esc && (esc.especialidade_principal||esc.especialidade)) || j.escritorio_esp || j.especialidade);
+  const workspaceLabel = ESC_PAT_NOME[j.pat?.escritorio || 'home'] || 'Home Office';
+  return `
+  <div class="esc-card-bloco esc-statrow" style="margin-bottom:1.1rem">
+    <div class="esc-statrow-linha">
+      <span class="esc-statrow-icone">⭐</span>
+      <span class="esc-statrow-texto">${esp} <span id="esc-statrow-rank" style="color:var(--txt3)">#—</span></span>
+    </div>
+    <div class="esc-statrow-linha">
+      <span class="esc-statrow-icone">💲</span>
+      <span class="esc-statrow-texto" style="color:var(--verde2);font-weight:700">${_fmtExt((esc&&esc.caixa)||0)}</span>
+    </div>
+    <div class="esc-statrow-linha">
+      <span class="esc-statrow-icone">🏢</span>
+      <span class="esc-statrow-texto">${workspaceLabel}</span>
+      <a href="#" class="esc-statrow-ver" onclick="document.getElementById('esc-workspace-bloco')?.scrollIntoView({behavior:'smooth'});return false">Ver »</a>
+    </div>
+  </div>`;
+}
+
+// Busca a posição do escritório no ranking do servidor (rankings/escritorios, top50)
+async function _escCarregarRankPos(escId) {
+  if (!escId) return;
+  try {
+    const { doc: fbDoc, getDoc: fbGetDoc } = await import(
+      'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js'
+    );
+    const { db: fbDb } = await import('./firebase-init.js');
+    const snap = await fbGetDoc(fbDoc(fbDb, 'rankings', 'escritorios'));
+    const el = document.getElementById('esc-statrow-rank');
+    if (!el) return;
+    if (!snap.exists()) { el.textContent = ''; return; }
+    const top50 = snap.data().top50 || [];
+    const entry = top50.find(e => e.id === escId);
+    el.textContent = entry ? `#${entry.pos}` : 'Fora do Top 50';
+  } catch (e) {
+    console.warn('[ESC RANK]', e);
+  }
+}
+
+function _escKpisPlaceholder() {
+  return `
+  <div class="esc-kpis">
+    <div class="esc-kpi-card">
+      <div class="esc-kpi-label">Receita do mês</div>
+      <div class="esc-kpi-valor">—</div>
+      <div class="esc-kpi-delta flat">carregando...</div>
+    </div>
+    <div class="esc-kpi-card">
+      <div class="esc-kpi-label">Despesas do mês</div>
+      <div class="esc-kpi-valor">—</div>
+      <div class="esc-kpi-delta flat">carregando...</div>
+    </div>
+    <div class="esc-kpi-card">
+      <div class="esc-kpi-label">Lucro líquido</div>
+      <div class="esc-kpi-valor">—</div>
+      <div class="esc-kpi-delta flat">carregando...</div>
+    </div>
+    <div class="esc-kpi-card">
+      <div class="esc-kpi-label">Caixa disponível</div>
+      <div class="esc-kpi-valor">—</div>
+      <div class="esc-kpi-delta flat">carregando...</div>
     </div>
   </div>`;
 }

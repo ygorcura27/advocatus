@@ -137,66 +137,87 @@ window.renderEquipe = async function(j, el) {
   const energiaDisp   = Math.max(0, 100 - (j.energia_usada_mes || 0));
 
   el.innerHTML = `
-    <div style="margin-bottom:.8rem"><button class="btn btn-ghost btn-sm" onclick="window.navTo('escritorio',null)">← Escritório</button></div>
-    <div class="secao-header">
-      <div class="secao-titulo">👥 Equipe — ${esc.nome}</div>
-      <span class="secao-badge">Tier ${tier} · ${funcs.length} membro(s)</span>
-    </div>
+        <div class="secao-header">
+          <div class="secao-titulo">👥 Equipe — ${esc.nome}</div>
+          <span class="secao-badge">Tier ${tier} · ${funcs.length} membro(s)</span>
+        </div>
 
-    <!-- Resumo financeiro -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-bottom:1rem">
-      <div class="stat-mini">
-        <div class="v" style="color:var(--navy)">${funcs.length}/${cap.estagiarios+cap.assistentes+cap.advogados}</div>
-        <div class="l">👥 Vagas ocupadas</div>
-      </div>
-      <div class="stat-mini">
-        <div class="v" style="color:var(--verm2)">-${_fmtK(totalSalarios)}</div>
-        <div class="l">💸 Salários/mês</div>
-      </div>
-      <div class="stat-mini">
-        <div class="v" style="color:var(--verm2)">-${_fmtK(cap.custo_fixo)}</div>
-        <div class="l">🏢 Custo fixo/mês</div>
-      </div>
-    </div>
+        <!-- Resumo financeiro -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-bottom:1rem">
+          <div class="stat-mini">
+            <div class="v" style="color:var(--navy)">${funcs.length}/${cap.estagiarios+cap.assistentes+cap.advogados}</div>
+            <div class="l">👥 Vagas ocupadas</div>
+          </div>
+          <div class="stat-mini">
+            <div class="v" style="color:var(--verm2)">-${_fmtK(totalSalarios)}</div>
+            <div class="l">💸 Salários/mês</div>
+          </div>
+          <div class="stat-mini">
+            <div class="v" style="color:var(--verm2)">-${_fmtK(cap.custo_fixo)}</div>
+            <div class="l">🏢 Custo fixo/mês</div>
+          </div>
+        </div>
 
-    <!-- Abas: Equipe | Diário -->
-    <div style="display:flex;gap:0;margin-bottom:1rem;border-bottom:1px solid var(--navy-light)">
-      <button class="equipe-tab-btn" data-tab="equipe" onclick="window.switchEquipeTab('equipe')"
-        style="background:none;border:none;border-bottom:${_activeEquipeTab==='equipe'?'2px solid var(--ouro)':'2px solid transparent'};padding:.45rem 1rem;cursor:pointer;font-weight:700;font-size:.78rem;color:${_activeEquipeTab==='equipe'?'var(--ouro)':'var(--txt3)'}">
-        👥 Equipe
-      </button>
-      <button class="equipe-tab-btn" data-tab="diario" onclick="window.switchEquipeTab('diario')"
-        style="background:none;border:none;border-bottom:${_activeEquipeTab==='diario'?'2px solid var(--ouro)':'2px solid transparent'};padding:.45rem 1rem;cursor:pointer;font-weight:700;font-size:.78rem;color:${_activeEquipeTab==='diario'?'var(--ouro)':'var(--txt3)'}">
-        📓 Diário
-      </button>
-    </div>
-    ${esc.gestor_id ? `
-    <div class="card" style="margin-bottom:1rem;padding:.7rem 1rem">
-      <div style="font-size:.78rem;font-weight:700;color:var(--navy);margin-bottom:.5rem">⚙️ Delegações ao Gestor</div>
-      ${_renderToggleGestor('📋 Delegar processos ao gestor', 'processos', esc.gestor_delega_processos !== false, escId)}
-      ${_renderToggleGestor('🎓 Delegar mentoria ao gestor', 'mentoria', !!esc.gestor_delega_mentoria, escId)}
-      ${_renderToggleGestor('⚖️ Delegar conflitos leves ao gestor', 'conflitos', !!esc.gestor_delega_conflitos, escId)}
-      <div style="font-size:.6rem;color:var(--txt4);margin-top:.4rem">⚠️ Conflitos estruturais sempre escalam ao dono, independente das delegações.</div>
-    </div>` : ''}
+        <!-- Abas: Equipe | Diário -->
+        <div style="display:flex;gap:0;margin-bottom:1rem;border-bottom:1px solid var(--navy-light)">
+          <button class="equipe-tab-btn" data-tab="equipe" onclick="window.switchEquipeTab('equipe')"
+            style="background:none;border:none;border-bottom:${_activeEquipeTab==='equipe'?'2px solid var(--ouro)':'2px solid transparent'};padding:.45rem 1rem;cursor:pointer;font-weight:700;font-size:.78rem;color:${_activeEquipeTab==='equipe'?'var(--ouro)':'var(--txt3)'}">
+            👥 Equipe
+          </button>
+          <button class="equipe-tab-btn" data-tab="diario" onclick="window.switchEquipeTab('diario')"
+            style="background:none;border:none;border-bottom:${_activeEquipeTab==='diario'?'2px solid var(--ouro)':'2px solid transparent'};padding:.45rem 1rem;cursor:pointer;font-weight:700;font-size:.78rem;color:${_activeEquipeTab==='diario'?'var(--ouro)':'var(--txt3)'}">
+            📓 Diário
+          </button>
+        </div>
+        ${esc.gestor_id ? `
+        <div class="card" style="margin-bottom:1rem;padding:.7rem 1rem">
+          <div style="font-size:.78rem;font-weight:700;color:var(--navy);margin-bottom:.5rem">⚙️ Delegações ao Gestor</div>
+          ${_renderToggleGestor('📋 Delegar processos ao gestor', 'processos', esc.gestor_delega_processos !== false, escId)}
+          ${_renderToggleGestor('🎓 Delegar mentoria ao gestor', 'mentoria', !!esc.gestor_delega_mentoria, escId)}
+          ${_renderToggleGestor('⚖️ Delegar conflitos leves ao gestor', 'conflitos', !!esc.gestor_delega_conflitos, escId)}
+          <div style="font-size:.6rem;color:var(--txt4);margin-top:.4rem">⚠️ Conflitos estruturais sempre escalam ao dono, independente das delegações.</div>
+        </div>` : ''}
 
-    <!-- Pane: Equipe -->
-    <div class="equipe-tab-pane" data-tab="equipe" ${_activeEquipeTab==='diario'?'style="display:none"':''}>
-      ${_renderGrupo('🎓 Estagiários', estagiarios, cap.estagiarios, 'est', escId, energiaDisp, procCountEquipe, esc.mes_global || 0)}
-      ${_renderGrupo('📋 Assistentes', assistentes, cap.assistentes, 'ass', escId, energiaDisp, procCountEquipe, esc.mes_global || 0)}
-      ${_renderGrupo('⚖️ Advogados', advogados, cap.advogados, 'jnr', escId, energiaDisp, procCountEquipe, esc.mes_global || 0)}
-      ${await _renderProcessosPendentesRevisao(j, escId)}
-    </div>
+        <!-- Pane: Equipe -->
+        <div class="equipe-tab-pane" data-tab="equipe" ${_activeEquipeTab==='diario'?'style="display:none"':''}>
+          ${_renderGrupo('🎓 Estagiários', estagiarios, cap.estagiarios, 'est', escId, energiaDisp, procCountEquipe, esc.mes_global || 0, 'equipe-grupo-estagiarios')}
+          ${_renderGrupo('📋 Assistentes', assistentes, cap.assistentes, 'ass', escId, energiaDisp, procCountEquipe, esc.mes_global || 0, 'equipe-grupo-assistentes')}
+          ${_renderGrupo('⚖️ Advogados', advogados, cap.advogados, 'jnr', escId, energiaDisp, procCountEquipe, esc.mes_global || 0, 'equipe-grupo-advogados')}
+          ${await _renderProcessosPendentesRevisao(j, escId)}
+        </div>
 
-    <!-- Pane: Diário da Equipe -->
-    <div class="equipe-tab-pane" data-tab="diario" ${_activeEquipeTab!=='diario'?'style="display:none"':''}>
-      ${await _renderDiarioEquipe(escId)}
-    </div>`;
+        <!-- Pane: Diário da Equipe -->
+        <div class="equipe-tab-pane" data-tab="diario" ${_activeEquipeTab!=='diario'?'style="display:none"':''}>
+          ${await _renderDiarioEquipe(escId)}
+        </div>`;
 };
 
-function _renderGrupo(titulo, membros, vagas, cargo_min, escId, energiaDisp, procCount = {}, mesGlobal = 0) {
+// Menu lateral categorizado da página de Equipe (mesmo padrão do Escritório/Patrimônio)
+window._equipeSideMenu = _equipeSideMenu;
+function _equipeSideMenu(semWrapper) {
+  const GRUPOS = [
+    { titulo: 'Equipe', links: [
+      { label: 'Estagiários', fn: "window.switchEquipeTab('equipe');document.getElementById('equipe-grupo-estagiarios')?.scrollIntoView({behavior:'smooth'})" },
+      { label: 'Assistentes', fn: "window.switchEquipeTab('equipe');document.getElementById('equipe-grupo-assistentes')?.scrollIntoView({behavior:'smooth'})" },
+      { label: 'Advogados',   fn: "window.switchEquipeTab('equipe');document.getElementById('equipe-grupo-advogados')?.scrollIntoView({behavior:'smooth'})" },
+      { label: 'Diário',      fn: "window.switchEquipeTab('diario')" },
+    ]},
+    { titulo: 'Escritório', links: [
+      { label: 'Visão Geral', fn: "window.navTo('escritorio',null)" },
+    ]},
+  ];
+  const grupos = GRUPOS.map(g => `
+      <div class="nav-grupo">
+        <div class="nav-grupo-titulo">${g.titulo}</div>
+        ${g.links.map(l => `<div class="nav-item" onclick="${l.fn}">${l.label}</div>`).join('')}
+      </div>`).join('');
+  return semWrapper ? grupos : `<aside class="esc-side-menu">${grupos}</aside>`;
+}
+
+function _renderGrupo(titulo, membros, vagas, cargo_min, escId, energiaDisp, procCount = {}, mesGlobal = 0, anchorId = '') {
   const ci = CARGO_INFO[cargo_min] || CARGO_INFO.est;
   return `
-    <div style="margin-bottom:1.2rem">
+    <div style="margin-bottom:1.2rem" ${anchorId?`id="${anchorId}"`:''}>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;padding-bottom:.35rem;border-bottom:2px solid var(--navy-light)">
         <div style="font-size:.8rem;font-weight:700;color:var(--navy)">${titulo}</div>
         <div style="display:flex;align-items:center;gap:.5rem">

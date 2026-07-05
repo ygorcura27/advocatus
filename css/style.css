@@ -65,6 +65,22 @@
   --topbar-h:   52px;
   --sidebar-l:  264px;
   --sidebar-r:  236px;
+
+  /* Compat — nomenclatura legada (pré "Design System v2"), ainda referenciada em
+     index.html e em componentes do jogo que nunca foram migrados para os tokens acima */
+  --couro:    var(--navy);
+  --couro2:   var(--navy2);
+  --perg:     var(--ouro-light);
+  --perg2:    #E0D0A8;
+  --ardosia:  var(--txt4);
+  --ardosia2: var(--navy-light);
+  --ardosia3: var(--bg2);
+  --borda1:   var(--borda-sub);
+  --fundo2:   var(--bg2);
+  --azul1:    var(--navy3);
+  --tinta:    var(--txt);
+  --txt1:     var(--txt);
+  --verde1:   var(--verde2);
 }
 
 html { font-size: 16px; }
@@ -81,6 +97,33 @@ body {
 ::-webkit-scrollbar-track { background: var(--bg2); }
 ::-webkit-scrollbar-thumb { background: var(--navy-light); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--navy4); }
+
+/* ── Acessibilidade: respeita a preferência de reduzir movimento ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Acessibilidade: foco visível em todo elemento interativo ── */
+a:focus-visible,
+button:focus-visible,
+.btn:focus-visible,
+.nav-item:focus-visible,
+.bnav-item:focus-visible,
+.tb-btn-avancar:focus-visible,
+.btn-avancar-mes:focus-visible,
+.btn-logout:focus-visible,
+.secao-acao:focus-visible,
+.quiz-opt:focus-visible,
+.sk-btn:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--ouro2);
+  outline-offset: 2px;
+}
 
 /* Elementos que devem usar sans-serif para melhor legibilidade */
 input, select, textarea, button, code, pre {
@@ -327,6 +370,17 @@ a:hover { color: var(--navy); }
 .perfil-rep-bar { height: 5px; background: rgba(255,255,255,.15); border-radius: 2px; overflow: hidden; margin-bottom: .2rem; }
 .perfil-rep-fill { height: 100%; background: linear-gradient(90deg, var(--ouro3), var(--ouro)); transition: width .4s ease; }
 .perfil-rep-txt { display: flex; justify-content: space-between; font-size: .62rem; color: rgba(255,255,255,.5); }
+
+/* ── Indicadores de status na sidebar (estilo Popmundo: ícone + barra) ── */
+.sl-status-bars { margin-top: .55rem; display: flex; flex-direction: column; gap: .3rem; }
+.sl-status-linha { display: flex; align-items: center; gap: .4rem; }
+.sl-status-icone { font-size: .72rem; flex-shrink: 0; width: 14px; text-align: center; }
+.sl-status-bar-wrap { flex: 1; height: 6px; background: rgba(255,255,255,.15); border-radius: 3px; overflow: hidden; }
+.sl-status-bar-fill { height: 100%; border-radius: 3px; transition: width .4s ease; }
+.sl-status-bar-fill.saude { background: linear-gradient(90deg, #2E8B57, #4AAB77); }
+.sl-status-bar-fill.disp  { background: linear-gradient(90deg, #8B1A1A, #E74C3C); }
+.sl-status-bar-fill.fama  { background: linear-gradient(90deg, var(--ouro3), var(--ouro)); }
+.sl-status-valor { font-size: .68rem; color: #6EE7A0; font-weight: 600; }
 
 .nav-lateral { padding: .6rem .5rem .5rem; }
 .nav-grupo { margin-bottom: .4rem; }
@@ -697,6 +751,41 @@ a:hover { color: var(--navy); }
 }
 .btn-vender:hover { background: #fbd4d0; }
 
+/* ── Informações básicas de um local (estilo "Local" do Popmundo) — só texto ── */
+.local-info-card {
+  background: var(--surface);
+  border: var(--borda);
+  border-radius: var(--r2);
+  padding: 1rem 1.1rem;
+  margin-bottom: 1.2rem;
+}
+.local-info-titulo {
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--navy);
+  margin-bottom: .3rem;
+}
+.local-info-desc {
+  font-size: .78rem;
+  color: var(--txt3);
+  line-height: 1.55;
+  margin-bottom: .8rem;
+  padding-bottom: .8rem;
+  border-bottom: var(--borda-sub);
+}
+.local-info-linha {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .35rem 0;
+  border-bottom: 1px solid var(--borda-sub);
+  font-size: .78rem;
+}
+.local-info-linha:last-child { border-bottom: none; }
+.local-info-label { color: var(--txt3); flex-shrink: 0; }
+.local-info-valor { color: var(--navy); font-weight: 600; text-align: right; }
+
 /* ═══════════════════════════════════════════════════════════
    TOAST
    ═══════════════════════════════════════════════════════════ */
@@ -830,7 +919,7 @@ a:hover { color: var(--navy); }
 
   .main-content { padding: .85rem .75rem; }
   .sidebar-right { display: none; }
-  .nav-top       { display: none; }
+  .nav-top { display: none; }
 
   /* Topbar mobile */
   .topbar {
@@ -1641,6 +1730,14 @@ a:hover { color: var(--navy); }
 .esc-ver-todos { font-size: .72rem; color: var(--navy3); font-weight: 500; text-decoration: none; white-space: nowrap; }
 .esc-ver-todos:hover { color: var(--navy); text-decoration: underline; }
 
+/* ── Linha de estatísticas do escritório (estilo Popmundo: gênero/dinheiro/imóvel) ── */
+.esc-statrow { display: flex; flex-direction: column; gap: .5rem; }
+.esc-statrow-linha { display: flex; align-items: center; gap: .55rem; font-size: .82rem; color: var(--txt2); }
+.esc-statrow-icone { flex-shrink: 0; font-size: .95rem; width: 18px; text-align: center; }
+.esc-statrow-texto { flex: 1; }
+.esc-statrow-ver { font-size: .72rem; color: var(--navy3); font-weight: 600; text-decoration: none; }
+.esc-statrow-ver:hover { color: var(--navy); text-decoration: underline; }
+
 /* ── Membro da equipe no painel ── */
 .esc-membro {
   display: flex; align-items: start; gap: .65rem;
@@ -1794,6 +1891,55 @@ a:hover { color: var(--navy); }
 .esc-acao-btn:hover { background: var(--navy3); transform: translateY(-2px); box-shadow: var(--sombra-navy); }
 .esc-acao-icone { font-size: 1.15rem; }
 .esc-acao-btn:disabled { opacity: .35; cursor: not-allowed; transform: none; }
+
+/* ── Layout Escritório: coluna principal + menu lateral categorizado ── */
+.esc-layout {
+  display: grid;
+  grid-template-columns: 1fr 220px;
+  gap: 1.2rem;
+  align-items: start;
+}
+.esc-main-col { min-width: 0; }
+.esc-side-menu {
+  position: sticky;
+  top: calc(var(--topbar-h) + 1rem);
+  background: var(--surface);
+  border: var(--borda);
+  border-radius: var(--r2);
+  padding: .8rem .6rem;
+  box-shadow: var(--sombra);
+}
+.esc-side-grupo { margin-bottom: .9rem; }
+.esc-side-grupo:last-child { margin-bottom: 0; }
+.esc-side-titulo {
+  font-size: .6rem; color: var(--txt4);
+  text-transform: uppercase; letter-spacing: .1em;
+  padding: .2rem .6rem .35rem;
+}
+.esc-side-link {
+  display: block; padding: .4rem .6rem; border-radius: var(--r);
+  font-size: .78rem; color: var(--txt2);
+  cursor: pointer; transition: all .15s; text-decoration: none;
+}
+.esc-side-link:hover { background: var(--navy-light); color: var(--navy); }
+.esc-side-link.ativo { background: var(--navy); color: #fff; font-weight: 600; }
+
+/* ── Atividade recente do escritório (diário) ── */
+.esc-atividade-feed { display: flex; flex-direction: column; }
+.esc-atividade-item {
+  display: flex; gap: .6rem; align-items: flex-start;
+  padding: .5rem 0; border-bottom: 1px solid var(--borda-sub);
+  font-size: .78rem;
+}
+.esc-atividade-item:last-child { border-bottom: none; }
+.esc-atividade-icone { flex-shrink: 0; font-size: .95rem; line-height: 1.3; }
+.esc-atividade-texto { flex: 1; color: var(--txt2); line-height: 1.4; }
+.esc-atividade-data { font-size: .65rem; color: var(--txt4); white-space: nowrap; flex-shrink: 0; }
+
+@media (max-width: 1180px) {
+  .esc-layout { grid-template-columns: 1fr; }
+  .esc-side-menu { position: static; }
+}
 
 /* ── Responsivo ── */
 @media (max-width: 1180px) {

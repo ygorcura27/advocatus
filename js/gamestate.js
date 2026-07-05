@@ -81,6 +81,12 @@ function _atualizarSidebarEsquerda(j) {
   _set('sl-rep-cap', `Cap ${cap}`);
   _style('sl-rep-fill', 'width', `${Math.min(100, pct)}%`);
 
+  // Indicadores de status (estilo Popmundo: saúde mental, disposição, fama, dinheiro)
+  _style('sl-saude-fill', 'width', `${Math.min(100, j.saude_mental||0)}%`);
+  _style('sl-disp-fill',  'width', `${Math.min(100, j.disposicao||0)}%`);
+  _style('sl-fama-fill',  'width', `${Math.min(100, pct)}%`);
+  _set('sl-dinheiro-val', fmt(saldo));
+
   // Brasão dinâmico
   _renderBrasao(j.cargo_id, rep);
 

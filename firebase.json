@@ -21,7 +21,10 @@
       "firebase.json",
       "**/.*",
       "**/node_modules/**",
-      "functions/**"
+      "functions/**",
+      "*.md",
+      "MECANICAS_DO_JOGO.txt",
+      "skills-lock.json"
     ],
     "rewrites": [
       {

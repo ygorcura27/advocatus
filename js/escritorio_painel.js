@@ -107,6 +107,52 @@ function _fmt(n) {
 }
 
 // ════════════════════════════════════════════════════════
+// ATIVIDADE RECENTE DO ESCRITÓRIO (feed compacto na visão geral)
+// ════════════════════════════════════════════════════════
+const _ATIV_ICONE = {
+  conflito_leve:'⚡', conflito_estrutural:'🔥', mediacao:'🤝', mentoria:'📚',
+  promocao:'⭐', ferias:'🏖️', competicao:'🏆', saida:'👋',
+  feedback_cliente:'💬', bonus:'💰', caso_importante:'⚖️',
+};
+
+window.renderAtividadeEscritorioPainel = async function(escId, el) {
+  try {
+    const snap = await getDocs(query(
+      collection(db, 'escritorios', escId, 'log_equipe'),
+      orderBy('criado_em', 'desc'),
+      limit(6)
+    ));
+
+    if (snap.empty) {
+      el.innerHTML = `<div style="text-align:center;padding:1rem 0;color:var(--txt4);font-size:.76rem">
+        Nenhuma atividade registrada ainda.
+      </div>`;
+      return;
+    }
+
+    const rows = snap.docs.map(d => {
+      const e     = d.data();
+      const msg   = e.msg || e.texto || '';
+      const icone = _ATIV_ICONE[e.tipo] || '📋';
+      const data  = e.criado_em
+        ? new Date(e.criado_em).toLocaleDateString('pt-BR', { day:'2-digit', month:'short' })
+        : '';
+      return `
+      <div class="esc-atividade-item">
+        <span class="esc-atividade-icone">${icone}</span>
+        <span class="esc-atividade-texto">${msg}</span>
+        <span class="esc-atividade-data">${data}</span>
+      </div>`;
+    }).join('');
+
+    el.innerHTML = `<div class="esc-atividade-feed">${rows}</div>`;
+  } catch (err) {
+    console.error('[ATIVIDADE ESCRITÓRIO]', err);
+    el.innerHTML = '<div style="color:var(--txt3);font-size:.75rem">Erro ao carregar atividade recente.</div>';
+  }
+};
+
+// ════════════════════════════════════════════════════════
 // EQUIPE
 // ════════════════════════════════════════════════════════
 window.renderEquipePainel = async function(j, escId, el) {
