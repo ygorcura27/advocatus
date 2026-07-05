@@ -170,12 +170,18 @@ function renderPerfil(j, el) {
     ? `<img src="${fotoUrl}" class="profile-photo" alt="${j.nome_personagem||'Perfil'}" style="object-fit:cover;border-radius:50%;width:80px;height:80px;border:2px solid var(--ouro)">`
     : `<div class="profile-photo">⚖️</div>`;
 
+  const energiaUsada = j.energia_usada_mes||0;
+  const energiaDisp  = Math.max(0, 100 - energiaUsada);
+  const repPct = Math.min(100, Math.round((j.reputacao||0)/cap*100));
+
   el.innerHTML = `
+      <div class="perfil-container">
         <div class="profile-hero">
           ${fotoHtml}
           <div>
             <div class="profile-hero-nome">${j.nome_personagem || '—'}</div>
             <div class="profile-hero-titulo">${label} · ${esp} · Rio de Janeiro</div>
+            <div class="profile-hero-desc">${j.descricao_personagem || `${label} atuando em ${esp}, ${escNome}.`}</div>
             <div class="profile-hero-meta">
               <span class="meta-tag">📅 ${j.anos_carreira || 0} anos de carreira</span>
               <span class="meta-tag">⚖️ ${total} casos no total</span>
@@ -192,39 +198,32 @@ function renderPerfil(j, el) {
           </div>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:.5rem;margin-bottom:1.2rem">
-          ${_miniStatCard('💰','Saldo', _fmtExt(j.dinheiro||0),'money')}
-          ${_miniStatCard('📈','Renda/mês', _fmtExt(j.renda_calculada||0),'money')}
-          ${_miniStatCard('💸','Despesas', _fmtExt(j.despesas_calculadas||0),'danger')}
-          ${_miniStatCardRep('🏅','Reputação', j.reputacao||0, cap)}
+        <div class="barra-status-bloco">
+          ${_barraStatus('⚡', energiaDisp)}
+          ${_barraStatus('🙂', j.saude_mental||80)}
+          ${_barraStatus('❤️', j.disposicao||80)}
+          ${_barraStatus('⭐', repPct, { semVermelho: true })}
+          <div class="barra-status-saldo">💲 ${_fmtExt(j.dinheiro||0)}</div>
         </div>
 
-        <!-- Energia do mês -->
-        ${(() => {
-          const energiaUsada = j.energia_usada_mes||0;
-          const energiaDisp  = Math.max(0, 100 - energiaUsada);
-          const corE = energiaDisp > 50 ? 'var(--verde2)' : energiaDisp > 20 ? 'var(--amber)' : 'var(--verm2)';
-          return `<div style="margin-bottom:1rem;padding:.75rem;background:var(--surface2);border:var(--borda-sub);border-radius:var(--r)">
-            <div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--txt3);margin-bottom:.3rem">
-              <span>⚡ Energia do mês</span>
-              <span style="font-weight:700;color:${corE}">${energiaDisp}/100</span>
-            </div>
-            <div style="height:8px;background:var(--bg2);border-radius:4px;overflow:hidden">
-              <div style="height:100%;width:${energiaDisp}%;background:${corE};border-radius:4px;transition:width .4s"></div>
-            </div>
-            <div style="font-size:.62rem;color:var(--txt4);margin-top:.25rem">
-              Pesquisa -5⚡ · Petição -10⚡ · Diligência -15⚡ · Audiência -20⚡
-            </div>
-          </div>`;
-        })()}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:1.2rem">
+          ${_miniStatCard('📈','Renda/mês', _fmtExt(j.renda_calculada||0),'money')}
+          ${_miniStatCard('💸','Despesas', _fmtExt(j.despesas_calculadas||0),'danger')}
+        </div>
+
+        <!-- Energia do mês — detalhamento de custos -->
+        <div style="margin-bottom:1rem;padding:.75rem;background:var(--surface2);border:var(--borda-sub);border-radius:var(--r)">
+          <div style="font-size:.68rem;color:var(--txt3);margin-bottom:.3rem">⚡ Energia do mês — custos por ação</div>
+          <div style="font-size:.62rem;color:var(--txt4)">
+            Pesquisa -5⚡ · Petição -10⚡ · Diligência -15⚡ · Audiência -20⚡
+          </div>
+        </div>
 
         <!-- Atributos -->
         <div class="secao-header" id="perfil-atributos-secao">
           <div class="secao-titulo">📊 Atributos</div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-bottom:1.2rem">
-          ${_attrRow('🧠','Saúde Mental', j.saude_mental||80, 'azul')}
-          ${_attrRow('⚡','Disposição', j.disposicao||80, 'ouro')}
           ${_attrRow('🌐','Networking', j.networking||10, 'verde')}
           ${_attrRow('🎓','Prestígio Acadêmico', j.prestigio_academico||0, 'roxo')}
         </div>
@@ -236,7 +235,8 @@ function renderPerfil(j, el) {
         </div>
         <div id="feed-atividade">
           <div style="font-size:.78rem;color:var(--ardosia);padding:.5rem 0">Carregando feed...</div>
-        </div>`;
+        </div>
+      </div>`;
 
   // Carregar feed do inbox assincronamente
   _carregarFeedAtividade(j.uid);
@@ -257,6 +257,11 @@ function _perfilSideMenu(semWrapper) {
       { label: 'Habilidades',       fn: "window.navTo('habilidades',null)" },
       { label: 'Cursos & Pós',      fn: "window.navTo('cursos',null)" },
       { label: 'Concurso Público',  fn: "window.navTo('concurso',null)" },
+    ]},
+    { titulo: 'Patrimônio', links: [
+      { label: 'Moradia',       fn: "window._pendingScrollId='pat-moradia-secao';window.navTo('patrimonio',null)" },
+      { label: 'Veículos',      fn: "window._pendingScrollId='pat-transporte-secao';window.navTo('patrimonio',null)" },
+      { label: 'Investimentos', fn: "window.navTo('financeiro',null)" },
     ]},
     { titulo: 'Social', links: [
       { label: 'Vagas',      fn: "window.navTo('vagas',null)" },
@@ -1749,6 +1754,25 @@ function _fmtExt(n) {
   if (!n && n !== 0) return '—';
   if (n >= 1000000) return 'R$ ' + (n/1000000).toFixed(2).replace('.',',') + 'M';
   return 'R$ ' + Number(n).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+// Cor centralizada de barra de status (estilo Popmundo): amarelo=100%, verde=75-99%,
+// azul=25-74%, vermelho=0-24% (Reputação nunca fica vermelha — usa semVermelho).
+function getBarColor(valor, { semVermelho = false } = {}) {
+  if (valor === 100) return 'amarela';
+  if (valor >= 75) return 'verde';
+  if (valor >= 25) return 'azul';
+  return semVermelho ? 'azul' : 'vermelha';
+}
+
+function _barraStatus(icon, valor, opts = {}) {
+  const cor = getBarColor(valor, opts);
+  return `
+  <div class="barra-status-linha">
+    <span class="barra-status-icone">${icon}</span>
+    <div class="barra-status-wrap"><div class="barra-status-fill barra-${cor}" style="width:${Math.max(0,Math.min(100,valor))}%"></div></div>
+    <span class="barra-status-pct">${Math.round(valor)}%</span>
+  </div>`;
 }
 
 function _miniStatCard(icon, label, val, tipo) {

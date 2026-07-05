@@ -832,6 +832,23 @@ a:hover { color: var(--navy); }
 .badge-tier  { background: var(--navy-light); color: var(--navy3); }
 .badge-oab   { background: var(--ouro-light); color: var(--ouro3); border: 1px solid var(--ouro2); }
 
+/* Container estreito, centralizado — estilo Popmundo (usado no Perfil) */
+.perfil-container { max-width: 1000px; margin: 0 auto; }
+.profile-hero-desc { font-size: .74rem; color: var(--txt3); line-height: 1.5; margin: .3rem 0 .6rem; }
+
+/* ── Barras de status (Energia/Saúde Mental/Disposição/Reputação) ── */
+.barra-status-bloco { margin-bottom: 1.1rem; }
+.barra-status-linha { display: flex; align-items: center; gap: .6rem; margin-bottom: .4rem; }
+.barra-status-icone { font-size: .95rem; width: 20px; text-align: center; flex-shrink: 0; }
+.barra-status-wrap { flex: 1; height: 10px; background: var(--bg2); border-radius: 5px; overflow: hidden; }
+.barra-status-fill { height: 100%; border-radius: 5px; transition: width .4s ease, background .3s ease; }
+.barra-status-pct { font-size: .72rem; font-weight: 700; color: var(--txt2); min-width: 3.2rem; text-align: right; flex-shrink: 0; }
+.barra-status-fill.barra-amarela   { background: linear-gradient(90deg, var(--ouro3), var(--ouro)); }
+.barra-status-fill.barra-verde     { background: linear-gradient(90deg, var(--verde2), var(--verde3)); }
+.barra-status-fill.barra-azul      { background: linear-gradient(90deg, var(--navy3), var(--navy4)); }
+.barra-status-fill.barra-vermelha  { background: linear-gradient(90deg, var(--verm2), var(--verm3)); }
+.barra-status-saldo { font-size: .85rem; font-weight: 700; color: var(--verde2); text-align: right; margin-top: .2rem; }
+
 /* ═══════════════════════════════════════════════════════════
    INBOX / MENSAGENS
    ═══════════════════════════════════════════════════════════ */

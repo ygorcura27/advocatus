@@ -282,6 +282,13 @@ window.renderPatrimonio = function(j, el) {
         return _card(cr.img, cr.l, cr.l, body, isAt, false);
       }).join('')}
         </div>`;
+
+  // Rolagem pendente vinda do menu lateral do Perfil (ex: "Moradia"/"Veículos")
+  if (window._pendingScrollId) {
+    const alvo = window._pendingScrollId;
+    window._pendingScrollId = null;
+    setTimeout(() => document.getElementById(alvo)?.scrollIntoView({ behavior: 'smooth' }), 60);
+  }
 };
 
 // ════════════════════════════════════════════════════════
@@ -420,60 +427,107 @@ window.escolherEscritorioPat = async function(id) {
 // ════════════════════════════════════════════════════════
 // RENDERIZAÇÃO — LOJA
 // ════════════════════════════════════════════════════════
+const CAT_LOJA_LABEL = { status:'Status', prof:'Profissional', exp:'Experiências', cong:'Congressos' };
+
 window.renderLoja = function(j, el) {
+  window._lojaCache = { j };
+  const categorias = Object.keys(CAT_LOJA_LABEL).filter(c => SHOP.some(it => it.cat === c));
+  _renderLojaTela(el, categorias[0], null);
+};
+
+function _itemLojaStatus(j, it) {
   const comprados  = (j.compras||[]).map(c=>c.id);
   const congUsados = j.congressos_usados || {};
   const mesAtual   = _mesAtual();
   const anoAtual   = _anoAtual();
+  const isCong     = it.cat === 'cong';
+  const jatem      = comprados.includes(it.id);
+  const usadoAno   = congUsados[it.id] === anoAtual;
+  const mesCorreto = isCong ? mesAtual === it.mes : true;
+  return { isCong, jatem, usadoAno, mesCorreto };
+}
 
-  const porCat = {status:[], prof:[], exp:[], cong:[]};
-  SHOP.forEach(it => (porCat[it.cat]||porCat.status).push(it));
-
-  function renderCard(it) {
-    const jatem      = comprados.includes(it.id);
-    const isCong     = it.cat === 'cong';
-    const usadoAno   = congUsados[it.id] === anoAtual;
-    const mesCorreto = isCong ? mesAtual === it.mes : true;
-
-    let body;
-    if (isCong) {
-      const mesBadge = `<div style="font-size:.6rem;color:var(--navy3);margin-bottom:.1rem">📅 ${MESES_NOME[it.mes-1]}</div>`;
-      if (usadoAno) {
-        body = mesBadge + `<div class="pc-ativo" style="color:var(--txt3)">✓ Participado (ano ${anoAtual})</div>`;
-      } else if (!mesCorreto) {
-        body = mesBadge + `<div style="font-size:.65rem;color:var(--txt3)">Disponível em ${MESES_NOME[it.mes-1]}</div>`;
-      } else if ((j.dinheiro||0) >= it.p) {
-        body = mesBadge + `<button class="btn btn-sm btn-sec" onclick="window.comprarItem('${it.id}')">Participar ${fmt(it.p)}</button>`;
-      } else {
-        body = mesBadge + `<div style="font-size:.65rem;color:var(--ardosia)">Saldo insuficiente</div>`;
-      }
-    } else if (jatem) {
-      body = `<div class="pc-ativo">✓ Adquirido</div>
-        <button class="btn-vender" onclick="window.venderItem('${it.id}')">Vender ${fmt(Math.floor(it.p*.5))}</button>`;
-    } else if ((j.dinheiro||0) >= it.p) {
-      body = `<button class="btn btn-sm btn-sec" onclick="window.comprarItem('${it.id}')">Comprar ${fmt(it.p)}</button>`;
-    } else {
-      body = `<div style="font-size:.65rem;color:var(--ardosia)">Saldo insuficiente</div>`;
-    }
-
-    return _card(it.img, it.n, it.n, body, jatem&&!isCong || usadoAno, false);
-  }
+// Tela "Fazer compras" — dropdown de categoria (esquerda) + produto (direita), estilo Popmundo
+function _renderLojaTela(el, catSel, itemSel) {
+  const j = window._lojaCache.j;
+  const categorias = Object.keys(CAT_LOJA_LABEL).filter(c => SHOP.some(it => it.cat === c));
+  const itensDaCategoria = SHOP.filter(it => it.cat === catSel);
+  const item = itemSel ? itensDaCategoria.find(it => it.id === itemSel) : itensDaCategoria[0];
 
   el.innerHTML = `
     <div class="secao-header">
       <div class="secao-titulo">🛍️ Loja</div>
       <span class="secao-badge">Saldo: ${fmt(j.dinheiro||0)}</span>
     </div>
-    <div class="secao-header" style="margin-top:.8rem"><div class="secao-titulo" style="font-size:.82rem">👔 Status</div></div>
-    <div class="grid-cards" style="margin-bottom:1rem">${porCat.status.map(renderCard).join('')}</div>
-    <div class="secao-header"><div class="secao-titulo" style="font-size:.82rem">💼 Profissional</div></div>
-    <div class="grid-cards" style="margin-bottom:1rem">${[...porCat.prof,...porCat.exp].map(renderCard).join('')}</div>
-    <div class="secao-header">
-      <div class="secao-titulo" style="font-size:.82rem">✈️ Congressos</div>
-      <span class="secao-badge" style="font-size:.62rem">1× por ano · mês fixo</span>
+
+    <div class="esc-card-bloco" style="margin-bottom:1rem">
+      <div class="secao-header" style="margin-bottom:.6rem"><div class="secao-titulo" style="font-size:.85rem">Fazer Compras</div></div>
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+        <select id="loja-sel-cat" style="font-size:.78rem;padding:.35rem .6rem;border-radius:var(--r);border:var(--borda);background:var(--surface);color:var(--txt)">
+          ${categorias.map(c => `<option value="${c}" ${c===catSel?'selected':''}>${CAT_LOJA_LABEL[c]}</option>`).join('')}
+        </select>
+        <select id="loja-sel-item" style="font-size:.78rem;padding:.35rem .6rem;border-radius:var(--r);border:var(--borda);background:var(--surface);color:var(--txt)">
+          ${itensDaCategoria.map(it => `<option value="${it.id}" ${item&&it.id===item.id?'selected':''}>${it.n}</option>`).join('')}
+        </select>
+      </div>
     </div>
-    <div class="grid-cards" style="margin-bottom:1.2rem">${porCat.cong.map(renderCard).join('')}</div>`;
-};
+
+    ${item ? _renderLojaDetalhe(j, item) : `<div class="card" style="text-align:center;padding:1.5rem;color:var(--txt3)">Nenhum item nesta categoria.</div>`}`;
+
+  document.getElementById('loja-sel-cat')?.addEventListener('change', (e) => {
+    const novaCat = e.target.value;
+    const primeiro = SHOP.find(it => it.cat === novaCat);
+    _renderLojaTela(el, novaCat, primeiro?.id || null);
+  });
+  document.getElementById('loja-sel-item')?.addEventListener('change', (e) => {
+    _renderLojaTela(el, catSel, e.target.value);
+  });
+}
+
+function _renderLojaDetalhe(j, it) {
+  const { isCong, jatem, usadoAno, mesCorreto } = _itemLojaStatus(j, it);
+  const podeComprar = (j.dinheiro||0) >= it.p;
+
+  let acao;
+  if (isCong) {
+    acao = usadoAno
+      ? `<div class="pc-ativo" style="color:var(--txt3)">✓ Participado este ano (${_anoAtual()})</div>`
+      : !mesCorreto
+        ? `<div style="font-size:.72rem;color:var(--txt3)">Disponível em ${MESES_NOME[it.mes-1]}</div>`
+        : podeComprar
+          ? `<button class="btn btn-prim btn-sm" onclick="window.comprarItem('${it.id}');window.renderLoja(window.JOGADOR,document.getElementById('main-content'))">Participar</button>`
+          : `<div style="font-size:.72rem;color:var(--verm2)">Saldo insuficiente</div>`;
+  } else if (jatem) {
+    acao = `<div class="pc-ativo">✓ Adquirido</div>
+      <button class="btn-vender" onclick="window.venderItem('${it.id}');window.renderLoja(window.JOGADOR,document.getElementById('main-content'))">Vender ${fmt(Math.floor(it.p*.5))}</button>`;
+  } else if (podeComprar) {
+    acao = `<button class="btn btn-prim btn-sm" onclick="window.comprarItem('${it.id}');window.renderLoja(window.JOGADOR,document.getElementById('main-content'))">Comprar</button>`;
+  } else {
+    acao = `<div style="font-size:.72rem;color:var(--verm2)">Saldo insuficiente</div>`;
+  }
+
+  return `
+  <div class="local-info-card">
+    <div class="local-info-titulo">${it.n}</div>
+    <div class="local-info-desc">${it.d || 'Item disponível na loja do escritório.'}</div>
+    <div class="local-info-linha"><span class="local-info-label">Categoria</span><span class="local-info-valor">${CAT_LOJA_LABEL[it.cat]}</span></div>
+    ${isCong ? `<div class="local-info-linha"><span class="local-info-label">Mês disponível</span><span class="local-info-valor">${MESES_NOME[it.mes-1]}</span></div>` : ''}
+    ${it.rep > 0 ? `<div class="local-info-linha"><span class="local-info-label">Bônus de reputação</span><span class="local-info-valor">+${it.rep}</span></div>` : ''}
+  </div>
+
+  <table class="ranking-tabela" style="margin-bottom:1rem">
+    <thead><tr><th>Item</th><th class="val-col">Preço</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>${it.n}</td>
+        <td class="val-col">${fmt(it.p)}</td>
+        <td>${jatem && !isCong ? 'Adquirido' : usadoAno ? 'Participado' : 'Disponível'}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap">${acao}</div>`;
+}
 
 // ════════════════════════════════════════════════════════
 // COMPRAR ITEM
