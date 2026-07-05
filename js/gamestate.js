@@ -70,22 +70,12 @@ function _atualizarSidebarEsquerda(j) {
   const rep    = j.reputacao || 0;
   const pct    = Math.round((rep / cap) * 100);
   const label  = CARGO_LABEL[j.cargo_id] || j.cargo_id;
-  const total  = (j.wins || 0) + (j.losses || 0);
-  const aprov  = total > 0 ? Math.round((j.wins / total) * 100) : 0;
-  const saldo  = j.dinheiro || 0;
-  const energia = j.energia || 0;
 
   _set('sl-nome',     j.nome_personagem || '—');
   _set('sl-cargo',    label);
   _set('sl-rep-val', `Rep ${rep}`);
   _set('sl-rep-cap', `Cap ${cap}`);
   _style('sl-rep-fill', 'width', `${Math.min(100, pct)}%`);
-
-  // Indicadores de status (estilo Popmundo: saúde mental, disposição, fama, dinheiro)
-  _style('sl-saude-fill', 'width', `${Math.min(100, j.saude_mental||0)}%`);
-  _style('sl-disp-fill',  'width', `${Math.min(100, j.disposicao||0)}%`);
-  _style('sl-fama-fill',  'width', `${Math.min(100, pct)}%`);
-  _set('sl-dinheiro-val', fmt(saldo));
 
   // Brasão dinâmico
   _renderBrasao(j.cargo_id, rep);

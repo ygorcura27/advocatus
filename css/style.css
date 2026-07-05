@@ -371,17 +371,6 @@ a:hover { color: var(--navy); }
 .perfil-rep-fill { height: 100%; background: linear-gradient(90deg, var(--ouro3), var(--ouro)); transition: width .4s ease; }
 .perfil-rep-txt { display: flex; justify-content: space-between; font-size: .62rem; color: rgba(255,255,255,.5); }
 
-/* ── Indicadores de status na sidebar (estilo Popmundo: ícone + barra) ── */
-.sl-status-bars { margin-top: .55rem; display: flex; flex-direction: column; gap: .3rem; }
-.sl-status-linha { display: flex; align-items: center; gap: .4rem; }
-.sl-status-icone { font-size: .72rem; flex-shrink: 0; width: 14px; text-align: center; }
-.sl-status-bar-wrap { flex: 1; height: 6px; background: rgba(255,255,255,.15); border-radius: 3px; overflow: hidden; }
-.sl-status-bar-fill { height: 100%; border-radius: 3px; transition: width .4s ease; }
-.sl-status-bar-fill.saude { background: linear-gradient(90deg, #2E8B57, #4AAB77); }
-.sl-status-bar-fill.disp  { background: linear-gradient(90deg, #8B1A1A, #E74C3C); }
-.sl-status-bar-fill.fama  { background: linear-gradient(90deg, var(--ouro3), var(--ouro)); }
-.sl-status-valor { font-size: .68rem; color: #6EE7A0; font-weight: 600; }
-
 .nav-lateral { padding: .6rem .5rem .5rem; }
 .nav-grupo { margin-bottom: .4rem; }
 .nav-grupo-titulo {
