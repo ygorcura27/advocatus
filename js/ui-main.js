@@ -203,10 +203,10 @@ function renderPerfil(j, el) {
             </div>
           </div>
           <div class="barra-status-bloco profile-hero-status">
-            ${_barraStatus('⚡', energiaDisp, {}, true)}
-            ${_barraStatus('img/simbolos/saude_mental.png', j.saude_mental||80)}
-            ${_barraStatus('img/simbolos/disposicao.png', j.disposicao||80)}
-            ${_barraStatus('img/simbolos/reputacao.png', repPct, { semVermelho: true })}
+            ${_barraStatus('⚡', energiaDisp, { label: 'Energia' }, true)}
+            ${_barraStatus('img/simbolos/saude_mental.png', j.saude_mental||80, { label: 'Saúde Mental' })}
+            ${_barraStatus('img/simbolos/disposicao.png', j.disposicao||80, { label: 'Disposição' })}
+            ${_barraStatus('img/simbolos/reputacao.png', repPct, { semVermelho: true, label: 'Reputação' })}
             <div class="barra-status-saldo"><img class="barra-status-icone-saldo" src="img/simbolos/dinheiro.png" alt=""> ${_fmtExt(j.dinheiro||0)}</div>
           </div>
           <div class="hero-badges">
@@ -1785,9 +1785,10 @@ function getBarColor(valor, { semVermelho = false } = {}) {
 
 function _barraStatus(icon, valor, opts = {}, ehEmoji = false) {
   const cor = getBarColor(valor, opts);
+  const label = opts.label || '';
   const iconeHtml = ehEmoji
-    ? `<span class="barra-status-icone barra-status-icone-emoji">${icon}</span>`
-    : `<img class="barra-status-icone" src="${icon}" alt="">`;
+    ? `<span class="barra-status-icone barra-status-icone-emoji" title="${label}">${icon}</span>`
+    : `<img class="barra-status-icone" src="${icon}" alt="${label}" title="${label}">`;
   return `
   <div class="barra-status-linha">
     ${iconeHtml}
