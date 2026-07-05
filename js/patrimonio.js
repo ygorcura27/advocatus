@@ -133,22 +133,22 @@ window._patSideMenu = _patSideMenu;
 function _patSideMenu(ativo, semWrapper) {
   const GRUPOS = [
     { titulo: 'Patrimônio', links: [
-      { id: 'visao-geral', label: 'Visão Geral', fn: "window.navTo('patrimonio',null)" },
+      { id: 'visao-geral', icon:'🏦', label: 'Visão Geral', fn: "window.navTo('patrimonio',null)" },
     ]},
     { titulo: 'Moradia', links: [
-      { id: 'moradia', label: 'Ver Opções', fn: "document.getElementById('pat-moradia-secao')?.scrollIntoView({behavior:'smooth'})" },
+      { id: 'moradia', icon:'🏠', label: 'Ver Opções', fn: "document.getElementById('pat-moradia-secao')?.scrollIntoView({behavior:'smooth'})" },
     ]},
     { titulo: 'Transporte', links: [
-      { id: 'transporte', label: 'Ver Opções', fn: "document.getElementById('pat-transporte-secao')?.scrollIntoView({behavior:'smooth'})" },
+      { id: 'transporte', icon:'🚗', label: 'Ver Opções', fn: "document.getElementById('pat-transporte-secao')?.scrollIntoView({behavior:'smooth'})" },
     ]},
     { titulo: 'Escritório', links: [
-      { id: 'escritorio', label: 'Espaço de Trabalho', fn: "window.navTo('escritorio',null)" },
+      { id: 'escritorio', icon:'💼', label: 'Espaço de Trabalho', fn: "window.navTo('escritorio',null)" },
     ]},
   ];
   const grupos = GRUPOS.map(g => `
       <div class="nav-grupo">
         <div class="nav-grupo-titulo">${g.titulo}</div>
-        ${g.links.map(l => `<div class="nav-item${l.id===ativo?' ativo':''}" onclick="${l.fn}">${l.label}</div>`).join('')}
+        ${g.links.map(l => `<div class="nav-item${l.id===ativo?' ativo':''}" onclick="${l.fn}"><span class="ni-icon">${l.icon}</span> ${l.label}</div>`).join('')}
       </div>`).join('');
   return semWrapper ? grupos : `<aside class="esc-side-menu">${grupos}</aside>`;
 }

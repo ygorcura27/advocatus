@@ -258,34 +258,34 @@ function renderPerfil(j, el) {
 function _perfilSideMenu(semWrapper) {
   const GRUPOS = [
     { titulo: 'Perfil', links: [
-      { label: 'Visão Geral',      fn: "window.scrollTo({top:0,behavior:'smooth'})" },
-      { label: 'Atributos',        fn: "document.getElementById('perfil-atributos-secao')?.scrollIntoView({behavior:'smooth'})" },
-      { label: 'Atividade Recente',fn: "document.getElementById('perfil-atividade-secao')?.scrollIntoView({behavior:'smooth'})" },
+      { icon:'⚖️', label: 'Visão Geral',      fn: "window.scrollTo({top:0,behavior:'smooth'})" },
+      { icon:'📊', label: 'Atributos',        fn: "document.getElementById('perfil-atributos-secao')?.scrollIntoView({behavior:'smooth'})" },
+      { icon:'📋', label: 'Atividade Recente',fn: "document.getElementById('perfil-atividade-secao')?.scrollIntoView({behavior:'smooth'})" },
     ]},
     { titulo: 'Carreira & Atividade', links: [
-      { label: 'Progressão',        fn: "window.navTo('progressao',null)" },
-      { label: 'Petições',          fn: "window.navTo('peticoes',null)" },
-      { label: 'Habilidades',       fn: "window.navTo('habilidades',null)" },
-      { label: 'Cursos & Pós',      fn: "window.navTo('cursos',null)" },
-      { label: 'Concurso Público',  fn: "window.navTo('concurso',null)" },
+      { icon:'📈', label: 'Progressão',        fn: "window.navTo('progressao',null)" },
+      { icon:'📜', label: 'Petições',          fn: "window.navTo('peticoes',null)" },
+      { icon:'⚡', label: 'Habilidades',       fn: "window.navTo('habilidades',null)" },
+      { icon:'🎓', label: 'Cursos & Pós',      fn: "window.navTo('cursos',null)" },
+      { icon:'🔨', label: 'Concurso Público',  fn: "window.navTo('concurso',null)" },
     ]},
     { titulo: 'Patrimônio', links: [
-      { label: 'Moradia',       fn: "window._pendingScrollId='pat-moradia-secao';window.navTo('patrimonio',null)" },
-      { label: 'Veículos',      fn: "window._pendingScrollId='pat-transporte-secao';window.navTo('patrimonio',null)" },
-      { label: 'Investimentos', fn: "window.navTo('financeiro',null)" },
+      { icon:'🏠', label: 'Moradia',       fn: "window._pendingScrollId='pat-moradia-secao';window.navTo('patrimonio',null)" },
+      { icon:'🚗', label: 'Veículos',      fn: "window._pendingScrollId='pat-transporte-secao';window.navTo('patrimonio',null)" },
+      { icon:'💳', label: 'Investimentos', fn: "window.navTo('financeiro',null)" },
     ]},
     { titulo: 'Social', links: [
-      { label: 'Vagas',        fn: "window.navTo('vagas',null)" },
-      { label: 'Rankings',     fn: "window.navTo('ranking',null)" },
-      { label: 'Mensagens',    fn: "window.navTo('inbox',null)" },
-      { label: 'Loja',         fn: "window.navTo('loja',null)" },
-      { label: 'Vida Pessoal', fn: "window.navTo('vida_pessoal',null)" },
+      { icon:'📋', label: 'Vagas',        fn: "window.navTo('vagas',null)" },
+      { icon:'🏆', label: 'Rankings',     fn: "window.navTo('ranking',null)" },
+      { icon:'📬', label: 'Mensagens',    fn: "window.navTo('inbox',null)" },
+      { icon:'🛍️', label: 'Loja',         fn: "window.navTo('loja',null)" },
+      { icon:'👤', label: 'Vida Pessoal', fn: "window.navTo('vida_pessoal',null)" },
     ]},
   ];
   const grupos = GRUPOS.map(g => `
       <div class="nav-grupo">
         <div class="nav-grupo-titulo">${g.titulo}</div>
-        ${g.links.map(l => `<div class="nav-item" onclick="${l.fn}">${l.label}</div>`).join('')}
+        ${g.links.map(l => `<div class="nav-item" onclick="${l.fn}"><span class="ni-icon">${l.icon}</span> ${l.label}</div>`).join('')}
       </div>`).join('');
   return semWrapper ? grupos : `<aside class="esc-side-menu">${grupos}</aside>`;
 }
@@ -971,38 +971,38 @@ function _espLabel2(esp) {
 function _escSideMenu(ativo, semWrapper) {
   const GRUPOS = [
     { titulo: 'Escritório', links: [
-      { id: 'visao-geral',      label: 'Visão Geral',           fn: "window.navTo('escritorio',null)" },
-      { id: 'balancete',        label: 'Balancete',             fn: "window.navTo('balancete',null)" },
-      { id: 'especializacoes',  label: 'Especializações',       fn: "document.getElementById('esc-especializacoes-bloco')?.scrollIntoView({behavior:'smooth'})" },
-      { id: 'workspace',        label: 'Espaço de Trabalho',    fn: "document.getElementById('esc-workspace-bloco')?.scrollIntoView({behavior:'smooth'})" },
+      { id: 'visao-geral',      icon:'🏢', label: 'Visão Geral',           fn: "window.navTo('escritorio',null)" },
+      { id: 'balancete',        icon:'📊', label: 'Balancete',             fn: "window.navTo('balancete',null)" },
+      { id: 'especializacoes',  icon:'🎯', label: 'Especializações',       fn: "document.getElementById('esc-especializacoes-bloco')?.scrollIntoView({behavior:'smooth'})" },
+      { id: 'workspace',        icon:'💼', label: 'Espaço de Trabalho',    fn: "document.getElementById('esc-workspace-bloco')?.scrollIntoView({behavior:'smooth'})" },
     ]},
     { titulo: 'Equipe', links: [
-      { id: 'equipe',       label: 'Ver Equipe',   fn: "window.navTo('equipe',null)" },
-      { id: 'estagiarios',  label: 'Estagiários',  fn: "window._pendingScrollId='equipe-grupo-estagiarios';window.switchEquipeTab&&window.switchEquipeTab('equipe');window.navTo('equipe',null)" },
-      { id: 'assistentes',  label: 'Assistentes',  fn: "window._pendingScrollId='equipe-grupo-assistentes';window.switchEquipeTab&&window.switchEquipeTab('equipe');window.navTo('equipe',null)" },
-      { id: 'advogados',    label: 'Advogados',    fn: "window._pendingScrollId='equipe-grupo-advogados';window.switchEquipeTab&&window.switchEquipeTab('equipe');window.navTo('equipe',null)" },
-      { id: 'diario',       label: 'Diário',       fn: "window.switchEquipeTab&&window.switchEquipeTab('diario');window.navTo('equipe',null)" },
+      { id: 'equipe',       icon:'👥', label: 'Ver Equipe',   fn: "window.navTo('equipe',null)" },
+      { id: 'estagiarios',  icon:'🎓', label: 'Estagiários',  fn: "window._pendingScrollId='equipe-grupo-estagiarios';window.switchEquipeTab&&window.switchEquipeTab('equipe');window.navTo('equipe',null)" },
+      { id: 'assistentes',  icon:'📋', label: 'Assistentes',  fn: "window._pendingScrollId='equipe-grupo-assistentes';window.switchEquipeTab&&window.switchEquipeTab('equipe');window.navTo('equipe',null)" },
+      { id: 'advogados',    icon:'⚖️', label: 'Advogados',    fn: "window._pendingScrollId='equipe-grupo-advogados';window.switchEquipeTab&&window.switchEquipeTab('equipe');window.navTo('equipe',null)" },
+      { id: 'diario',       icon:'📓', label: 'Diário',       fn: "window.switchEquipeTab&&window.switchEquipeTab('diario');window.navTo('equipe',null)" },
     ]},
     { titulo: 'Negócios', links: [
-      { id: 'clientes',       label: 'Clientes',       fn: "window.navTo('clientes',null)" },
-      { id: 'oportunidades',  label: 'Oportunidades',  fn: "document.getElementById('esc-oportunidades-bloco')?.scrollIntoView({behavior:'smooth'})" },
-      { id: 'processos',      label: 'Processos',      fn: "document.getElementById('esc-processos-bloco')?.scrollIntoView({behavior:'smooth'})" },
+      { id: 'clientes',       icon:'🤝', label: 'Clientes',       fn: "window.navTo('clientes',null)" },
+      { id: 'oportunidades',  icon:'✨', label: 'Oportunidades',  fn: "document.getElementById('esc-oportunidades-bloco')?.scrollIntoView({behavior:'smooth'})" },
+      { id: 'processos',      icon:'⚖️', label: 'Processos',      fn: "document.getElementById('esc-processos-bloco')?.scrollIntoView({behavior:'smooth'})" },
     ]},
     { titulo: 'Petições', links: [
-      { id: 'minhas-peticoes', label: 'Minhas Petições',           fn: "window.navTo('peticoes',null)" },
-      { id: 'repertorio',      label: 'Repertório do Escritório',  fn: "window.navTo('repertorio',null)" },
+      { id: 'minhas-peticoes', icon:'📜', label: 'Minhas Petições',           fn: "window.navTo('peticoes',null)" },
+      { id: 'repertorio',      icon:'📚', label: 'Repertório do Escritório',  fn: "window.navTo('repertorio',null)" },
     ]},
     { titulo: 'Mídia', links: [
-      { id: 'midia', label: 'Aparições na Internet', fn: "window.navTo('midia_convites',null)" },
+      { id: 'midia', icon:'🎙️', label: 'Aparições na Internet', fn: "window.navTo('midia_convites',null)" },
     ]},
     { titulo: 'Sócios', links: [
-      { id: 'societario', label: 'Estrutura Societária', fn: "document.querySelector('.esc-donut-wrap')?.scrollIntoView({behavior:'smooth'})" },
+      { id: 'societario', icon:'🧩', label: 'Estrutura Societária', fn: "document.querySelector('.esc-donut-wrap')?.scrollIntoView({behavior:'smooth'})" },
     ]},
   ];
   const grupos = GRUPOS.map(g => `
       <div class="nav-grupo">
         <div class="nav-grupo-titulo">${g.titulo}</div>
-        ${g.links.map(l => `<div class="nav-item${l.id===ativo?' ativo':''}" onclick="${l.fn}">${l.label}</div>`).join('')}
+        ${g.links.map(l => `<div class="nav-item${l.id===ativo?' ativo':''}" onclick="${l.fn}"><span class="ni-icon">${l.icon}</span> ${l.label}</div>`).join('')}
       </div>`).join('');
   return semWrapper ? grupos : `<aside class="esc-side-menu">${grupos}</aside>`;
 }
