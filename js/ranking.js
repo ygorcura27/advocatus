@@ -23,6 +23,7 @@ window.renderRanking = async function(j, el) {
       <button class="btn btn-sm btn-ghost"           id="aba-patrimonio"  onclick="window.mudarAbaRank('patrimonio',this)">💰 Patrimônio</button>
       <button class="btn btn-sm btn-ghost"           id="aba-networking"  onclick="window.mudarAbaRank('networking',this)">🌐 Networking</button>
       <button class="btn btn-sm btn-ghost"           id="aba-academico"   onclick="window.mudarAbaRank('academico',this)">🎓 Acadêmico</button>
+      <button class="btn btn-sm btn-ghost"           id="aba-podcast_influencia" onclick="window.mudarAbaRank('podcast_influencia',this)">🎙️ Vídeos Virais</button>
       <button class="btn btn-sm btn-ghost"           id="aba-escritorios" onclick="window.mudarAbaRank('escritorios',this)">🏢 Escritórios</button>
     </div>
 
@@ -117,6 +118,7 @@ function _renderTabelaJogadores(lista, tipo, meuUid) {
     patrimonio: { label: 'Patrimônio', fmt: v => fmt(v) },
     networking: { label: 'Networking', fmt: v => String(v) },
     academico:  { label: 'Prest. Acadêmico', fmt: v => String(v) },
+    podcast_influencia: { label: 'Influência (views)', fmt: v => String(v) },
   };
   const cfg = TIPO_LABEL[tipo] || TIPO_LABEL.reputacao;
 

@@ -125,6 +125,13 @@ service cloud.firestore {
         allow update: if isOwner(uid);
         allow delete: if isOwner(uid);
       }
+
+      // Convites de mídia direcionados (Podcasts/Aparições na Internet) —
+      // gerados e respondidos via Cloud Function (Admin SDK); dono só lê.
+      match /convites_midia/{conviteId} {
+        allow read:  if isOwner(uid);
+        allow write: if false;
+      }
     }
 
     // ══════════════════════════════════════════════════════
@@ -375,6 +382,15 @@ service cloud.firestore {
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
               || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
         allow update, delete: if false;
+      }
+
+      // Convites de mídia (Podcasts/Aparições na Internet) — gerados e
+      // respondidos via Cloud Function (Admin SDK); cliente só lê.
+      match /convites_midia/{conviteId} {
+        allow read: if isAuth()
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+        allow write: if false;
       }
 
       allow delete: if false;

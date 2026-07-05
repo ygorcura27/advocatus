@@ -1767,6 +1767,18 @@ a:hover { color: var(--navy); }
 .esc-card-bloco .secao-header .esc-ver-todos { color: var(--ouro); }
 .esc-card-bloco .secao-header .esc-ver-todos:hover { color: var(--ouro-light); }
 .esc-card-bloco .secao-header .secao-badge { background: rgba(255,255,255,.15); color: var(--ouro); }
+.esc-card-bloco .secao-header .btn-sec,
+.esc-card-bloco .secao-header .btn-ghost {
+  color: #fff;
+  border-color: rgba(255,255,255,.35);
+  background: rgba(255,255,255,.06);
+}
+.esc-card-bloco .secao-header .btn-sec:hover,
+.esc-card-bloco .secao-header .btn-ghost:hover {
+  background: rgba(255,255,255,.18);
+  border-color: var(--ouro);
+  color: var(--ouro);
+}
 .esc-ver-todos { font-size: .72rem; color: var(--navy3); font-weight: 500; text-decoration: none; white-space: nowrap; }
 .esc-ver-todos:hover { color: var(--navy); text-decoration: underline; }
 
@@ -1785,7 +1797,7 @@ a:hover { color: var(--navy); }
 }
 .esc-membro:last-of-type { border-bottom: none; }
 .esc-membro-avatar {
-  width: 153px; height: 153px; border-radius: 0; flex-shrink: 0;
+  width: 40px; height: 40px; border-radius: var(--r); flex-shrink: 0;
   object-fit: cover;
 }
 .esc-membro-info { flex: 1; min-width: 0; }
@@ -1814,12 +1826,12 @@ a:hover { color: var(--navy); }
 }
 .esc-cliente:last-of-type { border-bottom: none; }
 .esc-cliente-logo {
-  width: 153px; height: 153px; border-radius: 0;
+  width: 40px; height: 40px; border-radius: var(--r);
   background: var(--navy); display: flex; align-items: center; justify-content: center;
-  font-size: 1.3rem; font-weight: 700; color: var(--ouro); flex-shrink: 0;
+  font-size: .8rem; font-weight: 700; color: var(--ouro); flex-shrink: 0;
   font-variant-numeric: tabular-nums;
 }
-.esc-emp-img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 0; }
+.esc-emp-img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: var(--r); }
 .esc-cliente-info { flex: 1; min-width: 0; }
 .esc-cliente-nome { font-size: .8rem; font-weight: 600; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .esc-cliente-tipo { font-size: .62rem; color: var(--txt3); margin-top: 1px; }

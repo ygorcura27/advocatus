@@ -58,6 +58,8 @@ const {
 } = require('./artigos_livros');
 const { anteciparHonorarios, contratarLinhaCredito, pagarLinhaCredito,
         contratarSocioInvestidor, aplicarInvestimento, resgatarInvestimento } = require('./financeiro');
+// GDD v5.1 — Podcasts / Aparições na Internet
+const { responderConviteMidia } = require('./podcasts_social');
 
 exports.avancarMes              = avancarMes;
 exports.processarSentenca       = processarSentenca;
@@ -107,6 +109,7 @@ exports.publicarLivro            = publicarLivro;
 exports.citarObra                = citarObra;
 exports.obterObrasPublicas       = obterObrasPublicas;
 exports.tickMensal               = tickMensal;
+exports.responderConviteMidia    = responderConviteMidia;
 // GDD Seção 31-33 — Financeiro Avançado
 exports.anteciparHonorarios      = anteciparHonorarios;
 exports.contratarLinhaCredito    = contratarLinhaCredito;

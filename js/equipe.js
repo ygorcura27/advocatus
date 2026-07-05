@@ -191,29 +191,14 @@ window.renderEquipe = async function(j, el) {
         <div class="equipe-tab-pane" data-tab="diario" ${_activeEquipeTab!=='diario'?'style="display:none"':''}>
           ${await _renderDiarioEquipe(escId)}
         </div>`;
-};
 
-// Menu lateral categorizado da página de Equipe (mesmo padrão do Escritório/Patrimônio)
-window._equipeSideMenu = _equipeSideMenu;
-function _equipeSideMenu(semWrapper) {
-  const GRUPOS = [
-    { titulo: 'Equipe', links: [
-      { label: 'Estagiários', fn: "window.switchEquipeTab('equipe');document.getElementById('equipe-grupo-estagiarios')?.scrollIntoView({behavior:'smooth'})" },
-      { label: 'Assistentes', fn: "window.switchEquipeTab('equipe');document.getElementById('equipe-grupo-assistentes')?.scrollIntoView({behavior:'smooth'})" },
-      { label: 'Advogados',   fn: "window.switchEquipeTab('equipe');document.getElementById('equipe-grupo-advogados')?.scrollIntoView({behavior:'smooth'})" },
-      { label: 'Diário',      fn: "window.switchEquipeTab('diario')" },
-    ]},
-    { titulo: 'Escritório', links: [
-      { label: 'Visão Geral', fn: "window.navTo('escritorio',null)" },
-    ]},
-  ];
-  const grupos = GRUPOS.map(g => `
-      <div class="nav-grupo">
-        <div class="nav-grupo-titulo">${g.titulo}</div>
-        ${g.links.map(l => `<div class="nav-item" onclick="${l.fn}">${l.label}</div>`).join('')}
-      </div>`).join('');
-  return semWrapper ? grupos : `<aside class="esc-side-menu">${grupos}</aside>`;
-}
+  // Rolar até a âncora solicitada pelo menu lateral fixo do Escritório (ex.: Estagiários/Advogados)
+  if (window._pendingScrollId) {
+    const alvo = window._pendingScrollId;
+    window._pendingScrollId = null;
+    setTimeout(() => document.getElementById(alvo)?.scrollIntoView({ behavior: 'smooth' }), 50);
+  }
+};
 
 function _renderGrupo(titulo, membros, vagas, cargo_min, escId, energiaDisp, procCount = {}, mesGlobal = 0, anchorId = '') {
   const ci = CARGO_INFO[cargo_min] || CARGO_INFO.est;

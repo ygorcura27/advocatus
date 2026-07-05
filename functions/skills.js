@@ -116,6 +116,8 @@ function defaultSkillsJur() {
     area_corporate:  0,
     area_immigration:0,
     area_bankruptcy: 0,
+    // Mídia / Comunicação (GDD v5.1 — Podcasts/Vídeos Virais)
+    comunicacao_midiatica: 0,
   };
 }
 
@@ -253,4 +255,7 @@ module.exports = {
   MOD_DOCUMENT_TYPE,
   MOD_PRACTICE_AREA,
   COMPAT_AREAS,
+  // Utilitários genéricos (reuso em outros módulos, ex. podcasts_social.js)
+  interpolate,
+  capSkill,
 };

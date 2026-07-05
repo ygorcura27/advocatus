@@ -21,6 +21,7 @@ const { getFirestore }  = require('firebase-admin/firestore');
 const { logger }        = require('firebase-functions');
 const { processarPremiosAnuais, zerarContadoresAnuais } = require('./premios_anuais');
 const { processarImprensaMensal } = require('./imprensa');
+const { sortearTemaEGerarConvites } = require('./podcasts_social');
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -197,6 +198,13 @@ exports.tickMensal = onSchedule({
     } catch (e) {
       logger.error('[PREMIOS] Falha ao processar prêmios anuais:', e.message);
     }
+  }
+
+  // ── 7. Tema em alta + convites de mídia (Podcasts/Vídeos Virais) ──
+  try {
+    await sortearTemaEGerarConvites(db, mesGlobal);
+  } catch (e) {
+    logger.error('[MIDIA] Falha ao sortear tema/gerar convites:', e.message);
   }
 
   logger.info('[TICK] Tick mensal concluído');
@@ -619,6 +627,7 @@ async function atualizarRankings(db) {
     { id: 'dinheiro',   campo: 'dinheiro',             label: 'Patrimônio' },
     { id: 'wins',       campo: 'wins',                 label: 'Vitórias' },
     { id: 'networking', campo: 'networking',           label: 'Networking' },
+    { id: 'podcast_influencia', campo: 'podcast_influencia', label: 'Vídeos Virais' },
   ];
 
   const mesGlobal = (await db.collection('config').doc('server').get()).data()?.mes_global || 0;

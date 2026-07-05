@@ -64,20 +64,28 @@ function _navLateralPadrao(painel) {
 // Popula o menu lateral esquerdo de acordo com a categoria ativa — contextual
 // para Perfil/Escritório/Patrimônio/Equipe (que já têm menu próprio), com
 // fallback pro menu completo de sempre nas demais páginas.
+// Painéis que pertencem à "seção" Escritório — o menu lateral é fixo entre
+// eles (igual Popmundo: só o item ativo muda, nunca vira submenu diferente).
+const ESC_PAINEIS = {
+  escritorio: 'visao-geral',
+  processos:  'visao-geral',
+  balancete:  'balancete',
+  equipe:     'equipe',
+  clientes:   'clientes',
+  repertorio: 'repertorio',
+  midia_convites: 'midia',
+};
+
 function _renderSidebarLateral(painel) {
   const nav = document.getElementById('nav-lateral-dynamic');
   if (!nav) return;
 
   if (painel === 'perfil') {
     nav.innerHTML = _perfilSideMenu(true);
-  } else if (painel === 'escritorio') {
-    nav.innerHTML = _escSideMenu('visao-geral', true);
-  } else if (painel === 'repertorio') {
-    nav.innerHTML = _escSideMenu('repertorio', true);
+  } else if (painel in ESC_PAINEIS) {
+    nav.innerHTML = _escSideMenu(ESC_PAINEIS[painel], true);
   } else if (painel === 'patrimonio' && window._patSideMenu) {
     nav.innerHTML = window._patSideMenu('visao-geral', true);
-  } else if (painel === 'equipe' && window._equipeSideMenu) {
-    nav.innerHTML = window._equipeSideMenu(true);
   } else {
     nav.innerHTML = _navLateralPadrao(painel);
   }
@@ -118,6 +126,10 @@ function _renderizar() {
     case 'repertorio':
       if (window.renderRepertorioEscritorio) window.renderRepertorioEscritorio(j, main);
       else main.innerHTML = '<div class="card" style="color:var(--ardosia2)">Carregando repertório...</div>';
+      break;
+    case 'midia_convites':
+      if (window.renderConvitesMidia) window.renderConvitesMidia(j, main);
+      else main.innerHTML = '<div class="card" style="color:var(--ardosia2)">Carregando convites de mídia...</div>';
       break;
     case 'progressao':   renderProgressao(j, main);    break;
     case 'habilidades':  renderHabilidades(j, main);   break;
@@ -964,8 +976,11 @@ function _escSideMenu(ativo, semWrapper) {
       { id: 'workspace',        label: 'Espaço de Trabalho',    fn: "document.getElementById('esc-workspace-bloco')?.scrollIntoView({behavior:'smooth'})" },
     ]},
     { titulo: 'Equipe', links: [
-      { id: 'equipe',    label: 'Ver Equipe',   fn: "window.navTo('equipe',null)" },
-      { id: 'contratar', label: 'Contratar',    fn: "window.navTo('equipe',null)" },
+      { id: 'equipe',       label: 'Ver Equipe',   fn: "window.navTo('equipe',null)" },
+      { id: 'estagiarios',  label: 'Estagiários',  fn: "window._pendingScrollId='equipe-grupo-estagiarios';window.switchEquipeTab&&window.switchEquipeTab('equipe');window.navTo('equipe',null)" },
+      { id: 'assistentes',  label: 'Assistentes',  fn: "window._pendingScrollId='equipe-grupo-assistentes';window.switchEquipeTab&&window.switchEquipeTab('equipe');window.navTo('equipe',null)" },
+      { id: 'advogados',    label: 'Advogados',    fn: "window._pendingScrollId='equipe-grupo-advogados';window.switchEquipeTab&&window.switchEquipeTab('equipe');window.navTo('equipe',null)" },
+      { id: 'diario',       label: 'Diário',       fn: "window.switchEquipeTab&&window.switchEquipeTab('diario');window.navTo('equipe',null)" },
     ]},
     { titulo: 'Negócios', links: [
       { id: 'clientes',       label: 'Clientes',       fn: "window.navTo('clientes',null)" },
@@ -975,6 +990,9 @@ function _escSideMenu(ativo, semWrapper) {
     { titulo: 'Petições', links: [
       { id: 'minhas-peticoes', label: 'Minhas Petições',           fn: "window.navTo('peticoes',null)" },
       { id: 'repertorio',      label: 'Repertório do Escritório',  fn: "window.navTo('repertorio',null)" },
+    ]},
+    { titulo: 'Mídia', links: [
+      { id: 'midia', label: 'Aparições na Internet', fn: "window.navTo('midia_convites',null)" },
     ]},
     { titulo: 'Sócios', links: [
       { id: 'societario', label: 'Estrutura Societária', fn: "document.querySelector('.esc-donut-wrap')?.scrollIntoView({behavior:'smooth'})" },
