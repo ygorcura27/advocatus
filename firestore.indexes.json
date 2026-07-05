@@ -65,6 +65,14 @@
         { "fieldPath": "no_mercado",  "order": "ASCENDING" },
         { "fieldPath": "criada_em",   "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "convites_midia",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status",     "order": "ASCENDING" },
+        { "fieldPath": "criado_em",  "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
