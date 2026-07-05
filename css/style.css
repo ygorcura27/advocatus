@@ -839,7 +839,8 @@ a:hover { color: var(--navy); }
 /* ── Barras de status (Energia/Saúde Mental/Disposição/Reputação) ── */
 .barra-status-bloco { margin-bottom: 1.1rem; }
 .barra-status-linha { display: flex; align-items: center; gap: .6rem; margin-bottom: .4rem; }
-.barra-status-icone { font-size: .95rem; width: 20px; text-align: center; flex-shrink: 0; }
+.barra-status-icone { width: 20px; height: 20px; object-fit: contain; text-align: center; flex-shrink: 0; }
+.barra-status-icone.barra-status-icone-emoji { font-size: .95rem; width: 20px; height: auto; }
 .barra-status-wrap { flex: 1; height: 10px; background: var(--bg2); border-radius: 5px; overflow: hidden; }
 .barra-status-fill { height: 100%; border-radius: 5px; transition: width .4s ease, background .3s ease; }
 .barra-status-pct { font-size: .72rem; font-weight: 700; color: var(--txt2); min-width: 3.2rem; text-align: right; flex-shrink: 0; }
@@ -847,7 +848,8 @@ a:hover { color: var(--navy); }
 .barra-status-fill.barra-verde     { background: linear-gradient(90deg, var(--verde2), var(--verde3)); }
 .barra-status-fill.barra-azul      { background: linear-gradient(90deg, var(--navy3), var(--navy4)); }
 .barra-status-fill.barra-vermelha  { background: linear-gradient(90deg, var(--verm2), var(--verm3)); }
-.barra-status-saldo { font-size: .85rem; font-weight: 700; color: var(--verde2); text-align: right; margin-top: .2rem; }
+.barra-status-saldo { display: flex; align-items: center; justify-content: flex-end; gap: .4rem; font-size: .85rem; font-weight: 700; color: var(--verde2); margin-top: .2rem; }
+.barra-status-icone-saldo { width: 18px; height: 18px; object-fit: contain; }
 
 /* ═══════════════════════════════════════════════════════════
    INBOX / MENSAGENS

@@ -199,11 +199,11 @@ function renderPerfil(j, el) {
         </div>
 
         <div class="barra-status-bloco">
-          ${_barraStatus('⚡', energiaDisp)}
-          ${_barraStatus('🙂', j.saude_mental||80)}
-          ${_barraStatus('❤️', j.disposicao||80)}
-          ${_barraStatus('⭐', repPct, { semVermelho: true })}
-          <div class="barra-status-saldo">💲 ${_fmtExt(j.dinheiro||0)}</div>
+          ${_barraStatus('⚡', energiaDisp, {}, true)}
+          ${_barraStatus('img/simbolos/saude_mental.png', j.saude_mental||80)}
+          ${_barraStatus('img/simbolos/disposicao.png', j.disposicao||80)}
+          ${_barraStatus('img/simbolos/reputacao.png', repPct, { semVermelho: true })}
+          <div class="barra-status-saldo"><img class="barra-status-icone-saldo" src="img/simbolos/dinheiro.png" alt=""> ${_fmtExt(j.dinheiro||0)}</div>
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:1.2rem">
@@ -1765,11 +1765,14 @@ function getBarColor(valor, { semVermelho = false } = {}) {
   return semVermelho ? 'azul' : 'vermelha';
 }
 
-function _barraStatus(icon, valor, opts = {}) {
+function _barraStatus(icon, valor, opts = {}, ehEmoji = false) {
   const cor = getBarColor(valor, opts);
+  const iconeHtml = ehEmoji
+    ? `<span class="barra-status-icone barra-status-icone-emoji">${icon}</span>`
+    : `<img class="barra-status-icone" src="${icon}" alt="">`;
   return `
   <div class="barra-status-linha">
-    <span class="barra-status-icone">${icon}</span>
+    ${iconeHtml}
     <div class="barra-status-wrap"><div class="barra-status-fill barra-${cor}" style="width:${Math.max(0,Math.min(100,valor))}%"></div></div>
     <span class="barra-status-pct">${Math.round(valor)}%</span>
   </div>`;
