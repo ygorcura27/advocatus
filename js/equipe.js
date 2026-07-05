@@ -137,6 +137,7 @@ window.renderEquipe = async function(j, el) {
   const energiaDisp   = Math.max(0, 100 - (j.energia_usada_mes || 0));
 
   el.innerHTML = `
+        <div style="margin-bottom:.8rem"><button class="btn btn-ghost btn-sm" onclick="window.navTo('escritorio',null)">← Escritório</button></div>
         <div class="secao-header">
           <div class="secao-titulo">👥 Equipe — ${esc.nome}</div>
           <span class="secao-badge">Tier ${tier} · ${funcs.length} membro(s)</span>

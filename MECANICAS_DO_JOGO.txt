@@ -1,0 +1,601 @@
+═══════════════════════════════════════════════════════════════════
+                    ADVOCATUS ONLINE — MECÂNICAS DO JOGO
+═══════════════════════════════════════════════════════════════════
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. PROGRESSÃO DE CARREIRA (XP E CARGOS)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Cargo              XP mínimo   Anos carreira   Salário (min–max)       Rep. cap
+─────────────────────────────────────────────────────────────────────────────────
+Estagiário            0           0            R$ 1.700 fixo              20
+Assistente Jurídico  120           0            R$ 2.500–3.500             35
+→ Prova da OAB      260           0            (obrigatória para passar)   35
+Advogado Júnior     260           0            R$ 3.500–6.650             45
+Advogado Pleno      580           2            R$ 5.750–11.100            55
+Advogado Sênior    1100           4            R$ 10.600–20.000           65
+Associado          1800           6            R$ 20.000–35.000           80
+Sócio              2800           8            R$ 35.000–65.000          100
+Sócio Nominal      4500          12            R$ 65.000–120.000         100
+
+Aposentadoria compulsória: 75 anos. Escolha um herdeiro para continuar.
+
+Cada cargo tem um CAP DE REPUTAÇÃO. Skills e reputação não podem ultrapassar
+o cap do cargo atual — é preciso ser promovido para continuar crescendo.
+
+Promoção: é iniciada manualmente quando os requisitos (XP + anos + reputação)
+forem atingidos. O jogador define o salário e o NPC aceita se:
+  - Salário ≥ 70% do teto do próximo cargo, OU
+  - Reputação interna do NPC ≥ 60
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. XP (PONTOS DE EXPERIÊNCIA)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+XP é ganho a cada DECISÃO judicial (por instância percorrida):
+
+  Instância          XP base     Fórmula
+  ────────────────────────────────────────────────────
+  1º Grau              20        base + score × 0.15
+  TJ / TRF / TRT       32        base + score × 0.15
+  STJ / TST            50        base + score × 0.15
+  STF                  70        base + score × 0.15
+
+  • XP é SEMPRE acumulativo — nunca revertido, mesmo em derrotas.
+  • Estagiário / Assistente que instrui um caso travado por cargo (precisa
+    de Júnior+ para sentença) recebe XP parcial: +3 XP (est) ou +6 XP (ass).
+
+  • A reputação, ao contrário, OSCILA a cada decisão (sobe em vitórias,
+    cai em derrotas) — reflete o abalo real com o cliente.
+
+  • Dinheiro (honorários) só é creditado no TRÂNSITO EM JULGADO: fica
+    como "hon_pendente" até a cadeia de recursos se esgotar.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. BARRA DE ENERGIA DO JOGADOR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• Base: 100⚡ por mês (resetada ao avançar o mês)
+• Bônus academia: até +25⚡ (total máximo de 125⚡)
+• Penalidade de exaustão: -5⚡ (dura 3 meses)
+
+Custos de energia por ação:
+
+  Ação                                      Custo
+  ─────────────────────────────────────────────────
+  Conhecer alguém (Igreja/Mercado)            2⚡
+  Conhecer alguém (Shopping/Café/Academia)    3⚡
+  Conhecer alguém (Teatro/Congresso)          4⚡
+  Conhecer alguém (Balada)                    5⚡
+  Mandar mensagem (relacionamento)            2⚡
+  Jantar com parceiro                         5⚡
+  Passeio                                     8⚡
+  Intimidade                                  4⚡
+  Viagem nacional                            15⚡
+  Viagem internacional                       25⚡
+  Academia (manutenção do bônus)              5⚡
+  Mediar conflito (desentendimento)           5⚡
+  Mediar conflito (estrutural)               10⚡
+  Aceitar oportunidade pessoalmente          25⚡
+  Assumir processo do pool                   25⚡
+  Designar processo a NPC                     5⚡
+  Sentença no processo do pool               10⚡
+  Rodada de audiência (processo individual)  12⚡
+  Rodada de sustentação oral (recurso)       15⚡
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. BURNOUT DO JOGADOR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+EXAUSTÃO (aviso antes do burnout):
+  • 3 meses consecutivos com 10–15⚡ restantes ao final do mês
+  → Penalidade: -5⚡ de energia total pelos próximos 3 meses
+
+BURNOUT TOTAL:
+  • 3 meses consecutivos com 0–10⚡ restantes ao final do mês
+  → Estado: em_burnout ativado
+  → Recuperação: 3 meses consecutivos com >10⚡ restantes
+
+Efeitos colaterais de energia:
+  • Gasto >70⚡ no mês → -5 saúde mental
+  • Gasto <30⚡ no mês → +3 saúde mental, +3 disposição
+  • Disposição decai -2/mês automaticamente
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. PROCESSOS — SISTEMA INDIVIDUAL (audiência progressiva)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+GERAÇÃO DO PROCESSO:
+  • Dificuldades: baixa (2 fatos), média (3 fatos), alta (4 fatos)
+  • Valor da causa: baixa R$5k–30k | média R$20k–150k | alta R$100k–800k
+  • Convencimento inicial: 38 pontos (lado autor) ou 28 (lado réu na cível)
+
+AUDIÊNCIA — 3 RODADAS (cada uma custa 12⚡):
+  • O jogador escolhe teses (até 2) e provas (até 3) antes da audiência
+  • Cada rodada: argumento da parte contrária + resposta do jogador
+  • Convencimento oscila conforme força dos argumentos e provas
+  • Eventos processuais podem surgir (favoráveis ou desfavoráveis)
+
+SENTENÇA DE 1º GRAU:
+  • Processada pela Cloud Function "processarSentenca"
+  • O convencimento é RECALCULADO do zero pelo backend (a partir do
+    historico_respostas salvo) — o valor exibido no cliente é apenas
+    uma estimativa; não pode ser manipulado
+  • XP: 20 base + score × 0.15
+
+HONORÁRIOS (jogador solo):
+  • 30% do valor da causa + 10% de sucumbência (1ª instância)
+
+HONORÁRIOS (empregado de escritório):
+  • 10% da sucumbência
+
+Honorários ficam "hon_pendente" até o TRÂNSITO EM JULGADO.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6. RECURSOS JUDICIAIS (INSTÂNCIAS)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CAPACIDADE POSTULATÓRIA POR CARGO:
+  Cargo           Instâncias acessíveis
+  ────────────────────────────────────────────────────
+  Estagiário      Não pode recorrer
+  Assistente      Não pode recorrer
+  Júnior          Até TJ / TRF / TRT (2º grau)
+  Pleno           Até STJ / TST
+  Sênior+         STF
+
+Se o processo sobe para uma instância que o jogador não alcança, é
+feito REPASSE AUTOMÁTICO para outro membro da equipe do escritório
+que tenha capacidade postulatória para aquela instância.
+
+JULGADORES COLEGIADOS (recurso):
+  • TJ / TRF / TRT: 3 julgadores com perfis ocultos
+  • STJ / TST: 5 julgadores com perfis ocultos
+  • STF: 5 julgadores com perfis ocultos
+  Cada julgador tem uma classe oculta que reage diferentemente a
+  cada TEMA DE ARGUMENTO. Escolher a tese certa faz diferença.
+
+PLACAR:
+  • Decisão por maioria de votos
+  • Trava de acesso à instância superior: goleada muito pesada impede
+    subir (decisão praticamente unânime contra)
+
+CUSTOS DO RECURSO:
+  • 10⚡ para preparar o recurso
+  • 15⚡ por rodada de sustentação oral
+
+XP POR INSTÂNCIA:
+  • TJ/TRF/TRT: 32 base | STJ/TST: 50 base | STF: 70 base
+  • Fórmula completa: base + score × 0.15
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+7. POOL DO ESCRITÓRIO (PROCESSOS COLABORATIVOS)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TIER DE CLIENTE (processos do pool):
+
+  Tier   Honorários (faixa)           Chance de aparecer    Cargo mín. para atender
+  ──────────────────────────────────────────────────────────────────────────────────
+  D      R$ 1.500–4.500               50%                   Estagiário
+  C      R$ 5.000–14.000              35%                   Assistente
+  B      R$ 15.000–38.000             25%                   Júnior
+  A      R$ 40.000–95.000             15%                   Pleno
+  S      R$ 100.000–240.000           10%                   Sênior / Associado / Sócio
+
+LIMITE DE PROCESSOS DO POOL POR TIER DO ESCRITÓRIO:
+  Tier 1: 4 processos | Tier 2: 8 | Tier 3: 12 | Tier 4: 18 | Tier 5: 24
+
+RESULTADO DA SENTENÇA (pool):
+  • Procedente: 100% dos honorários
+  • Parcialmente procedente: 55% dos honorários
+  • Improcedente: 10% dos honorários
+
+RECURSO POOL:
+  • Chance do adversário recorrer em decisão parcial: ~65%
+  • O jogador DECIDE se recorre ou aceita a derrota (nunca automático)
+  • Prazo recursal: 3 meses — se vencer sem sustentar, -2 rep
+
+RECURSO CONTRÁRIO (Ação Declaratória):
+  • Cria processo com status "recurso_pendente" no pool
+  • Status inicial: disponivel → em_andamento → aguardando_sentenca
+    → concluido | recurso_pendente
+
+DESIGNAÇÃO A NPCs (no pool):
+  • Custo para o dono designar: 5⚡
+  • NPC consome 40⚡ ao ser designado
+  • Progresso entregue por mês (para 1 processo):
+    est=20%, ass=28%, jnr=40%, pln=55%, snr=70%, asc=82%, soc=95%
+  • Est e Ass não processam sentença — fica em "aguardando_sentença"
+    até Júnior+ do escritório assinar manualmente (custo 10⚡)
+  • Júnior+ processam sentença com base nas próprias skills
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+8. GESTÃO DO ESCRITÓRIO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ESPAÇO (escritório solo):
+  Home office:       R$ 0/mês
+  Coworking:         R$ 600/mês
+  Sala simples:      R$ 3.000/mês
+  Sala média:        R$ 7.500/mês
+  Sala premium:      R$ 18.000/mês
+
+Custo de Vida base por cargo (além de aluguel e carro):
+  est=R$600 | ass=R$700 | jnr=R$900 | pln=R$1.400 | snr=R$2.200
+  asc=R$3.000 | soc=R$4.500 | snm=R$6.000
+
+UPGRADE DO ESCRITÓRIO PRÓPRIO:
+
+  Para ir de     Capital   Rep. mínima  Cargo mín.  Anos desde Júnior  Custo fixo novo
+  ───────────────────────────────────────────────────────────────────────────────────────
+  Tier 1 → 2    R$ 16.000      2         Pleno            2 anos        R$ 8.000/mês
+  Tier 2 → 3    R$ 36.000     11         Sênior           4 anos        R$ 18.000/mês
+  Tier 3 → 4    R$ 70.000     34         Associado        7 anos        R$ 35.000/mês
+  Tier 4 → 5    R$140.000     81         Sócio           10 anos        R$ 70.000/mês
+
+CAPACIDADE DE EQUIPE POR TIER:
+
+  Tier   Estagiários   Assistentes   Advogados   Custo fixo/mês
+  ─────────────────────────────────────────────────────────────────
+  1          1              1           0          R$ 3.500
+  2          2              2           1          R$ 8.000
+  3          3              2           2          R$ 18.000
+  4          4              3           3          R$ 35.000
+  5          5              4           4          R$ 70.000
+
+OPORTUNIDADES DO ESCRITÓRIO (serviços):
+  • Aceitar pessoalmente: 25⚡ — 100% do valor vai para o caixa
+  • Delegar a NPC: custo 5⚡ do dono + 25⚡ do NPC, percentual do valor
+    varia: est=20%, ass=20%, jnr=30%, pln=40%, snr=50%, asc=70%, soc=100%
+
+FATURAMENTO:
+  • honorários de sentenças e oportunidades → entram no caixa
+  • Recebimentos recorrentes de clientes PJ mensal
+  • Ranking mensal de NPCs gera bônus no caixa
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+9. EQUIPE DE NPCs
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ENERGIA DO NPC: 100⚡/mês (resetada ao avançar o mês)
+  Sobrecarga: se usou >80⚡ no mês
+  Burnout NPC: 3 meses sobrecarregados → afastado 3 meses
+
+Custos de energia por ação:
+  Processo designado (ao assumir):     40⚡
+  Processo ativo no mês (Cloud Func):  20⚡ por processo
+  Oportunidade delegada:               25⚡
+  Estudo autônomo:                     20⚡
+  Mentoria (papel de mentor):          30⚡
+
+FEEDBACK DE PROCESSOS (estrelas):
+  • -2 a +2 pontos de efeito baseados em: provas fortes escolhidas,
+    resultado (procedente/parcial), estresse do NPC
+  • Mapeamento: efeito -2→1★, -1→2★, 0→3★, +1→4★, +2→5★
+  • 5★: 90% de chance de recorrência | 4★: 60% | 3★: 25% | 2★: 10% | 1★: 0%
+
+ESTRESSE DO NPC:
+  Fórmula: (conflitos_ativos × 20) + (feedback_ruim × 10) + (sobrecarga ? 10 : 0)
+
+TURNOVER:
+  • 3 meses com estresse ≥85: aviso de saída (inbox)
+  • 4 meses com estresse ≥85 após aviso: demissão voluntária
+
+PROMOÇÃO DE NPCs:
+  Requisitos: 6+ meses no cargo, 10+ casos resolvidos, ≥3.5★ de feedback,
+  skills ≥50% do cap do próximo cargo
+  Aceita: salário ≥ 70% do teto do próximo cargo OU rep interna ≥ 60
+  Se aceitar: -20 estresse, aviso_saida = false
+
+FÉRIAS DE NPCs:
+  Disponível após 12 meses sem férias + 12+ meses no cargo atual
+  Efeito: estresse = 0
+
+CAPS DE SKILLS POR CARGO:
+  est=20 | ass=35 | jnr=45 | pln=55 | snr=65 | asc=80 | soc=100
+
+SKILL POR CARGO (salários dos NPCs da equipe):
+  Estagiário:       R$ 1.700–1.700
+  Assistente:       R$ 2.500–3.500
+  Júnior:           R$ 3.500–6.650
+  Pleno:            R$ 5.750–11.100
+  Sênior:           R$ 10.600–20.000
+  Associado:        R$ 20.000–35.000
+  Sócio:            R$ 35.000–65.000
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+10. MENTORIA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Custo mensal do mentor: 30⚡
+Ganho base do aprendiz: 10% do valor da skill do mentor na skill ensinada
+Bônus se afinidade entre os dois ≥ 80: +3 pts no ganho
+Penalidade se mentor tem múltiplos aprendizes: -2 pts
+Penalidade se afinidade ≤ 20: ganho × 0.5
+Mínimo garantido: 1 ponto por mês
+
+O MENTOR também ganha +2 na skill sendo ensinada por mês.
+
+Enquanto em mentoria, o aprendiz NÃO estuda de forma autônoma.
+Burnout/férias de qualquer um dos dois suspende a mentoria no mês.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+11. RANKING MENSAL DE NPCs
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Pontuação: (casos_resolvidos × 10) + (media_acumulada × 15) + (taxa_vitoria × 5)
+
+  Posição    Recompensa
+  ───────────────────────────────────────────────────────────
+  1º lugar   +R$ 5.000 ao caixa + skill mais baixa +3 pts
+  2º lugar   +R$ 2.000 ao caixa + skill mais baixa +2 pts
+  3º lugar   +R$ 500 ao caixa
+  Último     —
+
+Penalidades por permanecer em último lugar:
+  3 meses consecutivos: +15 estresse
+  6 meses consecutivos: questiona permanência no escritório (risco saída)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+12. CONFLITOS ENTRE NPCs
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Tipos de conflito:
+  Desentendimento: custo 5⚡, sucesso 100%, resolve no mês seguinte
+  Conflito estrutural: custo 10⚡, sucesso 30%, custo financeiro:
+    Tier 1: R$1.000 | Tier 2: R$2.000 | Tier 3+: R$3.000
+
+Conflito ativo sem mediação: +20 ao estresse de cada envolvido por mês.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+13. CURSOS (DESENVOLVIMENTO DO JOGADOR)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Aprovação: frequência mínima de 75% no período.
+Reprovado: perde o investimento.
+
+  Curso                       Duração   Custo     Ganho de skills             Req.
+  ─────────────────────────────────────────────────────────────────────────────────
+  Litigância Estratégica      4 sem.    R$10k    +22 Oratória, +18 Persuasão  Ass.
+  Escrita Jurídica Avançada   5 sem.    R$8k     +25 Escrita, +10 Argumentação Ass.
+  Tribunal do Júri — Plenário 3 sem.    R$6k     +20 Oratória, +20 Persuasão  Jnr
+  Curso de Arbitragem         6 sem.    R$15k    +25 Negociação, +15 Persuasão Jnr
+  LLM Direito Tributário      12 sem.   R$40k    +30 Pesquisa, +15 Argumentação Jnr
+  Tributação Internacional     8 sem.   R$22k    +20 Pesquisa, +10 Negociação  Pln
+  MBA Gestão de Escritório    12 sem.   R$35k    +30 Gestão, +12 Networking    Pln
+  MBA Compliance Corporativo  16 sem.   R$55k    +30 Gestão, +10 Networking    Pln
+  Especialização CARF/TRF     10 sem.   R$30k    +25 Argumentação, +15 Pesq.   Snr
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+14. RECEBIMENTOS MENSAIS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+EMPREGADO DE ESCRITÓRIO:
+  Salário = sal_min + (sal_max - sal_min) × (reputação / 100) × multiplicador
+  (baseado no cargo, descontado aluguel + carro + custo de vida + parcelas)
+
+ADVOGADO SOLO:
+  Renda = honorários acumulados no mês (processos + oportunidades aceitas)
+  (descontado espaço + carro + custo de vida + parcelas)
+
+MORADIA — impacto na reputação mensal (exemplos):
+  Casa dos pais: 0 rep (pena -2/mês para Júnior+)
+  Bairros de risco (Belford, Nilópolis etc.): -1 rep/mês
+  Icaraí/Botafogo: +5 rep/mês
+  Ipanema: +9 rep/mês
+  Leblon: +10 rep/mês
+
+TRANSPORTE — impacto na reputação:
+  Ônibus: 0 rep, R$176/mês
+  Kwid/Mobi/HB20: 0 rep, R$850–1.000/mês
+  Tracker/T-Cross: +2 rep, R$1.700–1.800/mês
+  Compass/Corolla: +3 rep, R$2.200–2.500/mês
+  Tiguan: +5 rep, R$3.200/mês
+  BMW 3/Audi A4: +7 rep, R$4.400–4.500/mês
+  Mercedes Classe C: +8 rep, R$5.000/mês
+  Range Rover: +10 rep, R$7.000/mês
+
+BÔNUS ANUAL (Janeiro):
+  100% de vitórias no ano: 6 salários
+  ≥90%: 3 salários
+  ≥80%: 2 salários
+  ≥70%: 1 salário
+  (Só se aplicável a empregados de escritório, não solo)
+
+Janeiro também ativa o RECESSO JUDICIÁRIO: tribunais paralisam por
+60 minutos reais — bloqueia avançar o mês antes de acabar o cooldown.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+15. RELACIONAMENTOS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+NPCs são entidades GLOBAIS únicas — a mesma Larissa Almeida existe
+para todos os jogadores e só pode estar com um de cada vez (lock).
+
+Locais para conhecer alguém:
+  Igreja / Mercado / Livraria: 2⚡
+  Shopping / Café Literário / Academia: 3⚡
+  Teatro / Congresso Jurídico: 4⚡ (Congresso +2 networking)
+  Balada: 5⚡
+
+Interações mensais (limite +25 de afinidade por mês):
+  Mensagem: 2⚡ → +2 afinidade
+  Jantar: 5⚡ → +5
+  Passeio: 8⚡ → +8
+  Viagem nacional: 15⚡ → +15
+  Viagem internacional: 25⚡ → +25
+  Intimidade: 4⚡ → +6
+
+Presentes:
+  Simples: R$200 → +3 afinidade
+  Médio: R$1.000 → +8
+  Luxuoso: R$5.000 → +15
+
+ESTÁGIOS DO RELACIONAMENTO:
+  Estágio       Cap afinidade   Decaimento/mês   Chance término/mês
+  ─────────────────────────────────────────────────────────────────
+  Affair            50              -10              3%
+  Namorado(a)      100               -8              2%
+  Noivo(a)         150               -5              1%
+  Esposo(a)        200               -3             0.5%
+
+Impacto de término na saúde mental:
+  Affair: -10 SM | Namorado: -20 | Noivo: -35 | Esposo: -50
+  "Dar um tempo": metade desses valores
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+16. CASAMENTO (PROGRESSÃO DO RELACIONAMENTO)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Affair → Namorado(a):
+    Requisitos: afinidade ≥50, 6+ meses, Anel simples R$1.000
+
+  Namorado(a) → Noivo(a):
+    Requisitos: afinidade ≥100, 12+ meses, Anel de noivado R$10.000
+
+  Noivo(a) → Esposo(a):
+    Requisitos: afinidade ≥150, 12+ meses de noivado, Casamento R$50.000
+
+COMPATIBILIDADE (afeta felicidade):
+  Base: 50 pontos
+  Traços compatíveis: +15 por par | Traços conflitantes: -15 por par
+  Cap: 10–95 pontos
+
+  Compatibilidade → bônus de felicidade mensal:
+    ≥90: +10 | ≥70: +5 | ≥50: 0 | ≥30: -5 | <30: -10
+
+FELICIDADE afeta chance de vitória nos processos:
+  ≤20 felicidade: -10% | ≤40: -5% | ≤60: 0 | ≤80: +5% | >80: +10%
+
+TRAÇOS DE PERSONALIDADE (exemplos de efeitos mecânicos):
+  Romântica: +20% no ganho de afinidade, dano de término ×1.5
+  Independente: decaimento mensal ×0.5
+  Ciumenta: 2%/mês evento de conflito; 15% deste evento virar término
+  Materialista: +10 afinidade por presente; ×1.2 custo de eventos;
+                -10 afinidade por aniversário sem presente (após 6 meses sem)
+  Familiar: +15 afinidade ao nascer um filho; -10/mês sem filhos
+            depois que ela completar 30 anos
+  Conservadora: -5 afinidade/mês após 2 anos de namoro sem proposta
+  Carente: +25% ganho de afinidade, +50% perda de afinidade
+  Competitiva: +8 afinidade em promoção do jogador; -5 sem evolução por 12m
+  Ambiciosa: +4 afinidade em promoção; -5 sem evolução por 12m
+  Caseira: -4 afinidade se o jogador gastar >80⚡/mês
+  Aventureira: exige ao menos 1 viagem por ano (-5 afinidade/mês sem)
+
+INFIDELIDADE:
+  Chance de flagra: 8% por affair ativo adicional por mês
+  Se namorado(a)+ com affair ativo: +12%/mês
+  Consequências: -25 saúde mental, -30 felicidade, zera afinidade (término)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+17. FILHOS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Chance de gravidez por mês:
+  Namorado(a): 2% | Noivo(a): 4% | Esposo(a): 8%
+
+Duração da gestação: 9 meses
+
+Custo mensal por filho (debitado do saldo):
+  Bebê (0–5 anos):    R$800/mês
+  Criança (6–17):     R$1.200/mês
+  Jovem (18–22):      R$2.000/mês
+  Independente após 22 anos → custo cessa
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+18. ACADEMIA (BÔNUS DE ENERGIA)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Custo de adesão/manutenção: R$100 + (reputação × R$3) por mês
+Custo de uso: 5⚡ para "comparecer"
+
+Bônus acumulativo: +1⚡ de energia máxima por mês de comparecimento
+Limite: +25⚡ (energia máxima total: 125⚡)
+Perde: -1⚡ de bônus por mês sem comparecer
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+19. PATRIMÔNIO (MORADIA E IMÓVEIS)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Imóveis podem ser alugados (custo mensal proporcional ao valor) ou
+comprados (pagamento único, sem aluguel).
+
+Aluguel mensal estimado:
+  Imóvel < R$500k: valor × 0.55%
+  Imóvel R$500k–1M: valor × 0.40%
+  Imóvel > R$1M: valor × 0.30%
+
+Exemplos de valores de compra (bairros do Rio/Niterói):
+  Belford Roxo / Nilópolis: ~R$150k–170k     (-1 rep/mês)
+  Campo Grande: ~R$280k                       (0 rep/mês)
+  Madureira: ~R$300k                          (0 rep)
+  Tijuca / Catete: ~R$700k                    (+3 rep/mês)
+  Botafogo: ~R$1.200k                         (+5 rep/mês)
+  Copacabana: ~R$1.500k                       (+6 rep/mês)
+  Barra Médio: ~R$1.800k                      (+5 rep/mês)
+  Lagoa: ~R$2.200k                            (+7 rep/mês)
+  Ipanema: ~R$2.500k                          (+9 rep/mês)
+  Leblon: ~R$3.000k                           (+10 rep/mês)
+
+Bairros de perigo (Belford, Nilópolis etc.): 1% de chance de assalto
+(perde 10% do dinheiro em caixa naquele mês).
+
+Voltar para a casa dos pais: -3 rep imediato.
+Júnior+: tem 3 meses para sair da casa dos pais ou perde -5 rep.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+20. ESCRITÓRIOS NPC (EMPREGAR-SE)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+O jogador pode se empregar em escritórios NPC (fictícios, baseados em
+escritórios reais do Brasil) distribuídos em Tiers 1–5 e especializações.
+
+  Tier 1 (bairros médios):         sal_base ~R$1.000–4.000
+  Tier 2 (centro/sudoeste):        sal_base ~R$4.000–8.000
+  Tier 3 (zona sul/barra médio):   sal_base ~R$8.000–12.000
+  Tier 4 (Ipanema/Leblon):         sal_base ~R$18.000–23.000
+  Tier 5 (elite):                  sal_base ~R$39.000–45.000
+
+Especializações disponíveis: Tributário, Empresarial, Trabalhista,
+Previdenciário, Criminal.
+
+Como empregado, o salário é fixo por mês (sem honorários próprios).
+A renda mensal compensa falta de incerteza, mas o cap de rep é o do cargo.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+21. DIÁRIOS DO ESCRITÓRIO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DIÁRIO DA EQUIPE (submenu Equipe → coleção "log_equipe"):
+  Mentoria iniciada/concluída, estudo autônomo (marcos 80%/100%),
+  conflitos, burnout NPC, ranking mensal, férias, turnover,
+  promoções de NPCs.
+
+DIÁRIO DE GESTÃO (submenu Escritório → coleção "log_gestao"):
+  Sentenças de processos do pool, designação de processos.
+
+
+═══════════════════════════════════════════════════════════════════
+                    FIM DO DOCUMENTO DE MECÂNICAS
+═══════════════════════════════════════════════════════════════════

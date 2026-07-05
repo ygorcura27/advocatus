@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-04T00:00:00.000Z",
+  "title": "Design System: Advocatus Online",
+  "extensions": {
+    "colorMeta": {
+      "ink-navy": { "role": "primary", "displayName": "Navy Institucional", "canonical": "#1B2A4A", "tonalRamp": ["#0F1830", "#1B2A4A", "#243659", "#2E4270", "#3A5080", "#6D7FA8", "#A8B4D6", "#D6DCF0"] },
+      "earned-gold": { "role": "secondary", "displayName": "Dourado Conquistado", "canonical": "#C9A227", "tonalRamp": ["#5C4712", "#9A7820", "#B8922A", "#C9A227", "#DDBE5C", "#EDD48A", "#F5E4B5", "#FDF3D8"] },
+      "fog-bg": { "role": "neutral", "displayName": "Fundo Névoa", "canonical": "#F4F6FA" },
+      "paper-surface": { "role": "neutral", "displayName": "Superfície Papel", "canonical": "#FFFFFF" },
+      "text-primary": { "role": "neutral", "displayName": "Texto Primário", "canonical": "#1B2A4A" },
+      "verdict-green": { "role": "tertiary", "displayName": "Verde de Veredito", "canonical": "#2E8B57" },
+      "verdict-red": { "role": "tertiary", "displayName": "Vermelho de Veredito", "canonical": "#C0392B" },
+      "verdict-amber": { "role": "tertiary", "displayName": "Âmbar de Veredito", "canonical": "#B7791F" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Serifa do Wordmark", "purpose": "Apenas o logotipo Advocatus Online. Nunca usada em títulos." },
+      "headline": { "displayName": "Título de Seção", "purpose": "Títulos de seção, títulos de modal, data do relógio global." },
+      "body": { "displayName": "Corpo de Texto", "purpose": "Descrições, perguntas de quiz, texto de dica." },
+      "label": { "displayName": "Label em Caixa Alta", "purpose": "Labels de campo, títulos de grupos de navegação, legendas de estatística, badges." },
+      "mono": { "displayName": "Mono de Livro-Razão", "purpose": "Números de processo e outros identificadores estilo livro-razão." }
+    },
+    "shadows": [
+      { "name": "ambient-rest", "value": "0 1px 4px rgba(27,42,74,.08), 0 2px 12px rgba(27,42,74,.06)", "purpose": "Elevação padrão de repouso para cards e itens de processo." },
+      { "name": "ambient-hover", "value": "0 4px 20px rgba(27,42,74,.12), 0 8px 32px rgba(27,42,74,.08)", "purpose": "Estado elevado no hover." },
+      { "name": "navy-structural", "value": "0 2px 12px rgba(27,42,74,.2)", "purpose": "Assenta elementos navy escuros (barra superior, relógio global) contra a página mais clara." }
+    ],
+    "motion": [
+      { "name": "ease-standard", "value": "all .15s", "purpose": "Transição padrão para mudanças de estado de hover/foco em cards, itens de navegação e campos." },
+      { "name": "ease-lift", "value": "all .18s / .2s com translateY(-1px)", "purpose": "Elevação de hover em botões e cards, combinada com aumento de sombra." },
+      { "name": "pulse-gold", "value": "pulseGold 1.5s ease infinite", "purpose": "A única animação de chamar atenção sancionada: um pulso suave de anel dourado no botão Avançar Mês quando a ação fica disponível." }
+    ],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Botão Primário",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Botão de ação principal, ex.: ações de confirmar/enviar.",
+      "html": "<button class=\"ds-btn ds-btn-primary\">Confirmar</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; gap: .45rem; padding: .55rem 1.1rem; border-radius: 4px; font-family: 'DM Sans', system-ui, sans-serif; font-size: .8rem; font-weight: 600; cursor: pointer; transition: all .18s; border: none; line-height: 1; } .ds-btn-primary { background: #1B2A4A; color: #fff; } .ds-btn-primary:hover { background: #2E4270; transform: translateY(-1px); box-shadow: 0 2px 12px rgba(27,42,74,.2); } .ds-btn-primary:focus-visible { outline: 2px solid #C9A227; outline-offset: 2px; }"
+    },
+    {
+      "name": "Botão Secundário",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Ação de menor ênfase ao lado de um botão primário.",
+      "html": "<button class=\"ds-btn ds-btn-secondary\">Cancelar</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; gap: .45rem; padding: .55rem 1.1rem; border-radius: 4px; font-family: 'DM Sans', system-ui, sans-serif; font-size: .8rem; font-weight: 600; cursor: pointer; transition: all .18s; background: transparent; border: 1px solid #2E4270; color: #1B2A4A; line-height: 1; } .ds-btn-secondary:hover { background: #D6DCF0; }"
+    },
+    {
+      "name": "Botão Avançar Mês",
+      "kind": "custom",
+      "refersTo": "button-advance",
+      "description": "CTA-assinatura em navy com borda dourada, que pulsa quando a ação mensal está pronta.",
+      "html": "<button class=\"ds-btn-avancar\">▶ Avançar Mês <span class=\"ds-bam-hint\">Pronto para avançar</span></button>",
+      "css": ".ds-btn-avancar { display: flex; align-items: center; justify-content: center; gap: .5rem; width: 100%; padding: .75rem 1rem; background: linear-gradient(135deg, #1B2A4A 0%, #2E4270 100%); border: 2px solid #B8922A; border-radius: 8px; color: #C9A227; font-family: 'DM Sans', system-ui, sans-serif; font-size: .9rem; font-weight: 600; letter-spacing: .04em; cursor: pointer; transition: all .2s; box-shadow: 0 2px 8px rgba(27,42,74,.2), inset 0 1px 0 rgba(255,255,255,.08); } .ds-btn-avancar:hover { background: linear-gradient(135deg, #243659 0%, #3A5080 100%); border-color: #C9A227; box-shadow: 0 4px 16px rgba(27,42,74,.3), 0 0 12px rgba(201,162,39,.2); transform: translateY(-1px); } .ds-bam-hint { font-size: .6rem; color: rgba(201,162,39,.7); display: block; } @keyframes pulseGold { 0% { box-shadow: 0 2px 8px rgba(27,42,74,.2), 0 0 0 0 rgba(201,162,39,.4); } 70% { box-shadow: 0 2px 8px rgba(27,42,74,.2), 0 0 0 8px rgba(201,162,39,0); } 100% { box-shadow: 0 2px 8px rgba(27,42,74,.2), 0 0 0 0 rgba(201,162,39,0); } } .ds-btn-avancar.pronto { animation: pulseGold 1.5s ease infinite; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Card de conteúdo padrão usado em todos os painéis.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-titulo\">Título do Card</div><div class=\"ds-card-sub\">Texto de apoio secundário.</div></div>",
+      "css": ".ds-card { background: #FFFFFF; border: 1px solid #D1D8EE; border-radius: 8px; padding: 1rem; box-shadow: 0 1px 4px rgba(27,42,74,.08), 0 2px 12px rgba(27,42,74,.06); transition: box-shadow .15s, border-color .15s; } .ds-card:hover { box-shadow: 0 4px 20px rgba(27,42,74,.12), 0 8px 32px rgba(27,42,74,.08); border-color: #D6DCF0; } .ds-card-titulo { font-family: 'DM Sans', system-ui, sans-serif; font-weight: 600; font-size: .9rem; color: #1B2A4A; margin-bottom: .4rem; } .ds-card-sub { font-size: .72rem; color: #6B7FA0; }"
+    },
+    {
+      "name": "Tag de Status",
+      "kind": "chip",
+      "refersTo": "status-tag",
+      "description": "Marcador de status somente leitura em formato de pílula (urgente, resolvido, pendente).",
+      "html": "<span class=\"ds-tag ds-tag-ok\">Resolvido</span> <span class=\"ds-tag ds-tag-urg\">Urgente</span> <span class=\"ds-tag ds-tag-pend\">Pendente</span>",
+      "css": ".ds-tag { font-size: .6rem; padding: .1rem .45rem; border-radius: 20px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; font-family: 'DM Sans', system-ui, sans-serif; } .ds-tag-ok { background: #EAF7EF; color: #1A6B3C; } .ds-tag-urg { background: #FDECEA; color: #C0392B; } .ds-tag-pend { background: #FEFCE8; color: #B7791F; }"
+    },
+    {
+      "name": "Campo de Texto",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Campo de texto com label, usado em formulários por todo o app.",
+      "html": "<div class=\"ds-campo\"><label>Nome da Parte</label><input type=\"text\" placeholder=\"Digite aqui\"/></div>",
+      "css": ".ds-campo label { display: block; font-size: .63rem; color: #6B7FA0; text-transform: uppercase; letter-spacing: .1em; margin-bottom: .32rem; font-weight: 600; font-family: 'DM Sans', system-ui, sans-serif; } .ds-campo input { width: 100%; background: #FFFFFF; border: 1px solid #D1D8EE; color: #1B2A4A; padding: .6rem .8rem; border-radius: 4px; font-family: 'DM Sans', system-ui, sans-serif; font-size: .85rem; outline: none; transition: border-color .2s, box-shadow .2s; } .ds-campo input:focus { border-color: #2E4270; box-shadow: 0 0 0 3px rgba(46,66,112,.1); }"
+    },
+    {
+      "name": "Item de Navegação Ativo",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "Item de navegação da barra lateral, estado padrão vs. ativo.",
+      "html": "<div class=\"ds-nav-item\"><span>💼</span> Escritório</div><div class=\"ds-nav-item ds-ativo\"><span>⚖️</span> Processos</div>",
+      "css": ".ds-nav-item { display: flex; align-items: center; gap: .5rem; padding: .42rem .65rem; border-radius: 4px; cursor: pointer; transition: all .15s; font-size: .78rem; color: #3D4F6E; font-family: 'DM Sans', system-ui, sans-serif; margin-bottom: 4px; } .ds-nav-item:hover { background: #D6DCF0; color: #1B2A4A; } .ds-nav-item.ds-ativo { background: #1B2A4A; color: #fff; }"
+    },
+    {
+      "name": "Barra de Progresso",
+      "kind": "custom",
+      "refersTo": "progress-bar",
+      "description": "Barra fina de progresso em gradiente, usada para reputação, energia, skills e progresso de processo — a principal visualização de avanço do sistema.",
+      "html": "<div class=\"ds-bar-wrap\"><div class=\"ds-bar-fill\" style=\"width: 62%\"></div></div>",
+      "css": ".ds-bar-wrap { height: 6px; background: #EAECF2; border-radius: 3px; overflow: hidden; } .ds-bar-fill { height: 100%; background: linear-gradient(90deg, #2E4270, #B8922A); border-radius: 3px; transition: width .4s ease; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "As Câmaras do Mérito",
+    "overview": "Uma instituição jurídica atemporal, onde toda conquista rende prestígio. O sistema se inspira em grandes escritórios de advocacia, tribunais históricos e câmaras de julgamento — não em convenções de app ou de jogo: o navy profundo, os neutros acinzentados e o papel marfim carregam o peso da sala, e o dourado é reservado como sinal de algo que foi conquistado. A progressão — uma promoção, uma causa ganha, um prêmio — deve se registrar como um marco genuíno, encenado com a mesma confiança cinematográfica e discreta de uma cerimônia nas câmaras, não como um item de loot. Esse sistema rejeita explicitamente o exagero barato de jogo mobile: sem gradientes saturados, sem ícones cartunescos, sem chrome estilo gacha, sem teatro de confete-e-medalha. Rejeita igualmente o blend genérico de dashboard SaaS — sem tiles de métrica-herói, sem texto em gradiente, sem grids de cards idênticos fazendo o papel de hierarquia.",
+    "keyCharacteristics": [
+      "Autoridade do navy institucional como linguagem dominante das superfícies; o dourado aparece apenas para marcar distinção.",
+      "Elevação estrutural: plano em repouso, sombras se aprofundam somente em resposta à interação.",
+      "Serifa da marca (Playfair Display) reservada exclusivamente para o wordmark; DM Sans carrega todos os demais papéis de título e corpo de texto.",
+      "Status comunicado por famílias de cor nomeadas e discretas (verde/vermelho/âmbar de veredito), nunca por saturação bruta."
+    ],
+    "rules": [
+      { "name": "A Regra do Dourado Conquistado", "body": "O dourado nunca é uma cor de acento padrão para chrome ou decoração. Aparece apenas onde algo foi conquistado, ranqueado, ou merece ser distinguido.", "section": "colors" },
+      { "name": "A Regra do Neutro Frio", "body": "Os fundos tendem para o navy, nunca para o creme ou areia quentes.", "section": "colors" },
+      { "name": "A Regra da Serifa Única", "body": "Playfair Display aparece em exatamente um lugar: o wordmark. Todo outro título é composto em DM Sans.", "section": "typography" },
+      { "name": "A Regra Confirma-Não-Anuncia", "body": "Mudanças de elevação são sempre uma resposta a um estado (hover, ativo, pulso-de-pronto), nunca um floreio decorativo estático.", "section": "elevation" }
+    ],
+    "dos": [
+      "Reservar o dourado estritamente para distinção conquistada: reputação, prêmios, wordmark, CTAs primários prontos para ação.",
+      "Manter todo título em DM Sans, exceto o wordmark.",
+      "Deixar a elevação responder ao estado de interação em vez de ficar estática como decoração.",
+      "Usar as famílias de cor de veredito para status, nunca um preenchimento saturado bruto.",
+      "Usar barras de progresso, não badges ou confete, como linguagem principal para avanço."
+    ],
+    "donts": [
+      "Usar estética de jogo mobile barato: gradientes exagerados, ícones cartunescos, chrome de UI estilo gacha, padrões de celebração de badge-e-confete.",
+      "Cair nos clichês genéricos de dashboard SaaS: tiles de métrica-herói, texto em gradiente, grids de cards idênticos.",
+      "Esquentar os fundos neutros em direção a creme ou areia.",
+      "Introduzir uma segunda serifa ou fonte de display decorativa.",
+      "Usar uma faixa lateral colorida como decoração pura, fora da exceção sancionada de status urgente/administrativo.",
+      "Deixar as sombras ficarem dramáticas ou brincalhonas."
+    ]
+  }
+}

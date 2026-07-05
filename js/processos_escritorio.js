@@ -237,9 +237,9 @@ window.renderProcessosPool = async function(j, escId, el) {
 
     el.innerHTML = `
       <div class="esc-card-bloco" style="margin-bottom:1.1rem">
-        <div class="secao-header" style="margin-bottom:.8rem;border-bottom:1px solid #E8ECF5;padding-bottom:.5rem">
+        <div class="secao-header">
           <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
-            <div class="secao-titulo" style="font-size:.88rem;font-weight:700">⚖️ Gestão de Processos</div>
+            <div class="secao-titulo">⚖️ Gestão de Processos</div>
             ${gestorNome ? `<span style="font-size:.65rem;color:var(--verde2)">👤 Gestor: ${gestorNome}</span>` : ''}
           </div>
           <div style="display:flex;gap:.3rem;flex-shrink:0">

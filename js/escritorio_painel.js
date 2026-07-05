@@ -403,8 +403,8 @@ window.renderOportunidadesPainel = async function(j, escId, el) {
 
     el.innerHTML = `
       <div class="esc-card-bloco" style="margin-bottom:1.1rem">
-        <div class="secao-header" style="margin-bottom:.6rem;border-bottom:1px solid var(--borda-sub);padding-bottom:.5rem">
-          <div class="secao-titulo" style="font-size:.88rem;font-weight:700">Oportunidades do Mês</div>
+        <div class="secao-header">
+          <div class="secao-titulo">Oportunidades do Mês</div>
           ${temMais
             ? `<a href="#" class="esc-ver-todos" onclick="window.navTo('clientes',null);return false">Ver todas (${todas.length})</a>`
             : `<a href="#" class="esc-ver-todos" onclick="window.navTo('clientes',null);return false">Ver todas</a>`}

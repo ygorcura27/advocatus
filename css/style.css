@@ -86,7 +86,7 @@
 html { font-size: 16px; }
 body {
   font-family: var(--font-sans);
-  background: var(--bg);
+  background: var(--navy);
   color: var(--txt);
   line-height: 1.5;
   min-height: 100vh;
@@ -813,7 +813,7 @@ a:hover { color: var(--navy); }
   border: var(--borda); border-radius: var(--r2);
   padding: 1.2rem; background: var(--surface);
   margin-bottom: 1.2rem; display: grid;
-  grid-template-columns: 72px 1fr auto; gap: 1rem;
+  grid-template-columns: 72px 1fr minmax(170px, 25%) auto; gap: 1rem;
   align-items: start; box-shadow: var(--sombra);
 }
 .profile-photo {
@@ -838,6 +838,9 @@ a:hover { color: var(--navy); }
 
 /* ── Barras de status (Energia/Saúde Mental/Disposição/Reputação) ── */
 .barra-status-bloco { margin-bottom: 1.1rem; }
+.profile-hero-status { margin-bottom: 0; min-width: 0; }
+.profile-hero-status .barra-status-linha { gap: .4rem; margin-bottom: .3rem; }
+.profile-hero-status .barra-status-pct { min-width: 2.4rem; font-size: .66rem; }
 .barra-status-linha { display: flex; align-items: center; gap: .6rem; margin-bottom: .4rem; }
 .barra-status-icone { width: 20px; height: 20px; object-fit: contain; text-align: center; flex-shrink: 0; }
 .barra-status-icone.barra-status-icone-emoji { font-size: .95rem; width: 20px; height: auto; }
@@ -892,6 +895,15 @@ a:hover { color: var(--navy); }
 /* Tablet largo */
 @media (max-width: 1100px) {
   :root { --sidebar-r: 200px; }
+}
+
+/* Telas bem largas (desktop grande/ultrawide) — o jogo fica "encaixotado" no
+   centro, como uma janela do Popmundo, em vez de esticar a tela toda.
+   Não afeta telas menores/tablet/mobile — lá o conteúdo já precisa do espaço. */
+@media (min-width: 1600px) {
+  .layout, .topbar { max-width: 1400px; }
+  .layout { margin: var(--topbar-h) auto 0; }
+  .topbar { left: 50%; right: auto; transform: translateX(-50%); }
 }
 
 /* Tablet */
@@ -993,6 +1005,7 @@ a:hover { color: var(--navy); }
   .proc-card { padding: .7rem .75rem; }
   .profile-hero { grid-template-columns: 52px 1fr; gap: .7rem; }
   .profile-hero .hero-badges { display: none; }
+  .profile-hero .profile-hero-status { grid-column: 1 / -1; margin-top: .5rem; }
 
   /* Grid cards menor */
   .grid-cards { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
@@ -1739,13 +1752,21 @@ a:hover { color: var(--navy); }
 
 .esc-card-bloco {
   background: var(--surface);
-  border: var(--borda);
+  border: 1px solid var(--navy-light);
   border-radius: var(--r2);
   padding: 1rem;
-  box-shadow: var(--sombra);
+  box-shadow: var(--sombra2);
+  overflow: hidden;
 }
-.esc-card-bloco .secao-header { margin-bottom: .8rem; padding-bottom: .5rem; border-bottom: 1px solid var(--borda-sub); }
-.esc-card-bloco .secao-titulo { font-size: .88rem; font-weight: 700; }
+.esc-card-bloco .secao-header {
+  margin: -1rem -1rem .8rem; padding: .55rem 1rem;
+  background: linear-gradient(180deg, var(--navy2), var(--navy));
+  border-bottom: 2px solid var(--ouro2);
+}
+.esc-card-bloco .secao-titulo { font-size: .8rem; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: .04em; }
+.esc-card-bloco .secao-header .esc-ver-todos { color: var(--ouro); }
+.esc-card-bloco .secao-header .esc-ver-todos:hover { color: var(--ouro-light); }
+.esc-card-bloco .secao-header .secao-badge { background: rgba(255,255,255,.15); color: var(--ouro); }
 .esc-ver-todos { font-size: .72rem; color: var(--navy3); font-weight: 500; text-decoration: none; white-space: nowrap; }
 .esc-ver-todos:hover { color: var(--navy); text-decoration: underline; }
 

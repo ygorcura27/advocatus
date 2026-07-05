@@ -190,20 +190,19 @@ function renderPerfil(j, el) {
               <span class="meta-tag">👤 ${j.idade || 22} anos · Geração ${j.geracao || 1}</span>
             </div>
           </div>
+          <div class="barra-status-bloco profile-hero-status">
+            ${_barraStatus('⚡', energiaDisp, {}, true)}
+            ${_barraStatus('img/simbolos/saude_mental.png', j.saude_mental||80)}
+            ${_barraStatus('img/simbolos/disposicao.png', j.disposicao||80)}
+            ${_barraStatus('img/simbolos/reputacao.png', repPct, { semVermelho: true })}
+            <div class="barra-status-saldo"><img class="barra-status-icone-saldo" src="img/simbolos/dinheiro.png" alt=""> ${_fmtExt(j.dinheiro||0)}</div>
+          </div>
           <div class="hero-badges">
             <span class="badge-pill badge-cargo">${label}</span>
             <span class="badge-pill badge-esp">${esp}</span>
             ${j.oab ? '<span class="badge-pill badge-oab">OAB ✓</span>' : ''}
             ${j.no_serasa ? '<span class="badge-pill" style="background:rgba(122,32,32,.25);color:var(--verm3);border:1px solid rgba(200,80,80,.35)">🚨 Serasa</span>' : ''}
           </div>
-        </div>
-
-        <div class="barra-status-bloco">
-          ${_barraStatus('⚡', energiaDisp, {}, true)}
-          ${_barraStatus('img/simbolos/saude_mental.png', j.saude_mental||80)}
-          ${_barraStatus('img/simbolos/disposicao.png', j.disposicao||80)}
-          ${_barraStatus('img/simbolos/reputacao.png', repPct, { semVermelho: true })}
-          <div class="barra-status-saldo"><img class="barra-status-icone-saldo" src="img/simbolos/dinheiro.png" alt=""> ${_fmtExt(j.dinheiro||0)}</div>
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:1.2rem">
@@ -751,8 +750,8 @@ function _renderWorkspacePainel(j, el) {
 
   el.innerHTML = `
     <div class="esc-card-bloco" style="margin-bottom:1.1rem">
-      <div class="secao-header" style="margin-bottom:.8rem;border-bottom:1px solid var(--borda-sub);padding-bottom:.5rem">
-        <div class="secao-titulo" style="font-size:.88rem;font-weight:700">💼 Espaço de Trabalho</div>
+      <div class="secao-header">
+        <div class="secao-titulo">💼 Espaço de Trabalho</div>
       </div>
       ${!isSolo
         ? `<div style="font-size:.8rem;color:var(--verde);font-weight:600;padding:.5rem 0">
