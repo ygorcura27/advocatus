@@ -2358,3 +2358,104 @@ a:hover { color: var(--navy); }
 
 .rbtn.sel { border-color: var(--navy3); background: var(--navy-light); color: var(--navy); }
 .skjur-val   { font-size: .75rem; font-weight: 700; min-width: 2.5rem; text-align: right; }
+
+/* ── Cenário especial da Investigação/Julgamento (Art Direction v1.0, §9) ──
+   Única exceção deliberada ao sistema navy/flat: mesa de couro escuro como
+   arte de fundo pré-renderizada (img/cenarios/mesa_investigacao.png), com a
+   camada funcional (nós, HUD, veredito) ocupando o espaço negativo central.
+   Não replicar este tratamento em outras telas do jogo (§9.8). */
+.inv-scenario {
+  position: relative;
+  border-radius: var(--r2);
+  overflow: hidden;
+  background: #17120d url('../img/cenarios/mesa_investigacao.png') center / cover no-repeat;
+  box-shadow: var(--sombra2);
+  padding: 1.4rem 1.2rem;
+}
+.inv-scenario::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, rgba(10,8,5,.35) 0%, rgba(10,8,5,.6) 78%, rgba(10,8,5,.78) 100%);
+  pointer-events: none;
+}
+.inv-scenario > * { position: relative; z-index: 1; }
+
+.inv-hud {
+  display: flex;
+  gap: 0;
+  flex-wrap: wrap;
+  margin: 0 0 1.1rem;
+  background: linear-gradient(180deg, #2b2117, #1c150e);
+  border: 1px solid #4a3a22;
+  border-radius: var(--r-pill, 20px);
+  box-shadow: 0 2px 10px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.04);
+  overflow: hidden;
+}
+.inv-hud-item {
+  padding: .5rem .9rem;
+  font-size: .68rem;
+  font-weight: 600;
+  color: #E8D9B5;
+  border-right: 1px solid #4a3a22;
+  white-space: nowrap;
+}
+.inv-hud-item:last-child { border-right: none; }
+.inv-hud-item.ouro { color: var(--ouro); }
+
+.inv-titulo-caso {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  color: #F2E8D6;
+  font-weight: 700;
+  margin-bottom: .3rem;
+  text-shadow: 0 1px 3px rgba(0,0,0,.6);
+}
+.inv-sub-caso {
+  font-size: .78rem;
+  color: #C9BFA6;
+  margin-bottom: .9rem;
+  line-height: 1.5;
+}
+
+/* Nós como objetos de mesa (papel/polaroid/prancheta/envelope) — §9.3 */
+.inv-no {
+  background: #F2E8D6;
+  border: 1px solid #DDD0AA;
+  box-shadow: 0 3px 8px rgba(0,0,0,.35);
+  position: relative;
+}
+.inv-no-revelado { background: #EADDBF; }
+.inv-no.inv-no-bloqueado {
+  background: #3a3226;
+  border: 1px dashed #6b5a38;
+  color: #E8D9B5;
+}
+.inv-no-bloqueado .inv-no-tipo,
+.inv-no-bloqueado .inv-no-bloqueio { color: #E8D9B5; }
+.inv-no-tipo { color: #2a1f10; }
+.inv-no-peca { color: var(--verde2); }
+.inv-no-peca.suja { color: var(--verm2); }
+/* Clipe metálico no topo — evidência tipo documento/perícia */
+.inv-no[data-mat="clip"]::before {
+  content: '';
+  position: absolute; top: -6px; left: 50%; transform: translateX(-50%) rotate(-3deg);
+  width: 22px; height: 10px;
+  border: 2px solid #8A6A1A; border-bottom: none;
+  border-radius: 3px 3px 0 0;
+  background: transparent;
+}
+/* Selo/tachinha — evidência tipo pessoa/polaroid */
+.inv-no[data-mat="pin"] { transform: rotate(-1.5deg); }
+.inv-no[data-mat="pin"]::before {
+  content: '';
+  position: absolute; top: -4px; left: 50%; transform: translateX(-50%);
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--verm2);
+  box-shadow: 0 1px 2px rgba(0,0,0,.5);
+}
+/* Envelope lacrado — nó ainda não descoberto */
+.inv-no[data-mat="envelope"] {
+  background: #DDD0AA;
+  clip-path: polygon(0 0, 50% 22%, 100% 0, 100% 100%, 0 100%);
+}

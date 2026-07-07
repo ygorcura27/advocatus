@@ -2079,7 +2079,14 @@ function _renderModalProcesso(id, p) {
     return;
   }
 
-  if (j.oab && !p.setlist && !p.progresso && p.status !== 'concluido') {
+  // GDD addendum v1.0 — Investigação, Favores e Julgamento substitui também
+  // o "Montar Setlist" (motor de composição por caso do GDD v4.1) como
+  // ponto de entrada de casos NOVOS, para todo jogador (com ou sem OAB).
+  // Casos que já tinham um setlist montado antes desta mudança (p.setlist
+  // truthy) continuam resolvendo pelo caminho antigo — tratados nos
+  // branches de status acima (aguardando_evento/pronto_para_sentenca/
+  // aguardando_decisao_sentenca) — nada aqui interrompe esses em andamento.
+  if (j.oab && p.setlist && !p.progresso && p.status !== 'concluido') {
     abrirModal(`📜 ${p.tipo || 'Processo'} — Montar Setlist`, '<div id="modal-setlist-content" style="min-height:200px"><div style="padding:1rem;color:var(--ardosia2)">Carregando…</div></div>');
     setTimeout(() => {
       const el = document.getElementById('modal-setlist-content');

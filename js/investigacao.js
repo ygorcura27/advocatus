@@ -128,10 +128,10 @@ function _renderFase(j, main, p) {
 function _barraTurnos(inv) {
   const restantes = inv.turnos_totais - inv.turnos_usados;
   return `
-    <div class="inv-turnos-bar">
-      <span class="chip">Dia ${inv.dia}</span>
-      <span class="chip">${inv.periodo === 'manha' ? 'Manhã' : inv.periodo === 'tarde' ? 'Tarde' : 'Noite'}</span>
-      <span class="chip chip-ouro">${restantes}/${inv.turnos_totais} turnos restantes</span>
+    <div class="inv-hud">
+      <span class="inv-hud-item">Dia ${inv.dia}</span>
+      <span class="inv-hud-item">${inv.periodo === 'manha' ? 'Manhã' : inv.periodo === 'tarde' ? 'Tarde' : 'Noite'}</span>
+      <span class="inv-hud-item ouro">${restantes}/${inv.turnos_totais} turnos restantes</span>
     </div>`;
 }
 
@@ -142,19 +142,26 @@ const ICONE_NO = {
   pericia: '🔬', favor_relacionamento: '🤝',
 };
 
+// Material físico por tipo de nó (Art Direction v1.0, §9.3) — usado no
+// atributo data-mat do card para o detalhe visual (clipe/tachinha/envelope).
+const MATERIAL_NO = {
+  consulta: 'clip', analise_documental: 'clip', pericia: 'clip',
+  entrevista: 'pin', favor_relacionamento: 'pin',
+};
+
 function _renderMapaInvestigacao(j, main, p) {
   const inv = p.investigacao;
   const nosVisiveis = inv.nos.filter(n => n.status !== 'oculto');
   const revelados = inv.nos.filter(n => n.status === 'revelado').length;
 
   main.innerHTML = `
-    <div class="card">
-      <div class="card-titulo">${p.titulo || 'Investigação'}</div>
-      <div class="card-sub">${p.relato_cliente || 'O cliente relatou o caso — investigue os nós disponíveis antes que os turnos se esgotem.'}</div>
+    <div class="inv-scenario">
+      <div class="inv-titulo-caso">${p.titulo || 'Investigação'}</div>
+      <div class="inv-sub-caso">${p.relato_cliente || 'O cliente relatou o caso — investigue os nós disponíveis antes que os turnos se esgotem.'}</div>
       ${_barraTurnos(inv)}
       <div class="inv-nos-grid">
         ${nosVisiveis.map(no => `
-          <div class="inv-no inv-no-${no.status}" ${no.status !== 'revelado' ? `onclick="window._invAbrirNo('${no.id}')"` : ''}>
+          <div class="inv-no inv-no-${no.status}" data-mat="${no.status === 'oculto' ? 'envelope' : (MATERIAL_NO[no.tipo] || 'clip')}" ${no.status !== 'revelado' ? `onclick="window._invAbrirNo('${no.id}')"` : ''}>
             <div class="inv-no-icone">${ICONE_NO[no.tipo] || '❓'}</div>
             <div class="inv-no-tipo">${_labelTipoNo(no.tipo)}</div>
             ${no.status === 'revelado'
@@ -345,12 +352,12 @@ function _renderMontagem(j, main, p) {
   const revelados = inv.nos.filter(n => n.status === 'revelado' && n.peca);
 
   main.innerHTML = `
-    <div class="card">
-      <div class="card-titulo">Montagem de Estratégia</div>
-      <div class="card-sub">Selecione as evidências que vão compor sua mão para o julgamento.</div>
+    <div class="inv-scenario">
+      <div class="inv-titulo-caso">Montagem de Estratégia</div>
+      <div class="inv-sub-caso">Selecione as evidências que vão compor sua mão para o julgamento.</div>
       <div class="inv-nos-grid" style="margin-top:.75rem">
         ${revelados.map(no => `
-          <div class="inv-no inv-no-revelado ${_maoSelecionada.has(no.id) ? 'sel' : ''}" onclick="window._invToggleMao('${no.id}')">
+          <div class="inv-no inv-no-revelado ${_maoSelecionada.has(no.id) ? 'sel' : ''}" data-mat="${no.peca.pilar ? '' : (MATERIAL_NO[no.tipo] || 'clip')}" onclick="window._invToggleMao('${no.id}')">
             <div class="inv-no-icone">${ICONE_NO[no.tipo] || '❓'}</div>
             <div class="inv-no-tipo">${_labelTipoNo(no.tipo)}</div>
             <div class="inv-no-peca ${no.peca.suja ? 'suja' : ''}">Força ${no.peca.forca}${no.peca.suja ? ' · suja' : ''}${no.peca.pilar ? ' · pilar' : ''}</div>
@@ -384,11 +391,11 @@ function _renderJulgamento(j, main, p) {
   const restantes = julg.pecas_restantes.length;
 
   main.innerHTML = `
-    <div class="card">
-      <div class="card-titulo">Julgamento — Rodada ${julg.rodada_atual + 1}</div>
-      <div class="card-sub">Força total acumulada: <strong>${julg.forca_total}</strong> · Peças restantes: ${restantes}</div>
+    <div class="inv-scenario">
+      <div class="inv-titulo-caso">Julgamento — Rodada ${julg.rodada_atual + 1}</div>
+      <div class="inv-sub-caso">Força total acumulada: <strong style="color:var(--ouro)">${julg.forca_total}</strong> · Peças restantes: ${restantes}</div>
       ${restantes > 0 ? `
-        <p style="color:var(--txt3);margin:.75rem 0">O adversário está atacando sua peça mais vulnerável. Como reage?</p>
+        <p style="color:#C9BFA6;margin:.75rem 0">O adversário está atacando sua peça mais vulnerável. Como reage?</p>
         <div style="display:flex;gap:.5rem;flex-wrap:wrap">
           <button class="btn btn-prim" onclick="window._invReagir('defender')">🛡️ Defender</button>
           <button class="btn btn-sec" onclick="window._invReagirFavor()">🃏 Usar Favor (joker)</button>
