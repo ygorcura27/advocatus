@@ -136,6 +136,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
 import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { firebaseConfig } from './js/firebase-init.js';
+import { renderAvatarJogador } from './js/avatar_svg.js';
 
 const app   = initializeApp(firebaseConfig);
 const auth  = getAuth(app);
@@ -189,7 +190,7 @@ function _renderPerfil(d) {
   el.innerHTML = `
     <div class="profile-card">
       <div class="profile-header">
-        <div class="profile-avatar">⚖️</div>
+        <div class="profile-avatar">${renderAvatarJogador({ uid: String(d.profile_id||d.nome||'x'), cargo_id: d.cargo_id }, { size: 72 })}</div>
         <div>
           <div class="profile-id">#${d.profile_id}</div>
           <div class="profile-nome">

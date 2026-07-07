@@ -386,7 +386,9 @@ a:hover { color: var(--navy); }
 }
 .nav-item:hover { background: var(--navy-light); color: var(--navy); }
 .nav-item.ativo { background: var(--navy); color: #fff; }
-.nav-item .ni-icon { font-size: .9rem; flex-shrink: 0; }
+.nav-item .ni-icon { font-size: .9rem; flex-shrink: 0; display: inline-flex; color: var(--navy2); }
+.nav-item.ativo .ni-icon { color: #fff; }
+.nav-item .ni-icon svg { width: 16px; height: 16px; }
 .nav-item .ni-badge {
   margin-left: auto; font-size: .6rem;
   background: var(--verm3); color: #fff;

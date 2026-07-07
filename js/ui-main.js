@@ -8,6 +8,8 @@ import { collection, query, where, orderBy, limit,
          getDocs, doc, updateDoc, addDoc }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { db } from './firebase-init.js';
+import { icon } from './icons.js';
+import { renderAvatarJogador } from './avatar_svg.js';
 
 // ── Painel ativo ──
 let _painelAtivo = 'perfil';
@@ -32,31 +34,31 @@ function _navLateralPadrao(painel) {
   return `
     <div class="nav-grupo">
       <div class="nav-grupo-titulo">Carreira</div>
-      <div class="nav-item${ativo('perfil')}" onclick="navTo('perfil',this)"><span class="ni-icon">⚖️</span> Meu Perfil</div>
-      <div class="nav-item${ativo('escritorio')}" onclick="navTo('escritorio',this)"><span class="ni-icon">🏢</span> Escritório</div>
-      <div class="nav-item${ativo('investigacao')}" onclick="navTo('investigacao',this)"><span class="ni-icon">🔎</span> Investigação</div>
-      <div class="nav-item${ativo('progressao')}" onclick="navTo('progressao',this)"><span class="ni-icon">📈</span> Progressão</div>
+      <div class="nav-item${ativo('perfil')}" onclick="navTo('perfil',this)"><span class="ni-icon">${icon('perfil')}</span> Meu Perfil</div>
+      <div class="nav-item${ativo('escritorio')}" onclick="navTo('escritorio',this)"><span class="ni-icon">${icon('escritorio')}</span> Escritório</div>
+      <div class="nav-item${ativo('investigacao')}" onclick="navTo('investigacao',this)"><span class="ni-icon">${icon('investigacao')}</span> Investigação</div>
+      <div class="nav-item${ativo('progressao')}" onclick="navTo('progressao',this)"><span class="ni-icon">${icon('progressao')}</span> Progressão</div>
     </div>
     <div class="nav-grupo">
       <div class="nav-grupo-titulo">Desenvolvimento</div>
-      <div class="nav-item${ativo('peticoes')}" onclick="navTo('peticoes',this)"><span class="ni-icon">📜</span> Petições</div>
-      <div class="nav-item${ativo('habilidades')}" onclick="navTo('habilidades',this)"><span class="ni-icon">⚡</span> Habilidades</div>
-      <div class="nav-item${ativo('cursos')}" onclick="navTo('cursos',this)"><span class="ni-icon">🎓</span> Cursos & Pós</div>
-      <div class="nav-item${ativo('concurso')}" onclick="navTo('concurso',this)"><span class="ni-icon">🔨</span> Concurso Público</div>
+      <div class="nav-item${ativo('peticoes')}" onclick="navTo('peticoes',this)"><span class="ni-icon">${icon('peticoes')}</span> Petições</div>
+      <div class="nav-item${ativo('habilidades')}" onclick="navTo('habilidades',this)"><span class="ni-icon">${icon('habilidades')}</span> Habilidades</div>
+      <div class="nav-item${ativo('cursos')}" onclick="navTo('cursos',this)"><span class="ni-icon">${icon('cursos')}</span> Cursos & Pós</div>
+      <div class="nav-item${ativo('concurso')}" onclick="navTo('concurso',this)"><span class="ni-icon">${icon('concurso')}</span> Concurso Público</div>
     </div>
     <div class="nav-grupo">
       <div class="nav-grupo-titulo">Vida</div>
-      <div class="nav-item${ativo('patrimonio')}" onclick="navTo('patrimonio',this)"><span class="ni-icon">🏠</span> Patrimônio</div>
-      <div class="nav-item${ativo('financeiro')}" onclick="navTo('financeiro',this)"><span class="ni-icon">💳</span> Finanças Avançadas</div>
-      <div class="nav-item${ativo('loja')}" onclick="navTo('loja',this)"><span class="ni-icon">🛍️</span> Loja</div>
-      <div class="nav-item${ativo('vida_pessoal')}" onclick="navTo('vida_pessoal',this)"><span class="ni-icon">👤</span> Vida Pessoal</div>
+      <div class="nav-item${ativo('patrimonio')}" onclick="navTo('patrimonio',this)"><span class="ni-icon">${icon('patrimonio')}</span> Patrimônio</div>
+      <div class="nav-item${ativo('financeiro')}" onclick="navTo('financeiro',this)"><span class="ni-icon">${icon('financeiro')}</span> Finanças Avançadas</div>
+      <div class="nav-item${ativo('loja')}" onclick="navTo('loja',this)"><span class="ni-icon">${icon('loja')}</span> Loja</div>
+      <div class="nav-item${ativo('vida_pessoal')}" onclick="navTo('vida_pessoal',this)"><span class="ni-icon">${icon('vida_pessoal')}</span> Vida Pessoal</div>
     </div>
     <div class="nav-grupo">
       <div class="nav-grupo-titulo">Social</div>
-      <div class="nav-item${ativo('vagas')}" onclick="navTo('vagas',this)"><span class="ni-icon">📋</span> Vagas</div>
-      <div class="nav-item${ativo('ranking')}" onclick="navTo('ranking',this)"><span class="ni-icon">🏆</span> Rankings</div>
+      <div class="nav-item${ativo('vagas')}" onclick="navTo('vagas',this)"><span class="ni-icon">${icon('vagas')}</span> Vagas</div>
+      <div class="nav-item${ativo('ranking')}" onclick="navTo('ranking',this)"><span class="ni-icon">${icon('ranking')}</span> Rankings</div>
       <div class="nav-item${ativo('inbox')}" onclick="navTo('inbox',this)">
-        <span class="ni-icon">📬</span> Mensagens
+        <span class="ni-icon">${icon('inbox')}</span> Mensagens
         <span class="ni-badge" id="badge-inbox-nav" style="display:none">0</span>
       </div>
     </div>`;
@@ -185,7 +187,7 @@ function renderPerfil(j, el) {
   const fotoUrl = window.USER_PHOTO_URL || '';
   const fotoHtml = fotoUrl
     ? `<img src="${fotoUrl}" class="profile-photo" alt="${j.nome_personagem||'Perfil'}" style="object-fit:cover;border-radius:50%;width:80px;height:80px;border:2px solid var(--ouro)">`
-    : `<div class="profile-photo">⚖️</div>`;
+    : `<div class="profile-photo" style="width:80px;height:80px;border-radius:50%;overflow:hidden;border:2px solid var(--ouro)">${renderAvatarJogador(j, { size: 80 })}</div>`;
 
   const energiaUsada = j.energia_usada_mes||0;
   const energiaDisp  = Math.max(0, 100 - energiaUsada);

@@ -9,6 +9,7 @@ import { onAuthStateChanged, signOut }
 import { doc, getDoc, updateDoc, onSnapshot }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { auth, db } from './firebase-init.js';
+import { renderAvatarJogador } from './avatar_svg.js';
 
 // ── Estado global do jogador ──
 window.JOGADOR     = null;   // snapshot atual do jogador
@@ -87,12 +88,16 @@ function _iniciarListeners(uid) {
 // TOPBAR — USUÁRIO
 // ════════════════════════════════════════════════════════
 function _atualizarTopbarUsuario(user, jogador) {
-  const avatar = document.getElementById('tb-avatar');
-  const nome   = document.getElementById('tb-nome');
+  const avatar    = document.getElementById('tb-avatar');
+  const avatarSvg = document.getElementById('tb-avatar-svg');
+  const nome      = document.getElementById('tb-nome');
 
   if (user.photoURL) {
     window.USER_PHOTO_URL = user.photoURL;
     if (avatar) { avatar.src = user.photoURL; avatar.style.display = 'block'; }
+  } else if (avatarSvg && jogador) {
+    avatarSvg.innerHTML = renderAvatarJogador(jogador, { size: 28 });
+    avatarSvg.style.display = 'block';
   }
   if (nome) nome.textContent = jogador.nome_personagem || user.displayName || '—';
 }
