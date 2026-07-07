@@ -2123,6 +2123,10 @@ function _renderModalProcesso(id, p) {
 
   const ladoLabel = p.meu_lado === 'reu' ? '🛡️ Você está na DEFESA' : '⚖️ Você é o AUTOR da ação';
 
+  // Novo loop (GDD addendum v1.0 — Investigação, Favores e Julgamento):
+  // Intake → Investigação (mapa de nós/turnos) → Montagem → Julgamento.
+  // Substitui a tela de audiência legada (cv/progresso/rodadas) para todo
+  // processo sem setlist (fluxo GDD v4.1/v5.1, intocado — ver js/setlist.js).
   abrirModal(`⚖️ ${p.tipo || '—'}`,
     `<div style="background:var(--surface2);border:var(--borda);border-radius:var(--r);padding:.75rem;margin-bottom:.85rem">
       <div style="font-family:var(--font-mono);font-size:.6rem;color:var(--txt4);margin-bottom:.25rem">${p.numero || '—'}</div>
@@ -2132,256 +2136,15 @@ function _renderModalProcesso(id, p) {
       <div style="font-size:.7rem;color:var(--verde2);margin-top:.25rem">${fmt(p.valor)} · ${honInfo}</div>
       ${ehCasoPool ? `<div style="font-size:.65rem;color:var(--navy3);margin-top:.3rem">🏢 Caso colaborativo do escritório${p.escritorio_nome_etiqueta ? ' — ' + p.escritorio_nome_etiqueta : ''}</div>` : ''}
     </div>
-    <div style="margin-bottom:.85rem">
-      <div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--txt3);margin-bottom:.2rem">
-        <span>Progresso da audiência</span><span style="color:var(--navy);font-weight:700">${prog}%</span>
-      </div>
-      <div style="height:7px;background:var(--bg2);border-radius:3px;overflow:hidden;margin-bottom:.4rem">
-        <div style="height:100%;width:${prog}%;background:linear-gradient(90deg,var(--navy3),var(--ouro2));transition:width .4s"></div>
-      </div>
-      <div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--txt3)">
-        <span>Convencimento do magistrado</span>
-        <span style="font-weight:700;color:${cvColor}">${cv}</span>
-      </div>
-      <div style="height:5px;background:var(--bg2);border-radius:3px;overflow:hidden;margin-top:.18rem">
-        <div style="height:100%;width:${cv}%;background:${cvColor};transition:width .4s"></div>
-      </div>
-    </div>
     ${avisoEnergia}
     ${avisoCargo}
-    ${prog >= 100 && !travadoPorCargo
-      ? `<button class="btn btn-prim btn-block" onclick="window.processarSentenca('${id}')">⚖️ Processar sentença →</button>`
-      : prog >= 100 && travadoPorCargo
-      ? `<button class="btn btn-prim btn-block" disabled style="opacity:.5;cursor:not-allowed">⚖️ Aguardando Advogado Júnior+ →</button>`
-      : `<button class="btn btn-prim btn-block" ${energiaDisp < ENERGIA_POR_RODADA_AUDIENCIA || travadoPorCargo ? 'disabled' : ''} onclick="window.iniciarRodadaAudiencia('${id}')">
-           ▶ Sustentação oral — rodada ${(p.rodada_audiencia || 0) + 1}/3 →
-         </button>`}
-    <button class="btn btn-ghost btn-sm btn-block" style="margin-top:.4rem" onclick="window.tentarAcordo('${id}')">
-      🤝 Propor acordo (-5 ⚡)
-    </button>`
+    ${travadoPorCargo
+      ? `<button class="btn btn-prim btn-block" disabled style="opacity:.5;cursor:not-allowed">🔎 Aguardando Advogado Júnior+ →</button>`
+      : `<button class="btn btn-prim btn-block" onclick="window.abrirInvestigacao && window.abrirInvestigacao('${id}')">
+           🔎 ${p.investigacao ? 'Continuar investigação' : 'Iniciar investigação'} →
+         </button>`}`
   );
 }
-
-// ════════════════════════════════════════════════════════
-// AUDIÊNCIA — 3 rodadas de sustentação oral. Substitui o antigo fluxo
-// "peça processual + quiz técnico". Antes da 1ª rodada, jogador escolhe
-// até 3 provas e até 2 teses (uma vez só por processo, igual ao motor).
-// ════════════════════════════════════════════════════════
-window.iniciarRodadaAudiencia = async function(procId) {
-  const snap = await getDoc(doc(db, 'processos', procId));
-  if (!snap.exists()) return;
-  const p = snap.data();
-  const j = window.JOGADOR;
-
-  if (p.pool_escritorio_id && j) {
-    await _registrarContribuinte(procId, p, j);
-  }
-
-  const energiaDisp = Math.max(0, (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - (j.energia_usada_mes || 0));
-  if (energiaDisp < ENERGIA_POR_RODADA_AUDIENCIA) {
-    toast(`⚡ Energia insuficiente (requer ${ENERGIA_POR_RODADA_AUDIENCIA}⚡).`, 'ko');
-    return;
-  }
-
-  _estado = { procId, proc: p, fase: 'instrucao' };
-
-  // Se um funcionário já escolheu provas/teses antes (auto-seleção),
-  // pula a tela de escolha manual e vai direto pra audiência.
-  if (p.provas_selecionadas && p.teses_selecionadas) {
-    _renderRodadaAudiencia(procId, p);
-  } else {
-    _renderSelecaoProvas(procId, p);
-  }
-};
-
-function _renderSelecaoProvas(procId, p) {
-
-  if (!Array.isArray(p.provas) || p.provas.length === 0) {
-    toast(
-      'Este processo foi criado sem provas e não pode seguir para a audiência.',
-      'ko',
-      6000
-    );
-    console.error('[PROCESSO SEM PROVAS]', procId, p);
-    return;
-  }
-
-  abrirModal(
-    '📋 Fase 1 de 3 — Instrução Probatória',
-    `${_painelContextoProcesso(p)}
-    <div class="stitle">Selecione as provas</div>
-    <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.75rem">
-      Escolha até 3 provas.
-    </div>
-
-    <div class="pgrid" id="provas-sel" style="margin-bottom:1rem">
-      ${p.provas.map((prova, i) => `
-        <div class="pcard" id="prova-${i}" onclick="window.togProvaAudiencia(${i})">
-          <div class="pico">📄</div>
-          <div class="pnm">${prova.nome}</div>
-          <div class="ptyp">${(prova.tipo || '').toUpperCase()}</div>
-        </div>
-      `).join('')}
-    </div>
-
-    <button class="btn-avancar-fase"
-      id="btn-teses-aud"
-      onclick="window.irParaSelecaoTeses('${procId}')">
-      <span>Definir teses jurídicas</span>
-      <span class="baf-seta">→</span>
-    </button>`
-  );
-
-  window._provasEscolhidasAud = [];
-}
-
-window.togProvaAudiencia = function(i){
-  const arr = window._provasEscolhidasAud;
-  const idx = arr.indexOf(i);
-  if (idx >= 0) { arr.splice(idx,1); document.getElementById('prova-'+i)?.classList.remove('sel'); }
-  else if (arr.length < 3) { arr.push(i); document.getElementById('prova-'+i)?.classList.add('sel'); }
-};
-
-window.irParaSelecaoTeses = function(procId){
-  const p = _estado.proc;
-  abrirModal('📋 Fase 1 de 3 — Teses Jurídicas',
-    `${_painelContextoProcesso(p)}
-    <div class="stitle">Selecione até 2 teses</div>
-    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:1rem">
-      ${p.teses.map((t,i) => `
-        <div class="ti" id="tese-${i}" onclick="window.togTeseAudiencia(${i})">
-          <div class="tck" id="teseck-${i}"></div>
-          <div><div class="tnm">${t.nome}</div><div class="tds">${t.fundamento}</div></div>
-        </div>`).join('')}
-    </div>
-    <button class="btn-avancar-fase" onclick="window.confirmarInstrucaoAudiencia('${procId}')">
-      <span>Iniciar sustentação oral</span><span class="baf-seta">→</span>
-    </button>`
-  );
-  window._tesesEscolhidasAud = [];
-};
-
-window.togTeseAudiencia = function(i){
-  const arr = window._tesesEscolhidasAud;
-  const idx = arr.indexOf(i);
-  if (idx >= 0) { arr.splice(idx,1); document.getElementById('tese-'+i)?.classList.remove('sel'); document.getElementById('teseck-'+i).textContent=''; }
-  else if (arr.length < 2) { arr.push(i); document.getElementById('tese-'+i)?.classList.add('sel'); document.getElementById('teseck-'+i).textContent='✓'; }
-};
-
-window.confirmarInstrucaoAudiencia = async function(procId){
-  const provasSel = window._provasEscolhidasAud || [];
-  const tesesSel  = window._tesesEscolhidasAud || [];
-  await updateDoc(doc(db, 'processos', procId), {
-    provas_selecionadas: provasSel,
-    teses_selecionadas: tesesSel,
-  });
-  const snap = await getDoc(doc(db, 'processos', procId));
-  const p = snap.data();
-  _estado = { procId, proc: p, fase: 'audiencia' };
-  _renderRodadaAudiencia(procId, p);
-};
-
-function _renderRodadaAudiencia(procId, p) {
-  const rd = p.rodada_audiencia || 0;
-  if (rd >= 3) { window.processarSentenca(procId); return; }
-
-  const arg = p.args_audiencia[rd];
-  const meuLado = p.meu_lado || 'autor';
-  const labelArg = meuLado === 'reu' ? 'O autor sustenta:' : 'A parte ré argumenta:';
-
-  const opts = [
-    { tipo:'tecnica',   txt:p.resps_audiencia.tecnica[rd] },
-    { tipo:'agressiva', txt:p.resps_audiencia.agressiva[rd] },
-    { tipo:'passiva',   txt:p.resps_audiencia.passiva[rd] },
-  ].sort(() => Math.random() - 0.5);
-
-  abrirModal('🏛️ Fase 2 de 3 — Audiência',
-    `${_painelContextoProcesso(p)}
-    <div class="ftag">${p.juiz.nome} · rodada ${rd+1} de 3</div>
-    <div style="font-size:.72rem;color:var(--txt3);font-style:italic;margin-bottom:.5rem">${p.juiz.hint}</div>
-    <div class="abox"><div class="albl">${labelArg}</div><div class="atxt">${arg.txt}</div></div>
-    <div style="margin:.75rem 0">
-      <div style="display:flex;justify-content:space-between;font-size:.65rem;color:var(--txt3)">
-        <span>convencimento do magistrado</span><span>${p.convencimento}</span>
-      </div>
-      <div style="height:6px;background:var(--bg2);border-radius:3px;overflow:hidden;margin-top:.2rem">
-        <div style="height:100%;width:${p.convencimento}%;background:linear-gradient(90deg,#e57373,#3aaa6a)"></div>
-      </div>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:.4rem">
-      ${opts.map((o,i) => `<button class="rbtn" onclick="window.responderAudiencia('${procId}','${o.tipo}')"><span class="rl">${String.fromCharCode(65+i)}</span><span>${o.txt}</span></button>`).join('')}
-    </div>`
-  );
-}
-
-window.responderAudiencia = async function(procId, tipo) {
-  const j = window.JOGADOR;
-  const uid = j.uid || window.JOGADOR_UID;
-  const ok = await _gastarEnergia(ENERGIA_POR_RODADA_AUDIENCIA, 'Sustentação oral');
-  if (!ok) return;
-
-  const snap = await getDoc(doc(db, 'processos', procId));
-  const p = snap.data();
-  const rd = p.rodada_audiencia || 0;
-  const arg = p.args_audiencia[rd];
-
-  let d = tipo === arg.ideal ? 11 : tipo === arg.neutro ? 2 : -14;
-  const perfilJuiz = p.juiz.perfil_oculto;
-  if (perfilJuiz === 'formalista' && tipo === 'tecnica') d += 5;
-  if (perfilJuiz === 'garantista' && tipo === 'agressiva') d += 5;
-  if (perfilJuiz === 'conservador' && tipo === 'passiva') d -= 9;
-  if (perfilJuiz === 'formalista' && tipo === 'agressiva') d -= 4;
-
-  const provasSel = (p.provas_selecionadas || []).map(i => p.provas[i]);
-  const fm = provasSel.length ? provasSel.reduce((s,pr) => s + (pr.forca || 60), 0) / provasSel.length : 60;
-  if (fm >= 85 && tipo !== 'passiva') d += 5;
-  else if (fm >= 65 && tipo !== 'passiva') d += 2;
-  else if (fm < 50) d -= 4;
-  else if (fm < 35) d -= 8;
-
-  const tesesSel = p.teses_selecionadas || [];
-  d += tesesSel.length * 2;
-  if (tesesSel.length === 0) d -= 4;
-
-  const novoCv = Math.max(5, Math.min(95, (p.convencimento || 38) + d));
-  const novaRodada = rd + 1;
-  const novoProgresso = Math.round((novaRodada / 3) * 100);
-
-  // ── Revelação pós-escolha (Precisão/Confronto/Jogo de Cintura) ──
-  // Decisão de design: a categoria NUNCA aparece nos botões antes da
-  // escolha (preserva a leitura/intuição do jogador sobre o tom da fala
-  // e o perfil do juiz). Só DEPOIS de escolher, um toast revela qual
-  // categoria foi essa e o resultado — isso ensina o padrão
-  // progressivamente, sem entregar a "etiqueta" de antemão e sem travar
-  // o ritmo com uma tela extra de confirmação.
-  const NOME_CATEGORIA = { tecnica: 'Precisão', agressiva: 'Confronto', passiva: 'Jogo de Cintura' };
-  const sinalGanho = d >= 0 ? '+' : '';
-  const corResultado = d >= 5 ? 'ok' : d <= -5 ? 'ko' : 'neutro';
-  toast(`${NOME_CATEGORIA[tipo]}: ${sinalGanho}${d} de convencimento`, corResultado, 2800);
-
-  // Registra o HISTÓRICO de respostas (rodada + tipo escolhido), não só o
-  // convencimento final — é esse histórico que a Cloud Function usa para
-  // RECALCULAR o resultado do zero na hora da sentença, em vez de confiar
-  // no convencimento que o próprio cliente calculou e salvou. Sem isso, um
-  // jogador malicioso poderia escrever qualquer score direto no Firestore.
-  const historicoAnterior = p.historico_respostas_audiencia || [];
-  const novoHistorico = [...historicoAnterior, { rodada: rd, tipo }];
-
-  await updateDoc(doc(db, 'processos', procId), {
-    convencimento: novoCv, // valor exibido imediatamente na UI (otimista)
-    rodada_audiencia: novaRodada,
-    progresso: novoProgresso,
-    historico_respostas_audiencia: novoHistorico,
-  });
-
-  if (novaRodada >= 3) {
-    window.processarSentenca(procId);
-  } else {
-    const snap2 = await getDoc(doc(db, 'processos', procId));
-    _estado = { procId, proc: snap2.data(), fase: 'audiencia' };
-    _renderRodadaAudiencia(procId, snap2.data());
-  }
-};
 
 // ════════════════════════════════════════════════════════
 // SENTENÇA DE 1ª INSTÂNCIA — substitui o cálculo antigo de chance única
@@ -2770,9 +2533,13 @@ window.jogarRecursoProducao = async function(procId) {
   const p = snap.data();
   RECURSO_ATIVO = { id: procId, ...p };
 
-  // GDD v4.1 — OAB: sempre usa fluxo setlist, nunca o fluxo de rodadas antigo.
-  // Se o status mudou (dados stale na UI), redireciona para a modal correta.
-  if (j.oab) {
+  // GDD v4.1 — OAB (ou caso originado do novo loop de Investigação/
+  // Favores/Julgamento, que marca `setlist:[]` em finalizarJulgamento para
+  // reaproveitar este mesmo caminho de honorários/recurso — ver
+  // functions/investigacao.js): sempre usa fluxo setlist, nunca o fluxo de
+  // rodadas antigo. Se o status mudou (dados stale na UI), redireciona
+  // para a modal correta.
+  if (j.oab || p.setlist) {
     if (p.status === 'recurso_pendente') {
       abrirModal(`📜 Recurso — Montar Setlist`,
         '<div id="modal-setlist-recurso" style="min-height:200px"><div style="padding:1rem;color:var(--ardosia2)">Carregando…</div></div>');

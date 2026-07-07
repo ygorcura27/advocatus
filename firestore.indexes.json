@@ -73,6 +73,38 @@
         { "fieldPath": "status",     "order": "ASCENDING" },
         { "fieldPath": "criado_em",  "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "favores",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "devedor_uid", "order": "ASCENDING" },
+        { "fieldPath": "status",      "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "favores",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "credor_uid", "order": "ASCENDING" },
+        { "fieldPath": "status",     "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "favores",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "credor_npc_id", "order": "ASCENDING" },
+        { "fieldPath": "status",        "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "favores",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "devedor_npc_id", "order": "ASCENDING" },
+        { "fieldPath": "status",         "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

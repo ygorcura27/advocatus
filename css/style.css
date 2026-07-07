@@ -2298,4 +2298,63 @@ a:hover { color: var(--navy); }
 
 /* Skills jurídicas — grid de barras */
 .skjur-label { font-size: .75rem; }
+
+/* ═══════════════════════════════════════════════════════════
+   INVESTIGAÇÃO, FAVORES E JULGAMENTO — GDD addendum v1.0
+   Reaproveita tokens do design system (--navy, --ouro2, --surface,
+   --r/--r2, --borda, --sombra) e as classes .rbtn/.rl/.abox já usadas
+   na audiência legada, sem paleta nova.
+   ═══════════════════════════════════════════════════════════ */
+
+.inv-turnos-bar {
+  display: flex;
+  gap: .4rem;
+  flex-wrap: wrap;
+  margin: .6rem 0 1rem;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: .28rem .65rem;
+  border-radius: var(--r-pill, 20px);
+  border: var(--borda);
+  background: var(--surface2);
+  font-size: .68rem;
+  font-weight: 600;
+  color: var(--txt2);
+}
+.chip-ouro {
+  border-color: var(--ouro3);
+  background: var(--ouro-light);
+  color: var(--ouro3);
+}
+
+.inv-nos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: .6rem;
+  margin-top: .5rem;
+}
+.inv-no {
+  border: var(--borda);
+  border-radius: var(--r2);
+  padding: .75rem .6rem;
+  text-align: center;
+  background: var(--surface);
+  box-shadow: var(--sombra);
+  transition: all .15s;
+}
+.inv-no-visivel, .inv-no-oculto { cursor: pointer; }
+.inv-no-visivel:hover { border-color: var(--navy3); transform: translateY(-1px); box-shadow: var(--sombra2); }
+.inv-no-bloqueado { opacity: .7; cursor: pointer; border-style: dashed; }
+.inv-no-revelado { border-color: var(--navy-light); background: var(--surface2); }
+.inv-no.sel { border-color: var(--navy3); background: var(--navy-light); box-shadow: 0 0 0 2px var(--navy3); cursor: pointer; }
+.inv-no-icone { font-size: 1.4rem; margin-bottom: .3rem; }
+.inv-no-tipo { font-size: .68rem; font-weight: 600; color: var(--navy); margin-bottom: .25rem; }
+.inv-no-acao { font-size: .62rem; color: var(--ouro2); text-transform: uppercase; letter-spacing: .05em; }
+.inv-no-bloqueio { font-size: .62rem; color: var(--txt3); }
+.inv-no-peca { font-size: .68rem; color: var(--verde); font-weight: 600; }
+.inv-no-peca.suja { color: var(--verm2); }
+
+.rbtn.sel { border-color: var(--navy3); background: var(--navy-light); color: var(--navy); }
 .skjur-val   { font-size: .75rem; font-weight: 700; min-width: 2.5rem; text-align: right; }

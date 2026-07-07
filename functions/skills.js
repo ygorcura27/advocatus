@@ -118,6 +118,10 @@ function defaultSkillsJur() {
     area_bankruptcy: 0,
     // Mídia / Comunicação (GDD v5.1 — Podcasts/Vídeos Virais)
     comunicacao_midiatica: 0,
+    // Investigação/Favores/Julgamento (GDD addendum v1.0, Parte VII)
+    analise_forense:        0,
+    perfil_comportamental:  0,
+    discricao:              0,
   };
 }
 

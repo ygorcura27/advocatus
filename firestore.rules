@@ -132,6 +132,14 @@ service cloud.firestore {
         allow read:  if isOwner(uid);
         allow write: if false;
       }
+
+      // ── Subcoleção: confiança profissional com NPCs (GDD addendum v1.0,
+      // Parte IV — sistema de Favores) — só o próprio jogador lê; toda
+      // escrita é feita pelas Cloud Functions de investigacao.js (Admin SDK).
+      match /confiancas_npc/{npcId} {
+        allow read:  if isOwner(uid);
+        allow write: if false;
+      }
     }
 
     // ══════════════════════════════════════════════════════
@@ -394,6 +402,20 @@ service cloud.firestore {
       }
 
       allow delete: if false;
+    }
+
+    // ══════════════════════════════════════════════════════
+    // FAVORES (GDD addendum v1.0 — Investigação, Favores e Julgamento)
+    // Objetos nominais ligados a devedor/credor. Leitura ampla para
+    // autenticados (mesma justificativa da regra de /processos: consultas
+    // por where(devedor_uid,'==',uid) e where(credor_uid,'==',uid) quebram
+    // com regras dependentes de resource.data em queries de listagem).
+    // Toda escrita é feita pelas Cloud Functions de investigacao.js
+    // (Admin SDK ignora estas regras).
+    // ══════════════════════════════════════════════════════
+    match /favores/{favorId} {
+      allow read: if isAuth();
+      allow write: if false;
     }
 
     // ══════════════════════════════════════════════════════

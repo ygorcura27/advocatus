@@ -60,6 +60,13 @@ const { anteciparHonorarios, contratarLinhaCredito, pagarLinhaCredito,
         contratarSocioInvestidor, aplicarInvestimento, resgatarInvestimento } = require('./financeiro');
 // GDD v5.1 — Podcasts / Aparições na Internet
 const { responderConviteMidia } = require('./podcasts_social');
+// GDD addendum v1.0 — Investigação, Favores e Julgamento
+const {
+  iniciarCasoInvestigativo, executarAcaoInvestigacao,
+  pedirFavor, consumirFavorNode, confirmarMontagem,
+  abrirVadeMecum, aplicarTeseVademecum,
+  executarRodadaJulgamento, finalizarJulgamento,
+} = require('./investigacao');
 
 exports.avancarMes              = avancarMes;
 exports.processarSentenca       = processarSentenca;
@@ -117,3 +124,13 @@ exports.pagarLinhaCredito        = pagarLinhaCredito;
 exports.contratarSocioInvestidor = contratarSocioInvestidor;
 exports.aplicarInvestimento      = aplicarInvestimento;
 exports.resgatarInvestimento     = resgatarInvestimento;
+// GDD addendum v1.0 — Investigação, Favores e Julgamento
+exports.iniciarCasoInvestigativo = iniciarCasoInvestigativo;
+exports.executarAcaoInvestigacao = executarAcaoInvestigacao;
+exports.pedirFavor               = pedirFavor;
+exports.consumirFavorNode        = consumirFavorNode;
+exports.confirmarMontagem        = confirmarMontagem;
+exports.abrirVadeMecum           = abrirVadeMecum;
+exports.aplicarTeseVademecum     = aplicarTeseVademecum;
+exports.executarRodadaJulgamento = executarRodadaJulgamento;
+exports.finalizarJulgamento      = finalizarJulgamento;

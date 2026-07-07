@@ -34,6 +34,7 @@ function _navLateralPadrao(painel) {
       <div class="nav-grupo-titulo">Carreira</div>
       <div class="nav-item${ativo('perfil')}" onclick="navTo('perfil',this)"><span class="ni-icon">⚖️</span> Meu Perfil</div>
       <div class="nav-item${ativo('escritorio')}" onclick="navTo('escritorio',this)"><span class="ni-icon">🏢</span> Escritório</div>
+      <div class="nav-item${ativo('investigacao')}" onclick="navTo('investigacao',this)"><span class="ni-icon">🔎</span> Investigação</div>
       <div class="nav-item${ativo('progressao')}" onclick="navTo('progressao',this)"><span class="ni-icon">📈</span> Progressão</div>
     </div>
     <div class="nav-grupo">
@@ -130,6 +131,10 @@ function _renderizar() {
     case 'midia_convites':
       if (window.renderConvitesMidia) window.renderConvitesMidia(j, main);
       else main.innerHTML = '<div class="card" style="color:var(--ardosia2)">Carregando convites de mídia...</div>';
+      break;
+    case 'investigacao':
+      if (window.renderInvestigacao) window.renderInvestigacao(j, main);
+      else main.innerHTML = '<div class="card" style="color:var(--txt3)">Carregando investigação...</div>';
       break;
     case 'progressao':   renderProgressao(j, main);    break;
     case 'habilidades':  renderHabilidades(j, main);   break;

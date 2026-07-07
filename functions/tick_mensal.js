@@ -22,6 +22,7 @@ const { logger }        = require('firebase-functions');
 const { processarPremiosAnuais, zerarContadoresAnuais } = require('./premios_anuais');
 const { processarImprensaMensal } = require('./imprensa');
 const { sortearTemaEGerarConvites } = require('./podcasts_social');
+const { processarApodrecimentoFavores } = require('./investigacao');
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -205,6 +206,14 @@ exports.tickMensal = onSchedule({
     await sortearTemaEGerarConvites(db, mesGlobal);
   } catch (e) {
     logger.error('[MIDIA] Falha ao sortear tema/gerar convites:', e.message);
+  }
+
+  // ── 8. Apodrecimento de Favores (GDD addendum v1.0, Parte IV.2) ──
+  // 1 tick real = 1 dia real de apodrecimento, independente do calendário de jogo.
+  try {
+    await processarApodrecimentoFavores(db);
+  } catch (e) {
+    logger.error('[FAVORES] Falha ao processar apodrecimento:', e.message);
   }
 
   logger.info('[TICK] Tick mensal concluído');
