@@ -1920,11 +1920,25 @@ async function _gerarProcessoAutomaticoCF(db, j, oportunidade) {
   const area = AREAS_SERVICO[oportunidade.tipo] || 'civil';
   const valorCausa = oportunidade.valor * (3 + Math.random()*5);
 
+  // O advogado (jogador) representa uma parte, nunca É a parte — antes
+  // `autor: j.nome_personagem` colocava o próprio jogador como autor do
+  // processo. O cliente que gerou a oportunidade é quem tem o caso (autor);
+  // a contraparte precisa de um nome próprio, sorteado do mesmo pool de
+  // nomes de cliente (excluindo o próprio cliente) já que não existe um
+  // gerador de contraparte dedicado nesse fluxo.
+  const poolContraparte = [
+    ...NOMES_CLIENTE_PF_REL,
+    ...Object.values(NOMES_CLIENTE_PJ_REL).flat(),
+  ].filter(n => n !== oportunidade.cliente_nome);
+  const contraparte = poolContraparte.length
+    ? poolContraparte[Math.floor(Math.random() * poolContraparte.length)]
+    : 'Parte contrária';
+
   await db.collection('processos').add({
     numero: `${String(Math.floor(Math.random()*9999999)).padStart(7,'0')}-${String(Math.floor(Math.random()*99)).padStart(2,'0')}.${j.ano_pessoal||1}.8.19.0001`,
     tipo: 'Ação decorrente de ' + oportunidade.tipo,
     area, tipo_processo: 'judicial',
-    autor: j.nome_personagem || 'Advogado', reu: oportunidade.cliente_nome,
+    autor: oportunidade.cliente_nome, reu: contraparte,
     tribunal: 'TJRJ', advogado_uid: j.uid, escritorio_id: j.escritorio_proprio_id||null,
     status:'andamento', instancia:1, progresso:0, chance_sucesso:55,
     valor: Math.floor(valorCausa), nivel:5, hon_total_acumulado:0,

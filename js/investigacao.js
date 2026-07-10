@@ -166,10 +166,30 @@ function _renderFichaCaso(p) {
     </div>`;
 }
 
-function _renderMapaInvestigacao(j, main, p) {
+// Confiança atual do jogador com cada NPC por trás de nós bloqueados —
+// sem isso o card só dizia "Requer confiança" e a única forma de saber o
+// quão perto se estava do mínimo era pedir o favor e ler um toast que
+// some logo em seguida. Mostrar aqui deixa o progresso visível o tempo
+// todo, sem precisar adivinhar por que o nó "não destravou".
+async function _confiancasDosNosBloqueados(inv) {
+  const uid = window.JOGADOR?.uid || window.JOGADOR_UID;
+  const nosConfianca = inv.nos.filter(n => n.status === 'bloqueado' && n.bloqueio?.tipo === 'confianca');
+  const npcIds = [...new Set(nosConfianca.map(n => n.bloqueio.npc_id))];
+  const mapa = {};
+  await Promise.all(npcIds.map(async (npcId) => {
+    try {
+      const snap = await getDoc(doc(db, 'jogadores', uid, 'confiancas_npc', npcId));
+      mapa[npcId] = snap.exists() ? (snap.data().confianca ?? 50) : 50;
+    } catch (e) { mapa[npcId] = 50; }
+  }));
+  return mapa;
+}
+
+async function _renderMapaInvestigacao(j, main, p) {
   const inv = p.investigacao;
   const nosVisiveis = inv.nos.filter(n => n.status !== 'oculto');
   const revelados = inv.nos.filter(n => n.status === 'revelado').length;
+  const confiancas = await _confiancasDosNosBloqueados(inv);
 
   main.innerHTML = `
     <div class="inv-scenario">
@@ -185,7 +205,9 @@ function _renderMapaInvestigacao(j, main, p) {
             ${no.status === 'revelado'
               ? `<div class="inv-no-peca ${no.peca?.suja ? 'suja' : ''}">Força ${no.peca?.forca ?? '—'}${no.peca?.suja ? ' · suja' : ''}</div>`
               : no.status === 'bloqueado'
-                ? `<div class="inv-no-bloqueio">🔒 ${no.bloqueio?.tipo === 'favor' ? 'Requer favor' : 'Requer confiança'}</div>`
+                ? (no.bloqueio?.tipo === 'favor'
+                    ? `<div class="inv-no-bloqueio">🔒 Requer favor</div>`
+                    : `<div class="inv-no-bloqueio">🔒 Confiança ${confiancas[no.bloqueio.npc_id] ?? '—'}/${no.bloqueio.minimo}</div>`)
                 : `<div class="inv-no-acao">Investigar</div>`}
           </div>`).join('')}
       </div>
@@ -484,24 +506,59 @@ window._invConfirmarMontagem = async function() {
 
 // ─── Tela: Julgamento ───────────────────────────────────────────────────────
 
+// Mesma fórmula de functions/investigacao.js:prioridadeAtaque — usada aqui
+// só pra saber, ANTES de reagir, qual peça o adversário vai mirar. O
+// servidor recalcula com os dados reais na hora de resolver, então isto é
+// puramente pra dar contexto visível ao jogador, nunca a fonte de verdade.
+function _prioridadeAtaqueClient(peca) {
+  return (10 - peca.forca / 10) + (peca.suja ? 3 : 0) + (peca.pilar ? 2 : 0) + (peca.exposta ? 50 : 0);
+}
+
 function _renderJulgamento(j, main, p) {
   const julg = p.investigacao.julgamento;
-  const restantes = julg.pecas_restantes.length;
+  const pecas = julg.pecas_restantes;
+  const restantes = pecas.length;
+
+  if (restantes === 0) {
+    main.innerHTML = `
+      <div class="inv-scenario">
+        <div class="inv-titulo-caso">Julgamento — Rodada ${julg.rodada_atual + 1}</div>
+        <div class="inv-sub-caso">Força total acumulada: <strong style="color:var(--ouro)">${julg.forca_total}</strong></div>
+        <button class="btn btn-prim" onclick="window._invFinalizarJulgamento()">Ver Veredito</button>
+      </div>`;
+    return;
+  }
+
+  const ordenadas = [...pecas].sort((a, b) => _prioridadeAtaqueClient(b) - _prioridadeAtaqueClient(a));
+  const alvo = ordenadas[0];
+  const chanceDefender = Math.min(90, Math.round(30 + alvo.forca * 0.7));
+  const favoresDisp = (p.investigacao.favores_reservados || []).length;
 
   main.innerHTML = `
     <div class="inv-scenario">
       <div class="inv-titulo-caso">Julgamento — Rodada ${julg.rodada_atual + 1}</div>
       <div class="inv-sub-caso">Força total acumulada: <strong style="color:var(--ouro)">${julg.forca_total}</strong> · Peças restantes: ${restantes}</div>
-      ${restantes > 0 ? `
-        <p style="color:#C9BFA6;margin:.75rem 0">O adversário está atacando sua peça mais vulnerável. Como reage?</p>
-        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-          <button class="btn btn-prim" onclick="window._invReagir('defender')">🛡️ Defender</button>
-          <button class="btn btn-sec" onclick="window._invReagirFavor()">🃏 Usar Favor (joker)</button>
-          <button class="btn btn-ghost" onclick="window._invReagir('deixar_cair')">🗑️ Deixar cair</button>
-        </div>
-      ` : `
-        <button class="btn btn-prim" onclick="window._invFinalizarJulgamento()">Ver Veredito</button>
-      `}
+
+      <div class="inv-julg-mao">
+        ${ordenadas.map(pc => `
+          <div class="inv-julg-peca${pc === alvo ? ' inv-julg-alvo' : ''}">
+            ${pc === alvo ? '<div class="inv-julg-tag">🎯 Sob ataque</div>' : ''}
+            <div class="inv-julg-forca">Força ${pc.forca}</div>
+            <div class="inv-julg-badges">
+              ${pc.suja ? '<span class="inv-julg-badge suja">Suja</span>' : ''}
+              ${pc.pilar ? '<span class="inv-julg-badge pilar">Pilar</span>' : ''}
+            </div>
+          </div>`).join('')}
+      </div>
+
+      <p style="color:#C9BFA6;margin:.9rem 0 .5rem">
+        O adversário ataca sua peça de <strong>Força ${alvo.forca}</strong>${alvo.suja ? ' — <strong>suja</strong> (risco de exposição se a defesa falhar)' : ''}${alvo.pilar ? ' — peça <strong>pilar</strong>: se cair, o resto da mão perde metade da força' : ''}. Como reage?
+      </p>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+        <button class="btn btn-prim" onclick="window._invReagir('defender')">🛡️ Defender (~${chanceDefender}% de sucesso${alvo.suja ? ' · Sustentação Oral melhora a chance' : ''})</button>
+        <button class="btn btn-sec" onclick="window._invReagirFavor()">🃏 Usar Favor (sucesso garantido${favoresDisp ? ` — ${favoresDisp} disponível(is)` : ' — nenhum reservado'})</button>
+        <button class="btn btn-ghost" onclick="window._invReagir('deixar_cair')">🗑️ Deixar cair (0 força${alvo.pilar ? ' + penaliza o resto da mão' : ''})</button>
+      </div>
     </div>`;
 }
 
@@ -511,8 +568,11 @@ window._invReagir = async function(reacao, favorId) {
     const r = await callFn('executarRodadaJulgamento', { processo_id: _procId, reacao, favor_id: favorId });
     const snap = await getDoc(doc(db, 'processos', _procId));
     _procCache = snap.data();
+    const resultado = reacao === 'deixar_cair'
+      ? 'Peça descartada — 0 força.'
+      : `${r.forca_obtida > 0 ? '✅ Defesa bem-sucedida' : '⚠️ Defesa falhou'} — força obtida: ${r.forca_obtida}.`;
     window.toast && window.toast(
-      `${r.exposta ? '⚠️ Peça exposta! ' : ''}Força obtida: ${r.forca_obtida}`, r.exposta ? 'ko' : 'neutro', 3000,
+      `${resultado}${r.exposta ? ' ⚠️ Peça exposta!' : ''}`, r.exposta ? 'ko' : (r.forca_obtida > 0 ? 'ok' : 'neutro'), 3500,
     );
     _renderFase(window.JOGADOR, document.getElementById('main-content'), _procCache);
   } catch (err) {

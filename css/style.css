@@ -2353,6 +2353,32 @@ a:hover { color: var(--navy); }
   gap: .6rem;
   margin-top: .5rem;
 }
+
+/* Mão de peças do Julgamento — mostra as stats reais (força/suja/pilar)
+   e qual peça está sob ataque nesta rodada, em vez de esconder tudo
+   atrás de "peça mais vulnerável" sem nenhum dado visível. */
+.inv-julg-mao {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: .5rem; margin-top: .7rem;
+}
+.inv-julg-peca {
+  position: relative;
+  background: #F2E8D6; border: 1px solid #DDD0AA; border-radius: var(--r);
+  padding: .5rem .4rem; text-align: center;
+}
+.inv-julg-alvo { border-color: var(--verm2); box-shadow: 0 0 0 2px rgba(192,57,43,.3); }
+.inv-julg-tag {
+  position: absolute; top: -.55rem; left: 50%; transform: translateX(-50%);
+  background: var(--verm2); color: #fff; font-size: .58rem; font-weight: 700;
+  padding: .08rem .4rem; border-radius: 10px; white-space: nowrap;
+}
+.inv-julg-forca { font-size: .78rem; font-weight: 700; color: #2a1f10; }
+.inv-julg-badges { display: flex; gap: .25rem; justify-content: center; margin-top: .3rem; flex-wrap: wrap; }
+.inv-julg-badge {
+  font-size: .58rem; font-weight: 700; padding: .05rem .35rem; border-radius: 8px;
+}
+.inv-julg-badge.suja  { background: var(--verm-bg); color: var(--verm2); }
+.inv-julg-badge.pilar { background: var(--ouro-light); color: var(--ouro3); }
 .inv-no {
   border: var(--borda);
   border-radius: var(--r2);
