@@ -1129,8 +1129,24 @@ window.designarEstudo = async function(funcId, escId) {
   const snap = await getDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId));
   if (!snap.exists()) return;
   const f = { id: snap.id, ...snap.data() };
-  const skills    = f.skills || {};
-  const skillsJur = f.skills_jur || {};
+  const skills = f.skills || {};
+  let skillsJur = f.skills_jur || {};
+
+  // Funcionários contratados antes do skills_jur existir não têm esse
+  // campo salvo — cura aqui na primeira vez que o estudo é aberto pra
+  // eles, em vez de exigir uma migração em lote.
+  if (!Object.keys(skillsJur).length) {
+    const baseJur = _CARGO_JUR_BASE_EQ[f.cargo_id] || _CARGO_JUR_BASE_EQ.est;
+    skillsJur = {};
+    Object.keys(_SKILL_JUR_TODAS_LBL).forEach(k => {
+      skillsJur[k] = Math.max(0, Math.min(CAP_JUR_NPC, Math.round(baseJur * (0.6 + Math.random() * 0.6))));
+    });
+    try {
+      await updateDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId), { skills_jur: skillsJur });
+      f.skills_jur = skillsJur;
+    } catch (e) { console.warn('Falha ao criar skills_jur retroativo:', e); }
+  }
+
   if (!Object.keys(skills).length && !Object.keys(skillsJur).length) {
     toast('Nenhuma skill disponível.', 'ko'); return;
   }
