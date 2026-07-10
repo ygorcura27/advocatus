@@ -187,9 +187,14 @@ function _labelTipoNo(tipo) {
 }
 
 window._invIrParaMontagem = function() {
-  window.renderInvestigacao(window.JOGADOR, document.getElementById('main-content'));
   // Força fase de montagem no cliente apenas para navegar; o servidor
-  // valida/atualiza a fase de fato em confirmarMontagem.
+  // valida/atualiza a fase de fato em confirmarMontagem. Antes também
+  // chamava window.renderInvestigacao() aqui, que refaz um getDoc() no
+  // processo — como o servidor ainda não sabia da mudança de fase (só
+  // confirmarMontagem grava isso), aquele fetch voltava com fase
+  // 'investigacao' e, ao resolver um instante depois, sobrescrevia
+  // _procCache e re-renderizava o mapa por cima da Montagem, revertendo
+  // a tela sem nenhum aviso — exatamente o "não avançou" reportado.
   if (_procCache) { _procCache.investigacao.fase = 'montagem'; _renderMontagem(window.JOGADOR, document.getElementById('main-content'), _procCache); }
 };
 
