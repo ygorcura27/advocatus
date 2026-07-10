@@ -31,7 +31,20 @@ window.addEventListener('gamestate:ready', () => {
 // Financeiro, Loja, Vida Pessoal, Vagas, Rankings, Mensagens).
 function _navLateralPadrao(painel) {
   const ativo = (id) => id === painel ? ' ativo' : '';
+  // "Meu Perfil" ganha um grupo extra de atalhos para a própria página —
+  // mas usa o MESMO menu de navegação de todo o resto do app abaixo dele,
+  // em vez de um menu duplicado e divergente (era a causa do bug de
+  // ícones coloridos/inconsistentes e do link de Investigação sumindo
+  // só na tela de Perfil).
+  const grupoNestaPagina = painel === 'perfil' ? `
+    <div class="nav-grupo">
+      <div class="nav-grupo-titulo">Nesta página</div>
+      <div class="nav-item" onclick="window.scrollTo({top:0,behavior:'smooth'})"><span class="ni-icon">${icon('perfil')}</span> Visão Geral</div>
+      <div class="nav-item" onclick="document.getElementById('perfil-atributos-secao')?.scrollIntoView({behavior:'smooth'})"><span class="ni-icon">${icon('progressao')}</span> Atributos</div>
+      <div class="nav-item" onclick="document.getElementById('perfil-atividade-secao')?.scrollIntoView({behavior:'smooth'})"><span class="ni-icon">${icon('inbox')}</span> Atividade Recente</div>
+    </div>` : '';
   return `
+    ${grupoNestaPagina}
     <div class="nav-grupo">
       <div class="nav-grupo-titulo">Carreira</div>
       <div class="nav-item${ativo('perfil')}" onclick="navTo('perfil',this)"><span class="ni-icon">${icon('perfil')}</span> Meu Perfil</div>
@@ -83,9 +96,7 @@ function _renderSidebarLateral(painel) {
   const nav = document.getElementById('nav-lateral-dynamic');
   if (!nav) return;
 
-  if (painel === 'perfil') {
-    nav.innerHTML = _perfilSideMenu(true);
-  } else if (painel in ESC_PAINEIS) {
+  if (painel in ESC_PAINEIS) {
     nav.innerHTML = _escSideMenu(ESC_PAINEIS[painel], true);
   } else if (painel === 'patrimonio' && window._patSideMenu) {
     nav.innerHTML = window._patSideMenu('visao-geral', true);
@@ -260,42 +271,6 @@ function renderPerfil(j, el) {
   _carregarFeedAtividade(j.uid);
 }
 
-// Menu lateral contextual do Perfil — sub-seções da própria página +
-// grupos de Carreira/Social (mesma navegação de sempre, agora reorganizada).
-function _perfilSideMenu(semWrapper) {
-  const GRUPOS = [
-    { titulo: 'Perfil', links: [
-      { icon:'⚖️', label: 'Visão Geral',      fn: "window.scrollTo({top:0,behavior:'smooth'})" },
-      { icon:'📊', label: 'Atributos',        fn: "document.getElementById('perfil-atributos-secao')?.scrollIntoView({behavior:'smooth'})" },
-      { icon:'📋', label: 'Atividade Recente',fn: "document.getElementById('perfil-atividade-secao')?.scrollIntoView({behavior:'smooth'})" },
-    ]},
-    { titulo: 'Carreira & Atividade', links: [
-      { icon:'📈', label: 'Progressão',        fn: "window.navTo('progressao',null)" },
-      { icon:'📜', label: 'Petições',          fn: "window.navTo('peticoes',null)" },
-      { icon:'⚡', label: 'Habilidades',       fn: "window.navTo('habilidades',null)" },
-      { icon:'🎓', label: 'Cursos & Pós',      fn: "window.navTo('cursos',null)" },
-      { icon:'🔨', label: 'Concurso Público',  fn: "window.navTo('concurso',null)" },
-    ]},
-    { titulo: 'Patrimônio', links: [
-      { icon:'🏠', label: 'Moradia',       fn: "window._pendingScrollId='pat-moradia-secao';window.navTo('patrimonio',null)" },
-      { icon:'🚗', label: 'Veículos',      fn: "window._pendingScrollId='pat-transporte-secao';window.navTo('patrimonio',null)" },
-      { icon:'💳', label: 'Investimentos', fn: "window.navTo('financeiro',null)" },
-    ]},
-    { titulo: 'Social', links: [
-      { icon:'📋', label: 'Vagas',        fn: "window.navTo('vagas',null)" },
-      { icon:'🏆', label: 'Rankings',     fn: "window.navTo('ranking',null)" },
-      { icon:'📬', label: 'Mensagens',    fn: "window.navTo('inbox',null)" },
-      { icon:'🛍️', label: 'Loja',         fn: "window.navTo('loja',null)" },
-      { icon:'👤', label: 'Vida Pessoal', fn: "window.navTo('vida_pessoal',null)" },
-    ]},
-  ];
-  const grupos = GRUPOS.map(g => `
-      <div class="nav-grupo">
-        <div class="nav-grupo-titulo">${g.titulo}</div>
-        ${g.links.map(l => `<div class="nav-item" onclick="${l.fn}"><span class="ni-icon">${l.icon}</span> ${l.label}</div>`).join('')}
-      </div>`).join('');
-  return semWrapper ? grupos : `<aside class="esc-side-menu">${grupos}</aside>`;
-}
 
 async function _carregarFeedAtividade(uid) {
   try {

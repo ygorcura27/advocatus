@@ -201,7 +201,7 @@ window._invAbrirNo = async function(noId) {
   if (no.status === 'bloqueado') return _renderPopupBloqueio(no);
   if (no.tipo === 'consulta') return _executarNo(noId, null);
   if (no.tipo === 'analise_documental') return _renderPopupAnaliseDocumental(no);
-  if (no.tipo === 'entrevista') return _renderPopupEntrevista(no);
+  if (no.tipo === 'entrevista') { window._invDeclEscolhida = null; return _renderPopupEntrevista(no); }
   if (no.tipo === 'pericia') return _renderPopupPericia(no);
 };
 
@@ -255,7 +255,12 @@ function _renderPopupEntrevista(no) {
       <button class="btn btn-sec" onclick="window._invEscolherTom('empatia')">Empatia</button>
       <button class="btn btn-sec" onclick="window._invEscolherTom('silencio')">Silêncio</button>
     </div>`);
-  window._invDeclEscolhida = null;
+  // Não reseta window._invDeclEscolhida aqui — esta função também roda de
+  // novo a cada seleção (para repintar o botão marcado), e resetar aqui
+  // apagava a escolha um instante depois de marcá-la, então "Pressionar/
+  // Empatia/Silêncio" sempre via null e recusava com "Aponte uma
+  // declaração primeiro" mesmo com a opção visivelmente selecionada. Quem
+  // zera o valor agora é window._invAbrirNo, ao abrir um nó novo.
   window._invEscolherDeclaracao = (i) => { window._invDeclEscolhida = i; _renderPopupEntrevista(no); };
   window._invEscolherTom = (tom) => {
     if (window._invDeclEscolhida == null) { window.toast && window.toast('Aponte uma declaração primeiro.', 'ko'); return; }
