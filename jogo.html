@@ -305,6 +305,19 @@ window.navTo = function(painel, el) {
     if (match) match.classList.add('ativo');
   }
 
+  // Atualizar aba superior (nav-top) — antes só adicionava .ativo na aba
+  // clicada e nunca limpava as anteriores, então toda aba já visitada
+  // (Escritório, Ranking, Social, Loja) ficava dourada para sempre. Mapeia
+  // o painel atual (que pode ser um sub-painel sem link próprio no topo,
+  // ex. "balancete"/"habilidades") para a aba do topo a que pertence.
+  const ESC_PAINEIS_TOP = new Set(['escritorio','processos','balancete','equipe','clientes','repertorio','midia_convites']);
+  const abaTop = ESC_PAINEIS_TOP.has(painel) ? 'escritorio'
+    : (painel === 'ranking' || painel === 'vagas' || painel === 'loja') ? painel
+    : 'perfil';
+  document.querySelectorAll('.nav-top a').forEach(a => a.classList.remove('ativo'));
+  const matchTop = document.querySelector(`.nav-top a[onclick*="'${abaTop}'"]`);
+  if (matchTop) matchTop.classList.add('ativo');
+
   // Atualizar hash sem disparar hashchange novamente
   if (location.hash !== '#' + painel) {
     history.pushState({ painel }, '', '#' + painel);

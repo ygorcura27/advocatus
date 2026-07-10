@@ -136,26 +136,22 @@ window.renderEquipe = async function(j, el) {
   const totalSalarios = funcs.reduce((s,f) => s + (CARGO_INFO[f.cargo_id]?.sal || 0), 0);
   const energiaDisp   = Math.max(0, 100 - (j.energia_usada_mes || 0));
 
+  const totalVagas = cap.estagiarios + cap.assistentes + cap.advogados;
   el.innerHTML = `
         <div style="margin-bottom:.8rem"><button class="btn btn-ghost btn-sm" onclick="window.navTo('escritorio',null)">← Escritório</button></div>
-        <div class="secao-header">
-          <div class="secao-titulo">👥 Equipe — ${esc.nome}</div>
-          <span class="secao-badge">Tier ${tier} · ${funcs.length} membro(s)</span>
-        </div>
 
-        <!-- Resumo financeiro -->
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-bottom:1rem">
-          <div class="stat-mini">
-            <div class="v" style="color:var(--navy)">${funcs.length}/${cap.estagiarios+cap.assistentes+cap.advogados}</div>
-            <div class="l">👥 Vagas ocupadas</div>
-          </div>
-          <div class="stat-mini">
-            <div class="v" style="color:var(--verm2)">-${_fmtK(totalSalarios)}</div>
-            <div class="l">💸 Salários/mês</div>
-          </div>
-          <div class="stat-mini">
-            <div class="v" style="color:var(--verm2)">-${_fmtK(cap.custo_fixo)}</div>
-            <div class="l">🏢 Custo fixo/mês</div>
+        <!-- Hero da Equipe -->
+        <div class="equipe-hero">
+          <div class="equipe-hero-conteudo">
+            <div class="equipe-hero-titulo">${esc.nome}<span class="equipe-hero-tier">Tier ${tier}</span></div>
+            <div class="equipe-hero-stats">
+              <div class="equipe-hero-badge">
+                <span class="l">Equipe</span><span class="v">${funcs.length}<small>/${totalVagas}</small></span>
+              </div>
+              <div class="equipe-hero-badge">
+                <span class="l">Folha de pagamento</span><span class="v verm">-${_fmtK(totalSalarios + cap.custo_fixo)}<small>/mês</small></span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -181,9 +177,7 @@ window.renderEquipe = async function(j, el) {
 
         <!-- Pane: Equipe -->
         <div class="equipe-tab-pane" data-tab="equipe" ${_activeEquipeTab==='diario'?'style="display:none"':''}>
-          ${_renderGrupo('🎓 Estagiários', estagiarios, cap.estagiarios, 'est', escId, energiaDisp, procCountEquipe, esc.mes_global || 0, 'equipe-grupo-estagiarios')}
-          ${_renderGrupo('📋 Assistentes', assistentes, cap.assistentes, 'ass', escId, energiaDisp, procCountEquipe, esc.mes_global || 0, 'equipe-grupo-assistentes')}
-          ${_renderGrupo('⚖️ Advogados', advogados, cap.advogados, 'jnr', escId, energiaDisp, procCountEquipe, esc.mes_global || 0, 'equipe-grupo-advogados')}
+          ${_renderEquipePane(estagiarios, assistentes, advogados, escId, energiaDisp, procCountEquipe, esc.mes_global || 0, cap)}
           ${await _renderProcessosPendentesRevisao(j, escId)}
         </div>
 
@@ -192,7 +186,18 @@ window.renderEquipe = async function(j, el) {
           ${await _renderDiarioEquipe(escId)}
         </div>`;
 
-  // Rolar até a âncora solicitada pelo menu lateral fixo do Escritório (ex.: Estagiários/Advogados)
+  // Filtro de cargo solicitado pelo menu lateral fixo do Escritório
+  // (Estagiários/Assistentes/Advogados) — aplica o chip correspondente.
+  if (window._pendingFiltroCargo) {
+    const cargoAlvo = window._pendingFiltroCargo;
+    window._pendingFiltroCargo = null;
+    setTimeout(() => {
+      const chip = document.querySelector(`.equipe-chip[data-filtro-cargo="${cargoAlvo}"]`);
+      if (chip) window._filtrarEquipeCargo(cargoAlvo, chip);
+      document.getElementById('equipe-grid')?.scrollIntoView({ behavior: 'smooth' });
+    }, 50);
+  }
+  // Compat — âncoras antigas de outras telas (ex.: Patrimônio) continuam via scrollIntoView simples.
   if (window._pendingScrollId) {
     const alvo = window._pendingScrollId;
     window._pendingScrollId = null;
@@ -200,24 +205,95 @@ window.renderEquipe = async function(j, el) {
   }
 };
 
-function _renderGrupo(titulo, membros, vagas, cargo_min, escId, energiaDisp, procCount = {}, mesGlobal = 0, anchorId = '') {
-  const ci = CARGO_INFO[cargo_min] || CARGO_INFO.est;
+// ── Classificação de status para os chips de filtro e o indicador (dot) ──
+function _statusFuncionario(f) {
+  if (f.burnout_npc) return { key:'atencao', label:'Em burnout', cor:'verm' };
+  if ((f.conflitos_ativos||[]).length > 0) return { key:'atencao', label:'Em conflito', cor:'verm' };
+  if (f.aviso_saida) return { key:'atencao', label:'Risco de saída', cor:'verm' };
+  if (f.em_ferias) return { key:'disponivel', label:'Em férias', cor:'txt' };
+  if (f.acao_atual) return { key:'trabalhando', label:'Trabalhando', cor:'ambar' };
+  if (f.tipo === 'npc' && (f.energia_npc_usada_mes||0) > 80) return { key:'trabalhando', label:'Sobrecarregado', cor:'ambar' };
+  return { key:'disponivel', label:'Disponível', cor:'verde' };
+}
+
+function _renderVagaStrip(label, membros, vagas, cargo_min, escId) {
+  const cheio = membros.length >= vagas;
   return `
-    <div style="margin-bottom:1.2rem" ${anchorId?`id="${anchorId}"`:''}>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;padding-bottom:.35rem;border-bottom:2px solid var(--navy-light)">
-        <div style="font-size:.8rem;font-weight:700;color:var(--navy)">${titulo}</div>
-        <div style="display:flex;align-items:center;gap:.5rem">
-          <span style="font-size:.65rem;color:var(--txt4)">${membros.length}/${vagas} vagas</span>
-          ${membros.length < vagas
-            ? `<button class="btn btn-sm btn-prim" onclick="window.abrirModalContratar('${cargo_min}','${escId}')">+ Contratar</button>`
-            : `<span style="font-size:.65rem;color:var(--amber)">Vagas cheias</span>`}
-        </div>
-      </div>
-      ${membros.length === 0
-        ? `<div style="font-size:.75rem;color:var(--txt4);padding:.5rem 0">Nenhum ${titulo.split(' ')[1].toLowerCase()} contratado ainda.</div>`
-        : membros.map(f => _cardFuncionario(f, escId, energiaDisp, procCount, mesGlobal)).join('')}
+    <div class="equipe-vaga-item">
+      <span class="equipe-vaga-label">${label}</span>
+      <span class="equipe-vaga-count">${membros.length}/${vagas}</span>
+      ${cheio
+        ? `<span class="equipe-vaga-cheia">Vagas cheias</span>`
+        : `<button class="btn btn-sm btn-prim" onclick="window.abrirModalContratar('${cargo_min}','${escId}')">+ Contratar</button>`}
     </div>`;
 }
+
+const _CARGO_GRUPO_EQ = { est:'est', ass:'ass', jnr:'adv', pln:'adv', snr:'adv' };
+
+function _renderEquipePane(estagiarios, assistentes, advogados, escId, energiaDisp, procCount, mesGlobal, cap) {
+  const todos = [...estagiarios, ...assistentes, ...advogados];
+
+  const contCargo = { todos: todos.length, est: estagiarios.length, ass: assistentes.length, adv: advogados.length };
+  const contStatus = { todos: todos.length, disponivel: 0, trabalhando: 0, atencao: 0 };
+  todos.forEach(f => { contStatus[_statusFuncionario(f).key]++; });
+
+  const CHIPS_CARGO = [
+    ['todos', 'Todos', contCargo.todos], ['est', 'Estagiários', contCargo.est],
+    ['ass', 'Assistentes', contCargo.ass], ['adv', 'Advogados', contCargo.adv],
+  ];
+  const CHIPS_STATUS = [
+    ['todos', 'Todos', contStatus.todos], ['disponivel', 'Disponível', contStatus.disponivel],
+    ['trabalhando', 'Trabalhando', contStatus.trabalhando], ['atencao', 'Atenção', contStatus.atencao],
+  ];
+
+  const chipsHtml = (itens, attr, fn) => `
+    <div class="equipe-chip-grupo">
+      ${itens.map(([val, lbl, n], i) => `
+        <button class="equipe-chip${i===0?' ativo':''}" data-${attr}="${val}" onclick="window.${fn}('${val}',this)">
+          ${lbl} <span class="equipe-chip-n">${n}</span>
+        </button>`).join('')}
+    </div>`;
+
+  const cardsHtml = todos.length === 0
+    ? `<div class="equipe-vazio">Nenhum membro contratado ainda — use os botões abaixo para montar sua equipe.</div>`
+    : `<div class="equipe-grid" id="equipe-grid">${todos.map(f => _cardFuncionario(f, escId, energiaDisp, procCount, mesGlobal)).join('')}</div>`;
+
+  return `
+    <div class="equipe-filtros">
+      ${chipsHtml(CHIPS_CARGO, 'filtro-cargo', '_filtrarEquipeCargo')}
+      ${chipsHtml(CHIPS_STATUS, 'filtro-status', '_filtrarEquipeStatus')}
+    </div>
+    <div class="equipe-vaga-strip">
+      ${_renderVagaStrip('🎓 Estagiários', estagiarios, cap.estagiarios, 'est', escId)}
+      ${_renderVagaStrip('📋 Assistentes', assistentes, cap.assistentes, 'ass', escId)}
+      ${_renderVagaStrip('⚖️ Advogados', advogados, cap.advogados, 'jnr', escId)}
+    </div>
+    ${cardsHtml}`;
+}
+
+// ── Filtros da grade (toggle de display, sem re-render) ──
+let _filtroCargoAtivo = 'todos';
+let _filtroStatusAtivo = 'todos';
+
+function _aplicarFiltrosEquipe() {
+  document.querySelectorAll('.func-card').forEach(card => {
+    const okCargo  = _filtroCargoAtivo === 'todos' || card.dataset.cargoGrupo === _filtroCargoAtivo;
+    const okStatus = _filtroStatusAtivo === 'todos' || card.dataset.status === _filtroStatusAtivo;
+    card.style.display = (okCargo && okStatus) ? '' : 'none';
+  });
+}
+window._filtrarEquipeCargo = function(valor, el) {
+  _filtroCargoAtivo = valor;
+  el.parentElement.querySelectorAll('.equipe-chip').forEach(c => c.classList.remove('ativo'));
+  el.classList.add('ativo');
+  _aplicarFiltrosEquipe();
+};
+window._filtrarEquipeStatus = function(valor, el) {
+  _filtroStatusAtivo = valor;
+  el.parentElement.querySelectorAll('.equipe-chip').forEach(c => c.classList.remove('ativo'));
+  el.classList.add('ativo');
+  _aplicarFiltrosEquipe();
+};
 
 const _SKILL_CAP_EQ = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
 const _CARGO_BON_EQ = { est:0,  ass:5,  jnr:10, pln:15, snr:20, asc:25, soc:30  };
@@ -285,155 +361,185 @@ function _cardFuncionario(f, escId, energiaDisp, procCount = {}, mesGlobal = 0) 
   const podeCoordenar = energiaDisp >= ci.custo_coord;
   const efic      = f.tipo === 'npc' ? _calcEfic(f) : null;
   const eficColor = efic >= 80 ? '#2E8B57' : efic >= 55 ? '#B7791F' : '#C0392B';
+  const status    = _statusFuncionario(f);
+  const cargoGrupo = _CARGO_GRUPO_EQ[f.cargo_id] || 'est';
 
   const ini = (f.nome||'?').split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase().slice(0,2);
   const svgSrc = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='153' height='153'%3E%3Ccircle cx='76' cy='76' r='76' fill='%232E4270'/%3E%3Ctext x='76' y='96' font-size='36' font-weight='700' fill='%23C9A227' text-anchor='middle' font-family='DM Sans,Arial'%3E${ini}%3C/text%3E%3C/svg%3E`;
   const nomeEsc = f.nome.replace(/'/g, "\\'");
   const fotoHtml = (f.tipo === 'npc' && f.foto_npc)
-    ? `<img src="img/npcs%20escritorio/${f.foto_npc}" alt="${f.nome}" style="width:153px;height:153px;object-fit:cover;border-radius:var(--r);flex-shrink:0" onerror="window._svgNpcFallback(this,'${nomeEsc}')">`
-    : `<img src="${svgSrc}" alt="${ini}" style="width:153px;height:153px;border-radius:var(--r);flex-shrink:0">`;
+    ? `<img class="func-avatar" src="img/npcs%20escritorio/${f.foto_npc}" alt="${f.nome}" onerror="window._svgNpcFallback(this,'${nomeEsc}')">`
+    : `<img class="func-avatar" src="${svgSrc}" alt="${ini}">`;
+
+  // Duas skills de maior valor viram barra — o resto fica no Perfil, sem perder o dado.
+  const capSkill  = _SKILL_CAP_EQ[f.cargo_id] || 35;
+  const skillsOrd = Object.entries(skills).sort((a,b) => b[1]-a[1]);
+  const topSkills = skillsOrd.slice(0, 2);
+  const restantes = skillsOrd.length - topSkills.length;
+  const skillsHtml = topSkills.length === 0 ? '' : `
+    <div class="func-skills">
+      ${topSkills.map(([k,v]) => `
+        <div class="func-skill-row">
+          <span class="func-skill-label">${_skillLabel(k)}</span>
+          <div class="func-skill-bar"><div class="func-skill-fill" style="width:${Math.min(100, Math.round(v/capSkill*100))}%"></div></div>
+          <span class="func-skill-val">${v}</span>
+        </div>`).join('')}
+      ${restantes > 0 ? `<div class="func-skill-mais" onclick="window._abrirPerfilFuncionario('${escId}','${f.id}')">+${restantes} habilidade(s) — ver Perfil</div>` : ''}
+    </div>`;
+
+  const statusStack = `<div class="func-status-stack">
+    ${f.acao_atual ? `
+      <div style="font-size:.7rem;color:var(--amber)">
+        📋 Trabalhando em processo · ${f.acao_atual.progresso_delegado||0}% concluído
+      </div>` : ''}
+    ${f.tipo === 'npc' ? (() => {
+      const npcUsado  = f.energia_npc_usada_mes || 0;
+      const npcDisp   = Math.max(0, 100 - npcUsado);
+      const emBurnout = !!f.burnout_npc;
+      const sobrecarr = !emBurnout && npcUsado > 80;
+      const pct       = Math.round((npcDisp / 100) * 100);
+      const corBarra  = emBurnout ? 'var(--verm2)' : sobrecarr ? 'var(--amber)' : 'var(--verde2)';
+      const maxProc   = _NPC_MAX_PROC_EQ[f.cargo_id] || 1;
+      const procAtivos = procCount[f.id] || 0;
+      const statusTxt = emBurnout
+        ? `🔴 Burnout — ${f.burnout_npc_restante||0} mês(es) afastado`
+        : sobrecarr
+          ? `⚠️ Sobrecarregado este mês`
+          : `⚡ ${npcDisp}/100 disponível`;
+      return `<div style="margin:.3rem 0">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.2rem">
+          <span style="font-size:.6rem;color:${corBarra}">${statusTxt}</span>
+          <span style="font-size:.6rem;color:var(--txt4)">📋 ${procAtivos}/${maxProc} casos</span>
+        </div>
+        <div style="height:5px;background:var(--bg2);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${corBarra};border-radius:3px;transition:width .4s"></div>
+        </div>
+      </div>`;
+    })() : ''}
+    ${f.tipo === 'npc' && (f.estresse || 0) > 0 ? (() => {
+      const s  = f.estresse || 0;
+      const sc = s > 60 ? 'var(--verm2)' : s > 30 ? 'var(--amber)' : 'var(--verde2)';
+      const st = s > 60 ? '😤 Muito estressado' : s > 30 ? '😐 Tenso' : '😊 Tranquilo';
+      return `<div style="margin:.2rem 0">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.15rem">
+          <span style="font-size:.6rem;color:${sc}">${st}</span>
+          <span style="font-size:.6rem;color:var(--txt4)">🌡️ ${s}/100</span>
+        </div>
+        <div style="height:4px;background:var(--bg2);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${s}%;background:${sc};border-radius:3px"></div>
+        </div>
+      </div>`;
+    })() : ''}
+    ${f.tipo === 'npc' && f.mentor_id ? (() => {
+      const skLbl = _SKILL_FULL_LBL[f.skill_sendo_treinada] || f.skill_sendo_treinada || '—';
+      return `<div style="font-size:.65rem;color:var(--verde2);background:var(--verde-bg);padding:.2rem .4rem;border-radius:4px">
+        📚 Aprendiz de ${f.mentor_nome||'mentor'} · ${skLbl} · ${f.meses_mentoria_restantes||0} mês(es)
+      </div>`;
+    })() : ''}
+    ${f.tipo === 'npc' && !f.mentor_id && !f.burnout_npc && !f.em_ferias ? (() => {
+      const skFoco = f.skill_em_estudo;
+      const lbl = skFoco ? (_SKILL_FULL_LBL[skFoco]||skFoco) : 'Auto (skill mais fraca)';
+      return `<div style="font-size:.63rem;color:var(--txt4)">
+        📖 Estudo autônomo: <span style="color:var(--navy3)">${lbl}</span>
+        <button onclick="window.designarEstudo('${f.id}','${escId}')"
+          style="font-size:.55rem;padding:.05rem .25rem;margin-left:.3rem;background:transparent;border:1px solid var(--txt4);border-radius:3px;cursor:pointer;color:var(--txt4)">mudar</button>
+      </div>`;
+    })() : ''}
+    ${f.tipo === 'npc' && (f.aprendizes_ids||[]).length > 0 ? `
+      <div style="font-size:.65rem;color:var(--navy3)">
+        🎓 Mentor ativo: ${(f.aprendizes_ids||[]).length} aprendiz(es)
+      </div>` : ''}
+    ${f.tipo === 'npc' && f.em_ferias ? `
+      <div style="font-size:.65rem;color:var(--txt3);background:var(--bg2);padding:.2rem .4rem;border-radius:4px">
+        🏖️ Em férias este mês
+      </div>` : ''}
+    ${f.tipo === 'npc' && !f.em_ferias && mesGlobal - (f.ultimas_ferias_mes_total ?? 0) >= 12 && (f.meses_no_cargo||0) >= 12 ? `
+      <div style="font-size:.65rem;color:var(--amber)">
+        ✅ Férias disponíveis (${mesGlobal - (f.ultimas_ferias_mes_total ?? 0)} meses sem descanso)
+      </div>` : ''}
+    ${f.tipo === 'npc' && (f.conflitos_ativos||[]).length > 0 ? (f.conflitos_ativos||[]).map((c, idx) => {
+      const cor = c.tipo === 'estrutural' ? 'var(--verm2)' : 'var(--amber)';
+      const lbl = c.tipo === 'estrutural' ? '⚠️ Conflito estrutural' : '😤 Desentendimento';
+      return `<div style="font-size:.65rem;color:${cor};display:flex;justify-content:space-between;align-items:center">
+        <span>${lbl} com ${c.com_nome}</span>
+        ${!c.em_mediacao
+          ? `<button style="font-size:.55rem;padding:.1rem .3rem;background:${cor};color:#fff;border:none;border-radius:3px;cursor:pointer"
+              onclick="window.mediarConflito('${f.id}',${idx},'${escId}')">Mediar</button>`
+          : `<span style="font-size:.55rem;color:var(--verde2)">Em mediação</span>`}
+      </div>`;
+    }).join('') : ''}
+    ${f.tipo === 'npc' ? (() => {
+      const promo = _elegibilidadePromocao(f);
+      if (!promo?.elegivel) return '';
+      const proxCi = CARGO_INFO[promo.prox];
+      return `<div style="font-size:.65rem;color:var(--verde2);background:var(--verde-bg);padding:.2rem .4rem;border-radius:4px">
+        ✨ Elegível para promoção → ${proxCi?.l || promo.prox}
+      </div>`;
+    })() : ''}
+    ${f.tipo === 'npc' && f.aviso_saida ? `
+      <div style="font-size:.65rem;color:var(--verm2);font-weight:700">
+        🚨 Risco de saída — estresse crítico!
+      </div>` : ''}
+  </div>`;
+
+  // Ações secundárias vivem no menu "⋯" — só "Designar" fica sempre visível no rodapé.
+  const menuItens = [];
+  if (f.tipo === 'npc' && _CARGO_MENTOR_EQ.has(f.cargo_id) && !f.burnout_npc && !f.em_ferias && (f.aprendizes_ids||[]).length < 2) {
+    menuItens.push(`<button onclick="window.abrirModalMentoria('${f.id}','${escId}')">🎓 Mentoria</button>`);
+  }
+  if (f.tipo === 'npc' && (_elegibilidadePromocao(f)||{}).elegivel) {
+    menuItens.push(`<button onclick="window.abrirModalPromover('${f.id}','${escId}')">✨ Promover</button>`);
+  }
+  if (f.tipo === 'npc' && !f.em_ferias && mesGlobal - (f.ultimas_ferias_mes_total ?? 0) >= 12 && (f.meses_no_cargo||0) >= 12) {
+    menuItens.push(`<button onclick="window.concederFerias('${f.id}','${escId}','${nomeEsc}')">🏖️ Férias</button>`);
+  }
+  menuItens.push(`<button onclick="window._abrirPerfilFuncionario('${escId}','${f.id}')">👤 Perfil</button>`);
+  menuItens.push(`<button class="func-menu-danger" onclick="window.demitirFuncionario('${f.id}','${escId}','${f.nome}')">Demitir</button>`);
 
   return `
-    <div class="card" style="margin-bottom:.5rem;border-left:3px solid var(--navy3)">
-      <div style="display:flex;align-items:start;justify-content:space-between;gap:.8rem">
+    <div class="func-card" data-cargo-grupo="${cargoGrupo}" data-status="${status.key}">
+      <div class="func-card-topo">
         ${fotoHtml}
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:700;font-size:.88rem;color:var(--navy)">${f.nome}</div>
-          <div style="font-size:.68rem;color:var(--ouro2);margin-bottom:.3rem">${ci.l} · Produtividade: <b style="color:${prodColor}">${prod}%</b>${efic !== null ? ` · Eficiência: <b style="color:${eficColor}">${efic}%</b>` : ''}</div>
-          <div style="display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.4rem">
-            ${Object.entries(skills).map(([k,v])=>
-              `<span style="font-size:.6rem;padding:.1rem .35rem;background:var(--navy-light);border-radius:20px;color:var(--navy3)">${_skillLabel(k)}: ${v}</span>`
-            ).join('')}
+        <div class="func-card-info">
+          <div class="func-nome-row">
+            <span class="func-dot func-dot-${status.cor}" title="${status.label}"></span>
+            <span class="func-nome">${f.nome}</span>
           </div>
-          ${f.acao_atual ? `
-            <div style="font-size:.7rem;color:var(--amber);margin-bottom:.3rem">
-              📋 Trabalhando em processo · ${f.acao_atual.progresso_delegado||0}% concluído
-            </div>` : ''}
-          ${f.tipo === 'npc' ? (() => {
-            const npcUsado  = f.energia_npc_usada_mes || 0;
-            const npcDisp   = Math.max(0, 100 - npcUsado);
-            const emBurnout = !!f.burnout_npc;
-            const sobrecarr = !emBurnout && npcUsado > 80;
-            const pct       = Math.round((npcDisp / 100) * 100);
-            const corBarra  = emBurnout ? 'var(--verm2)' : sobrecarr ? 'var(--amber)' : 'var(--verde2)';
-            const maxProc   = _NPC_MAX_PROC_EQ[f.cargo_id] || 1;
-            const procAtivos = procCount[f.id] || 0;
-            const statusTxt = emBurnout
-              ? `🔴 Burnout — ${f.burnout_npc_restante||0} mês(es) afastado`
-              : sobrecarr
-                ? `⚠️ Sobrecarregado este mês`
-                : `⚡ ${npcDisp}/100 disponível`;
-            return `<div style="margin:.35rem 0 .3rem">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.2rem">
-                <span style="font-size:.6rem;color:${corBarra}">${statusTxt}</span>
-                <span style="font-size:.6rem;color:var(--txt4)">📋 ${procAtivos}/${maxProc} casos</span>
-              </div>
-              <div style="height:5px;background:var(--bg2);border-radius:3px;overflow:hidden">
-                <div style="height:100%;width:${pct}%;background:${corBarra};border-radius:3px;transition:width .4s"></div>
-              </div>
-            </div>`;
-          })() : ''}
-          ${f.tipo === 'npc' && (f.estresse || 0) > 0 ? (() => {
-            const s  = f.estresse || 0;
-            const sc = s > 60 ? 'var(--verm2)' : s > 30 ? 'var(--amber)' : 'var(--verde2)';
-            const st = s > 60 ? '😤 Muito estressado' : s > 30 ? '😐 Tenso' : '😊 Tranquilo';
-            return `<div style="margin:.2rem 0">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.15rem">
-                <span style="font-size:.6rem;color:${sc}">${st}</span>
-                <span style="font-size:.6rem;color:var(--txt4)">🌡️ ${s}/100</span>
-              </div>
-              <div style="height:4px;background:var(--bg2);border-radius:3px;overflow:hidden">
-                <div style="height:100%;width:${s}%;background:${sc};border-radius:3px"></div>
-              </div>
-            </div>`;
-          })() : ''}
-          ${f.tipo === 'npc' && f.mentor_id ? (() => {
-            const skLbl = _SKILL_FULL_LBL[f.skill_sendo_treinada] || f.skill_sendo_treinada || '—';
-            return `<div style="font-size:.65rem;color:var(--verde2);margin:.2rem 0;background:var(--verde-bg);padding:.2rem .4rem;border-radius:4px">
-              📚 Aprendiz de ${f.mentor_nome||'mentor'} · ${skLbl} · ${f.meses_mentoria_restantes||0} mês(es)
-            </div>`;
-          })() : ''}
-          ${f.tipo === 'npc' && !f.mentor_id && !f.burnout_npc && !f.em_ferias ? (() => {
-            const cap = _SKILL_CAP_EQ[f.cargo_id] || 20;
-            const skFoco = f.skill_em_estudo;
-            const lbl = skFoco ? (_SKILL_FULL_LBL[skFoco]||skFoco) : 'Auto (skill mais fraca)';
-            return `<div style="font-size:.63rem;color:var(--txt4);margin:.15rem 0">
-              📖 Estudo autônomo: <span style="color:var(--navy3)">${lbl}</span>
-              <button onclick="window.designarEstudo('${f.id}','${escId}')"
-                style="font-size:.55rem;padding:.05rem .25rem;margin-left:.3rem;background:transparent;border:1px solid var(--txt4);border-radius:3px;cursor:pointer;color:var(--txt4)">mudar</button>
-            </div>`;
-          })() : ''}
-          ${f.tipo === 'npc' && (f.aprendizes_ids||[]).length > 0 ? `
-            <div style="font-size:.65rem;color:var(--navy3);margin:.2rem 0">
-              🎓 Mentor ativo: ${(f.aprendizes_ids||[]).length} aprendiz(es)
-            </div>` : ''}
-          ${f.tipo === 'npc' && f.em_ferias ? `
-            <div style="font-size:.65rem;color:var(--txt3);margin:.2rem 0;background:var(--bg2);padding:.2rem .4rem;border-radius:4px">
-              🏖️ Em férias este mês
-            </div>` : ''}
-          ${f.tipo === 'npc' && !f.em_ferias && mesGlobal - (f.ultimas_ferias_mes_total ?? 0) >= 12 && (f.meses_no_cargo||0) >= 12 ? `
-            <div style="font-size:.65rem;color:var(--amber);margin:.2rem 0">
-              ✅ Férias disponíveis (${mesGlobal - (f.ultimas_ferias_mes_total ?? 0)} meses sem descanso)
-            </div>` : ''}
-          ${f.tipo === 'npc' && (f.conflitos_ativos||[]).length > 0 ? (() => {
-            return (f.conflitos_ativos||[]).map((c, idx) => {
-              const cor = c.tipo === 'estrutural' ? 'var(--verm2)' : 'var(--amber)';
-              const lbl = c.tipo === 'estrutural' ? '⚠️ Conflito estrutural' : '😤 Desentendimento';
-              return `<div style="font-size:.65rem;color:${cor};margin:.15rem 0;display:flex;justify-content:space-between;align-items:center">
-                <span>${lbl} com ${c.com_nome}</span>
-                ${!c.em_mediacao
-                  ? `<button style="font-size:.55rem;padding:.1rem .3rem;background:${cor};color:#fff;border:none;border-radius:3px;cursor:pointer"
-                      onclick="window.mediarConflito('${f.id}',${idx},'${escId}')">Mediar</button>`
-                  : `<span style="font-size:.55rem;color:var(--verde2)">Em mediação</span>`}
-              </div>`;
-            }).join('');
-          })() : ''}
-          ${f.tipo === 'npc' ? (() => {
-            const promo = _elegibilidadePromocao(f);
-            if (!promo?.elegivel) return '';
-            const proxCi = CARGO_INFO[promo.prox];
-            return `<div style="font-size:.65rem;color:var(--verde2);margin:.2rem 0;background:var(--verde-bg);padding:.2rem .4rem;border-radius:4px">
-              ✨ Elegível para promoção → ${proxCi?.l || promo.prox}
-            </div>`;
-          })() : ''}
-          ${f.tipo === 'npc' && f.aviso_saida ? `
-            <div style="font-size:.65rem;color:var(--verm2);margin:.2rem 0;font-weight:700">
-              🚨 Risco de saída — estresse crítico!
-            </div>` : ''}
-          <div style="font-size:.68rem;color:var(--txt4)">
-            Salário: <b style="color:var(--verm2)">R$ ${ci.sal.toLocaleString('pt-BR')}/mês</b>
-            ${ci.hon_pct > 0 ? ` · Comissão: ${ci.hon_pct*100}% honorários` : ''}
+          <div class="func-cargo">${ci.l}${f.tipo === 'npc' && f.meses_no_cargo ? ` · ${f.meses_no_cargo}m no cargo` : ''}</div>
+          <div class="func-badges">
+            <span class="func-badge" style="color:${prodColor}">P ${prod}%</span>
+            ${efic !== null ? `<span class="func-badge" style="color:${eficColor}">E ${efic}%</span>` : ''}
           </div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:.3rem;flex-shrink:0">
-          <button class="btn btn-sm btn-prim" ${!podeCoordenar?'disabled':''}
-            onclick="window.abrirModalDesignar('${f.id}','${escId}')"
-            title="${!podeCoordenar?'Energia insuficiente':'Designar processo'}">
-            📋 Designar (-${ci.custo_coord}⚡)
-          </button>
-          ${f.tipo === 'npc' && _CARGO_MENTOR_EQ.has(f.cargo_id) && !f.burnout_npc && !f.em_ferias && (f.aprendizes_ids||[]).length < 2 ? `
-            <button class="btn btn-sm btn-sec" onclick="window.abrirModalMentoria('${f.id}','${escId}')">
-              🎓 Mentoria
-            </button>` : ''}
-          ${f.tipo === 'npc' && (_elegibilidadePromocao(f)||{}).elegivel ? `
-            <button class="btn btn-sm btn-sec" onclick="window.abrirModalPromover('${f.id}','${escId}')">
-              ✨ Promover
-            </button>` : ''}
-          ${f.tipo === 'npc' && !f.em_ferias && mesGlobal - (f.ultimas_ferias_mes_total ?? 0) >= 12 && (f.meses_no_cargo||0) >= 12 ? `
-            <button class="btn btn-sm btn-sec" onclick="window.concederFerias('${f.id}','${escId}','${f.nome.replace(/'/g,"\\'")}')">
-              🏖️ Férias
-            </button>` : ''}
-          <button class="btn btn-sm btn-sec" onclick="window._abrirPerfilFuncionario('${escId}','${f.id}')">
-            👤 Perfil
-          </button>
-          <button class="btn btn-sm btn-ghost btn-danger"
-            onclick="window.demitirFuncionario('${f.id}','${escId}','${f.nome}')">
-            Demitir
-          </button>
+        <div class="func-menu-wrap">
+          <button class="func-menu-btn" onclick="window._toggleFuncMenu(event,'${f.id}')" aria-label="Mais ações">⋯</button>
+          <div class="func-menu" id="func-menu-${f.id}">${menuItens.join('')}</div>
         </div>
+      </div>
+      ${skillsHtml}
+      ${statusStack}
+      <div class="func-card-footer">
+        <span class="func-salario">R$ ${ci.sal.toLocaleString('pt-BR')}/mês${ci.hon_pct > 0 ? ` · ${ci.hon_pct*100}% hon.` : ''}</span>
+        <button class="btn btn-sm btn-prim" ${!podeCoordenar?'disabled':''}
+          onclick="window.abrirModalDesignar('${f.id}','${escId}')"
+          title="${!podeCoordenar?'Energia insuficiente':'Designar processo'}">
+          📋 Designar (-${ci.custo_coord}⚡)
+        </button>
       </div>
     </div>`;
 }
+
+// ── Menu "⋯" (ações secundárias) — abre um por vez, fecha ao clicar fora ──
+window._toggleFuncMenu = function(ev, fid) {
+  ev.stopPropagation();
+  const alvo = document.getElementById(`func-menu-${fid}`);
+  const jaAberto = alvo?.classList.contains('aberto');
+  document.querySelectorAll('.func-menu.aberto').forEach(m => m.classList.remove('aberto'));
+  if (alvo && !jaAberto) alvo.classList.add('aberto');
+};
+document.addEventListener('click', () => {
+  document.querySelectorAll('.func-menu.aberto').forEach(m => m.classList.remove('aberto'));
+});
 
 async function _renderProcessosPendentesRevisao(j, escId) {
   try {

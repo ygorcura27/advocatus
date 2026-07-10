@@ -225,8 +225,22 @@ window.renderProcessosPool = async function(j, escId, el) {
 
     const uid = j.uid || window.JOGADOR_UID;
 
+    // Buscar o estado real de investigação (fase/turnos) dos casos que o
+    // jogador já assumiu — sem isso a coluna "Seus casos em andamento" só
+    // tinha o campo legado `progresso` (nunca atualizado pelo novo fluxo de
+    // Investigação/Julgamento), então toda linha ficava presa em "0%" para
+    // sempre e sem nenhuma ação para continuar o caso.
+    const investigMap = {};
+    const casosDoJogador = emAndamento.filter(p => p.assumido_uid === uid && p.processo_ref);
+    if (casosDoJogador.length > 0) {
+      const snaps = await Promise.all(casosDoJogador.map(p => getDoc(doc(db, 'processos', p.processo_ref))));
+      snaps.forEach((snap, i) => {
+        if (snap.exists()) investigMap[casosDoJogador[i].id] = snap.data().investigacao || null;
+      });
+    }
+
     // Coluna 1 — pool + em andamento + aguardando sentença
-    const col1Html = _renderColPool(disponiveis, emAndamento, aguardSent, j, escId);
+    const col1Html = _renderColPool(disponiveis, emAndamento, aguardSent, j, escId, investigMap);
 
     // Coluna 2 — fase recursal
     const mesAtualTotal = _poolMesTotal(j.mes_pessoal, j.ano_pessoal);
@@ -281,7 +295,18 @@ window.renderProcessosPool = async function(j, escId, el) {
 
 // ─── Coluna 1: Pool de novos processos ────────────────────────────────────────
 
-function _renderColPool(disponiveis, emAndamento, aguardSent, j, escId) {
+function _faseInvestigacaoLabel(inv, podeContinuar) {
+  if (!inv) return podeContinuar
+    ? { label: 'Aguardando início — clique para investigar', pct: 0 }
+    : { label: 'Sem investigação vinculada', pct: 0 };
+  if (inv.fase === 'investigacao') return { label: `🔎 Investigação · ${inv.turnos_usados}/${inv.turnos_totais} turnos`, pct: Math.round((inv.turnos_usados / inv.turnos_totais) * 45) };
+  if (inv.fase === 'montagem')     return { label: '🗂️ Montagem de estratégia', pct: 60 };
+  if (inv.fase === 'julgamento')   return { label: '⚖️ Julgamento em curso', pct: 80 };
+  if (inv.fase === 'encerrado')    return { label: '📋 Aguardando sua decisão', pct: 95 };
+  return { label: 'Em andamento', pct: 10 };
+}
+
+function _renderColPool(disponiveis, emAndamento, aguardSent, j, escId, investigMap) {
   const uid = j.uid || window.JOGADOR_UID;
   const energiaDisp = Math.max(0,
     (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - (j.energia_usada_mes || 0));
@@ -323,19 +348,25 @@ function _renderColPool(disponiveis, emAndamento, aguardSent, j, escId) {
   const andJogador = emAndamento.filter(p => p.assumido_uid);
   const andGestao  = emAndamento.filter(p => !p.assumido_uid);
 
-  const rowsAndJog = andJogador.map(p => `
-    <div class="proc-pool-row">
+  const rowsAndJog = andJogador.map(p => {
+    const podeContinuar = !!p.processo_ref;
+    const fase = _faseInvestigacaoLabel(investigMap && investigMap[p.id], podeContinuar);
+    return `
+    <div class="proc-pool-row${podeContinuar ? ' proc-pool-row-clicavel' : ''}"
+      ${podeContinuar ? `onclick="window.abrirInvestigacao('${p.processo_ref}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();window.abrirInvestigacao('${p.processo_ref}')}" role="button" tabindex="0"` : ''}>
       <div class="proc-pool-area">⚙️</div>
       <div style="flex:1;min-width:0">
         <div class="proc-pool-titulo">${p.titulo}</div>
         <div class="proc-pool-meta">Você · ${p.cliente_nome||'—'}</div>
-        ${_barraProgresso(p.progresso||0)}
+        <div style="font-size:.62rem;color:var(--navy3);margin-top:.1rem">${fase.label}</div>
+        ${_barraProgresso(fase.pct)}
       </div>
       <div style="text-align:right;flex-shrink:0">
-        <div style="font-size:.68rem;font-weight:700;color:var(--navy)">${p.progresso||0}%</div>
         <div style="font-size:.6rem;color:var(--txt4)">${_fmtP(p.honorarios)}</div>
+        ${podeContinuar ? `<div style="font-size:.6rem;color:var(--ouro2);font-weight:600;margin-top:.2rem">Continuar →</div>` : ''}
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   const rowsAndGes = andGestao.map(p => `
     <div class="proc-pool-row" style="border-left:2px solid var(--verde2)">

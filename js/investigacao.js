@@ -263,14 +263,60 @@ function _renderPopupEntrevista(no) {
   };
 }
 
-function _renderPopupBloqueio(no) {
+// Nós de favor/confiança só guardam um npc_id sintético (ex.: "npc_caso_3"),
+// sem nome — gera um nome estável (o mesmo id sempre vira o mesmo nome) só
+// para exibição, sem depender de nenhum cadastro de personagem.
+const _NPC_NOME_POOL = [
+  'Dr. Renato Aguiar', 'Dra. Camila Duarte', 'Dr. Otávio Ramalho', 'Dra. Beatriz Nunes',
+  'Dr. Fábio Serpa', 'Dra. Helena Bittencourt', 'Dr. Marcelo Trindade', 'Dra. Iara Peçanha',
+  'Dr. Caio Montenegro', 'Dra. Sofia Andrade',
+];
+function _nomeNpcDeterministico(npcId) {
+  let h = 0;
+  for (let i = 0; i < npcId.length; i++) h = (h * 31 + npcId.charCodeAt(i)) >>> 0;
+  return _NPC_NOME_POOL[h % _NPC_NOME_POOL.length];
+}
+
+// Mesmos limiares de functions/investigacao.js:pedirFavor — aqui só para
+// mostrar uma estimativa ao jogador antes de gastar o pedido; o servidor
+// ainda recalcula (com bônus de Negociação) e decide o desfecho de fato.
+function _faixaConfianca(conf) {
+  if (conf >= 80) return { label: 'Muito provável', pct: '~90%', cor: 'var(--verde2)' };
+  if (conf >= 60) return { label: 'Provável', pct: '~70%', cor: 'var(--verde2)' };
+  if (conf >= 35) return { label: 'Arriscado', pct: '~40%', cor: 'var(--amber)' };
+  return { label: 'Improvável', pct: '~15%', cor: 'var(--verm2)' };
+}
+
+async function _renderPopupBloqueio(no) {
+  const npcId   = no.bloqueio.npc_id || `npc_${no.id}`;
+  const nomeNpc = _nomeNpcDeterministico(npcId);
+
+  let confianca = 50;
+  try {
+    const uid = window.JOGADOR?.uid || window.JOGADOR_UID;
+    const confSnap = await getDoc(doc(db, 'jogadores', uid, 'confiancas_npc', npcId));
+    if (confSnap.exists()) confianca = confSnap.data().confianca ?? 50;
+  } catch (e) { /* mantém padrão 50 */ }
+  const faixa = _faixaConfianca(confianca);
+  const sobrenome = nomeNpc.split(' ').slice(-1)[0];
+
   window.abrirModal('Nó bloqueado', `
-    <p style="color:var(--txt3);margin-bottom:.75rem">
+    <p style="color:var(--txt3);margin-bottom:.5rem">
       ${no.bloqueio.tipo === 'favor'
         ? 'Este nó só se abre consumindo um favor específico já em sua posse.'
         : 'Este nó exige um nível de confiança alto com o NPC responsável.'}
     </p>
-    <button class="btn btn-prim" onclick="window._invPedirFavorNo('${no.id}')">Pedir Favor</button>`);
+    <div style="background:var(--surface2);border:var(--borda);border-radius:var(--r);padding:.6rem .75rem;margin-bottom:.85rem">
+      <div style="font-size:.8rem;font-weight:700;color:var(--navy)">🤝 ${nomeNpc}</div>
+      <div style="font-size:.72rem;color:var(--txt3);margin-top:.2rem">
+        Confiança atual: <b>${confianca}/100</b>${no.bloqueio.minimo ? ` · mínimo exigido: <b>${no.bloqueio.minimo}</b>` : ''}
+      </div>
+      <div style="font-size:.72rem;margin-top:.2rem;color:${faixa.cor}">
+        Chance de conseguir o favor: <b>${faixa.label}</b> (${faixa.pct})
+      </div>
+      <div style="font-size:.65rem;color:var(--txt4);margin-top:.25rem">Sua habilidade de Negociação pode aumentar essa chance.</div>
+    </div>
+    <button class="btn btn-prim" onclick="window._invPedirFavorNo('${no.id}')">Pedir favor a ${sobrenome}</button>`);
   window._invPedirFavorNo = async (noId) => {
     window.fecharModal();
     window.toast && window.toast('⏳ Pedindo favor...', 'neutro', 1500);
@@ -278,10 +324,10 @@ function _renderPopupBloqueio(no) {
       const npcId = no.bloqueio.npc_id || `npc_${noId}`;
       const r = await callFn('pedirFavor', { npc_id: npcId, tipo: 'profissional', origem: `no_${noId}` });
       if (r.desfecho === 'recusa') {
-        window.toast && window.toast('❌ O NPC recusou o pedido.', 'ko', 3500);
+        window.toast && window.toast(`❌ ${nomeNpc} recusou o pedido.`, 'ko', 3500);
         return;
       }
-      window.toast && window.toast(`🤝 Favor concedido (${r.desfecho.replace(/_/g,' ')}).`, 'ok', 3500);
+      window.toast && window.toast(`🤝 ${nomeNpc} concedeu o favor (${r.desfecho.replace(/_/g,' ')}).`, 'ok', 3500);
       if (no.bloqueio.tipo === 'favor' && r.favor_id) {
         const r2 = await callFn('consumirFavorNode', { processo_id: _procId, no_id: noId, favor_id: r.favor_id });
         _procCache.investigacao = r2.investigacao;
@@ -309,7 +355,12 @@ window._invAbrirVademecum = async function() {
 
 function _renderListaVademecum(candidatos) {
   window.abrirModal('Vade Mecum — Precedentes', `
-    <p style="color:var(--txt3);margin-bottom:.75rem">Selecione um precedente para ler a holding completa.</p>
+    <p style="color:var(--txt3);margin-bottom:.5rem">Escolha um precedente para tentar aplicá-lo como tese no seu caso.</p>
+    <p style="font-size:.72rem;color:var(--txt4);background:var(--surface2);border:var(--borda);border-radius:var(--r);padding:.55rem .7rem;margin-bottom:.85rem;line-height:1.55">
+      ⚖️ Se a tese encaixar nos fatos do seu caso, ela reduz permanentemente o limiar de vitória no julgamento.
+      Se não encaixar, o adversário a desacredita em audiência e você não ganha bônus algum — mas a tentativa já consome
+      sua <strong>única aplicação de tese</strong> neste caso, então escolha com cuidado.
+    </p>
     <div style="display:flex;flex-direction:column;gap:.4rem">
       ${candidatos.map(p => `<button class="rbtn" onclick='window._invVerPrecedente(${JSON.stringify(p.id)})'>${p.nome} — <em>${p.tema}</em></button>`).join('')}
     </div>`);
@@ -318,7 +369,11 @@ function _renderListaVademecum(candidatos) {
     const prec = window._invCandidatosVademecum.find(p => p.id === id);
     window.abrirModal(prec.nome, `
       <p style="color:var(--txt3);margin-bottom:.5rem"><strong>Tema:</strong> ${prec.tema}</p>
-      <p style="margin-bottom:1rem">${prec.holding}</p>
+      <p style="margin-bottom:.85rem">${prec.holding}</p>
+      <p style="font-size:.7rem;color:var(--txt4);background:var(--surface2);border:var(--borda);border-radius:var(--r);padding:.55rem .7rem;margin-bottom:.9rem;line-height:1.55">
+        Aplicar esta tese só compensa se a holding acima realmente conversar com os fatos do seu caso — o
+        julgamento verifica o encaixe antes de conceder o bônus.
+      </p>
       <div style="display:flex;gap:.5rem">
         <button class="btn btn-prim" onclick='window._invAplicarTese(${JSON.stringify(prec.id)}, ${JSON.stringify(prec.tags)})'>Aplicar esta tese</button>
         <button class="btn btn-sec" onclick='window._invVoltarVademecum()'>Não é este — ver outro</button>
