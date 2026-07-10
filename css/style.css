@@ -542,6 +542,15 @@ a:hover { color: var(--navy); }
 .card-titulo { font-weight: 600; font-size: .9rem; color: var(--navy); margin-bottom: .4rem; }
 .card-sub    { font-size: .72rem; color: var(--txt3); }
 
+/* Card travado (recurso ainda não disponível) — opaco, sem hover, sem cursor de ação. */
+.card-travado { opacity: .55; cursor: not-allowed; }
+.card-travado:hover { box-shadow: var(--sombra); border-color: var(--bg2); }
+.badge-em-breve {
+  display: inline-block; font-size: .6rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--txt3); background: var(--bg2);
+  border-radius: 10px; padding: .1rem .5rem; margin-left: .4rem; vertical-align: middle;
+}
+
 .ornamento { text-align: center; color: var(--txt4); font-size: .72rem; letter-spacing: .35em; margin: 1rem 0; }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1458,6 +1467,11 @@ a:hover { color: var(--navy); }
 .sk-cap {
   font-size: .72em;
   opacity: .5;
+}
+.sk-estrelas {
+  font-size: .68rem;
+  letter-spacing: -1px;
+  margin-right: .4rem;
 }
 .sk-bar {
   display: inline-block;
@@ -2431,6 +2445,17 @@ a:hover { color: var(--navy); }
   line-height: 1.5;
 }
 
+/* Ficha do caso — dados reais (autor/réu/tribunal/valor) que o jogador
+   precisa para resolver os puzzles de perícia/análise documental. */
+.inv-ficha-caso {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: .5rem;
+  background: rgba(0,0,0,.28); border: 1px solid rgba(201,162,39,.25); border-radius: var(--r);
+  padding: .6rem .75rem; margin-bottom: 1rem;
+}
+.inv-ficha-item { display: flex; flex-direction: column; gap: .1rem; }
+.inv-ficha-label { font-size: .6rem; text-transform: uppercase; letter-spacing: .06em; color: #C9BFA6; }
+.inv-ficha-valor { font-size: .78rem; font-weight: 700; color: #F2E8D6; }
+
 /* Nós como objetos de mesa (papel/polaroid/prancheta/envelope) — §9.3 */
 .inv-no {
   background: #F2E8D6;
@@ -2520,20 +2545,22 @@ a:hover { color: var(--navy); }
 .equipe-chip.ativo { background: var(--navy); border-color: var(--navy); color: #fff; }
 .equipe-chip-n { opacity: .7; margin-left: .15rem; }
 
-.equipe-vaga-strip {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: .5rem;
-  margin-bottom: 1rem;
+/* Container retangular por cargo — âncora de scroll para os botões
+   Estagiários/Assistentes/Advogados (menu do Escritório + chips daqui). */
+.equipe-cargo-container {
+  background: var(--surface2); border: var(--borda); border-radius: var(--r2);
+  padding: .9rem 1rem; margin-bottom: .9rem; scroll-margin-top: 1rem;
 }
-.equipe-vaga-item {
-  display: flex; align-items: center; justify-content: space-between; gap: .5rem;
-  background: var(--surface2); border: var(--borda); border-radius: var(--r);
-  padding: .5rem .7rem;
+.equipe-cargo-header {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem;
+  margin-bottom: .75rem; padding-bottom: .6rem; border-bottom: 2px solid var(--navy-light);
 }
-.equipe-vaga-label { font-size: .72rem; color: var(--navy); font-weight: 600; flex: 1; min-width: 0; }
-.equipe-vaga-count { font-size: .68rem; color: var(--txt3); flex-shrink: 0; }
-.equipe-vaga-cheia { font-size: .65rem; color: var(--amber); flex-shrink: 0; }
+.equipe-cargo-titulo { font-size: .88rem; font-weight: 700; color: var(--navy); }
+.equipe-cargo-vagas { display: flex; align-items: center; gap: .55rem; }
+.equipe-vaga-count { font-size: .68rem; color: var(--txt3); }
+.equipe-vaga-cheia { font-size: .65rem; color: var(--amber); }
 
-.equipe-vazio { font-size: .78rem; color: var(--txt3); padding: 1.5rem 0; text-align: center; }
+.equipe-vazio { font-size: .78rem; color: var(--txt3); padding: 1rem 0; text-align: center; }
 
 .equipe-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: .7rem;
@@ -2554,7 +2581,7 @@ a:hover { color: var(--navy); }
 .func-dot-txt   { background: var(--txt4); }
 .func-nome { font-weight: 700; font-size: .84rem; color: var(--navy); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .func-cargo { font-size: .66rem; color: var(--ouro2); margin-top: .1rem; }
-.func-badges { display: flex; gap: .35rem; margin-top: .3rem; }
+.func-badges { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .3rem; }
 .func-badge { font-size: .62rem; font-weight: 700; background: var(--bg2); border-radius: 4px; padding: .1rem .4rem; }
 
 .func-menu-wrap { position: relative; flex-shrink: 0; }

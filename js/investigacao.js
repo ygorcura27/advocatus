@@ -149,6 +149,23 @@ const MATERIAL_NO = {
   entrevista: 'pin', favor_relacionamento: 'pin',
 };
 
+function _fmtValor(v) { return `R$ ${Math.round(v || 0).toLocaleString('pt-BR')}`; }
+
+// Ficha real do caso — autor/réu/tribunal/valor já existem no processo
+// (gerados por gerarProcesso), mas nunca eram mostrados nesta cena. Sem
+// isso o jogador não tinha NADA pra comparar contra as opções dos nós de
+// perícia/análise documental (que agora derivam a resposta certa desses
+// mesmos dados reais — ver functions/investigacao.js).
+function _renderFichaCaso(p) {
+  return `
+    <div class="inv-ficha-caso">
+      <div class="inv-ficha-item"><span class="inv-ficha-label">Autor</span><span class="inv-ficha-valor">${p.autor || '—'}</span></div>
+      <div class="inv-ficha-item"><span class="inv-ficha-label">Réu</span><span class="inv-ficha-valor">${p.reu || '—'}</span></div>
+      <div class="inv-ficha-item"><span class="inv-ficha-label">Tribunal</span><span class="inv-ficha-valor">${p.tribunal || '—'}</span></div>
+      <div class="inv-ficha-item"><span class="inv-ficha-label">Valor da causa</span><span class="inv-ficha-valor">${_fmtValor(p.valor)}</span></div>
+    </div>`;
+}
+
 function _renderMapaInvestigacao(j, main, p) {
   const inv = p.investigacao;
   const nosVisiveis = inv.nos.filter(n => n.status !== 'oculto');
@@ -158,6 +175,7 @@ function _renderMapaInvestigacao(j, main, p) {
     <div class="inv-scenario">
       <div class="inv-titulo-caso">${p.titulo || 'Investigação'}</div>
       <div class="inv-sub-caso">${p.relato_cliente || 'O cliente relatou o caso — investigue os nós disponíveis antes que os turnos se esgotem.'}</div>
+      ${_renderFichaCaso(p)}
       ${_barraTurnos(inv)}
       <div class="inv-nos-grid">
         ${nosVisiveis.map(no => `
@@ -230,7 +248,7 @@ async function _executarNo(noId, escolha) {
 function _renderPopupAnaliseDocumental(no) {
   const campos = no.dados_puzzle.campos;
   window.abrirModal('Análise documental', `
-    <p style="color:var(--txt3);margin-bottom:.75rem">Um dos campos abaixo não bate com o resto do caso. Aponte qual parece suspeito.</p>
+    <p style="color:var(--txt3);margin-bottom:.75rem">Um dos campos abaixo não bate com a ficha do caso. Confira Autor/Réu/Tribunal/Valor no topo da cena e aponte qual destoa.</p>
     <div style="display:flex;flex-direction:column;gap:.4rem">
       ${campos.map((c, i) => `<button class="rbtn" onclick="window._invEscolherCampo(${i})"><span class="rl">${String.fromCharCode(65+i)}</span><span>${c}</span></button>`).join('')}
     </div>`);
@@ -240,7 +258,7 @@ function _renderPopupAnaliseDocumental(no) {
 function _renderPopupPericia(no) {
   const opcoes = no.dados_puzzle.opcoes;
   window.abrirModal('Perícia técnica', `
-    <p style="color:var(--txt3);margin-bottom:.75rem">Escolha o que pedir ao perito para examinar — apenas uma opção revela a divergência real.</p>
+    <p style="color:var(--txt3);margin-bottom:.75rem">Escolha o valor que bate com o valor da causa na ficha do caso (topo da cena) — só uma opção confere.</p>
     <div style="display:flex;flex-direction:column;gap:.4rem">
       ${opcoes.map((o, i) => `<button class="rbtn" onclick="window._invEscolherPericia(${i})"><span class="rl">${String.fromCharCode(65+i)}</span><span>${o}</span></button>`).join('')}
     </div>`);
@@ -332,7 +350,11 @@ async function _renderPopupBloqueio(no) {
     window.toast && window.toast('⏳ Pedindo favor...', 'neutro', 1500);
     try {
       const npcId = no.bloqueio.npc_id || `npc_${noId}`;
-      const r = await callFn('pedirFavor', { npc_id: npcId, tipo: 'profissional', origem: `no_${noId}` });
+      const payload = { npc_id: npcId, tipo: 'profissional', origem: `no_${noId}` };
+      // Nó de confiança: manda processo_id/no_id pro servidor já checar e
+      // destravar o nó ali mesmo, se a confiança resultante bater o mínimo.
+      if (no.bloqueio.tipo === 'confianca') { payload.processo_id = _procId; payload.no_id = noId; }
+      const r = await callFn('pedirFavor', payload);
       if (r.desfecho === 'recusa') {
         window.toast && window.toast(`❌ ${nomeNpc} recusou o pedido.`, 'ko', 3500);
         return;
@@ -342,6 +364,17 @@ async function _renderPopupBloqueio(no) {
         const r2 = await callFn('consumirFavorNode', { processo_id: _procId, no_id: noId, favor_id: r.favor_id });
         _procCache.investigacao = r2.investigacao;
         _renderFase(window.JOGADOR, document.getElementById('main-content'), _procCache);
+      } else if (no.bloqueio.tipo === 'confianca') {
+        if (r.desbloqueado && r.investigacao) {
+          _procCache.investigacao = r.investigacao;
+          window.toast && window.toast('🔓 Confiança suficiente — nó desbloqueado!', 'ok', 3000);
+          _renderFase(window.JOGADOR, document.getElementById('main-content'), _procCache);
+        } else {
+          window.toast && window.toast(
+            `Confiança agora: ${r.confianca}/100 — ainda abaixo do mínimo (${no.bloqueio.minimo}) exigido para este nó.`,
+            'neutro', 4500,
+          );
+        }
       }
     } catch (err) {
       window.toast && window.toast('Erro: ' + erroAmigavel(err), 'ko');

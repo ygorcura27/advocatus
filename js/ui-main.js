@@ -960,9 +960,9 @@ function _escSideMenu(ativo, semWrapper) {
     ]},
     { titulo: 'Equipe', links: [
       { id: 'equipe',       iconKey:'equipe',      label: 'Ver Equipe',   fn: "window.navTo('equipe',null)" },
-      { id: 'estagiarios',  iconKey:'cursos',      label: 'Estagiários',  fn: "window._pendingFiltroCargo='est';window.switchEquipeTab&&window.switchEquipeTab('equipe');window.navTo('equipe',null)" },
-      { id: 'assistentes',  iconKey:'assistentes', label: 'Assistentes',  fn: "window._pendingFiltroCargo='ass';window.switchEquipeTab&&window.switchEquipeTab('equipe');window.navTo('equipe',null)" },
-      { id: 'advogados',    iconKey:'advogados',   label: 'Advogados',    fn: "window._pendingFiltroCargo='adv';window.switchEquipeTab&&window.switchEquipeTab('equipe');window.navTo('equipe',null)" },
+      { id: 'estagiarios',  iconKey:'cursos',      label: 'Estagiários',  fn: "window._pendingScrollId='equipe-grupo-estagiarios';window.switchEquipeTab&&window.switchEquipeTab('equipe');window.navTo('equipe',null)" },
+      { id: 'assistentes',  iconKey:'assistentes', label: 'Assistentes',  fn: "window._pendingScrollId='equipe-grupo-assistentes';window.switchEquipeTab&&window.switchEquipeTab('equipe');window.navTo('equipe',null)" },
+      { id: 'advogados',    iconKey:'advogados',   label: 'Advogados',    fn: "window._pendingScrollId='equipe-grupo-advogados';window.switchEquipeTab&&window.switchEquipeTab('equipe');window.navTo('equipe',null)" },
       { id: 'diario',       iconKey:'diario',      label: 'Diário',       fn: "window.switchEquipeTab&&window.switchEquipeTab('diario');window.navTo('equipe',null)" },
     ]},
     { titulo: 'Negócios', links: [
@@ -1410,6 +1410,13 @@ function renderHabilidades(j, el) {
     return `<div class="sk-bar"><div class="sk-bar-fill" style="width:${pct}%"></div></div>`;
   }
 
+  // Regra de estrelas das skills jurídicas (Base/Documento/Área — escala /50):
+  // 1★ 10-19, 2★ 20-29, 3★ 30-39, 4★ 40-49, 5★ 50+.
+  function skEstrelas(val) {
+    const n = val >= 50 ? 5 : val >= 40 ? 4 : val >= 30 ? 3 : val >= 20 ? 2 : val >= 10 ? 1 : 0;
+    return n > 0 ? `<span class="sk-estrelas" title="${n}/5 estrelas">${'⭐'.repeat(n)}</span>` : '';
+  }
+
   function skRowGeral(sk) {
     const val     = skills[sk.k] || 0;
     const isPrior = prioridades.includes(sk.k);
@@ -1436,7 +1443,7 @@ function renderHabilidades(j, el) {
     return `<tr class="sk-row">
       <td class="sk-nome">${label}</td>
       <td class="sk-nivel">
-        <span class="sk-num">${val}<span class="sk-cap">/${capJur}</span></span>
+        <span class="sk-num">${val}<span class="sk-cap">/${capJur}</span></span> ${skEstrelas(val)}
         ${skBar(val, capJur)}
       </td>
       <td class="sk-acao">
@@ -1490,7 +1497,7 @@ function renderHabilidades(j, el) {
         <tr class="sk-row">
           <td class="sk-nome">Didática Acadêmica</td>
           <td class="sk-nivel">
-            <span class="sk-num">${didatica}<span class="sk-cap">/50</span></span>
+            <span class="sk-num">${didatica}<span class="sk-cap">/50</span></span> ${skEstrelas(didatica)}
             ${skBar(didatica, 50)}
           </td>
           <td class="sk-acao">

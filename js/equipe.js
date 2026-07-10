@@ -186,18 +186,9 @@ window.renderEquipe = async function(j, el) {
           ${await _renderDiarioEquipe(escId)}
         </div>`;
 
-  // Filtro de cargo solicitado pelo menu lateral fixo do Escritório
-  // (Estagiários/Assistentes/Advogados) — aplica o chip correspondente.
-  if (window._pendingFiltroCargo) {
-    const cargoAlvo = window._pendingFiltroCargo;
-    window._pendingFiltroCargo = null;
-    setTimeout(() => {
-      const chip = document.querySelector(`.equipe-chip[data-filtro-cargo="${cargoAlvo}"]`);
-      if (chip) window._filtrarEquipeCargo(cargoAlvo, chip);
-      document.getElementById('equipe-grid')?.scrollIntoView({ behavior: 'smooth' });
-    }, 50);
-  }
-  // Compat — âncoras antigas de outras telas (ex.: Patrimônio) continuam via scrollIntoView simples.
+  // Âncora solicitada pelo menu lateral do Escritório (Estagiários/
+  // Assistentes/Advogados) ou por outras telas (ex.: Patrimônio) — desce
+  // a página até o container do cargo correspondente.
   if (window._pendingScrollId) {
     const alvo = window._pendingScrollId;
     window._pendingScrollId = null;
@@ -216,78 +207,79 @@ function _statusFuncionario(f) {
   return { key:'disponivel', label:'Disponível', cor:'verde' };
 }
 
-function _renderVagaStrip(label, membros, vagas, cargo_min, escId) {
+// Container retangular por cargo — nome do setor no topo, vagas/contratar
+// no cabeçalho, e a grade de cards do próprio cargo dentro. Tem um id de
+// âncora fixo para os botões "Estagiários/Assistentes/Advogados" (menu do
+// Escritório e os chips desta página) descerem direto até ele.
+function _renderContainerCargo(titulo, anchorId, membros, vagas, cargo_min, escId, energiaDisp, procCount, mesGlobal) {
   const cheio = membros.length >= vagas;
+  const cardsHtml = membros.length === 0
+    ? `<div class="equipe-vazio">Nenhum membro contratado neste cargo ainda.</div>`
+    : `<div class="equipe-grid">${membros.map(f => _cardFuncionario(f, escId, energiaDisp, procCount, mesGlobal)).join('')}</div>`;
   return `
-    <div class="equipe-vaga-item">
-      <span class="equipe-vaga-label">${label}</span>
-      <span class="equipe-vaga-count">${membros.length}/${vagas}</span>
-      ${cheio
-        ? `<span class="equipe-vaga-cheia">Vagas cheias</span>`
-        : `<button class="btn btn-sm btn-prim" onclick="window.abrirModalContratar('${cargo_min}','${escId}')">+ Contratar</button>`}
+    <div class="equipe-cargo-container" id="${anchorId}">
+      <div class="equipe-cargo-header">
+        <div class="equipe-cargo-titulo">${titulo}</div>
+        <div class="equipe-cargo-vagas">
+          <span class="equipe-vaga-count">${membros.length}/${vagas} vagas</span>
+          ${cheio
+            ? `<span class="equipe-vaga-cheia">Cheias</span>`
+            : `<button class="btn btn-sm btn-prim" onclick="window.abrirModalContratar('${cargo_min}','${escId}')">+ Contratar</button>`}
+        </div>
+      </div>
+      ${cardsHtml}
     </div>`;
 }
-
-const _CARGO_GRUPO_EQ = { est:'est', ass:'ass', jnr:'adv', pln:'adv', snr:'adv' };
 
 function _renderEquipePane(estagiarios, assistentes, advogados, escId, energiaDisp, procCount, mesGlobal, cap) {
   const todos = [...estagiarios, ...assistentes, ...advogados];
 
-  const contCargo = { todos: todos.length, est: estagiarios.length, ass: assistentes.length, adv: advogados.length };
   const contStatus = { todos: todos.length, disponivel: 0, trabalhando: 0, atencao: 0 };
   todos.forEach(f => { contStatus[_statusFuncionario(f).key]++; });
 
   const CHIPS_CARGO = [
-    ['todos', 'Todos', contCargo.todos], ['est', 'Estagiários', contCargo.est],
-    ['ass', 'Assistentes', contCargo.ass], ['adv', 'Advogados', contCargo.adv],
+    ['equipe-grupo-estagiarios', 'Estagiários', estagiarios.length],
+    ['equipe-grupo-assistentes', 'Assistentes', assistentes.length],
+    ['equipe-grupo-advogados', 'Advogados', advogados.length],
   ];
   const CHIPS_STATUS = [
     ['todos', 'Todos', contStatus.todos], ['disponivel', 'Disponível', contStatus.disponivel],
     ['trabalhando', 'Trabalhando', contStatus.trabalhando], ['atencao', 'Atenção', contStatus.atencao],
   ];
 
-  const chipsHtml = (itens, attr, fn) => `
+  const chipsCargoHtml = `
     <div class="equipe-chip-grupo">
-      ${itens.map(([val, lbl, n], i) => `
-        <button class="equipe-chip${i===0?' ativo':''}" data-${attr}="${val}" onclick="window.${fn}('${val}',this)">
+      ${CHIPS_CARGO.map(([anchorId, lbl, n]) => `
+        <button class="equipe-chip" onclick="document.getElementById('${anchorId}')?.scrollIntoView({behavior:'smooth',block:'start'})">
+          ${lbl} <span class="equipe-chip-n">${n}</span>
+        </button>`).join('')}
+    </div>`;
+  const chipsStatusHtml = `
+    <div class="equipe-chip-grupo">
+      ${CHIPS_STATUS.map(([val, lbl, n], i) => `
+        <button class="equipe-chip${i===0?' ativo':''}" data-filtro-status="${val}" onclick="window._filtrarEquipeStatus('${val}',this)">
           ${lbl} <span class="equipe-chip-n">${n}</span>
         </button>`).join('')}
     </div>`;
 
-  const cardsHtml = todos.length === 0
-    ? `<div class="equipe-vazio">Nenhum membro contratado ainda — use os botões abaixo para montar sua equipe.</div>`
-    : `<div class="equipe-grid" id="equipe-grid">${todos.map(f => _cardFuncionario(f, escId, energiaDisp, procCount, mesGlobal)).join('')}</div>`;
-
   return `
     <div class="equipe-filtros">
-      ${chipsHtml(CHIPS_CARGO, 'filtro-cargo', '_filtrarEquipeCargo')}
-      ${chipsHtml(CHIPS_STATUS, 'filtro-status', '_filtrarEquipeStatus')}
+      ${chipsCargoHtml}
+      ${chipsStatusHtml}
     </div>
-    <div class="equipe-vaga-strip">
-      ${_renderVagaStrip('🎓 Estagiários', estagiarios, cap.estagiarios, 'est', escId)}
-      ${_renderVagaStrip('📋 Assistentes', assistentes, cap.assistentes, 'ass', escId)}
-      ${_renderVagaStrip('⚖️ Advogados', advogados, cap.advogados, 'jnr', escId)}
-    </div>
-    ${cardsHtml}`;
+    ${_renderContainerCargo('🎓 Estagiários', 'equipe-grupo-estagiarios', estagiarios, cap.estagiarios, 'est', escId, energiaDisp, procCount, mesGlobal)}
+    ${_renderContainerCargo('📋 Assistentes', 'equipe-grupo-assistentes', assistentes, cap.assistentes, 'ass', escId, energiaDisp, procCount, mesGlobal)}
+    ${_renderContainerCargo('⚖️ Advogados', 'equipe-grupo-advogados', advogados, cap.advogados, 'jnr', escId, energiaDisp, procCount, mesGlobal)}`;
 }
 
-// ── Filtros da grade (toggle de display, sem re-render) ──
-let _filtroCargoAtivo = 'todos';
+// ── Filtro por status (toggle de display, sem re-render) — cargo agora é
+// estrutural (um container por cargo), então só o status precisa filtrar. ──
 let _filtroStatusAtivo = 'todos';
-
 function _aplicarFiltrosEquipe() {
   document.querySelectorAll('.func-card').forEach(card => {
-    const okCargo  = _filtroCargoAtivo === 'todos' || card.dataset.cargoGrupo === _filtroCargoAtivo;
-    const okStatus = _filtroStatusAtivo === 'todos' || card.dataset.status === _filtroStatusAtivo;
-    card.style.display = (okCargo && okStatus) ? '' : 'none';
+    card.style.display = (_filtroStatusAtivo === 'todos' || card.dataset.status === _filtroStatusAtivo) ? '' : 'none';
   });
 }
-window._filtrarEquipeCargo = function(valor, el) {
-  _filtroCargoAtivo = valor;
-  el.parentElement.querySelectorAll('.equipe-chip').forEach(c => c.classList.remove('ativo'));
-  el.classList.add('ativo');
-  _aplicarFiltrosEquipe();
-};
 window._filtrarEquipeStatus = function(valor, el) {
   _filtroStatusAtivo = valor;
   el.parentElement.querySelectorAll('.equipe-chip').forEach(c => c.classList.remove('ativo'));
@@ -308,6 +300,32 @@ const _SKILL_FULL_LBL    = {
   argumentacao:'Argumentação', oratoria:'Oratória', persuasao:'Persuasão',
   negociacao:'Negociação', gestao:'Gestão',
 };
+
+// Skills jurídicas / tipos de documento / áreas do direito — mesma
+// nomenclatura usada no Perfil do jogador (js/ui-main.js renderHabilidades)
+// e no Perfil do funcionário (js/escritorio_painel.js). Agora também
+// existem DE VERDADE no funcionário (f.skills_jur), seedadas em
+// _contratarNPC e treináveis pelo Estudo Autônomo — antes só existiam
+// como uma aproximação calculada na hora só pra exibição no Perfil.
+const _SKILL_JUR_BASE_LBL = {
+  legal_drafting:'Redação Jurídica', legal_research:'Pesquisa Jurídica',
+  argumentation:'Argumentação (Jur.)', oral_advocacy:'Sustentação Oral',
+  negotiation:'Negociação (Jur.)', procedure:'Litigância', gestao:'Gestão (Jur.)',
+};
+const _DOC_JUR_LBL = {
+  doc_initial_filing:'Petição Inicial', doc_responsive_pleading:'Contestação',
+  doc_motion:'Requerimento', doc_appellate_brief:'Razões de Apelação',
+  doc_supreme_brief:'Razões de Rec. Especial', doc_trial_brief:'Memoriais',
+  doc_evidence:'Prova Documental', doc_deposition:'Depoimento',
+};
+const _AREA_JUR_LBL = {
+  area_employment:'Trabalhista', area_tax:'Tributário', area_civil:'Cível',
+  area_criminal:'Criminal', area_corporate:'Empresarial',
+  area_immigration:'Imigração', area_bankruptcy:'Rec. Judicial',
+};
+const _SKILL_JUR_TODAS_LBL = { ..._SKILL_JUR_BASE_LBL, ..._DOC_JUR_LBL, ..._AREA_JUR_LBL };
+const CAP_JUR_NPC = 50;
+const _CARGO_JUR_BASE_EQ = { est:4, ass:8, jnr:14, pln:20, snr:26 };
 
 function _calcProd(func) {
   const skills = func.skills || {};
@@ -362,7 +380,6 @@ function _cardFuncionario(f, escId, energiaDisp, procCount = {}, mesGlobal = 0) 
   const efic      = f.tipo === 'npc' ? _calcEfic(f) : null;
   const eficColor = efic >= 80 ? '#2E8B57' : efic >= 55 ? '#B7791F' : '#C0392B';
   const status    = _statusFuncionario(f);
-  const cargoGrupo = _CARGO_GRUPO_EQ[f.cargo_id] || 'est';
 
   const ini = (f.nome||'?').split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase().slice(0,2);
   const svgSrc = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='153' height='153'%3E%3Ccircle cx='76' cy='76' r='76' fill='%232E4270'/%3E%3Ctext x='76' y='96' font-size='36' font-weight='700' fill='%23C9A227' text-anchor='middle' font-family='DM Sans,Arial'%3E${ini}%3C/text%3E%3C/svg%3E`;
@@ -497,7 +514,7 @@ function _cardFuncionario(f, escId, energiaDisp, procCount = {}, mesGlobal = 0) 
   menuItens.push(`<button class="func-menu-danger" onclick="window.demitirFuncionario('${f.id}','${escId}','${f.nome}')">Demitir</button>`);
 
   return `
-    <div class="func-card" data-cargo-grupo="${cargoGrupo}" data-status="${status.key}">
+    <div class="func-card" data-status="${status.key}">
       <div class="func-card-topo">
         ${fotoHtml}
         <div class="func-card-info">
@@ -507,8 +524,8 @@ function _cardFuncionario(f, escId, energiaDisp, procCount = {}, mesGlobal = 0) 
           </div>
           <div class="func-cargo">${ci.l}${f.tipo === 'npc' && f.meses_no_cargo ? ` · ${f.meses_no_cargo}m no cargo` : ''}</div>
           <div class="func-badges">
-            <span class="func-badge" style="color:${prodColor}">P ${prod}%</span>
-            ${efic !== null ? `<span class="func-badge" style="color:${eficColor}">E ${efic}%</span>` : ''}
+            <span class="func-badge" style="color:${prodColor}">Produtividade ${prod}%</span>
+            ${efic !== null ? `<span class="func-badge" style="color:${eficColor}">Eficiência ${efic}%</span>` : ''}
           </div>
         </div>
         <div class="func-menu-wrap">
@@ -711,8 +728,17 @@ window._contratarNPC = async function(cargo_min, escId) {
     skills[k] = Math.max(1, Math.round(v * (0.7 + Math.random() * 0.6)));
   });
 
+  // Skills jurídicas / documentos / áreas — mesma variação ±30-60% das
+  // gerais, escaladas por cargo, cap fixo de 50 (sem bônus de pós-grad,
+  // que só existe pro jogador).
+  const baseJur   = _CARGO_JUR_BASE_EQ[cargo_id] || _CARGO_JUR_BASE_EQ.est;
+  const skills_jur = {};
+  Object.keys(_SKILL_JUR_TODAS_LBL).forEach(k => {
+    skills_jur[k] = Math.max(0, Math.min(CAP_JUR_NPC, Math.round(baseJur * (0.6 + Math.random() * 0.6))));
+  });
+
   const funcionario = {
-    nome, cargo_id, skills, sexo,
+    nome, cargo_id, skills, skills_jur, sexo,
     tipo:       'npc',
     foto_npc,
     escritorio_id: escId,
@@ -1103,25 +1129,41 @@ window.designarEstudo = async function(funcId, escId) {
   const snap = await getDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId));
   if (!snap.exists()) return;
   const f = { id: snap.id, ...snap.data() };
-  const skills = Object.keys(f.skills || {});
-  if (!skills.length) { toast('Nenhuma skill disponível.', 'ko'); return; }
+  const skills    = f.skills || {};
+  const skillsJur = f.skills_jur || {};
+  if (!Object.keys(skills).length && !Object.keys(skillsJur).length) {
+    toast('Nenhuma skill disponível.', 'ko'); return;
+  }
 
   const cap = _SKILL_CAP_EQ[f.cargo_id] || 20;
-  const opts = skills.map(sk => {
-    const v = f.skills[sk] || 0;
-    const pct = Math.round(v / cap * 100);
-    return `<option value="${sk}" ${f.skill_em_estudo === sk ? 'selected' : ''}>${_SKILL_FULL_LBL[sk]||sk} — ${v}/${cap} (${pct}%)</option>`;
-  }).join('');
+  const optGroup = (titulo, keys, src, capV) => {
+    const disponiveis = keys.filter(k => k in src);
+    if (!disponiveis.length) return '';
+    const opts = disponiveis.map(k => {
+      const v = src[k] || 0;
+      const pct = Math.round(v / capV * 100);
+      return `<option value="${k}" ${f.skill_em_estudo === k ? 'selected' : ''}>${_SKILL_JUR_TODAS_LBL[k]||_SKILL_FULL_LBL[k]||k} — ${v}/${capV} (${pct}%)</option>`;
+    }).join('');
+    return `<optgroup label="${titulo}">${opts}</optgroup>`;
+  };
+
+  const gruposHtml = [
+    optGroup('Habilidades Gerais', Object.keys(skills), skills, cap),
+    optGroup('Skills Jurídicas', Object.keys(_SKILL_JUR_BASE_LBL), skillsJur, CAP_JUR_NPC),
+    optGroup('Tipos de Documento', Object.keys(_DOC_JUR_LBL), skillsJur, CAP_JUR_NPC),
+    optGroup('Áreas do Direito', Object.keys(_AREA_JUR_LBL), skillsJur, CAP_JUR_NPC),
+  ].join('');
 
   abrirModal('📖 Foco de Estudo Autônomo',
     `<div style="font-size:.78rem;color:var(--txt3);margin-bottom:.8rem">
       <b>${f.nome}</b> estuda 1 skill por mês automaticamente (-20⚡ NPC).<br>
-      Escolha a skill para priorizar, ou deixe em "Auto" para a mais fraca.
+      Escolha qualquer skill para priorizar — geral, jurídica, tipo de documento ou área do direito —
+      ou deixe em "Auto" para a mais fraca entre todas.
     </div>
     <div class="campo"><label>Skill prioritária</label>
       <select id="estudo-skill">
         <option value="" ${!f.skill_em_estudo ? 'selected' : ''}>🤖 Auto — skill mais fraca</option>
-        ${opts}
+        ${gruposHtml}
       </select>
     </div>
     <div style="display:flex;gap:.5rem;margin-top:.8rem">
@@ -1138,7 +1180,7 @@ window._confirmarEstudo = async function(funcId, escId) {
     skill_em_estudo: skill || null,
   });
   fecharModal();
-  const lbl = skill ? (_SKILL_FULL_LBL[skill]||skill) : 'automático';
+  const lbl = skill ? (_SKILL_JUR_TODAS_LBL[skill]||_SKILL_FULL_LBL[skill]||skill) : 'automático';
   toast(`📖 Foco de estudo definido: ${lbl}.`, 'ok');
   setTimeout(() => window.navTo && window.navTo('equipe', null), 400);
 };

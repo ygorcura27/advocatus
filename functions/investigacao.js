@@ -71,52 +71,93 @@ function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
 // ─── Geração do grafo de nós (Parte III) ───────────────────────────────────
 
-const TEMPLATES_ANALISE_DOCUMENTAL = [
-  { campos: ['Data do documento', 'Remetente', 'Valor', 'Horário de envio'] },
-  { campos: ['Assinatura', 'Data do protocolo', 'Número do processo', 'Carimbo do cartório'] },
+// Distratores para os campos "corrompidos" — nunca aparecem como resposta
+// certa (a certa sempre vem de um dado real do próprio processo: p.autor,
+// p.tribunal, p.valor). Só precisam ser plausíveis e diferentes do real.
+const NOMES_FAKE_PARTE = [
+  'Marcos Villela', 'Studio Fênix Comércio', 'Andréa Cavalcante', 'Grupo Mármore Ltda',
+  'Paulo Sertão', 'Distribuidora Ipê S/A', 'Cláudia Reis', 'Construtora Delta',
 ];
-const TEMPLATES_ENTREVISTA = [
-  { declaracoes: [
-      'Eu estava no escritório o dia inteiro, não vi nada de estranho.',
-      'Cheguei um pouco mais tarde naquele dia — mas não foi nada demais.',
-      'Sempre sigo o protocolo à risca, nunca pulei uma etapa.',
-    ] },
-  { declaracoes: [
-      'Não conversei com ele sobre o contrato depois daquilo.',
-      'Foi só uma reunião de rotina, nada relevante.',
-      'Eu nem sabia que o laudo tinha sido alterado.',
-    ] },
-];
-const TEMPLATES_PERICIA = [
-  { opcoes: ['Data de criação do arquivo', 'Metadados de edição', 'Assinatura digital'] },
-  { opcoes: ['Análise grafotécnica', 'Cadeia de custódia', 'Contraprova pericial'] },
+const TRIBUNAIS_FAKE = ['Justiça Federal', 'Justiça Estadual', 'TRT', 'Juizado Especial Cível', 'CARF'];
+const FILLERS_EVASIVOS = [
+  'Não me lembro dos detalhes, foi tudo muito corrido naquela época.',
+  'Prefiro não entrar em detalhes — não tenho certeza do que aconteceu.',
+  'Isso não é da minha alçada, não sei dizer com precisão.',
 ];
 
-function gerarNo(id, tipoForcado) {
+function _valorFmt(v) { return `R$ ${Math.round(v || 0).toLocaleString('pt-BR')}`; }
+function _embaralhar(n) { return Array.from({ length: n }, (_, i) => i).sort(() => Math.random() - 0.5); }
+
+// ─── Puzzles ancorados nos dados reais do caso (Parte III) ─────────────────
+// Antes os 3 tipos de nó usavam templates genéricos fixos com a resposta
+// certa sorteada (Math.random()) — nenhum dado do caso entrava na conta, e
+// não havia como deduzir a resposta certa de jeito nenhum. Agora cada
+// puzzle deriva a resposta certa de um dado REAL do processo (p.autor,
+// p.tribunal, p.valor, p.fatos_narrativa) e os distratores de pools
+// genéricos — a cena (js/investigacao.js) mostra a ficha do caso para o
+// jogador conferir contra as opções.
+
+function _campoCorrompido(p) {
+  const real = {
+    autor:    p.autor || 'Parte desconhecida',
+    tribunal: p.tribunal || 'Tribunal não informado',
+    valor:    _valorFmt(p.valor),
+  };
+  const dims = ['autor', 'tribunal', 'valor'];
+  const alvo = pick(dims);
+  const fake = {
+    autor:    pick(NOMES_FAKE_PARTE.filter(n => n !== real.autor)) || NOMES_FAKE_PARTE[0],
+    tribunal: pick(TRIBUNAIS_FAKE.filter(t => t !== real.tribunal)) || TRIBUNAIS_FAKE[0],
+    valor:    _valorFmt(Math.max(500, (p.valor || 10000) * (0.35 + Math.random() * 0.5))),
+  };
+  const LABEL = { autor: 'Parte autora', tribunal: 'Tribunal de origem', valor: 'Valor da causa' };
+  const campos = dims.map(d => `${LABEL[d]}: ${d === alvo ? fake[d] : real[d]}`);
+  return { campos, campo_suspeito: dims.indexOf(alvo) };
+}
+
+function _periciaValor(p) {
+  const valores = [
+    _valorFmt(p.valor), // 0 = certa
+    _valorFmt(Math.max(500, (p.valor || 10000) * (0.3 + Math.random() * 0.4))),
+    _valorFmt((p.valor || 10000) * (1.4 + Math.random() * 0.6)),
+  ];
+  const ordem = _embaralhar(3);
+  const opcoes = ordem.map(i => `Confirmar se o laudo cita ${valores[i]} como valor da causa`);
+  return { opcoes, certa: ordem.indexOf(0) };
+}
+
+function _entrevistaDeclaracoes(p) {
+  const fatos = (p.fatos_narrativa || []).filter(Boolean);
+  const base = fatos.length >= 2 ? fatos.slice(0, 2) : [...fatos, 'O restante do procedimento seguiu dentro do esperado.'].slice(0, 2);
+  const declaracoesReais = base.map(f => `Posso confirmar: ${f.charAt(0).toLowerCase()}${f.slice(1)}`);
+  const todas = [...declaracoesReais, pick(FILLERS_EVASIVOS)];
+  const ordem = _embaralhar(3);
+  const declaracoes = ordem.map(i => todas[i]);
+  return { declaracoes, evasiva: ordem.indexOf(2) };
+}
+
+function gerarNo(id, tipoForcado, p) {
   const tipo = tipoForcado || pick(['consulta', 'analise_documental', 'entrevista', 'pericia']);
   const base = { id, tipo, status: 'oculto', bloqueio: null, peca: null, dados_puzzle: null };
 
   if (tipo === 'analise_documental') {
-    const t = pick(TEMPLATES_ANALISE_DOCUMENTAL);
-    base.dados_puzzle = { campos: t.campos, campo_suspeito: Math.floor(Math.random() * t.campos.length) };
+    base.dados_puzzle = _campoCorrompido(p);
   } else if (tipo === 'entrevista') {
-    const t = pick(TEMPLATES_ENTREVISTA);
-    base.dados_puzzle = { declaracoes: t.declaracoes, evasiva: Math.floor(Math.random() * t.declaracoes.length) };
+    base.dados_puzzle = _entrevistaDeclaracoes(p);
   } else if (tipo === 'pericia') {
-    const t = pick(TEMPLATES_PERICIA);
-    base.dados_puzzle = { opcoes: t.opcoes, certa: Math.floor(Math.random() * t.opcoes.length) };
+    base.dados_puzzle = _periciaValor(p);
   }
   return base;
 }
 
-function gerarGrafoDeNos() {
+function gerarGrafoDeNos(p) {
   const nos = [];
-  nos.push(gerarNo('n0', 'consulta'));
+  nos.push(gerarNo('n0', 'consulta', p));
   nos[0].status = 'visivel'; // nó semente — sempre visível no intake
 
   const NUM_NOS = 7;
   for (let i = 1; i < NUM_NOS; i++) {
-    const no = gerarNo(`n${i}`);
+    const no = gerarNo(`n${i}`, null, p);
     // ~30% dos nós (exceto o semente) exigem favor ou confiança
     if (Math.random() < 0.30) {
       no.tipo = 'favor_relacionamento';
@@ -285,7 +326,7 @@ exports.executarAcaoInvestigacao = onCall({ region: 'southamerica-east1' }, asyn
 exports.pedirFavor = onCall({ region: 'southamerica-east1' }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
   const uid = request.auth.uid;
-  const { npc_id, tipo, origem, peso } = request.data || {};
+  const { npc_id, tipo, origem, peso, processo_id, no_id } = request.data || {};
   if (!npc_id) throw new HttpsError('invalid-argument', 'npc_id obrigatório.');
 
   const db = getFirestore();
@@ -343,7 +384,32 @@ exports.pedirFavor = onCall({ region: 'southamerica-east1' }, async (request) =>
 
   await confRef.set({ confianca: novaConfianca, ultimo_evento: desfecho, atualizado_em: new Date().toISOString() }, { merge: true });
 
-  return { faixa, desfecho, confianca: novaConfianca, favor_id: favorId };
+  // Se o pedido foi feito para destravar um nó bloqueado por CONFIANÇA
+  // (bloqueio.tipo === 'confianca'), desbloqueia aqui mesmo quando a
+  // confiança resultante já bate o mínimo exigido. Sem isso o cliente
+  // mostrava "favor concedido" e o nó continuava bloqueado do mesmo
+  // jeito — nada persistia, nada reabria o mapa, e dava pra pedir de novo
+  // pro mesmo nó pra sempre.
+  let desbloqueado = false;
+  let investigacaoAtualizada = null;
+  if (processo_id && no_id) {
+    const processoRef = db.collection('processos').doc(processo_id);
+    const pSnap = await processoRef.get();
+    if (pSnap.exists) {
+      const p = pSnap.data();
+      const investigacao = p.investigacao;
+      const no = investigacao?.nos?.find(n => n.id === no_id);
+      if (no && no.bloqueio?.tipo === 'confianca' && novaConfianca >= no.bloqueio.minimo) {
+        no.status = 'visivel';
+        no.bloqueio = null;
+        desbloqueado = true;
+        await processoRef.update({ investigacao });
+        investigacaoAtualizada = investigacao;
+      }
+    }
+  }
+
+  return { faixa, desfecho, confianca: novaConfianca, favor_id: favorId, desbloqueado, investigacao: investigacaoAtualizada };
 });
 
 // ─── 4. Consumir favor para desbloquear nó ─────────────────────────────────

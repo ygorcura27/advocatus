@@ -385,46 +385,50 @@ const CONCURSO_BANCO = [
 
 let _concursoState = null;
 
+// Só o exame da OAB fica ativo por enquanto — Magistratura/MP/Defensoria
+// travados com "Em breve" (o mecanismo de quiz continua definido logo
+// abaixo, só não está mais acessível pela UI até serem finalizados).
 window.renderConcursoPanel = function(j, el) {
-  const temReq = j.oab && (j.anos_carreira||0) >= 3;
   el.innerHTML = `
     <div class="secao-header"><div class="secao-titulo">🔨 Concurso Público</div></div>
-    ${!temReq ? `<div class="card" style="color:var(--ardosia2)">
-      Requisitos: OAB aprovada + 3 anos de carreira. Você tem: ${j.anos_carreira||0} anos.
-    </div>` : `
-    <div class="card" style="margin-bottom:.8rem">
-      <div class="card-titulo">Requisitos atingidos</div>
-      <div class="card-sub">OAB ✅ · ${j.anos_carreira||0} anos de carreira ✅</div>
-    </div>
     <div style="display:flex;flex-direction:column;gap:.6rem">
-      <div class="card" onclick="window.iniciarConcurso('juiz')" style="cursor:pointer">
+      <div class="card" onclick="window.navTo('habilidades',null)" style="cursor:pointer">
+        <div style="display:flex;align-items:center;gap:.7rem">
+          <span style="font-size:1.4rem">⚖️</span>
+          <div>
+            <div class="card-titulo">Exame da OAB</div>
+            <div class="card-sub">${j.oab ? '✅ Aprovado(a) — você já pode advogar.' : 'Pré-requisito para advogar. Prepare-se e faça o exame na aba Habilidades →'}</div>
+          </div>
+        </div>
+      </div>
+      <div class="card card-travado">
         <div style="display:flex;align-items:center;gap:.7rem">
           <span style="font-size:1.4rem">🔨</span>
           <div>
-            <div class="card-titulo">Magistratura</div>
+            <div class="card-titulo">Magistratura <span class="badge-em-breve">Em breve</span></div>
             <div class="card-sub">Juiz Substituto → Juiz Titular → Desembargador → Ministro</div>
           </div>
         </div>
       </div>
-      <div class="card" onclick="window.iniciarConcurso('promotor')" style="cursor:pointer">
+      <div class="card card-travado">
         <div style="display:flex;align-items:center;gap:.7rem">
           <span style="font-size:1.4rem">🛡️</span>
           <div>
-            <div class="card-titulo">Ministério Público</div>
+            <div class="card-titulo">Ministério Público <span class="badge-em-breve">Em breve</span></div>
             <div class="card-sub">Promotor Adjunto → Promotor → Procurador → PGJ</div>
           </div>
         </div>
       </div>
-      <div class="card" onclick="window.iniciarConcurso('defensor')" style="cursor:pointer">
+      <div class="card card-travado">
         <div style="display:flex;align-items:center;gap:.7rem">
           <span style="font-size:1.4rem">🤝</span>
           <div>
-            <div class="card-titulo">Defensoria Pública</div>
+            <div class="card-titulo">Defensoria Pública <span class="badge-em-breve">Em breve</span></div>
             <div class="card-sub">Defensor Adjunto → Defensor → Defensor-Chefe → Defensor-Geral</div>
           </div>
         </div>
       </div>
-    </div>`}`;
+    </div>`;
 };
 
 window.iniciarConcurso = function(tipo) {

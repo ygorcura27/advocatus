@@ -28,7 +28,6 @@ const _genericas             = require('./peticoes_genericas');
 const _perfis                = require('./perfis');
 const { processarRoyaltiesLivros } = require('./artigos_livros');
 
-const COOLDOWN_JANEIRO_MIN = 60;
 const ENERGIA_TOTAL        = 100;
 
 const REP_CAP = {
@@ -92,6 +91,24 @@ const _SKL_LABEL = {
   pesquisa:'Pesquisa', escrita_juridica:'Escrita Jurídica',
   argumentacao:'Argumentação', oratoria:'Oratória', persuasao:'Persuasão',
 };
+
+// Skills jurídicas / tipos de documento / áreas do direito — mesmas
+// chaves de f.skills_jur (ver js/equipe.js _contratarNPC). Usado só pra
+// rotular o log/inbox do estudo autônomo quando a skill treinada vem
+// deste balde em vez do f.skills tradicional.
+const _SKL_JUR_LABEL_CF = {
+  legal_drafting:'Redação Jurídica', legal_research:'Pesquisa Jurídica',
+  argumentation:'Argumentação (Jur.)', oral_advocacy:'Sustentação Oral',
+  negotiation:'Negociação (Jur.)', procedure:'Litigância', gestao:'Gestão (Jur.)',
+  doc_initial_filing:'Petição Inicial', doc_responsive_pleading:'Contestação',
+  doc_motion:'Requerimento', doc_appellate_brief:'Razões de Apelação',
+  doc_supreme_brief:'Razões de Rec. Especial', doc_trial_brief:'Memoriais',
+  doc_evidence:'Prova Documental', doc_deposition:'Depoimento',
+  area_employment:'Trabalhista', area_tax:'Tributário', area_civil:'Cível',
+  area_criminal:'Criminal', area_corporate:'Empresarial',
+  area_immigration:'Imigração', area_bankruptcy:'Rec. Judicial',
+};
+const CAP_JUR_NPC_CF = 50;
 
 // ── Calc eficiência de skills (0.4 a 1.0) ──
 // 0.4 mínimo garante que NPCs sem skills ainda evoluem (lentamente)
@@ -653,32 +670,38 @@ async function _processarEstudoNPCsCF(db, escRef, fSnap, uid) {
     const energiaUsada = f.energia_npc_usada_mes || 0;
     if (energiaUsada + CUSTO_ESTUDO > 100) continue;
 
-    const cap    = CARGO_CAP_SKL[f.cargo_id] || 20;
-    const skills = f.skills || {};
-    const skillKeys = Object.keys(skills).filter(k => typeof skills[k] === 'number');
-    if (!skillKeys.length) continue;
+    const cap       = CARGO_CAP_SKL[f.cargo_id] || 20;
+    const skills    = f.skills || {};
+    const skillsJur = f.skills_jur || {};
+    const skillKeys    = Object.keys(skills).filter(k => typeof skills[k] === 'number');
+    const skillJurKeys = Object.keys(skillsJur).filter(k => typeof skillsJur[k] === 'number');
+    if (!skillKeys.length && !skillJurKeys.length) continue;
 
-    // Skill designada pelo player OU a mais fraca percentualmente
-    let skill = f.skill_em_estudo && skillKeys.includes(f.skill_em_estudo)
-      ? f.skill_em_estudo
-      : skillKeys.reduce((best, k) =>
-          (skills[k] / cap) < (skills[best] / cap) ? k : best, skillKeys[0]);
+    // Pool único {chave, balde, valor, cap} juntando as duas categorias —
+    // "Auto" e a busca por alternativa quando a designada já bateu o cap
+    // agora enxergam skills_jur/doc/área também, não só o balde tradicional.
+    const pool = [
+      ...skillKeys.map(k => ({ k, balde: 'skills', v: skills[k] || 0, cap })),
+      ...skillJurKeys.map(k => ({ k, balde: 'skills_jur', v: skillsJur[k] || 0, cap: CAP_JUR_NPC_CF })),
+    ];
 
-    const valorAtual = skills[skill] || 0;
-    if (valorAtual >= cap) {
-      // Se a skill designada já está no cap, busca outra
-      const alternativa = skillKeys.find(k => (skills[k] || 0) < cap);
+    let alvo = (f.skill_em_estudo && pool.find(p => p.k === f.skill_em_estudo))
+      || pool.reduce((best, p) => (p.v / p.cap) < (best.v / best.cap) ? p : best, pool[0]);
+
+    if (alvo.v >= alvo.cap) {
+      const alternativa = pool.find(p => p.v < p.cap);
       if (!alternativa) continue;
-      skill = alternativa;
+      alvo = alternativa;
     }
 
     const ganho   = Math.random() < 0.4 ? 2 : 1; // 60% chance de +1, 40% de +2
-    const novoVal = Math.min(cap, valorAtual + ganho);
-    const pctAntes = Math.floor((valorAtual / cap) * 10) * 10;
-    const pctDepois = Math.floor((novoVal / cap) * 10) * 10;
+    const novoVal = Math.min(alvo.cap, alvo.v + ganho);
+    const pctAntes = Math.floor((alvo.v / alvo.cap) * 10) * 10;
+    const pctDepois = Math.floor((novoVal / alvo.cap) * 10) * 10;
+    const label = _SKL_LABEL[alvo.k] || _SKL_JUR_LABEL_CF[alvo.k] || alvo.k;
 
     proms.push(fd.ref.update({
-      [`skills.${skill}`]:    novoVal,
+      [`${alvo.balde}.${alvo.k}`]: novoVal,
       energia_npc_usada_mes: energiaUsada + CUSTO_ESTUDO,
     }));
 
@@ -686,12 +709,12 @@ async function _processarEstudoNPCsCF(db, escRef, fSnap, uid) {
     if (pctDepois > pctAntes && (pctDepois === 80 || pctDepois === 100)) {
       const marco = pctDepois === 100 ? 'atingiu o limite' : `atingiu ${pctDepois}% do cap`;
       logs.push(_logEquipeCF(escRef,
-        `📖 ${f.nome} ${marco} em ${_SKL_LABEL[skill]||skill} pelo estudo autônomo.`));
+        `📖 ${f.nome} ${marco} em ${label} pelo estudo autônomo.`));
       if (pctDepois >= 80 && uid) {
         proms.push(db.collection('jogadores').doc(uid).collection('inbox').add({
           de: 'sistema',
-          assunto: `📖 ${f.nome} evoluiu em ${_SKL_LABEL[skill]||skill}`,
-          corpo: `Pelo esforço próprio, ${f.nome} ${marco} em ${_SKL_LABEL[skill]||skill} (${novoVal}/${cap}).`,
+          assunto: `📖 ${f.nome} evoluiu em ${label}`,
+          corpo: `Pelo esforço próprio, ${f.nome} ${marco} em ${label} (${novoVal}/${alvo.cap}).`,
           tipo: 'estudo_marco', lida: false, criado_em: new Date().toISOString(),
         }));
       }
@@ -889,21 +912,6 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
       await _perfis.atribuirProfileIdJogador(db, uid);
     } catch (e) {
       logger.warn('[PROFILE_ID] Erro ao atribuir profile_id:', e.message);
-    }
-  }
-
-  const mesAtualJogador = j.mes_pessoal !== undefined ? j.mes_pessoal : 0;
-  if (mesAtualJogador === 0 && j.janeiro_bloqueado_ate) {
-    const bloqueadoAte = new Date(j.janeiro_bloqueado_ate).getTime();
-    const agora        = Date.now();
-    if (agora < bloqueadoAte) {
-      const restanteMs  = bloqueadoAte - agora;
-      const restanteMin = Math.ceil(restanteMs / 60000);
-      const restanteH   = Math.floor(restanteMin / 60);
-      const restanteM   = restanteMin % 60;
-      const textoEspera = restanteH > 0 ? restanteH + 'h ' + restanteM + 'min' : restanteMin + ' minutos';
-      throw new HttpsError('resource-exhausted',
-        'Ferias de janeiro! Descanse e volte em ' + textoEspera + '.');
     }
   }
 
@@ -1253,8 +1261,9 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
   updates.disposicao   = disposicao;
 
   if (isJaneiro) {
-    const desbloqueioTs = new Date(Date.now() + COOLDOWN_JANEIRO_MIN * 60 * 1000).toISOString();
-    updates.janeiro_bloqueado_ate = desbloqueioTs;
+    // Trava de 1h real removida — o mês só avança por ação do jogador
+    // (em breve isso vai virar 1 mês/dia automático, então não faz
+    // sentido também travar janeiro atrás de um cooldown de relógio).
     const wA = j.wins_ano || 0, lA = j.losses_ano || 0, tot = wA + lA;
     if (tot > 0 && j.escritorio_id !== 'solo') {
       const pct  = Math.round(wA / tot * 100);
