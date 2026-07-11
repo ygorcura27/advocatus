@@ -55,7 +55,9 @@ service cloud.firestore {
     // CONFIG DO SERVIDOR (somente leitura para jogadores)
     // ══════════════════════════════════════════════════════
     match /config/{doc} {
-      allow read: if isAuth();
+      // server_secret alimenta o RNG determinístico de aposentadoria de NPC
+      // (functions/npc/cicloDeVida.js) — nunca pode ser lido pelo cliente.
+      allow read: if isAuth() && doc != 'server_secret';
       allow write: if false; // somente Cloud Functions escrevem aqui
     }
 

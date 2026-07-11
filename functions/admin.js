@@ -600,6 +600,16 @@ exports.adminAction = onCall({ region: 'southamerica-east1' }, async (request) =
       };
     }
 
+    // ════════════════════════════════════════════════════
+    // NPCs ADVERSÁRIOS (GDD v5.3/v5.10 — seed de advogados/procuradores/promotores)
+    // ════════════════════════════════════════════════════
+
+    case 'npc_seed': {
+      const { rodarSeedNPCs } = require('./npc/orquestracao');
+      const resumos = await rodarSeedNPCs(db);
+      return { ok: true, resumos };
+    }
+
     default:
       throw new HttpsError('invalid-argument', `Ação desconhecida: ${acao}`);
   }

@@ -23,6 +23,7 @@ const { processarPremiosAnuais, zerarContadoresAnuais } = require('./premios_anu
 const { processarImprensaMensal } = require('./imprensa');
 const { sortearTemaEGerarConvites } = require('./podcasts_social');
 const { processarApodrecimentoFavores } = require('./investigacao');
+const { processarTickMensalNPC } = require('./npc/orquestracao');
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -214,6 +215,19 @@ exports.tickMensal = onSchedule({
     await processarApodrecimentoFavores(db);
   } catch (e) {
     logger.error('[FAVORES] Falha ao processar apodrecimento:', e.message);
+  }
+
+  // ── 9. NPCs adversários — ciclo de vida, distribuição mínima, finalização
+  //      de petições (GDD v5.3/v5.10 — aposentadoria+reposição, catálogo) ──
+  try {
+    const resultadoNPC = await processarTickMensalNPC(db);
+    logger.info(
+      `[NPC_TICK] ${resultadoNPC.finalizadas.length} NPC(s) com petições finalizadas, ` +
+      `${resultadoNPC.ciclosDeVida.reduce((s, c) => s + c.eventos.length, 0)} aposentadoria(s), ` +
+      `${resultadoNPC.distribuicoes.reduce((s, d) => s + d.repostos.length, 0)} reposição(ões) de iniciante`,
+    );
+  } catch (e) {
+    logger.error('[NPC_TICK] Falha no processamento mensal de NPCs:', e);
   }
 
   logger.info('[TICK] Tick mensal concluído');
