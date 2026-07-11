@@ -29,7 +29,19 @@
  * jogadores (fundador_uid/socios_uids). São diferenciados pelo campo
  * `e_npc: true` e usam IDs próprios (npc_esc_{reservaId}) — nenhuma leitura
  * do jogo faz .get() sem filtro em toda a coleção, então não colidem.
+ *
+ * CORREÇÃO (pós-deploy v5.10): o claim global podia ficar órfão para sempre.
+ * Se o vencedor reivindicasse /reservas_npc/{reservaId} (status 'claiming')
+ * e crashasse antes de chegar a 'completed' (ex.: erro no passo seguinte),
+ * nenhuma execução futura tinha como saber que o vencedor original morreu —
+ * toda tentativa nova via `doc.exists` e desistia, achando que outra
+ * execução ainda estava em andamento. Agora um claim 'claiming' mais velho
+ * que CLAIM_STALE_MS é tratado como órfão e reivindicado de novo. Isso é
+ * seguro porque _reservarVagaEmCandidato() já é idempotente por reservaId
+ * (verifica o marcador local antes de decrementar qualquer vaga) — retomar
+ * não duplica reserva nenhuma, só reexecuta a busca de escritório.
  */
+const CLAIM_STALE_MS = 30000;
 
 async function vincularEscritorioNPC(db, jurisdicao, tiersElegiveis, tickAtualFn, reservaId) {
   if (!reservaId) {
@@ -51,18 +63,27 @@ async function vincularEscritorioNPC(db, jurisdicao, tiersElegiveis, tickAtualFn
   }
 
   // ── 2. Reivindicar o claim global atomicamente ──
-  // Apenas o vencedor avança para a busca de escritório candidato.
+  // Apenas o vencedor avança para a busca de escritório candidato. Um claim
+  // 'claiming' mais velho que CLAIM_STALE_MS é considerado órfão (vencedor
+  // original crashou) e pode ser reivindicado de novo.
   const venceuGlobal = await db.runTransaction(async (tx) => {
     const doc = await tx.get(globalReservaRef);
-    if (doc.exists) return false; // outra execução chegou primeiro
-    tx.set(globalReservaRef, {
-      reserva_id: reservaId,
-      status: 'claiming',
-      escritorio_id: null,
-      tier: null,
-      em: Date.now(),
-    });
-    return true;
+    if (!doc.exists) {
+      tx.set(globalReservaRef, {
+        reserva_id: reservaId,
+        status: 'claiming',
+        escritorio_id: null,
+        tier: null,
+        em: Date.now(),
+      });
+      return true;
+    }
+    const dados = doc.data();
+    if (dados.status === 'claiming' && (Date.now() - dados.em) > CLAIM_STALE_MS) {
+      tx.update(globalReservaRef, { em: Date.now() }); // renova a posse do claim
+      return true;
+    }
+    return false; // outra execução tem o claim e ainda está dentro do prazo
   });
 
   if (!venceuGlobal) {
@@ -74,7 +95,8 @@ async function vincularEscritorioNPC(db, jurisdicao, tiersElegiveis, tickAtualFn
     }
     throw new Error(
       `vincularEscritorioNPC: concorrência no claim global de reservaId="${reservaId}". ` +
-      `O vencedor ainda não concluiu a reserva. Reprocesse o slot para retomar.`,
+      `O vencedor ainda não concluiu a reserva (claim com menos de ${CLAIM_STALE_MS}ms). ` +
+      `Reprocesse o slot para retomar.`,
     );
   }
 

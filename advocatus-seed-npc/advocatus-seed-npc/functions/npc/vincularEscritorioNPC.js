@@ -24,7 +24,14 @@
  * Compatibilidade retroativa: se /reservas_npc/{reservaId} já existir com
  * escritorio_id gravado (tentativa anterior completa ou parcial), a função
  * devolve esse escritório sem tentar candidatos novos.
+ *
+ * CORREÇÃO (pós-deploy v5.10): o claim global podia ficar órfão para sempre
+ * se o vencedor crashasse entre reivindicar (status 'claiming') e concluir
+ * (status 'completed'). Um claim 'claiming' mais velho que CLAIM_STALE_MS é
+ * tratado como órfão e reivindicado de novo — seguro porque
+ * _reservarVagaEmCandidato() já é idempotente por reservaId.
  */
+const CLAIM_STALE_MS = 30000;
 
 async function vincularEscritorioNPC(db, jurisdicao, tiersElegiveis, tickAtualFn, reservaId) {
   if (!reservaId) {
@@ -49,15 +56,22 @@ async function vincularEscritorioNPC(db, jurisdicao, tiersElegiveis, tickAtualFn
   // Apenas o vencedor avança para a busca de escritório candidato.
   const venceuGlobal = await db.runTransaction(async (tx) => {
     const doc = await tx.get(globalReservaRef);
-    if (doc.exists) return false; // outra execução chegou primeiro
-    tx.set(globalReservaRef, {
-      reserva_id: reservaId,
-      status: 'claiming',
-      escritorio_id: null,
-      tier: null,
-      em: Date.now(),
-    });
-    return true;
+    if (!doc.exists) {
+      tx.set(globalReservaRef, {
+        reserva_id: reservaId,
+        status: 'claiming',
+        escritorio_id: null,
+        tier: null,
+        em: Date.now(),
+      });
+      return true;
+    }
+    const dados = doc.data();
+    if (dados.status === 'claiming' && (Date.now() - dados.em) > CLAIM_STALE_MS) {
+      tx.update(globalReservaRef, { em: Date.now() }); // claim órfão — renova a posse
+      return true;
+    }
+    return false; // outra execução tem o claim e ainda está dentro do prazo
   });
 
   if (!venceuGlobal) {
@@ -72,7 +86,8 @@ async function vincularEscritorioNPC(db, jurisdicao, tiersElegiveis, tickAtualFn
     }
     throw new Error(
       `vincularEscritorioNPC: concorrência no claim global de reservaId="${reservaId}". ` +
-      `O vencedor ainda não concluiu a reserva. Reprocesse o slot para retomar.`,
+      `O vencedor ainda não concluiu a reserva (claim com menos de ${CLAIM_STALE_MS}ms). ` +
+      `Reprocesse o slot para retomar.`,
     );
   }
 
