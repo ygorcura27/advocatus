@@ -23,6 +23,7 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { logger }             = require('firebase-functions');
+const { nomeAutorPeca }      = require('./shared/autorPeca');
 
 const VEICULOS = {
   supreme_wire:    { label: 'Supreme Wire',       foco: 'decisoes_superiores' },
@@ -151,7 +152,7 @@ async function processarImprensaMensal(db, mesGlobal) {
         .limit(1).get();
       if (!jaPublicou.empty) continue;
 
-      const nomeJogador = await _nomeJogador(db, p.jogador_uid);
+      const nomeJogador = await nomeAutorPeca(db, p);
       const tpl = _sortear(MANCHETES_FAMA_PETICAO);
       const manchete = _manchete(tpl, {
         titulo: p.titulo || 'petição',
@@ -222,14 +223,6 @@ async function processarImprensaMensal(db, mesGlobal) {
   } catch (e) {
     logger.warn('[IMPRENSA] Erro ao processar reputação alta:', e.message);
   }
-}
-
-async function _nomeJogador(db, uid) {
-  if (!uid) return 'Advogado';
-  try {
-    const snap = await db.collection('jogadores').doc(uid).get();
-    return snap.exists ? (snap.data().nome_personagem || snap.data().nome || 'Advogado') : 'Advogado';
-  } catch { return 'Advogado'; }
 }
 
 module.exports = {
