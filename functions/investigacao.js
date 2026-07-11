@@ -205,7 +205,7 @@ exports.iniciarCasoInvestigativo = onCall({ region: 'southamerica-east1' }, asyn
     turnos_usados: 0,
     dia: 1,
     periodo: PERIODOS[0],
-    nos: gerarGrafoDeNos(),
+    nos: gerarGrafoDeNos(p),
     intuicao_usos_restantes: sk.usosIntuicaoPorCaso(skJur.perfil_comportamental),
     favores_reservados: [],
     mao_evidencias: [],
