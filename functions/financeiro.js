@@ -122,7 +122,9 @@ exports.contratarLinhaCredito = onCall({ region: 'southamerica-east1' }, async (
   if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
   const uid = request.auth.uid;
   const { valor, nonce } = request.data || {};
-  if (!valor || valor <= 0) throw new HttpsError('invalid-argument', 'Valor inválido.');
+  if (typeof valor !== 'number' || !Number.isFinite(valor) || valor <= 0) {
+    throw new HttpsError('invalid-argument', 'Valor inválido.');
+  }
 
   const db = getFirestore();
   return comIdempotencia(db, { uid, nonce, acao: 'contratarLinhaCredito' }, async () => {
@@ -162,6 +164,14 @@ exports.pagarLinhaCredito = onCall({ region: 'southamerica-east1' }, async (requ
   if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
   const uid = request.auth.uid;
   const { valor, nonce } = request.data || {};
+  // valor é opcional (omitido = quita o saldo inteiro), mas se enviado
+  // precisa ser positivo — um valor negativo aqui creditava dinheiro E
+  // aumentava o saldo devedor ao mesmo tempo (Math.min(negativo, saldo)
+  // sempre escolhe o negativo, e saldo - negativo = saldo + |negativo|).
+  if (valor !== undefined && valor !== null &&
+      (typeof valor !== 'number' || !Number.isFinite(valor) || valor <= 0)) {
+    throw new HttpsError('invalid-argument', 'Valor inválido.');
+  }
 
   const db = getFirestore();
   return comIdempotencia(db, { uid, nonce, acao: 'pagarLinhaCredito' }, async () => {
@@ -250,7 +260,9 @@ exports.aplicarInvestimento = onCall({ region: 'southamerica-east1' }, async (re
   if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
   const uid = request.auth.uid;
   const { tipo, valor, subtipo, firma_id, nonce } = request.data || {};
-  if (!tipo || !valor || valor <= 0) throw new HttpsError('invalid-argument', 'tipo e valor são obrigatórios.');
+  if (!tipo || typeof valor !== 'number' || !Number.isFinite(valor) || valor <= 0) {
+    throw new HttpsError('invalid-argument', 'tipo e valor são obrigatórios.');
+  }
 
   const db      = getFirestore();
   return comIdempotencia(db, { uid, nonce, acao: 'aplicarInvestimento' }, async () => {
