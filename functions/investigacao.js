@@ -139,8 +139,12 @@ function _entrevistaDeclaracoes(p) {
   // vez de 3 e `ordem` (sempre um shuffle de 3 posições) aponta pra um
   // índice inexistente — undefined quebra o update() do Firestore.
   const base = [...fatos, ..._FALLBACKS_DECLARACAO].slice(0, 2);
-  const declaracoesReais = base.map(f => `Posso confirmar: ${f.charAt(0).toLowerCase()}${f.slice(1)}`);
-  const todas = [...declaracoesReais, pick(FILLERS_EVASIVOS)];
+  // As 3 declarações levam o MESMO prefixo "Posso confirmar:" — se só as
+  // reais tivessem prefixo, a evasiva ficaria óbvia pelo formato, sem
+  // precisar ler o conteúdo (bug de design apontado em produção).
+  const formatar = (f) => `Posso confirmar: ${f.charAt(0).toLowerCase()}${f.slice(1)}`;
+  const declaracoesReais = base.map(formatar);
+  const todas = [...declaracoesReais, formatar(pick(FILLERS_EVASIVOS))];
   const ordem = _embaralhar(3);
   const declaracoes = ordem.map(i => todas[i]);
   return { declaracoes, evasiva: ordem.indexOf(2) };
