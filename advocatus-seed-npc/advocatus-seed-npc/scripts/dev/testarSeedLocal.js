@@ -36,14 +36,17 @@ async function avancarTick(db, n = 1) {
 // confeccionarPecaSincrona: stub que só registra a chamada e devolve uma
 // peça mínima — no projeto real, troque pela função de confecção do v5.1.
 let contadorPecas = 0;
-async function confeccionarPecaSincrona({ autor_uid, tipo_peticao, ramo_direito, estilo_escrita, tese_central }) {
+async function confeccionarPecaSincrona({ db, id_determinista, autor_uid, tipo_peticao, ramo_direito, estilo_escrita, tese_central }) {
   contadorPecas += 1;
-  return {
-    id: `peca_${contadorPecas}`,
+  const peca = {
+    id: id_determinista,
     autor_uid, tipo_peticao, ramo_direito, estilo_escrita, tese_central,
     nota_teto: 10 + Math.floor(Math.random() * 16), // 10–25, só para o teste ter variação
     popularidade: 0,
   };
+  // ADAPTER OBRIGATÓRIO (v5.10): persistir usando id_determinista como doc ID.
+  await db.collection('peticoes').doc(id_determinista).set(peca);
+  return peca;
 }
 
 // poolTeses: stub mínimo por ramo — no projeto real, aponte para POOL_TESES (v5.1 §20).
@@ -63,6 +66,9 @@ async function main() {
   // (GDD v5.1 Parte XI): /contadores/personagens precisa existir antes do
   // primeiro gerarProximoId(). No projeto real isso já está feito.
   await db.collection('contadores').doc('personagens').set({ proximo_id: 1000000 });
+
+  // P1.3 (v5.10): RNG determinístico de aposentadoria exige /config/server_secret.
+  await db.collection('config').doc('server_secret').set({ secret: 'chave-de-teste-nao-usar-em-producao' });
 
   console.log('== 1. Rodando seedAdvogadosNPC (1ª execução) ==');
   const resumo = await seedAdvogadosNPC({ db, jurisdicao, confeccionarPecaSincrona, poolTeses, tickAtualFn });

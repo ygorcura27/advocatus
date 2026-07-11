@@ -41,11 +41,17 @@ async function testeErroTransitorioRetomado() {
   const tipo      = 'inicial';
   const idPeca    = idPecaEssencial(profileId, area, tipo);
 
-  let chamadas = 0;
+  // Contagem por peça (id_determinista), não um total global — 'civil' tem
+  // mais de um tipo essencial (inicial, contestacao) e cada um deve ser
+  // confeccionado no máximo 1x, exceto 'inicial' que sofre o erro
+  // transitório e por isso é chamado 2x (falha + retry bem-sucedido).
+  let chamadasTotais = 0;
+  const chamadasPorPeca = {};
   function confeccionarComErroTransitorio({ db: _db, id_determinista }) {
-    chamadas++;
-    if (chamadas === 1) throw new Error('Erro transitório simulado na primeira chamada');
-    // Segunda chamada: sucesso.
+    chamadasTotais++;
+    chamadasPorPeca[id_determinista] = (chamadasPorPeca[id_determinista] || 0) + 1;
+    if (chamadasTotais === 1) throw new Error('Erro transitório simulado na primeira chamada');
+    // Demais chamadas: sucesso.
     _db._dados['peticoes'] = _db._dados['peticoes'] || {};
     _db._dados['peticoes'][id_determinista] = { id: id_determinista };
     return Promise.resolve({ id: id_determinista });
@@ -81,7 +87,19 @@ async function testeErroTransitorioRetomado() {
   const claimFinal = db._dados['peticoes_claims'][idPeca];
   assert(claimFinal && claimFinal.status === 'completed', 'Claim marcado como completed após retry');
 
-  assert(chamadas === 2, `confeccionarPecaSincrona chamada exatamente 2 vezes (foi: ${chamadas})`);
+  assert(
+    chamadasPorPeca[idPeca] === 2,
+    `confeccionarPecaSincrona chamada exatamente 2 vezes para a peça que sofreu o erro transitório (foi: ${chamadasPorPeca[idPeca]})`,
+  );
+
+  const idPecaContestacao = idPecaEssencial(profileId, area, 'contestacao');
+  assert(
+    chamadasPorPeca[idPecaContestacao] === 1,
+    `confeccionarPecaSincrona chamada exatamente 1 vez para a peça não afetada pelo erro (foi: ${chamadasPorPeca[idPecaContestacao]})`,
+  );
+
+  const totalPecasDistintas = Object.keys(chamadasPorPeca).length;
+  assert(totalPecasDistintas === 2, `exatamente 2 peças distintas confeccionadas nesta run (foram: ${totalPecasDistintas})`);
 }
 
 // ── Teste 2: erro no adapter que não lança mas não persiste ───────────────────

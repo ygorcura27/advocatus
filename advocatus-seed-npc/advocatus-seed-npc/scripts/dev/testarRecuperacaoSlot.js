@@ -38,16 +38,13 @@ async function main() {
   let contadorPecas = 0;
   async function confeccionarPecaSincrona(dados) {
     contadorPecas += 1;
-    const id = `peca_${dados.autor_uid}_${dados.ramo_direito}_${dados.tipo_peticao}`;
+    // ADAPTER OBRIGATÓRIO (v5.10): deve persistir usando id_determinista como doc ID.
+    const id = dados.id_determinista;
     await db.collection('peticoes').doc(id).set({
       id, autor_uid: dados.autor_uid, ramo_direito: dados.ramo_direito,
       tipo_peticao: dados.tipo_peticao, nota_teto: 15, popularidade: 0,
     });
     return { id, nota_teto: 15, popularidade: 0 };
-  }
-  async function pecaJaExiste(profileId, area, tipo) {
-    const doc = await db.collection('peticoes').doc(`peca_${profileId}_${area}_${tipo}`).get();
-    return doc.exists;
   }
   const poolTeses = {
     civil: ['tese_a'], employment: ['tese_b'], empresarial: ['tese_c'],
@@ -56,7 +53,7 @@ async function main() {
 
   const paramsBase = {
     db, jurisdicao: 'circuit_1', sub: 'advogado', skillMin: 6, skillMax: 12, tiers: [1],
-    confeccionarPecaSincrona, poolTeses, tickAtualFn, pecaJaExiste,
+    confeccionarPecaSincrona, poolTeses, tickAtualFn,
   };
 
   console.log('== CENÁRIO A: crash DEPOIS do perfil ficar READY, ANTES de marcar o slot completed ==');
