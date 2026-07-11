@@ -127,7 +127,7 @@ window.renderCarreiraProgressao = function(j, el) {
                     + (sk.argumentation||0)*0.25 + (sk.procedure||0)*0.15).toFixed(1);
       const pronto = parseFloat(score) >= 20; // preview: sugere ir estudar se baixo
       return `
-    <div class="card" style="border-color:rgba(184,146,42,.4)">
+    <div class="card" style="border-color:rgba(176,138,78,.4)">
       <div class="card-titulo">📋 Exame OAB <span style="font-size:.72rem;color:var(--ardosia2)">(GDD v4.1 — baseado em skills)</span></div>
       <div class="card-sub" style="margin-bottom:.5rem">
         Score estimado: <b>${score}/50</b> · Aprovação: 32,5

@@ -661,7 +661,7 @@ window._abrirDesignarParaFunc = async function(escId, funcId, cargoId, container
     }).join('');
 
     const avisoSobrecarga = npcSobrecarregado
-      ? `<div style="font-size:.68rem;color:var(--amber);background:rgba(184,146,42,.1);border-radius:4px;padding:.3rem .5rem;margin-bottom:.4rem">
+      ? `<div style="font-size:.68rem;color:var(--amber);background:rgba(176,138,78,.1);border-radius:4px;padding:.3rem .5rem;margin-bottom:.4rem">
            ⚠️ Funcionário sobrecarregado (${npcEnergiaDisp} NPC⚡ restantes). Designar pode causar burnout.
          </div>`
       : `<div style="font-size:.63rem;color:var(--txt4);margin-bottom:.3rem">Capacidade NPC: ${npcEnergiaDisp}/${NPC_ENERGIA_MES}⚡</div>`;

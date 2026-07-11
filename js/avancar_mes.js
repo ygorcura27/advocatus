@@ -51,7 +51,7 @@ function _renderBlocoFerias(disponivel, pct, corBarra, bloqueadoAte, energiaTota
     <div class="energia-bar-wrap" style="margin-bottom:.6rem">
       <div class="energia-bar-fill" style="width:${pct}%;background:linear-gradient(90deg,${corBarra}88,${corBarra})"></div>
     </div>
-    <div style="background:rgba(184,146,42,.08);border:1px solid rgba(184,146,42,.25);border-radius:2px;padding:.75rem;text-align:center;margin-bottom:.5rem">
+    <div style="background:rgba(176,138,78,.08);border:1px solid rgba(176,138,78,.25);border-radius:2px;padding:.75rem;text-align:center;margin-bottom:.5rem">
       <div style="font-size:1.4rem;margin-bottom:.25rem">🏖️</div>
       <div style="font-size:.78rem;font-weight:600;color:var(--ouro2);margin-bottom:.2rem">Recesso de Janeiro</div>
       <div style="font-size:.68rem;color:var(--ardosia2);margin-bottom:.5rem">Tribunais fechados. Descanse antes de avançar para Fevereiro.</div>

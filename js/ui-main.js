@@ -1696,7 +1696,7 @@ function _mostrarModalRecesso(j) {
         <div style="font-weight:600;font-size:.85rem;color:var(--perg);margin:.2rem 0">Descansar</div>
         <div style="font-size:.7rem;color:var(--ardosia2)">Gratuito<br>+5 Saúde Mental</div>
       </div>
-      <div onclick="window.recessoEscolha('networking')" style="background:rgba(184,146,42,.06);border:var(--borda);border-radius:2px;padding:.9rem;text-align:center;cursor:pointer">
+      <div onclick="window.recessoEscolha('networking')" style="background:rgba(176,138,78,.06);border:var(--borda);border-radius:2px;padding:.9rem;text-align:center;cursor:pointer">
         <div style="font-size:1.6rem">🍷</div>
         <div style="font-weight:600;font-size:.85rem;color:var(--perg);margin:.2rem 0">Networking</div>
         <div style="font-size:.7rem;color:var(--ardosia2)">Custo: R$1.500<br>+3 rep · +10 Networking</div>

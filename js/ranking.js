@@ -92,7 +92,7 @@ async function _carregarRanking(tipo, j) {
         minhaPos.style.display = '';
         minhaPos.innerHTML = `
           <div style="font-size:.72rem;color:var(--ardosia2);margin-bottom:.4rem">Sua posição:</div>
-          <div style="background:rgba(184,146,42,.08);border:var(--borda);border-radius:2px;padding:.6rem">
+          <div style="background:rgba(176,138,78,.08);border:var(--borda);border-radius:2px;padding:.6rem">
             ${_linhaRanking(eu, tipo, true)}
           </div>`;
       } else if (minhaPos) {
