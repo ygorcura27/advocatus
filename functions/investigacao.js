@@ -126,9 +126,19 @@ function _periciaValor(p) {
   return { opcoes, certa: ordem.indexOf(0) };
 }
 
+const _FALLBACKS_DECLARACAO = [
+  'O restante do procedimento seguiu dentro do esperado.',
+  'Não há mais detalhes registrados além do que já consta nos autos.',
+];
+
 function _entrevistaDeclaracoes(p) {
   const fatos = (p.fatos_narrativa || []).filter(Boolean);
-  const base = fatos.length >= 2 ? fatos.slice(0, 2) : [...fatos, 'O restante do procedimento seguiu dentro do esperado.'].slice(0, 2);
+  // Sempre exatamente 2 — processos sem fatos_narrativa (ex.: casos
+  // automáticos de oportunidade, avancar_mes.js) não podem deixar `base`
+  // com 1 elemento só, senão `todas` (linha abaixo) fica com 2 itens em
+  // vez de 3 e `ordem` (sempre um shuffle de 3 posições) aponta pra um
+  // índice inexistente — undefined quebra o update() do Firestore.
+  const base = [...fatos, ..._FALLBACKS_DECLARACAO].slice(0, 2);
   const declaracoesReais = base.map(f => `Posso confirmar: ${f.charAt(0).toLowerCase()}${f.slice(1)}`);
   const todas = [...declaracoesReais, pick(FILLERS_EVASIVOS)];
   const ordem = _embaralhar(3);
