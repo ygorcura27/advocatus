@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Advocatus Online</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400;1,9..40,600&family=Playfair+Display:ital,wght@0,700;1,400;1,600&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:ital,wght@0,400;0,600;0,700;1,400;1,600&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,600&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 <style>
 /* ── Estilos específicos da tela de entrada ── */
@@ -33,15 +33,15 @@ body { background: var(--couro); overflow: hidden; }
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse at 30% 40%, rgba(184,146,42,.08) 0%, transparent 60%),
-    radial-gradient(ellipse at 70% 70%, rgba(184,146,42,.05) 0%, transparent 50%);
+    radial-gradient(ellipse at 30% 40%, rgba(22,214,168,.08) 0%, transparent 60%),
+    radial-gradient(ellipse at 70% 70%, rgba(176,138,78,.06) 0%, transparent 50%);
 }
 .entrada-visual-logo {
   position: relative;
   text-align: center;
 }
 .entrada-visual-logo .marca {
-  font-family: 'Playfair Display', serif;
+  font-family: var(--font-serif);
   font-size: clamp(2.5rem, 5vw, 4.5rem);
   font-weight: 900;
   color: var(--perg);
@@ -104,7 +104,7 @@ body { background: var(--couro); overflow: hidden; }
 /* Painel direito — formulários */
 .entrada-painel {
   background: var(--couro);
-  border-left: 1px solid rgba(184,146,42,.15);
+  border-left: 1px solid rgba(176,138,78,.15);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -159,7 +159,7 @@ body { background: var(--couro); overflow: hidden; }
 .login-divider::before, .login-divider::after {
   content: '';
   flex: 1; height: 1px;
-  background: rgba(184,146,42,.15);
+  background: rgba(176,138,78,.15);
 }
 .login-disclaimer {
   font-size: .68rem;
@@ -207,7 +207,7 @@ body { background: var(--couro); overflow: hidden; }
 }
 .criacao-progresso-fill {
   height: 100%;
-  background: var(--ouro2);
+  background: var(--navy3);
   border-radius: 2px;
   transition: width .3s ease;
 }
@@ -225,7 +225,7 @@ body { background: var(--couro); overflow: hidden; }
 .criacao-footer .btn-prim { flex: 1; margin-top: 0; }
 .btn-sec-criacao {
   background: transparent;
-  border: 1px solid rgba(184,146,42,.3);
+  border: 1px solid rgba(176,138,78,.3);
   color: var(--ardosia2);
   padding: .82rem 1.1rem;
   border-radius: 2px;
@@ -249,7 +249,7 @@ body { background: var(--couro); overflow: hidden; }
 .campo input, .campo select {
   width: 100%;
   background: rgba(255,255,255,.05);
-  border: 1px solid rgba(184,146,42,.2);
+  border: 1px solid rgba(176,138,78,.2);
   color: var(--perg);
   padding: .65rem .85rem;
   border-radius: 2px;
@@ -260,7 +260,7 @@ body { background: var(--couro); overflow: hidden; }
   -webkit-appearance: none;
 }
 .campo input:focus, .campo select:focus {
-  border-color: var(--ouro2);
+  border-color: var(--navy3);
   background: rgba(255,255,255,.07);
 }
 .campo select option { background: var(--couro2); color: var(--perg); }
@@ -274,7 +274,7 @@ body { background: var(--couro); overflow: hidden; }
   margin-bottom: 1.1rem;
 }
 .carreira-card {
-  border: 1px solid rgba(184,146,42,.2);
+  border: 1px solid rgba(176,138,78,.2);
   border-radius: 2px;
   padding: .8rem .7rem;
   cursor: pointer;
@@ -283,12 +283,12 @@ body { background: var(--couro); overflow: hidden; }
   background: rgba(255,255,255,.03);
 }
 .carreira-card:hover {
-  border-color: rgba(184,146,42,.5);
-  background: rgba(184,146,42,.06);
+  border-color: rgba(22,214,168,.5);
+  background: rgba(22,214,168,.06);
 }
 .carreira-card.selecionado {
-  border-color: var(--ouro2);
-  background: rgba(184,146,42,.12);
+  border-color: var(--navy3);
+  background: rgba(22,214,168,.12);
 }
 .carreira-card .ic { font-size: 1.4rem; display: block; margin-bottom: .3rem; }
 .carreira-card .nm { font-size: .76rem; font-weight: 600; color: var(--perg); }
@@ -297,8 +297,8 @@ body { background: var(--couro); overflow: hidden; }
 /* Info de carreira */
 #carreira-info {
   display: none;
-  background: rgba(184,146,42,.06);
-  border: 1px solid rgba(184,146,42,.2);
+  background: rgba(22,214,168,.06);
+  border: 1px solid rgba(22,214,168,.2);
   border-radius: 2px;
   padding: .75rem;
   margin-bottom: 1.1rem;
@@ -310,7 +310,7 @@ body { background: var(--couro); overflow: hidden; }
 /* Botão primário */
 .btn-prim {
   width: 100%;
-  background: var(--ouro2);
+  background: var(--navy3);
   color: var(--couro);
   border: none;
   padding: .82rem;
@@ -324,7 +324,7 @@ body { background: var(--couro); overflow: hidden; }
   transition: all .2s;
   margin-top: .5rem;
 }
-.btn-prim:hover { background: var(--ouro); }
+.btn-prim:hover { background: var(--navy4); }
 .btn-prim:disabled { opacity: .4; cursor: not-allowed; }
 
 /* Loading overlay */
@@ -341,14 +341,14 @@ body { background: var(--couro); overflow: hidden; }
 }
 #loading.vis { display: flex; }
 .loading-logo {
-  font-family: 'Playfair Display', serif;
+  font-family: var(--font-serif);
   font-size: 1.5rem;
   color: var(--ouro2);
 }
 .loading-spin {
   width: 24px; height: 24px;
-  border: 2px solid rgba(184,146,42,.2);
-  border-top-color: var(--ouro2);
+  border: 2px solid rgba(22,214,168,.2);
+  border-top-color: var(--navy3);
   border-radius: 50%;
   animation: spin .7s linear infinite;
 }
@@ -376,7 +376,7 @@ body { background: var(--couro); overflow: hidden; }
 .carreira-card:focus-visible,
 .campo input:focus-visible,
 .campo select:focus-visible {
-  outline: 2px solid var(--ouro2);
+  outline: 2px solid var(--navy3);
   outline-offset: 2px;
 }
 @media (prefers-reduced-motion: reduce) {

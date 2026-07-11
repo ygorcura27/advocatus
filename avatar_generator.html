@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avatar Generator - Advocatus Online</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .controls {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 1em;
+            font-family: inherit;
+        }
+        
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        button {
+            padding: 12px 24px;
+            font-size: 1em;
+            font-weight: 600;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+            grid-column: 1 / -1;
+        }
+        
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+        
+        .btn-secondary:hover {
+            background: #d0d0d0;
+        }
+        
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .avatar-item {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .avatar-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+        }
+        
+        .avatar-canvas {
+            width: 100%;
+            height: 150px;
+            display: block;
+            background: white;
+        }
+        
+        .avatar-info {
+            padding: 10px;
+            font-size: 0.85em;
+            color: #666;
+        }
+        
+        .avatar-id {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.3s ease;
+        }
+        
+        .status {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        
+        .status.show {
+            display: block;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .download-section {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .download-section h2 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .export-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        @media (max-width: 768px) {
+            .gallery {
+                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            }
+            
+            .button-group {
+                grid-template-columns: 1fr;
+            }
+            
+            .export-options {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎨 Avatar Generator</h1>
+            <p>Advocatus Online - Cartoon Character Generator</p>
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label for="apiKey">Chave API Anthropic:</label>
+                <input type="password" id="apiKey" placeholder="sk-ant-...">
+                <small style="color: #666; margin-top: 5px; display: block;">
+                    Sua chave é usada apenas localmente, nunca armazenada.
+                </small>
+            </div>
+            
+            <div class="status" id="status"></div>
+            
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress" style="width: 0%"></div>
+            </div>
+            
+            <div class="button-group">
+                <button class="btn-primary" id="generateBtn" onclick="generateAvatars()">
+                    🚀 Gerar 40 Avatares
+                </button>
+                <button class="btn-secondary" onclick="clearGallery()">
+                    🗑️  Limpar Galeria
+                </button>
+            </div>
+        </div>
+        
+        <div class="gallery" id="gallery"></div>
+        
+        <div class="download-section" id="downloadSection" style="display: none;">
+            <h2>📥 Exportar Avatares</h2>
+            <div class="export-options">
+                <button class="btn-secondary" onclick="downloadAsZip()">
+                    📦 Download ZIP (PNGs)
+                </button>
+                <button class="btn-secondary" onclick="downloadMapping()">
+                    📄 Download Mapping JSON
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://api.anthropic.com/v1/messages';
+        
+        let generatedAvatars = [];
+        
+        // Avatar drawing functions
+        const AvatarDrawer = {
+            drawAvatar(canvas, seed, traits) {
+                const ctx = canvas.getContext('2d');
+                const w = canvas.width;
+                const h = canvas.height;
+                
+                // Random seed
+                const random = this.seededRandom(seed);
+                
+                // Background
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, w, h);
+                
+                // Head
+                const headX = w / 2;
+                const headY = h * 0.35;
+                const headRadius = 40;
+                
+                ctx.fillStyle = this.skinColor(traits.ethnicity);
+                ctx.beginPath();
+                ctx.arc(headX, headY, headRadius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Eyes
+                const eyeY = headY - 10;
+                const eyeDistance = 15;
+                this.drawEye(ctx, headX - eyeDistance, eyeY, random);
+                this.drawEye(ctx, headX + eyeDistance, eyeY, random);
+                
+                // Nose
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(headX, eyeY + 5);
+                ctx.lineTo(headX, eyeY + 15);
+                ctx.stroke();
+                
+                // Mouth
+                ctx.beginPath();
+                ctx.arc(headX, headY + 15, 8, 0, Math.PI);
+                ctx.stroke();
+                
+                // Hair
+                this.drawHair(ctx, headX, headY, headRadius, traits.gender, random);
+                
+                // Body/Clothing
+                this.drawClothing(ctx, headX, headY + headRadius + 10, traits.style, random);
+                
+                // Glasses (optional)
+                if (traits.style.includes('oculos')) {
+                    this.drawGlasses(ctx, headX, eyeY);
+                }
+            },
+            
+            drawEye(ctx, x, y, random) {
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.arc(x, y, 4, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(x + 1.5, y - 1, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+            },
+            
+            drawHair(ctx, x, y, radius, gender, random) {
+                ctx.fillStyle = this.hairColor(random());
+                ctx.beginPath();
+                ctx.arc(x, y - radius, radius * 0.9, 0, Math.PI);
+                ctx.fill();
+                
+                if (gender === 'female') {
+                    ctx.fillRect(x - radius + 5, y, 10, 30);
+                    ctx.fillRect(x + radius - 15, y, 10, 30);
+                }
+            },
+            
+            drawClothing(ctx, x, y, style, random) {
+                const width = 60;
+                const height = 50;
+                
+                if (style.includes('blazer')) {
+                    ctx.fillStyle = this.clothingColor(random());
+                    ctx.fillRect(x - width / 2, y, width, height);
+                    
+                    // Lapels
+                    ctx.strokeStyle = '#000';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(x, y + 10);
+                    ctx.lineTo(x - width / 3, y + height / 2);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(x, y + 10);
+                    ctx.lineTo(x + width / 3, y + height / 2);
+                    ctx.stroke();
+                } else {
+                    ctx.fillStyle = this.clothingColor(random());
+                    ctx.fillRect(x - width / 2, y, width, height);
+                }
+                
+                // Neck
+                ctx.fillStyle = this.skinColor('universal');
+                ctx.fillRect(x - 8, y - 8, 16, 8);
+            },
+            
+            drawGlasses(ctx, x, y) {
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(x - 12, y, 8, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(x + 12, y, 8, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(x - 4, y);
+                ctx.lineTo(x + 4, y);
+                ctx.stroke();
+            },
+            
+            skinColor(ethnicity) {
+                const colors = {
+                    'branco': '#f4d4b8',
+                    'loiro': '#f4d4b8',
+                    'ruivo': '#f4d4b8',
+                    'negro': '#c99166',
+                    'asiatico': '#dba373',
+                    'arabe': '#d4a574',
+                    'universal': '#e8c4a0'
+                };
+                return colors[ethnicity] || colors.universal;
+            },
+            
+            hairColor(random) {
+                const colors = ['#2c1810', '#5c4a3d', '#d4a574', '#8b4513', '#a0522d'];
+                return colors[Math.floor(random * colors.length)];
+            },
+
+            clothingColor(random) {
+                const colors = ['#003d7a', '#8b0000', '#2c2c2c', '#4a7c4e', '#8b7355'];
+                return colors[Math.floor(random * colors.length)];
+            },
+            
+            seededRandom(seed) {
+                return function() {
+                    seed = (seed * 9301 + 49297) % 233280;
+                    return seed / 233280;
+                };
+            }
+        };
+        
+        function showStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status show ${type}`;
+        }
+        
+        function updateProgress(current, total) {
+            const percent = (current / total) * 100;
+            document.getElementById('progress').style.width = percent + '%';
+        }
+        
+        async function generateAvatars() {
+            const btn = document.getElementById('generateBtn');
+            btn.disabled = true;
+            
+            try {
+                showStatus('🔄 Gerando 40 avatares...', 'info');
+                
+                const avatarSpecs = [
+                    // HOMENS
+                    { id: 'H001', gender: 'male', age: 'jovem', ethnicity: 'branco', style: 'casual' },
+                    { id: 'H002', gender: 'male', age: 'adulto', ethnicity: 'branco', style: 'blazer' },
+                    { id: 'H003', gender: 'male', age: 'senior', ethnicity: 'branco', style: 'oculos' },
+                    { id: 'H004', gender: 'male', age: 'jovem', ethnicity: 'loiro', style: 'casual' },
+                    { id: 'H005', gender: 'male', age: 'adulto', ethnicity: 'loiro', style: 'blazer' },
+                    { id: 'H006', gender: 'male', age: 'senior', ethnicity: 'loiro', style: 'formal' },
+                    { id: 'H007', gender: 'male', age: 'jovem', ethnicity: 'ruivo', style: 'casual' },
+                    { id: 'H008', gender: 'male', age: 'adulto', ethnicity: 'ruivo', style: 'formal' },
+                    { id: 'H009', gender: 'male', age: 'jovem', ethnicity: 'negro', style: 'casual' },
+                    { id: 'H010', gender: 'male', age: 'adulto', ethnicity: 'negro', style: 'blazer' },
+                    { id: 'H011', gender: 'male', age: 'senior', ethnicity: 'negro', style: 'oculos' },
+                    { id: 'H012', gender: 'male', age: 'jovem', ethnicity: 'asiatico', style: 'casual' },
+                    { id: 'H013', gender: 'male', age: 'adulto', ethnicity: 'asiatico', style: 'blazer' },
+                    { id: 'H014', gender: 'male', age: 'jovem', ethnicity: 'arabe', style: 'formal' },
+                    { id: 'H015', gender: 'male', age: 'adulto', ethnicity: 'arabe', style: 'formal' },
+                    { id: 'H016', gender: 'male', age: 'jovem', ethnicity: 'branco', style: 'oculos' },
+                    { id: 'H017', gender: 'male', age: 'jovem', ethnicity: 'negro', style: 'blazer' },
+                    { id: 'H018', gender: 'male', age: 'senior', ethnicity: 'asiatico', style: 'formal' },
+                    { id: 'H019', gender: 'male', age: 'adulto', ethnicity: 'loiro', style: 'casual' },
+                    { id: 'H020', gender: 'male', age: 'adulto', ethnicity: 'branco', style: 'casual' },
+                    // MULHERES
+                    { id: 'M001', gender: 'female', age: 'jovem', ethnicity: 'branca', style: 'casual' },
+                    { id: 'M002', gender: 'female', age: 'adulto', ethnicity: 'branca', style: 'blazer' },
+                    { id: 'M003', gender: 'female', age: 'senior', ethnicity: 'branca', style: 'oculos' },
+                    { id: 'M004', gender: 'female', age: 'jovem', ethnicity: 'loira', style: 'casual' },
+                    { id: 'M005', gender: 'female', age: 'adulto', ethnicity: 'loira', style: 'blazer' },
+                    { id: 'M006', gender: 'female', age: 'senior', ethnicity: 'loira', style: 'formal' },
+                    { id: 'M007', gender: 'female', age: 'jovem', ethnicity: 'ruiva', style: 'casual' },
+                    { id: 'M008', gender: 'female', age: 'adulto', ethnicity: 'ruiva', style: 'formal' },
+                    { id: 'M009', gender: 'female', age: 'jovem', ethnicity: 'negra', style: 'casual' },
+                    { id: 'M010', gender: 'female', age: 'adulto', ethnicity: 'negra', style: 'blazer' },
+                    { id: 'M011', gender: 'female', age: 'senior', ethnicity: 'negra', style: 'oculos' },
+                    { id: 'M012', gender: 'female', age: 'jovem', ethnicity: 'asiatica', style: 'casual' },
+                    { id: 'M013', gender: 'female', age: 'adulto', ethnicity: 'asiatica', style: 'blazer' },
+                    { id: 'M014', gender: 'female', age: 'jovem', ethnicity: 'arabe', style: 'formal' },
+                    { id: 'M015', gender: 'female', age: 'adulto', ethnicity: 'arabe', style: 'formal' },
+                    { id: 'M016', gender: 'female', age: 'jovem', ethnicity: 'branca', style: 'oculos' },
+                    { id: 'M017', gender: 'female', age: 'jovem', ethnicity: 'negra', style: 'blazer' },
+                    { id: 'M018', gender: 'female', age: 'senior', ethnicity: 'asiatica', style: 'formal' },
+                    { id: 'M019', gender: 'female', age: 'adulto', ethnicity: 'loira', style: 'casual' },
+                    { id: 'M020', gender: 'female', age: 'adulto', ethnicity: 'branca', style: 'casual' }
+                ];
+                
+                generatedAvatars = [];
+                
+                for (let i = 0; i < avatarSpecs.length; i++) {
+                    const spec = avatarSpecs[i];
+                    updateProgress(i + 1, avatarSpecs.length);
+                    
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 256;
+                    canvas.height = 256;
+                    
+                    AvatarDrawer.drawAvatar(canvas, spec.id.charCodeAt(0) * 1000 + i, spec);
+                    
+                    generatedAvatars.push({
+                        id: spec.id,
+                        ...spec,
+                        dataUrl: canvas.toDataURL('image/png')
+                    });
+                    
+                    // Render in gallery
+                    renderAvatar(spec.id, spec, canvas.toDataURL('image/png'));
+                    
+                    // Rate limit
+                    await new Promise(r => setTimeout(r, 50));
+                }
+                
+                showStatus(`✅ ${generatedAvatars.length} avatares gerados com sucesso!`, 'success');
+                document.getElementById('downloadSection').style.display = 'block';
+                
+            } catch (error) {
+                showStatus(`❌ Erro: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+            }
+        }
+        
+        function renderAvatar(id, traits, dataUrl) {
+            const gallery = document.getElementById('gallery');
+            
+            const item = document.createElement('div');
+            item.className = 'avatar-item';
+            
+            const img = document.createElement('img');
+            img.className = 'avatar-canvas';
+            img.src = dataUrl;
+            
+            const info = document.createElement('div');
+            info.className = 'avatar-info';
+            info.innerHTML = `
+                <div class="avatar-id">${id}</div>
+                <div>${traits.gender === 'male' ? '👨' : '👩'} ${traits.ethnicity}</div>
+            `;
+            
+            item.appendChild(img);
+            item.appendChild(info);
+            gallery.appendChild(item);
+        }
+        
+        function clearGallery() {
+            document.getElementById('gallery').innerHTML = '';
+            generatedAvatars = [];
+            document.getElementById('downloadSection').style.display = 'none';
+        }
+        
+        function downloadAsZip() {
+            // Simulated: em produção usar JSZip library
+            showStatus('💾 Download simulado (use right-click > Save As na galeria)', 'info');
+            generatedAvatars.forEach(avatar => {
+                const a = document.createElement('a');
+                a.href = avatar.dataUrl;
+                a.download = `${avatar.id}_${avatar.ethnicity}.png`;
+                a.click();
+            });
+        }
+        
+        function downloadMapping() {
+            const mapping = {
+                avatars: {},
+                metadata: {
+                    totalAvatars: generatedAvatars.length,
+                    generatedDate: new Date().toISOString().split('T')[0],
+                    style: 'cartoon procedural',
+                    resolution: '256x256'
+                }
+            };
+            
+            generatedAvatars.forEach(avatar => {
+                mapping.avatars[avatar.id] = {
+                    id: avatar.id,
+                    gender: avatar.gender,
+                    age: avatar.age,
+                    ethnicity: avatar.ethnicity,
+                    style: avatar.style
+                };
+            });
+            
+            const a = document.createElement('a');
+            a.href = 'data:application/json,' + encodeURIComponent(JSON.stringify(mapping, null, 2));
+            a.download = 'avatar_mapping.json';
+            a.click();
+        }
+    </script>
+</body>
+</html>

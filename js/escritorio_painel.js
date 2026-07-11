@@ -46,7 +46,7 @@ window._svgNpcFallback = function(el, nome) {
 function _avatarSrc(func) {
   const nome = func.nome || func.name || '?';
   if (func.tipo === 'npc' && func.foto_npc) {
-    return `img/npcs%20escritorio/${func.foto_npc}`;
+    return `img/npcs%20cartoon/${func.foto_npc}`;
   }
   return _avatarSvg(nome);
 }

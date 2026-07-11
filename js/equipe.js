@@ -27,6 +27,59 @@ const CARGO_INFO = {
   snr: { l:'Advogado Sênior',    sal:9000,  hon_pct:0.10, acoes_mes:2, custo_coord:10, bonus_chance:12 },
 };
 
+// Avatares cartoon dos NPCs — arquivos em img/npcs cartoon/, gerados por
+// avatar_generator.html com os mesmos 40 specs (H001-H020, M001-M020).
+// Nome do arquivo: {ID}_{ETNIA}_{IDADE}_{ESTILO}.png (tudo maiúsculo).
+const NPC_CARTOON_SPECS = {
+  m: [
+    { id:'H001', ethnicity:'branco', age:'jovem',  style:'casual' },
+    { id:'H002', ethnicity:'branco', age:'adulto', style:'blazer' },
+    { id:'H003', ethnicity:'branco', age:'senior', style:'oculos' },
+    { id:'H004', ethnicity:'loiro',  age:'jovem',  style:'casual' },
+    { id:'H005', ethnicity:'loiro',  age:'adulto', style:'blazer' },
+    { id:'H006', ethnicity:'loiro',  age:'senior', style:'formal' },
+    { id:'H007', ethnicity:'ruivo',  age:'jovem',  style:'casual' },
+    { id:'H008', ethnicity:'ruivo',  age:'adulto', style:'formal' },
+    { id:'H009', ethnicity:'negro',  age:'jovem',  style:'casual' },
+    { id:'H010', ethnicity:'negro',  age:'adulto', style:'blazer' },
+    { id:'H011', ethnicity:'negro',  age:'senior', style:'oculos' },
+    { id:'H012', ethnicity:'asiatico', age:'jovem',  style:'casual' },
+    { id:'H013', ethnicity:'asiatico', age:'adulto', style:'blazer' },
+    { id:'H014', ethnicity:'arabe',  age:'jovem',  style:'formal' },
+    { id:'H015', ethnicity:'arabe',  age:'adulto', style:'formal' },
+    { id:'H016', ethnicity:'branco', age:'jovem',  style:'oculos' },
+    { id:'H017', ethnicity:'negro',  age:'jovem',  style:'blazer' },
+    { id:'H018', ethnicity:'asiatico', age:'senior', style:'formal' },
+    { id:'H019', ethnicity:'loiro',  age:'adulto', style:'casual' },
+    { id:'H020', ethnicity:'branco', age:'adulto', style:'casual' },
+  ],
+  f: [
+    { id:'M001', ethnicity:'branca', age:'jovem',  style:'casual' },
+    { id:'M002', ethnicity:'branca', age:'adulto', style:'blazer' },
+    { id:'M003', ethnicity:'branca', age:'senior', style:'oculos' },
+    { id:'M004', ethnicity:'loira',  age:'jovem',  style:'casual' },
+    { id:'M005', ethnicity:'loira',  age:'adulto', style:'blazer' },
+    { id:'M006', ethnicity:'loira',  age:'senior', style:'formal' },
+    { id:'M007', ethnicity:'ruiva',  age:'jovem',  style:'casual' },
+    { id:'M008', ethnicity:'ruiva',  age:'adulto', style:'formal' },
+    { id:'M009', ethnicity:'negra',  age:'jovem',  style:'casual' },
+    { id:'M010', ethnicity:'negra',  age:'adulto', style:'blazer' },
+    { id:'M011', ethnicity:'negra',  age:'senior', style:'oculos' },
+    { id:'M012', ethnicity:'asiatica', age:'jovem',  style:'casual' },
+    { id:'M013', ethnicity:'asiatica', age:'adulto', style:'blazer' },
+    { id:'M014', ethnicity:'arabe',  age:'jovem',  style:'formal' },
+    { id:'M015', ethnicity:'arabe',  age:'adulto', style:'formal' },
+    { id:'M016', ethnicity:'branca', age:'jovem',  style:'oculos' },
+    { id:'M017', ethnicity:'negra',  age:'jovem',  style:'blazer' },
+    { id:'M018', ethnicity:'asiatica', age:'senior', style:'formal' },
+    { id:'M019', ethnicity:'loira',  age:'adulto', style:'casual' },
+    { id:'M020', ethnicity:'branca', age:'adulto', style:'casual' },
+  ],
+};
+function _nomeArquivoCartoon(spec) {
+  return `${spec.id}_${spec.ethnicity.toUpperCase()}_${spec.age.toUpperCase()}_${spec.style.toUpperCase()}.png`;
+}
+
 // Capacidade por tier do escritório
 const TIER_CAPACIDADE = {
   1: { estagiarios:1, assistentes:1, advogados:0, custo_fixo:3500  },
@@ -385,7 +438,7 @@ function _cardFuncionario(f, escId, energiaDisp, procCount = {}, mesGlobal = 0) 
   const svgSrc = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='153' height='153'%3E%3Ccircle cx='76' cy='76' r='76' fill='%232E4270'/%3E%3Ctext x='76' y='96' font-size='36' font-weight='700' fill='%23C9A227' text-anchor='middle' font-family='DM Sans,Arial'%3E${ini}%3C/text%3E%3C/svg%3E`;
   const nomeEsc = f.nome.replace(/'/g, "\\'");
   const fotoHtml = (f.tipo === 'npc' && f.foto_npc)
-    ? `<img class="func-avatar" src="img/npcs%20escritorio/${f.foto_npc}" alt="${f.nome}" onerror="window._svgNpcFallback(this,'${nomeEsc}')">`
+    ? `<img class="func-avatar" src="img/npcs%20cartoon/${f.foto_npc}" alt="${f.nome}" onerror="window._svgNpcFallback(this,'${nomeEsc}')">`
     : `<img class="func-avatar" src="${svgSrc}" alt="${ini}">`;
 
   // Duas skills de maior valor viram barra — o resto fica no Perfil, sem perder o dado.
@@ -704,13 +757,12 @@ window._contratarNPC = async function(cargo_min, escId) {
   const sobrenome    = NOMES_NPC.sobrenomes[Math.floor(Math.random() * NOMES_NPC.sobrenomes.length)];
   const nome         = primeiroNome + ' ' + sobrenome;
 
-  // Atribuir foto única dentro deste escritório (1-20, sem repetir)
-  const prefixoFoto = sexo === 'm' ? 'foto_npc_homem_' : 'foto_npc_mulher_';
+  // Atribuir foto cartoon única dentro deste escritório (20 por sexo, sem repetir)
   let foto_npc = null;
   try {
     const fSnap = await getDocs(collection(db, 'escritorios', escId, 'funcionarios'));
     const fotosUsadas = new Set(fSnap.docs.map(d => d.data().foto_npc).filter(Boolean));
-    const pool = Array.from({length: 20}, (_, i) => `${prefixoFoto}${i+1}.png`).filter(f => !fotosUsadas.has(f));
+    const pool = NPC_CARTOON_SPECS[sexo].map(_nomeArquivoCartoon).filter(f => !fotosUsadas.has(f));
     if (pool.length > 0) foto_npc = pool[Math.floor(Math.random() * pool.length)];
   } catch(e) { /* segue sem foto */ }
 
