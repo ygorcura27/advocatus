@@ -1357,9 +1357,9 @@ function renderEquipe(j, el) {
         <div style="flex:1">
           <div style="font-weight:600;font-size:.88rem;color:var(--perg)">${e.nome}</div>
           <div style="font-size:.72rem;color:var(--ardosia2)">${e.fac||'—'} · <span style="color:var(--ouro2)">${_skLabel(e.sk_dest)}</span></div>
-          <div style="font-size:.68rem;color:#ffa726;margin-top:.2rem">Salário: ${fmt(e.sal||1700)}/mês</div>
-          <div style="height:3px;background:rgba(255,255,255,.07);border-radius:1px;overflow:hidden;margin-top:.35rem;width:120px">
-            <div style="height:100%;width:${e.desemp||60}%;background:var(--ouro2)"></div>
+          <div style="font-size:.68rem;color:var(--amber);margin-top:.2rem">Salário: ${fmt(e.sal||1700)}/mês</div>
+          <div class="skill-bar" style="margin-top:.35rem;width:120px">
+            <div class="skill-fill" style="width:${e.desemp||60}%"></div>
           </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:.3rem">
