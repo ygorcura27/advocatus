@@ -501,13 +501,21 @@ async function _processarMentoriaNPCsCF(db, escRef, fSnap, uid) {
 // ════════════════════════════════════════════════════════
 // PROCESSAMENTO MENSAL: CONFLITOS
 // ════════════════════════════════════════════════════════
-async function _processarConflitosNPCsCF(db, escRef, fSnap, mesGlobal, uid) {
+async function _processarConflitosNPCsCF(db, escRef, fSnap, mesGlobal, uid, gestorId) {
   const npcs = fSnap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }))
     .filter(f => f.tipo === 'npc' && !f.burnout_npc && !f.em_ferias);
   if (npcs.length < 2) return;
 
   const npcMap = {};
   for (const n of npcs) npcMap[n.id] = n;
+
+  // Amortecimento pela habilidade de Gestão do gestor — quanto melhor a
+  // gestão, menos desentendimentos novos surgem por mês. Sem gestor ou
+  // gestor com skill 0: sem amortecimento (fator 1). Skill 100 (cap
+  // máximo, cargo Sócio): corta a chance de novo conflito pela metade.
+  const gestor       = gestorId ? npcMap[gestorId] : null;
+  const gestaoSkill  = gestor ? ((gestor.skills || {}).gestao || 0) : 0;
+  const fatorGestor  = 1 - Math.min(100, gestaoSkill) / 200; // 1.0 → 0.5
 
   const proms = [], logs = [];
   const processados = new Set(); // evita double-process por par
@@ -597,7 +605,12 @@ async function _processarConflitosNPCsCF(db, escRef, fSnap, mesGlobal, uid) {
       const afinA    = (a.afinidade_com_npcs || {})[b.id] ?? 50;
       const afinB    = (b.afinidade_com_npcs || {})[a.id] ?? 50;
       const afinMedia = (afinA + afinB) / 2;
-      const chance   = afinMedia < 25 ? 0.15 : afinMedia > 60 ? 0.03 : 0.07;
+      // Taxas base reduzidas (eram 0.15/0.07/0.03 — gerava conflito demais
+      // em equipes grandes, já que o loop é por PAR: uma equipe de 20 tem
+      // 190 pares rolando por mês). fatorGestor amortece ainda mais com
+      // boa gestão (metade da chance no cap de skill).
+      const chanceBase = afinMedia < 25 ? 0.06 : afinMedia > 60 ? 0.012 : 0.03;
+      const chance     = chanceBase * fatorGestor;
       if (Math.random() > chance) continue;
 
       const c    = { com_id: b.id, com_nome: b.nome, tipo: 'leve', desde_mes_total: mesGlobal, em_mediacao: false };
@@ -2051,7 +2064,7 @@ async function _processarServicosMensalCF(db, uid, j) {
     const fSnapFresh = await escRef.collection('funcionarios').get();
     await _processarMentoriaNPCsCF(db, escRef, fSnapFresh, uid);
     await _processarEstudoNPCsCF(db, escRef, fSnapFresh, uid);
-    await _processarConflitosNPCsCF(db, escRef, fSnapFresh, esc.mes_global || 0, uid);
+    await _processarConflitosNPCsCF(db, escRef, fSnapFresh, esc.mes_global || 0, uid, esc.gestor_id);
     await _processarFeriasNPCsCF(db, escRef, fSnapFresh, esc.mes_global || 0, uid);
     await _verificarTurnoverNPCsCF(db, escRef, uid, fSnapFresh);
 
