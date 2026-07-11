@@ -105,6 +105,25 @@
         { "fieldPath": "devedor_npc_id", "order": "ASCENDING" },
         { "fieldPath": "status",         "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "escritorios",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "e_npc",                       "order": "ASCENDING" },
+        { "fieldPath": "jurisdicao",                  "order": "ASCENDING" },
+        { "fieldPath": "tier",                        "order": "ASCENDING" },
+        { "fieldPath": "vagas_advogado_disponiveis",  "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "escritorios",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "e_npc",                       "order": "ASCENDING" },
+        { "fieldPath": "jurisdicao",                  "order": "ASCENDING" },
+        { "fieldPath": "vagas_advogado_disponiveis",  "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [
