@@ -7,6 +7,7 @@
 
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { comIdempotencia } = require('./shared/nonce');
 
 // ════════════════════════════════════════════════════════
 // CONSTANTES ESTÁTICAS (espelhadas no frontend)
@@ -34,8 +35,10 @@ const _FIRMAS_NPC = [
 exports.anteciparHonorarios = onCall({ region: 'southamerica-east1' }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
   const uid = request.auth.uid;
+  const { nonce } = request.data || {};
   const db  = getFirestore();
 
+  return comIdempotencia(db, { uid, nonce, acao: 'anteciparHonorarios' }, async () => {
   const jogadorRef  = db.collection('jogadores').doc(uid);
   const jogadorSnap = await jogadorRef.get();
   if (!jogadorSnap.exists) throw new HttpsError('not-found', 'Jogador não encontrado.');
@@ -107,6 +110,7 @@ exports.anteciparHonorarios = onCall({ region: 'southamerica-east1' }, async (re
     valorLiquido,
     msg: `R$ ${valorLiquido.toLocaleString('pt-BR')} antecipados (desconto ${descPctDisplay}% sobre R$ ${maxAntecipavel.toLocaleString('pt-BR')}).`,
   };
+  });
 });
 
 // ════════════════════════════════════════════════════════
@@ -117,10 +121,11 @@ exports.anteciparHonorarios = onCall({ region: 'southamerica-east1' }, async (re
 exports.contratarLinhaCredito = onCall({ region: 'southamerica-east1' }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
   const uid = request.auth.uid;
-  const { valor } = request.data || {};
+  const { valor, nonce } = request.data || {};
   if (!valor || valor <= 0) throw new HttpsError('invalid-argument', 'Valor inválido.');
 
   const db = getFirestore();
+  return comIdempotencia(db, { uid, nonce, acao: 'contratarLinhaCredito' }, async () => {
   const jogadorRef  = db.collection('jogadores').doc(uid);
   const jogadorSnap = await jogadorRef.get();
   if (!jogadorSnap.exists) throw new HttpsError('not-found', 'Jogador não encontrado.');
@@ -147,6 +152,7 @@ exports.contratarLinhaCredito = onCall({ region: 'southamerica-east1' }, async (
   });
 
   return { ok: true, valor: valorEfetivo, saldoTotal: usadoAtual + valorEfetivo, teto };
+  });
 });
 
 // ════════════════════════════════════════════════════════
@@ -155,9 +161,10 @@ exports.contratarLinhaCredito = onCall({ region: 'southamerica-east1' }, async (
 exports.pagarLinhaCredito = onCall({ region: 'southamerica-east1' }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
   const uid = request.auth.uid;
-  const { valor } = request.data || {};
+  const { valor, nonce } = request.data || {};
 
   const db = getFirestore();
+  return comIdempotencia(db, { uid, nonce, acao: 'pagarLinhaCredito' }, async () => {
   const jogadorRef  = db.collection('jogadores').doc(uid);
   const jogadorSnap = await jogadorRef.get();
   if (!jogadorSnap.exists) throw new HttpsError('not-found', 'Jogador não encontrado.');
@@ -178,6 +185,7 @@ exports.pagarLinhaCredito = onCall({ region: 'southamerica-east1' }, async (requ
   });
 
   return { ok: true, pago: pagamento, saldoRestante: novoSaldo };
+  });
 });
 
 // ════════════════════════════════════════════════════════
@@ -187,8 +195,10 @@ exports.pagarLinhaCredito = onCall({ region: 'southamerica-east1' }, async (requ
 exports.contratarSocioInvestidor = onCall({ region: 'southamerica-east1' }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
   const uid = request.auth.uid;
+  const { nonce } = request.data || {};
   const db  = getFirestore();
 
+  return comIdempotencia(db, { uid, nonce, acao: 'contratarSocioInvestidor' }, async () => {
   const jogRef  = db.collection('jogadores').doc(uid);
   const jogSnap = await jogRef.get();
   if (!jogSnap.exists) throw new HttpsError('not-found', 'Jogador não encontrado.');
@@ -229,6 +239,7 @@ exports.contratarSocioInvestidor = onCall({ region: 'southamerica-east1' }, asyn
     ok: true, nome, capital,
     msg: `${nome} aportou R$${capital.toLocaleString('pt-BR')} em troca de 20% dos honorários por 36 meses.`,
   };
+  });
 });
 
 // ════════════════════════════════════════════════════════
@@ -238,10 +249,11 @@ exports.contratarSocioInvestidor = onCall({ region: 'southamerica-east1' }, asyn
 exports.aplicarInvestimento = onCall({ region: 'southamerica-east1' }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
   const uid = request.auth.uid;
-  const { tipo, valor, subtipo, firma_id } = request.data || {};
+  const { tipo, valor, subtipo, firma_id, nonce } = request.data || {};
   if (!tipo || !valor || valor <= 0) throw new HttpsError('invalid-argument', 'tipo e valor são obrigatórios.');
 
   const db      = getFirestore();
+  return comIdempotencia(db, { uid, nonce, acao: 'aplicarInvestimento' }, async () => {
   const jogRef  = db.collection('jogadores').doc(uid);
   const jogSnap = await jogRef.get();
   if (!jogSnap.exists) throw new HttpsError('not-found', 'Jogador não encontrado.');
@@ -295,6 +307,7 @@ exports.aplicarInvestimento = onCall({ region: 'southamerica-east1' }, async (re
 
   await jogRef.update(updates);
   return { ok: true, msg: `R$${valor.toLocaleString('pt-BR')} aplicados em ${tipo.replace('_', ' ')}.` };
+  });
 });
 
 // ════════════════════════════════════════════════════════
@@ -303,10 +316,11 @@ exports.aplicarInvestimento = onCall({ region: 'southamerica-east1' }, async (re
 exports.resgatarInvestimento = onCall({ region: 'southamerica-east1' }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
   const uid = request.auth.uid;
-  const { tipo, id } = request.data || {};
+  const { tipo, id, nonce } = request.data || {};
   if (!tipo) throw new HttpsError('invalid-argument', 'tipo obrigatório.');
 
   const db      = getFirestore();
+  return comIdempotencia(db, { uid, nonce, acao: 'resgatarInvestimento' }, async () => {
   const jogRef  = db.collection('jogadores').doc(uid);
   const jogSnap = await jogRef.get();
   if (!jogSnap.exists) throw new HttpsError('not-found', 'Jogador não encontrado.');
@@ -349,4 +363,5 @@ exports.resgatarInvestimento = onCall({ region: 'southamerica-east1' }, async (r
   updates.dinheiro = (j.dinheiro || 0) + valorDevolvido;
   await jogRef.update(updates);
   return { ok: true, valorDevolvido, msg: `R$${valorDevolvido.toLocaleString('pt-BR')} resgatados com sucesso.` };
+  });
 });

@@ -62,6 +62,15 @@ service cloud.firestore {
     }
 
     // ══════════════════════════════════════════════════════
+    // NONCES DE IDEMPOTÊNCIA (GDD P1.7 — functions/shared/nonce.js)
+    // Marcador puramente interno: o cliente só ENVIA o nonce no payload da
+    // callable, nunca lê ou escreve o documento diretamente.
+    // ══════════════════════════════════════════════════════
+    match /nonces_usados/{doc} {
+      allow read, write: if false; // somente Cloud Functions (Admin SDK)
+    }
+
+    // ══════════════════════════════════════════════════════
     // JOGADORES
     // ══════════════════════════════════════════════════════
     match /jogadores/{uid} {

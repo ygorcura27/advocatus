@@ -9,6 +9,11 @@ import { collection, getDocs, query, where, doc, getDoc }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { db } from './firebase-init.js';
 
+// Nonce por chamada — protege contra reenvio duplicado da mesma ação (GDD P1.7).
+function _gerarNonce() {
+  return (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}_${Math.random().toString(36).slice(2)}`);
+}
+
 function _fmtR(n) {
   if (!n && n !== 0) return '—';
   if (n >= 1000000) return `R$ ${(n/1000000).toFixed(1)}M`;
@@ -434,7 +439,7 @@ window._confirmarInvestimento = async function(tipo) {
   if (valor <= 0) { toast('Valor inválido.', 'ko'); return; }
   try {
     const fn = httpsCallable(window.FB_FUNCTIONS, 'aplicarInvestimento');
-    const r  = await fn({ tipo, valor, subtipo, firma_id });
+    const r  = await fn({ tipo, valor, subtipo, firma_id, nonce: _gerarNonce() });
     fecharModal();
     toast(`✅ ${r.data.msg}`, 'ok', 5000);
     setTimeout(() => window.navTo?.('financeiro', null), 500);
@@ -460,7 +465,7 @@ window.__confirmarResgate = async function(tipo, id, valor) {
   fecharModal();
   try {
     const fn = httpsCallable(window.FB_FUNCTIONS, 'resgatarInvestimento');
-    const r  = await fn({ tipo, id: id || null });
+    const r  = await fn({ tipo, id: id || null, nonce: _gerarNonce() });
     toast(`✅ ${r.data.msg}`, 'ok', 5000);
     setTimeout(() => window.navTo?.('financeiro', null), 500);
   } catch (e) {
@@ -474,7 +479,7 @@ window.__confirmarResgate = async function(tipo, id, valor) {
 window._contratarInvestidor = async function() {
   try {
     const fn = httpsCallable(window.FB_FUNCTIONS, 'contratarSocioInvestidor');
-    const r  = await fn({});
+    const r  = await fn({ nonce: _gerarNonce() });
     toast(`✅ ${r.data.msg}`, 'ok', 8000);
     setTimeout(() => window.navTo?.('financeiro', null), 600);
   } catch (e) {
@@ -491,7 +496,7 @@ window.solicitarAntecipacaoHonorarios = async function() {
   if (rep < 20) { toast('Reputação mínima 20 para antecipação.', 'ko'); return; }
   try {
     const fn = httpsCallable(window.FB_FUNCTIONS, 'anteciparHonorarios');
-    const r  = await fn({});
+    const r  = await fn({ nonce: _gerarNonce() });
     toast(`✅ ${r.data.msg}`, 'ok', 6000);
     setTimeout(() => window.navTo?.('financeiro', null), 600);
   } catch (e) {
@@ -537,7 +542,7 @@ window._confirmarLinhaCredito = async function() {
   if (valor < 500) { toast('Valor mínimo: R$ 500.', 'ko'); return; }
   try {
     const fn = httpsCallable(window.FB_FUNCTIONS, 'contratarLinhaCredito');
-    const r  = await fn({ valor });
+    const r  = await fn({ valor, nonce: _gerarNonce() });
     fecharModal();
     toast(`✅ ${_fmtR(r.data.valor)} creditados via linha de crédito!`, 'ok', 5000);
     setTimeout(() => window.navTo?.('financeiro', null), 500);
@@ -557,7 +562,7 @@ window.pagarLinhaCredito = async function() {
 
   try {
     const fn = httpsCallable(window.FB_FUNCTIONS, 'pagarLinhaCredito');
-    const r  = await fn({ valor: pagar });
+    const r  = await fn({ valor: pagar, nonce: _gerarNonce() });
     toast(r.data.saldoRestante > 0
       ? `✅ ${_fmtR(r.data.pago)} pagos. Restante: ${_fmtR(r.data.saldoRestante)}.`
       : '✅ Linha de crédito quitada!', 'ok', 4000);
