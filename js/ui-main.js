@@ -665,7 +665,7 @@ async function renderBalancete(j, el) {
   const CARGO_L = { est:'Estagiário', ass:'Assistente Jurídico', jnr:'Adv. Júnior', pln:'Adv. Pleno', snr:'Adv. Sênior', asc:'Associado', soc:'Sócio' };
   const TIER_L  = { 1:'Boutique', 2:'Boutique', 3:'Regional', 4:'Full Service', 5:'Big Law' };
 
-  const honorarios = data.rendaMes - data.receitaRecorrente;
+  const honorarios = data.honorariosMes;
 
   el.innerHTML = `
     <div style="margin-bottom:.8rem">
@@ -689,7 +689,7 @@ async function renderBalancete(j, el) {
       </div>` : ''}
       <div class="blcte-linha blcte-total">
         <span>TOTAL RECEITAS</span>
-        <span class="blcte-val receita">${fmt(data.rendaMes)}</span>
+        <span class="blcte-val receita">${fmt(honorarios + data.receitaRecorrente)}</span>
       </div>
     </div>
 
@@ -1126,7 +1126,16 @@ function _escKpisPlaceholder() {
 
 async function _escKpis(esc, j) {
   const caixa    = (esc && esc.caixa) || 0;
-  const rendaMes = esc ? (esc.faturamento_mes_atual || 0) : (j.honorarios_mes || 0);
+  // honorariosMes + receitaRecorrente somados aqui (não lendo
+  // faturamento_mes_atual direto) garante que "Receita do mês" e o
+  // balancete NUNCA mostrem números inconsistentes entre si — antes,
+  // faturamento_mes_atual era incrementado em paralelo por vários pontos
+  // (sentença, acordão, recorrente) e podia divergir da soma real dos dois
+  // componentes, e o balancete derivava honorários por subtração
+  // (rendaMes - recorrente), que virava negativo-escondido-em-abs() nesse caso.
+  const honorariosMes    = esc ? (esc.faturamento_honorarios_mes || 0) : (j.honorarios_mes || 0);
+  const receitaRecorrenteKpi = esc ? (esc.faturamento_recorrente_mes || 0) : 0;
+  const rendaMes = honorariosMes + receitaRecorrenteKpi;
 
   const TIER_CUSTO_FIXO = { 1:3500, 2:8000, 3:18000, 4:35000, 5:70000 };
   const CARGO_SAL       = { est:1700, ass:2500, jnr:3500, pln:5500, snr:9000, asc:12000, soc:15000 };
@@ -1140,7 +1149,7 @@ async function _escKpis(esc, j) {
 
   let salariosTotais    = 0;
   let listaFuncionarios = [];
-  const receitaRecorrente = esc ? (esc.faturamento_recorrente_mes || 0) : 0;
+  const receitaRecorrente = receitaRecorrenteKpi;
 
   if (esc && esc.id) {
     try {
@@ -1169,7 +1178,7 @@ async function _escKpis(esc, j) {
 
   window._escBalanceteData = {
     escNome: (esc && esc.nome) || j.escritorio_nome || 'Escritório',
-    rendaMes, receitaRecorrente, custoFixo, salariosTotais, workspaceCm,
+    rendaMes, honorariosMes, receitaRecorrente, custoFixo, salariosTotais, workspaceCm,
     workspaceLabel: wLabel, despMes, lucroMes, minhaCota,
     tier, funcionarios: listaFuncionarios, escId: esc?.id,
   };

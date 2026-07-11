@@ -219,6 +219,7 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid) {
           proms.push(escRef.update({
             caixa: require('firebase-admin/firestore').FieldValue.increment(valorRecebido),
             faturamento_mes_atual: require('firebase-admin/firestore').FieldValue.increment(valorRecebido),
+            faturamento_honorarios_mes: require('firebase-admin/firestore').FieldValue.increment(valorRecebido),
           }));
         }
         const iconRes = { procedente:'✅', parcial:'🟡', improcedente:'❌' }[resultado];
@@ -1032,7 +1033,7 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
       const escRefProprio = db.collection('escritorios').doc(j.escritorio_proprio_id);
       // Lê escritório antes do reset para processar sócio investidor (GDD §33)
       const escSnapPre  = await escRefProprio.get();
-      const escUpdReset = { faturamento_mes_atual: 0, faturamento_recorrente_mes: 0 };
+      const escUpdReset = { faturamento_mes_atual: 0, faturamento_recorrente_mes: 0, faturamento_honorarios_mes: 0 };
       if (escSnapPre.exists) {
         const escPre = escSnapPre.data();
         const inv    = escPre.investidor;

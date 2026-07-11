@@ -274,6 +274,7 @@ async function _finalizarProcessoDefinitivo(db, processoRef, jogadorRef, p, j, s
         await escRef.update({
           caixa: (escSnap.data().caixa||0) + honPotencial,
           faturamento_mes_atual: (escSnap.data().faturamento_mes_atual||0) + honPotencial,
+          faturamento_honorarios_mes: (escSnap.data().faturamento_honorarios_mes||0) + honPotencial,
         });
       }
     } else {
@@ -636,6 +637,7 @@ exports.decidirRecursoSentenca = onCall({ region: 'southamerica-east1' }, async 
             await escRef.update({
               caixa: (escSnap.data().caixa||0) + hon,
               faturamento_mes_atual: (escSnap.data().faturamento_mes_atual||0) + hon,
+              faturamento_honorarios_mes: (escSnap.data().faturamento_honorarios_mes||0) + hon,
             });
           }
         } else {

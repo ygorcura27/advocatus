@@ -328,6 +328,7 @@ if (escritorioDoCaso) {
           await escRef.update({
             caixa: (escSnap.data().caixa||0) + honAcordao,
             faturamento_mes_atual: (escSnap.data().faturamento_mes_atual||0) + honAcordao,
+            faturamento_honorarios_mes: (escSnap.data().faturamento_honorarios_mes||0) + honAcordao,
           });
           resposta.honNoCaixa = true;
         }
