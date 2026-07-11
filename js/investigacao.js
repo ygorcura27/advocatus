@@ -418,9 +418,24 @@ window._invAbrirVademecum = async function() {
   }
 };
 
+function _renderContextoCasoVademecum() {
+  const p = _procCache || {};
+  const fatos = (p.fatos_narrativa || []).filter(Boolean);
+  const partes = p.autor && p.reu ? `${p.autor} × ${p.reu}` : (p.tipo || 'Processo');
+  const fatosHtml = fatos.length > 0
+    ? `<ul style="margin:.3rem 0 0 1rem;padding:0">${fatos.map(f => `<li>${f}</li>`).join('')}</ul>`
+    : `<p style="margin:.3rem 0 0;font-style:italic">Sem fatos registrados neste processo — julgue pelo tipo/área abaixo.</p>`;
+  return `
+    <div style="font-size:.75rem;color:var(--txt3);background:var(--surface2);border:var(--borda);border-radius:var(--r);padding:.55rem .7rem;margin-bottom:.7rem;line-height:1.5">
+      <strong style="color:var(--txt2)">Seu caso:</strong> ${partes} — ${p.tipo || ''}${p.area ? ` (${p.area})` : ''}
+      ${fatosHtml}
+    </div>`;
+}
+
 function _renderListaVademecum(candidatos) {
   window.abrirModal('Vade Mecum — Precedentes', `
     <p style="color:var(--txt3);margin-bottom:.5rem">Escolha um precedente para tentar aplicá-lo como tese no seu caso.</p>
+    ${_renderContextoCasoVademecum()}
     <p style="font-size:.72rem;color:var(--txt4);background:var(--surface2);border:var(--borda);border-radius:var(--r);padding:.55rem .7rem;margin-bottom:.85rem;line-height:1.55">
       ⚖️ Se a tese encaixar nos fatos do seu caso, ela reduz permanentemente o limiar de vitória no julgamento.
       Se não encaixar, o adversário a desacredita em audiência e você não ganha bônus algum — mas a tentativa já consome
@@ -435,6 +450,7 @@ function _renderListaVademecum(candidatos) {
     window.abrirModal(prec.nome, `
       <p style="color:var(--txt3);margin-bottom:.5rem"><strong>Tema:</strong> ${prec.tema}</p>
       <p style="margin-bottom:.85rem">${prec.holding}</p>
+      ${_renderContextoCasoVademecum()}
       <p style="font-size:.7rem;color:var(--txt4);background:var(--surface2);border:var(--borda);border-radius:var(--r);padding:.55rem .7rem;margin-bottom:.9rem;line-height:1.55">
         Aplicar esta tese só compensa se a holding acima realmente conversar com os fatos do seu caso — o
         julgamento verifica o encaixe antes de conceder o bônus.
