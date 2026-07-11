@@ -224,7 +224,8 @@ exports.tickMensal = onSchedule({
     logger.info(
       `[NPC_TICK] ${resultadoNPC.finalizadas.length} NPC(s) com petições finalizadas, ` +
       `${resultadoNPC.ciclosDeVida.reduce((s, c) => s + c.eventos.length, 0)} aposentadoria(s), ` +
-      `${resultadoNPC.distribuicoes.reduce((s, d) => s + d.repostos.length, 0)} reposição(ões) de iniciante`,
+      `${resultadoNPC.distribuicoes.reduce((s, d) => s + d.repostos.length, 0)} reposição(ões) de iniciante, ` +
+      `${resultadoNPC.expansoes.reduce((s, e) => s + e.criados.length, 0)} expansão(ões) institucional(is)`,
     );
   } catch (e) {
     logger.error('[NPC_TICK] Falha no processamento mensal de NPCs:', e);

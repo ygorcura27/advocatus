@@ -12,11 +12,22 @@
 const { logger } = require('firebase-functions');
 const { seedAdvogadosNPC } = require('./seedAdvogadosNPC');
 const { processarCicloDeVida, garantirDistribuicaoMinima, lerServerSecret } = require('./cicloDeVida');
+const { garantirCapacidadeInstitucional } = require('./capacidadeInstitucional');
 const { confeccionarPecaSincronaNPC, finalizarPeticoesNPCPendentes } = require('./confeccionarPecaNPC');
 const { tickAtualFn } = require('./tickAdapter');
 const { TESES_POOL } = require('../teses');
 
 const JURISDICOES = Object.freeze(['brasil', 'usa']);
+
+/**
+ * Jurisdição onde jogadores reais existem hoje. jogador.jurisdicao_id nunca
+ * chegou a ser setado em nenhum fluxo do jogo (criação de personagem, etc.)
+ * — todo jogador real está, na prática, em 'brasil'. Multi-jurisdição de
+ * jogador é scaffold (functions/jurisdictions/*.json), não feature em uso.
+ * Por isso a demanda de capacidade institucional (P1.5) só é calculada e
+ * aplicada aqui — 'usa' não tem jogadores gerando processos reais.
+ */
+const JURISDICAO_COM_JOGADORES = 'brasil';
 
 /**
  * Garante que /config/server_secret existe (P1.3 — RNG determinístico da
@@ -61,16 +72,19 @@ async function rodarSeedNPCs(db) {
  *   1. finaliza petições de NPC pendentes (nota_teto)
  *   2. aposentadoria + reposição (ledger idempotente)
  *   3. distribuição mínima de iniciantes
+ *   4. expansão institucional (procurador/promotor), só em JURISDICAO_COM_JOGADORES
  *
- * Expansão institucional (P1.5, capacidadeInstitucional.js) fica de fora
- * deste passo automático — o jogo ainda não tem uma métrica real de "casos
- * ativos por jurisdição" para alimentar `casosAtivosNaJurisdicao`.
+ * A demanda (P1.5) usa uma contagem GLOBAL de processos 'andamento' como
+ * proxy de "casos ativos" — não uma contagem por jurisdição de verdade,
+ * porque processos não têm jurisdição própria e todo jogador real está em
+ * 'brasil' de qualquer forma (ver JURISDICAO_COM_JOGADORES acima). Se
+ * multi-jurisdição de jogador virar feature real, isso precisa ser revisto.
  */
 async function processarTickMensalNPC(db) {
   await garantirServerSecret(db);
   const mesGlobal = await tickAtualFn(db);
 
-  const resultado = { finalizadas: [], ciclosDeVida: [], distribuicoes: [] };
+  const resultado = { finalizadas: [], ciclosDeVida: [], distribuicoes: [], expansoes: [] };
 
   try {
     resultado.finalizadas = await finalizarPeticoesNPCPendentes(db, mesGlobal);
@@ -100,6 +114,27 @@ async function processarTickMensalNPC(db) {
     } catch (e) {
       logger.error(`[NPC_TICK] Erro na distribuição mínima (${jurisdicao}):`, e);
     }
+  }
+
+  // ── 4. Expansão institucional (P1.5) — só onde há jogadores reais ──
+  try {
+    const casosAtivosSnap = await db.collection('processos').where('status', '==', 'andamento').get();
+    const casosAtivos = casosAtivosSnap.size;
+
+    for (const subtipo of ['procurador', 'promotor']) {
+      const expansao = await garantirCapacidadeInstitucional({
+        db, jurisdicao: JURISDICAO_COM_JOGADORES, subtipo,
+        casosAtivosNaJurisdicao: casosAtivos,
+        confeccionarPecaSincrona: confeccionarPecaSincronaNPC,
+        poolTeses: TESES_POOL,
+        tickAtualFn,
+      });
+      if (expansao.expandido) {
+        resultado.expansoes.push({ jurisdicao: JURISDICAO_COM_JOGADORES, subtipo, ...expansao });
+      }
+    }
+  } catch (e) {
+    logger.error('[NPC_TICK] Erro na expansão institucional:', e);
   }
 
   return resultado;
