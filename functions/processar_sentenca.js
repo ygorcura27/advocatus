@@ -267,13 +267,37 @@ async function _finalizarProcessoDefinitivo(db, processoRef, jogadorRef, p, j, s
     if (escritorioDoCaso) {
       const escRef = db.collection('escritorios').doc(escritorioDoCaso);
       const escSnap = await escRef.get();
-      if (escSnap.exists) await escRef.update({ caixa: (escSnap.data().caixa||0) + honPotencial });
+      // faturamento_mes_atual alimenta o balancete (js/ui-main.js:_escKpis) —
+      // sem isso o honorário entra no caixa mas o balancete mensal mostra
+      // R$ 0 de receita mesmo com vitórias reais (bug relatado em produção).
+      if (escSnap.exists) {
+        await escRef.update({
+          caixa: (escSnap.data().caixa||0) + honPotencial,
+          faturamento_mes_atual: (escSnap.data().faturamento_mes_atual||0) + honPotencial,
+        });
+      }
     } else {
       await jogadorRef.update({
         dinheiro: (j.dinheiro || 0) + honPotencial,
         honorarios_mes: (j.honorarios_mes||0) + honPotencial,
       });
     }
+  }
+
+  // Reputação do ESCRITÓRIO — mesmo padrão de processar_acordao.js. Faltava
+  // aqui: sentença só atualizava a reputação do jogador (updJog acima), o
+  // escritório nunca se movia por vitória/derrota via veredito (só via
+  // acordão) — reportado em produção (reputação travada apesar de vitórias).
+  if (escritorioDoCaso && repDelta) {
+    try {
+      const escRef = db.collection('escritorios').doc(escritorioDoCaso);
+      const escSnap = await escRef.get();
+      if (escSnap.exists) {
+        const escCap = repCapDoCargo('escritorio');
+        const escRep = escSnap.data().reputacao || 0;
+        await escRef.update({ reputacao: Math.max(0, Math.min(escCap, escRep + repDelta)) });
+      }
+    } catch (e) { logger.warn('Reputação do escritório (sentença):', e.message); }
   }
   await processoRef.update({
     status: favoravelAoJogador ? 'ganho' : 'perdido',
@@ -608,7 +632,12 @@ exports.decidirRecursoSentenca = onCall({ region: 'southamerica-east1' }, async 
         if (escritorioDoCaso) {
           const escRef  = db.collection('escritorios').doc(escritorioDoCaso);
           const escSnap = await escRef.get();
-          if (escSnap.exists) await escRef.update({ caixa: (escSnap.data().caixa||0) + hon });
+          if (escSnap.exists) {
+            await escRef.update({
+              caixa: (escSnap.data().caixa||0) + hon,
+              faturamento_mes_atual: (escSnap.data().faturamento_mes_atual||0) + hon,
+            });
+          }
         } else {
           await jogadorRef.update({
             dinheiro:       (j.dinheiro||0) + hon,
@@ -623,6 +652,19 @@ exports.decidirRecursoSentenca = onCall({ region: 'southamerica-east1' }, async 
           if (escSnap.exists)
             await escRef.update({ prestigio: Math.max(0, (escSnap.data().prestigio||10) - Math.ceil(Math.abs(repDt)*0.5)) });
         } catch(e) { logger.warn('Rep escritório setlist:', e); }
+      }
+      // Reputação do ESCRITÓRIO (tier-upgrade — distinta de prestigio acima).
+      // Faltava se mover em vitória ou derrota via veredito/setlist.
+      if (escritorioDoCaso && repDt) {
+        try {
+          const escRef  = db.collection('escritorios').doc(escritorioDoCaso);
+          const escSnap = await escRef.get();
+          if (escSnap.exists) {
+            const escCap = repCapDoCargo('escritorio');
+            const escRep = escSnap.data().reputacao || 0;
+            await escRef.update({ reputacao: Math.max(0, Math.min(escCap, escRep + repDt)) });
+          }
+        } catch (e) { logger.warn('Reputação do escritório (setlist):', e.message); }
       }
       await processoRef.update({
         status:               ganhou ? 'ganho' : 'perdido',
