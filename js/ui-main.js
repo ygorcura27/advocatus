@@ -15,6 +15,25 @@ import { renderAvatarJogador } from './avatar_svg.js';
 let _painelAtivo = 'perfil';
 
 // ════════════════════════════════════════════════════════
+// ÍCONES ESTÁTICOS DO CHROME (bottom nav + barra de energia mobile)
+// Rodam uma vez no load — substituem os emojis crus por SVG (icons.js)
+// ════════════════════════════════════════════════════════
+(function _renderIconesBottomNav() {
+  const injetarNav = (id, nome) => {
+    const el = document.querySelector(`#${id} .bnav-icon`);
+    if (el) el.innerHTML = icon(nome);
+  };
+  injetarNav('bn-perfil',       'perfil');
+  injetarNav('bn-escritorio',   'escritorio');
+  injetarNav('bn-vagas',        'vagas');
+  injetarNav('bn-habilidades',  'habilidades');
+  injetarNav('bn-mais',         'menu');
+
+  const bemLabel = document.getElementById('bem-mobile-label');
+  if (bemLabel) bemLabel.innerHTML = `<span class="ni-icon">${icon('habilidades')}</span>Energia`;
+})();
+
+// ════════════════════════════════════════════════════════
 // NAVEGAÇÃO
 // ════════════════════════════════════════════════════════
 window.addEventListener('nav:painel', (e) => {

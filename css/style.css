@@ -43,6 +43,7 @@
   --verm-bg:   #FDECEA;
   --amber:     #B7791F;
   --amber-bg:  #FEFCE8;
+  --amber-ink: #7D5A15; /* --amber não passa 4.5:1 sobre --amber-bg/superfícies claras — usar aqui para texto */
 
   /* Bordas */
   --borda:      1px solid #D1D8EE;
@@ -140,6 +141,23 @@ input, select, textarea, button, code, pre {
 a { color: var(--navy3); text-decoration: none; }
 a:hover { color: var(--navy); }
 
+/* Ícone de linha (icons.js) usado fora de .nav-item — topbar, sidebar
+   direita, bottom nav. Cor sempre herdada via currentColor. */
+.ni-icon { display: inline-flex; flex-shrink: 0; vertical-align: middle; }
+.ni-icon svg { display: block; }
+
+/* ── Spinner de carregamento — substitui emoji estático no loading inicial ── */
+.loading-inicial {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: .7rem; height: 200px; color: var(--txt3); font-size: .8rem;
+}
+.spinner-ring {
+  width: 26px; height: 26px; border-radius: 50%;
+  border: 2.5px solid var(--navy-light); border-top-color: var(--navy3);
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* ═══════════════════════════════════════════════════════════
    TOPBAR
    ═══════════════════════════════════════════════════════════ */
@@ -213,7 +231,8 @@ a:hover { color: var(--navy); }
 .topbar-nome { font-size: .72rem; color: rgba(255,255,255,.8); max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .topbar-rep  { font-size: .75rem; font-weight: 700; color: var(--ouro); }
 .topbar-saldo{ font-size: .75rem; color: #6EE7A0; font-weight: 600; }
-.topbar-serasa{ display:none; font-size:.62rem; padding:.1rem .4rem; background:rgba(231,76,60,.25); border:1px solid rgba(231,76,60,.5); border-radius:var(--r); color:#FF8A80; }
+.topbar-serasa{ display:none; align-items:center; gap:.3rem; font-size:.62rem; font-weight:600; letter-spacing:.02em; padding:.15rem .55rem; background:rgba(231,76,60,.25); border:1px solid rgba(231,76,60,.5); border-radius:var(--r); color:#FF8A80; }
+.topbar-serasa .ni-icon svg { width: 12px; height: 12px; }
 /* ── Topbar: bloco de prestígio ── */
 .tb-pres-bloco {
   display: flex;
@@ -437,6 +456,8 @@ a:hover { color: var(--navy); }
   display: flex; justify-content: space-between; align-items: center;
 }
 .bloco-titulo span { color: var(--txt2); font-weight: 600; }
+.bloco-titulo .bt-label { display: inline-flex; align-items: center; gap: .35rem; }
+.bloco-titulo .ni-icon svg, .energia-bloco .ni-icon svg { width: 12px; height: 12px; }
 .energia-bar-wrap { height: 8px; background: var(--bg2); border-radius: 4px; overflow: hidden; margin-bottom: .4rem; border: var(--borda-sub); }
 .energia-bar-fill { height: 100%; background: linear-gradient(90deg, #2E8B57, #4AAB77); border-radius: 4px; transition: width .4s ease; }
 .energia-costs { font-size: .63rem; color: var(--txt4); line-height: 1.85; }
@@ -489,7 +510,8 @@ a:hover { color: var(--navy); }
   padding: .7rem;
   margin-bottom: 1rem;
 }
-.evento-label  { font-size: .58rem; color: var(--amber); text-transform: uppercase; letter-spacing: .1em; margin-bottom: .25rem; }
+.evento-label  { font-size: .58rem; color: var(--amber-ink); text-transform: uppercase; letter-spacing: .1em; margin-bottom: .25rem; display: flex; align-items: center; gap: .3rem; }
+.evento-label .ni-icon svg { width: 11px; height: 11px; }
 .evento-titulo { font-size: .8rem; font-weight: 600; color: var(--txt); margin-bottom: .2rem; }
 .evento-desc   { font-size: .7rem; color: var(--txt3); line-height: 1.5; }
 
@@ -1032,7 +1054,11 @@ a:hover { color: var(--navy); }
     text-transform: uppercase;
     letter-spacing: .08em;
     margin-bottom: .15rem;
+    display: flex;
+    align-items: center;
+    gap: .3rem;
   }
+  .bem-mobile-label .ni-icon svg { width: 11px; height: 11px; }
   .bem-mobile-bar {
     height: 4px;
     background: rgba(255,255,255,.12);
@@ -1093,6 +1119,7 @@ a:hover { color: var(--navy); }
   .bnav-item.ativo { color: var(--navy); }
   .bnav-item:not(.ativo) { color: var(--txt4); }
   .bnav-icon { font-size: 1.1rem; line-height: 1; }
+  .bnav-icon.ni-icon svg { width: 19px; height: 19px; }
   .bnav-label { font-size: .55rem; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
 
   /* Espaço para bottom nav + barra energia */

@@ -8,6 +8,7 @@ import { doc, updateDoc }
 import { httpsCallable }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
 import { db } from './firebase-init.js';
+import { icon } from './icons.js';
 
 // ENERGIA_TOTAL deixou de ser uma constante fixa (era 100, e por isso nunca
 // refletia o bônus de até +25⚡ da academia — bug visual: card sempre mostrava
@@ -30,7 +31,7 @@ export function renderBlocoEnergia(j) {
 
   if (emFerias) {
     el.innerHTML = `<button class="btn btn-ghost btn-block" disabled style="opacity:.45;font-size:.78rem;cursor:not-allowed">
-      🔒 Recesso de Janeiro — aguarde
+      <span class="ni-icon">${icon('cadeado')}</span> Recesso de Janeiro — aguarde
     </button>`;
     return;
   }
@@ -43,7 +44,8 @@ export function renderBlocoEnergia(j) {
 // ── Bloco visual de férias de janeiro ──
 function _renderBlocoFerias(disponivel, pct, corBarra, bloqueadoAte, energiaTotal) {
   return `
-    <div class="bloco-titulo">⚡ Energia do Mês
+    <div class="bloco-titulo">
+      <span class="bt-label"><span class="ni-icon">${icon('habilidades')}</span>Energia do Mês</span>
       <span style="color:${corBarra};font-weight:700">${disponivel}/${energiaTotal}</span>
     </div>
     <div class="energia-bar-wrap" style="margin-bottom:.6rem">
@@ -57,7 +59,7 @@ function _renderBlocoFerias(disponivel, pct, corBarra, bloqueadoAte, energiaTota
       <div style="font-size:.6rem;color:var(--ardosia);margin-top:.15rem">para liberar Fevereiro</div>
     </div>
     <button class="btn btn-ghost btn-block" disabled style="opacity:.35;font-size:.72rem;cursor:not-allowed">
-      🔒 Avançar bloqueado — aguarde o recesso
+      <span class="ni-icon">${icon('cadeado')}</span> Avançar bloqueado — aguarde o recesso
     </button>`;
 }
 

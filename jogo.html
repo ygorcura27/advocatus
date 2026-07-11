@@ -33,7 +33,7 @@
 
   <!-- Usuário -->
   <div class="topbar-user">
-    <div id="tb-serasa" class="topbar-serasa">🚨</div>
+    <div id="tb-serasa" class="topbar-serasa"></div>
     <img id="tb-avatar" class="topbar-avatar" src="" alt="" style="display:none">
     <span id="tb-avatar-svg" class="topbar-avatar" style="display:none;border-radius:50%;overflow:hidden"></span>
     <span id="tb-nome" class="topbar-nome">—</span>
@@ -68,11 +68,9 @@
   <!-- ══ ÁREA CENTRAL ══ -->
   <main class="main-content" id="main-content">
     <!-- Conteúdo injetado por ui-main.js -->
-    <div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--ardosia)">
-      <div style="text-align:center">
-        <div style="font-size:1.5rem;margin-bottom:.5rem">⚖️</div>
-        <div>Carregando...</div>
-      </div>
+    <div class="loading-inicial">
+      <div class="spinner-ring"></div>
+      <div>Carregando...</div>
     </div>
   </main>
 
@@ -113,14 +111,14 @@
 
     <!-- Evento global -->
     <div class="evento-bloco" id="sr-evento" style="display:none">
-      <div class="evento-label" id="sr-evento-label">⚡ Evento Global</div>
+      <div class="evento-label" id="sr-evento-label"></div>
       <div class="evento-titulo" id="sr-evento-titulo">—</div>
       <div class="evento-desc"  id="sr-evento-desc">—</div>
     </div>
 
     <!-- Performance anual -->
     <div style="margin-bottom:1rem">
-      <div class="bloco-titulo">📊 Performance Anual</div>
+      <div class="bloco-titulo" id="bt-performance-anual"></div>
       <div style="font-size:.72rem;color:var(--ardosia2);line-height:1.9">
         <div style="display:flex;justify-content:space-between">
           <span>Vitórias</span>
@@ -143,7 +141,7 @@
 
     <!-- Mini ranking -->
     <div class="ranking-mini" id="sr-ranking">
-      <div class="bloco-titulo">🏆 Top Reputação</div>
+      <div class="bloco-titulo" id="bt-top-reputacao"></div>
       <div id="sr-ranking-lista">
         <div style="font-size:.7rem;color:var(--ardosia)">Carregando...</div>
       </div>
@@ -158,23 +156,23 @@
 <!-- ════════ BOTTOM NAV (mobile) ════════ -->
 <nav class="bottom-nav" id="bottom-nav">
   <div class="bnav-item ativo" id="bn-perfil" onclick="navTo('perfil',this);closeSidebar()">
-    <span class="bnav-icon">⚖️</span>
+    <span class="bnav-icon ni-icon"></span>
     <span class="bnav-label">Perfil</span>
   </div>
   <div class="bnav-item" id="bn-escritorio" onclick="navTo('escritorio',this);closeSidebar()">
-    <span class="bnav-icon">🏢</span>
+    <span class="bnav-icon ni-icon"></span>
     <span class="bnav-label">Escrit.</span>
   </div>
   <div class="bnav-item" id="bn-vagas" onclick="navTo('vagas',this);closeSidebar()">
-    <span class="bnav-icon">💼</span>
+    <span class="bnav-icon ni-icon"></span>
     <span class="bnav-label">Vagas</span>
   </div>
   <div class="bnav-item" id="bn-habilidades" onclick="navTo('habilidades',this);closeSidebar()">
-    <span class="bnav-icon">⚡</span>
+    <span class="bnav-icon ni-icon"></span>
     <span class="bnav-label">Skills</span>
   </div>
   <div class="bnav-item" id="bn-mais" onclick="toggleSidebar()">
-    <span class="bnav-icon">☰</span>
+    <span class="bnav-icon ni-icon"></span>
     <span class="bnav-label">Mais</span>
   </div>
 </nav>
@@ -182,7 +180,7 @@
 <!-- ════════ BARRA DE ENERGIA MOBILE ════════ -->
 <div class="bloco-energia-mobile" id="barra-energia-mobile">
   <div class="bem-mobile-energia">
-    <div class="bem-mobile-label">Energia ⚡</div>
+    <div class="bem-mobile-label" id="bem-mobile-label"></div>
     <div class="bem-mobile-bar">
       <div class="bem-mobile-bar-fill" id="bem-fill" style="width:100%;background:#4AAB77"></div>
     </div>

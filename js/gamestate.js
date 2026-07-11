@@ -8,6 +8,7 @@ import { collection, query, where, orderBy, limit,
          onSnapshot, getDocs }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { db } from './firebase-init.js';
+import { icon } from './icons.js';
 
 // ── Constantes de jogo ──
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
@@ -35,6 +36,25 @@ const CARGO_LABEL = {
 
 window.CARGO_LABEL = CARGO_LABEL;
 window.REP_CAP     = REP_CAP;
+
+// ════════════════════════════════════════════════════════
+// ÍCONES ESTÁTICOS DO CHROME (topbar / sidebar direita)
+// Rodam uma vez no load — substituem os emojis crus por SVG (icons.js)
+// ════════════════════════════════════════════════════════
+(function _renderIconesChrome() {
+  const injetar = (id, nome, texto) => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = `<span class="ni-icon">${icon(nome)}</span>${texto}`;
+  };
+  const injetarBlocoTitulo = (id, nome, texto) => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = `<span class="bt-label"><span class="ni-icon">${icon(nome)}</span>${texto}</span>`;
+  };
+  injetar('tb-serasa',       'alerta', 'Serasa');
+  injetar('sr-evento-label', 'alerta', 'Evento Global');
+  injetarBlocoTitulo('bt-performance-anual', 'balancete', 'Performance Anual');
+  injetarBlocoTitulo('bt-top-reputacao',     'ranking',   'Top Reputação');
+})();
 
 // ════════════════════════════════════════════════════════
 // LISTENER: JOGADOR
@@ -122,7 +142,7 @@ function _atualizarSidebarDireita(j) {
 
   // Serasa
   const serasaEl = document.getElementById('tb-serasa');
-  if (serasaEl) serasaEl.style.display = j.no_serasa ? '' : 'none';
+  if (serasaEl) serasaEl.style.display = j.no_serasa ? 'flex' : 'none';
 
   // Carregar mini ranking
   _carregarMiniRanking(j.uid);

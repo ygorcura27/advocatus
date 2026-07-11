@@ -57,6 +57,11 @@ const PATHS = {
   oportunidades:   `<path ${S} d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/>`,
   midia:           `<rect ${S} x="9" y="3" width="6" height="11" rx="3"/><path ${S} d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path ${S} d="M12 17.5V21"/><path ${S} d="M9 21h6"/>`,
   societario:      `<circle ${S} cx="12" cy="4.5" r="2"/><path ${S} d="M12 6.5v3.5"/><path ${S} d="M6 17v-3.5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2V17"/><circle ${S} cx="6" cy="19.3" r="2"/><circle ${S} cx="12" cy="19.3" r="2"/><circle ${S} cx="18" cy="19.3" r="2"/>`,
+
+  // Chrome persistente (topbar/sidebars/bottom nav) — substituem emojis crus
+  alerta:       `<path ${S} d="M12 3.5 21 19H3z"/><path ${S} d="M12 9.5v4.2M12 16.8h.01"/>`,
+  menu:         `<path ${S} d="M4 6h16M4 12h16M4 18h16"/>`,
+  cadeado:      `<rect ${S} x="5" y="10.5" width="14" height="9.5" rx="1.5"/><path ${S} d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>`,
 };
 
 /** Retorna o SVG (string) do ícone `nome`. `opts.size` default 20. */
