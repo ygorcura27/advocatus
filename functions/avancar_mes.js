@@ -2470,6 +2470,15 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
   // N relacionamentos ativos. Monta um Set de relacionamento_id que já
   // geraram filho, para lookup O(1) dentro do loop abaixo.
   const filhosSnapParaChecagem = await db.collection('jogadores').doc(uid).collection('filhos').get();
+  // IDs dos filhos que já existiam ANTES do loop de relacionamentos abaixo
+  // (que pode gerar filhos novos via _gerarFilhoCF). Usado no loop de
+  // envelhecimento (mais abaixo) para não aplicar +1 mês num filho recém
+  // -nascido NESTE MESMO avancar_mes — sem essa checagem, um filho nascido
+  // agora já sairia com idade_meses=1 em vez de 0, ficando permanentemente
+  // "1 mês mais velho" que um irmão nascido no mesmo mês por outro
+  // relacionamento processado numa iteração posterior deste mesmo loop
+  // (bug relatado em produção: filhos "da mesma data" com idades diferentes).
+  const filhosIdsAntesDoTick = new Set(filhosSnapParaChecagem.docs.map(d => d.id));
   const relacionamentosComFilho = new Set(
     filhosSnapParaChecagem.docs.map(d => d.data().relacionamento_id).filter(Boolean)
   );
@@ -2612,7 +2621,7 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
     } else if (r.gravida) {
       const novoMesGrav = (r.mes_gravidez||0) + 1;
       if (novoMesGrav >= DURACAO_GESTACAO_REL) {
-        await _gerarFilhoCF(db, uid, r);
+        await _gerarFilhoCF(db, uid, r, j.nome_personagem);
         upd.gravida = false;
         upd.mes_gravidez = 0;
         smDelta += 10;
@@ -2739,6 +2748,11 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
   const filhosSnap = await db.collection('jogadores').doc(uid).collection('filhos').get();
   let custoFilhos = 0;
   for (const fDoc of filhosSnap.docs) {
+    // Filho nascido NESTE mesmo avancar_mes (via _gerarFilhoCF acima) não
+    // envelhece agora — ele já nasce com idade_meses:0 correto para este
+    // mês; envelhecer de novo aqui o deixaria 1 mês na frente de um irmão
+    // nascido no mesmo mês por outro relacionamento processado depois.
+    if (!filhosIdsAntesDoTick.has(fDoc.id)) continue;
     const f = fDoc.data();
     const idadeMesesAtual = f.idade_meses!==undefined ? f.idade_meses : Math.round((f.idade||0)*12);
     const novaIdadeMeses = idadeMesesAtual + 1;
@@ -2762,9 +2776,20 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
   }
 }
 
-async function _gerarFilhoCF(db, uid, relacionamento) {
+// Último termo de um nome composto ("Beatriz Souza" → "Souza"). Nome de
+// um só termo devolve string vazia — sem sobrenome pra herdar.
+function _sobrenomeCF(nomeCompleto) {
+  const partes = (nomeCompleto || '').trim().split(/\s+/);
+  return partes.length > 1 ? partes[partes.length - 1] : '';
+}
+
+async function _gerarFilhoCF(db, uid, relacionamento, nomeJogador) {
   const sexo = Math.random() < 0.5 ? 'm' : 'f';
-  const nome = NOMES_BEBE_CF[sexo][Math.floor(Math.random()*NOMES_BEBE_CF[sexo].length)];
+  const primeiroNome = NOMES_BEBE_CF[sexo][Math.floor(Math.random()*NOMES_BEBE_CF[sexo].length)];
+  // Sobrenome da mãe (relacionamento) primeiro, do pai (jogador) por último.
+  const sobrenomeMae = _sobrenomeCF(relacionamento.nome);
+  const sobrenomePai = _sobrenomeCF(nomeJogador);
+  const nome = [primeiroNome, sobrenomeMae, sobrenomePai].filter(Boolean).join(' ');
 
   await db.collection('jogadores').doc(uid).collection('filhos').add({
     nome, sexo, idade:0, idade_meses:0,
