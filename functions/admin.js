@@ -607,7 +607,13 @@ exports.adminAction = onCall({ region: 'southamerica-east1' }, async (request) =
     case 'npc_seed': {
       const { rodarSeedNPCs } = require('./npc/orquestracao');
       const resumos = await rodarSeedNPCs(db);
-      return { ok: true, resumos };
+      const total = Object.values(resumos).reduce((s, r) => s + r.criados, 0);
+      const jaExistiam = Object.values(resumos).reduce((s, r) => s + r.jaExistentes, 0);
+      return {
+        ok: true,
+        msg: `Seed de NPCs: ${total} criado(s), ${jaExistiam} já existente(s). ${JSON.stringify(resumos)}`,
+        resumos,
+      };
     }
 
     default:
