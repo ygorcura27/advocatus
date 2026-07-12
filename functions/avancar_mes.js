@@ -873,6 +873,9 @@ async function _verificarPrazosRecursaisPoolCF(db, escId, uid, updates, novoMes,
       encerrado_mes: novoMesTotal,
       prazo_expirado: true,
     }));
+    proms.push(db.collection('escritorios').doc(escId).update({
+      casos_perdidos: require('firebase-admin/firestore').FieldValue.increment(1),
+    }));
 
     // Atualizar pool subcol se vinculado
     if (p.pool_proc_subcol_id && p.pool_proc_esc_id) {

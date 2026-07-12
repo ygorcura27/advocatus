@@ -20,7 +20,7 @@
 
 
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
-const { getFirestore }       = require('firebase-admin/firestore');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { logger }             = require('firebase-functions');
 const banco = require('./shared/banco_juridico.js');
 
@@ -297,6 +297,14 @@ if (escritorioDoCaso) {
   if (transitouAgora) {
     const statusFinal = jogadorGanhouEsteJulgamento ? 'ganho' : 'perdido';
     await processoRef.update({ status: statusFinal, encerrado_mes: mesTotalPessoal(j) });
+    const escritorioDoCasoContagem = p.pool_escritorio_id || j.escritorio_proprio_id;
+    if (escritorioDoCasoContagem) {
+      try {
+        await db.collection('escritorios').doc(escritorioDoCasoContagem).update(
+          jogadorGanhouEsteJulgamento ? { casos_ganhos: FieldValue.increment(1) } : { casos_perdidos: FieldValue.increment(1) }
+        );
+      } catch (e) { logger.warn('Contagem casos_ganhos/perdidos (acórdão):', e.message); }
+    }
     await _atualizarSatisfacaoClienteAcordao(db, p, jogadorGanhouEsteJulgamento ? 'procedente' : 'improcedente');
     // Atualizar pool subcol (quando processo veio de _assumirCasoPool)
     if (p.pool_proc_subcol_id && p.pool_proc_esc_id) {
@@ -378,6 +386,12 @@ exports.decidirProximaInstancia = onCall({ region: 'southamerica-east1' }, async
 
   if (!recorrer) {
     await processoRef.update({ status: 'perdido', encerrado_mes: mesTotalPessoal(j) });
+    const escritorioDoCasoContagem = p.pool_escritorio_id || j.escritorio_proprio_id;
+    if (escritorioDoCasoContagem) {
+      try {
+        await db.collection('escritorios').doc(escritorioDoCasoContagem).update({ casos_perdidos: FieldValue.increment(1) });
+      } catch (e) { logger.warn('Contagem casos_perdidos (decidir instância):', e.message); }
+    }
     if (p.pool_proc_subcol_id && p.pool_proc_esc_id) {
       try {
         await db.collection('escritorios').doc(p.pool_proc_esc_id)

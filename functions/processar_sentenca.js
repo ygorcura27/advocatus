@@ -17,7 +17,7 @@
  */
 
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
-const { getFirestore }       = require('firebase-admin/firestore');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { logger }             = require('firebase-functions');
 const banco = require('./shared/banco_juridico.js');
 const { aplicarXpPracticeArea } = require('./skills');
@@ -306,6 +306,13 @@ async function _finalizarProcessoDefinitivo(db, processoRef, jogadorRef, p, j, s
     hon_total_acumulado: favoravelAoJogador ? honPotencial : 0,
     convencimento: score,
   });
+  if (escritorioDoCaso) {
+    try {
+      await db.collection('escritorios').doc(escritorioDoCaso).update(
+        favoravelAoJogador ? { casos_ganhos: FieldValue.increment(1) } : { casos_perdidos: FieldValue.increment(1) }
+      );
+    } catch (e) { logger.warn('Contagem casos_ganhos/perdidos (sentença):', e.message); }
+  }
   if (escritorioDoCaso && !favoravelAoJogador) {
     try {
       const escRef = db.collection('escritorios').doc(escritorioDoCaso);
@@ -674,6 +681,13 @@ exports.decidirRecursoSentenca = onCall({ region: 'southamerica-east1' }, async 
         hon_total_acumulado:  hon,
         hon_pendente:         0,
       });
+      if (escritorioDoCaso) {
+        try {
+          await db.collection('escritorios').doc(escritorioDoCaso).update(
+            ganhou ? { casos_ganhos: FieldValue.increment(1) } : { casos_perdidos: FieldValue.increment(1) }
+          );
+        } catch (e) { logger.warn('Contagem casos_ganhos/perdidos (recurso):', e.message); }
+      }
       if (p.pool_proc_subcol_id && p.pool_proc_esc_id) {
         try {
           await db.collection('escritorios').doc(p.pool_proc_esc_id)
