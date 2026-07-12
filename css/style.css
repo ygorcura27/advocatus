@@ -89,6 +89,72 @@
   --papel:    var(--surface); /* referenciado só em profile.html, nunca tinha sido definido — bug pré-existente, não deste commit */
 }
 
+/* ═══════════════════════════════════════════════════════════
+   MODO CLARO — mesma paleta, invertida, portada de
+   .impeccable/preview/dossie-v1.html (:root[data-theme="light"]).
+   Acentos escurecidos em relação ao dark mode porque viram
+   texto/borda sobre branco — versão vívida do dark mode teria
+   contraste ruim aqui. --navy/--navy2 ficam propositalmente
+   inalterados (continuam escuros) — são usados como fundo de
+   elementos que mantêm contraste dark mesmo no tema claro
+   (topbar, alguns badges com texto branco); mudar isso quebraria
+   esses componentes.
+   ═══════════════════════════════════════════════════════════ */
+:root[data-theme="light"] {
+  --bg:        #F2F4F8;
+  --bg2:       #E8ECF2;
+  --bg3:       #DDE1E8;
+  --surface:   #FFFFFF;
+  --surface2:  #E8ECF2;
+
+  --navy3:     #0EA37D;
+  --navy4:     #0B7F61;
+  --navy-light:#E8ECF2;
+
+  --ouro:      #8A6A32;
+  --ouro2:     #6E5427;
+  --ouro3:     #5A4420;
+  --ouro-light:#F2ECDD;
+
+  --txt:       #1B2333;
+  --txt2:      #3D4658;
+  --txt3:      #5B6578;
+  --txt4:      #8992A3;
+
+  --verde:     #4C7A43;
+  --verde2:    #3E6537;
+  --verde3:    #4C7A43;
+  --verde-bg:  rgba(76,122,67,.12);
+  --verm:      #B23A2A;
+  --verm2:     #8F2C1E;
+  --verm3:     #A03824;
+  --verm-bg:   rgba(178,58,42,.10);
+  --amber:     #946022;
+  --amber-bg:  rgba(148,96,34,.12);
+  --amber-ink: #6E4A1A;
+
+  --borda:      1px solid rgba(27,35,51,.12);
+  --borda2:     1px solid rgba(27,35,51,.24);
+  --borda-navy: 1px solid var(--navy3);
+  --borda-sub:  1px solid rgba(27,35,51,.07);
+
+  --sombra:     0 1px 2px rgba(20,28,40,.06), 0 4px 16px rgba(20,28,40,.08);
+  --sombra2:    0 8px 28px rgba(20,28,40,.10), 0 2px 6px rgba(20,28,40,.06);
+  --sombra-navy:0 2px 12px rgba(14,163,125,.18);
+
+  --couro2:   var(--navy2);
+  --perg:     var(--ouro);
+  --perg2:    #6E5427;
+  --ardosia2: var(--txt3);
+  --ardosia3: var(--bg2);
+  --fundo2:   var(--bg2);
+  --azul1:    var(--navy3);
+  --verde1:   var(--verde2);
+  --papel:    var(--surface);
+}
+html { color-scheme: dark; }
+:root[data-theme="light"] { color-scheme: light; }
+
 html { font-size: 16px; }
 body {
   font-family: var(--font-sans);
@@ -876,6 +942,50 @@ a:hover { color: var(--txt); }
 .stat-row .stat-bar-fill { height: 100%; border-radius: 2px; }
 @media (max-width: 720px) { .stat-row { grid-template-columns: repeat(3, 1fr); } .stat-row .stat:nth-child(n+4) { border-top: 1px solid var(--borda2); } }
 @media (max-width: 460px) { .stat-row { grid-template-columns: repeat(2, 1fr); } }
+
+/* ═══════════════════════════════════════════════════════════
+   COMPONENTES DO MOCKUP — .painel/.peca/.perf-row/.equipe-tabs etc.
+   Vocabulário do .impeccable/preview/dossie-v1.html que nunca tinha
+   sido portado pro CSS real (telas reusavam .card/.secao-header como
+   aproximação, mas não são a mesma coisa visualmente). Tokens reais.
+   ═══════════════════════════════════════════════════════════ */
+.painel { background: var(--surface); border: var(--borda); border-radius: 3px; box-shadow: var(--sombra); }
+.painel-head { display: flex; align-items: center; justify-content: space-between; gap: .6rem; flex-wrap: wrap; padding: .9rem 1.1rem; border-bottom: var(--borda); }
+.painel-titulo { font-family: var(--font-serif); font-size: 1rem; font-weight: 600; color: var(--txt); }
+.painel-link { font-family: var(--font-mono); font-size: .68rem; color: var(--ouro); cursor: pointer; background: none; border: none; }
+.painel-btn { display: inline-flex; align-items: center; gap: .35rem; background: transparent; border: var(--borda2); color: var(--txt3); font-weight: 600; font-size: .68rem; padding: .38rem .7rem; border-radius: 2px; cursor: pointer; transition: border-color .15s, color .15s; }
+.painel-btn:hover { border-color: var(--navy3); color: var(--txt); }
+.painel-btn-primary { background: linear-gradient(180deg, var(--navy3), var(--navy4)); color: var(--navy); border: 1px solid rgba(255,255,255,.14); }
+.painel-btn-primary:hover { border-color: rgba(255,255,255,.3); color: var(--navy); }
+
+.perf-row { display: flex; justify-content: space-between; align-items: center; font-size: .76rem; padding: .4rem 0; border-bottom: var(--borda-sub); color: var(--txt3); }
+.perf-row:last-child { border-bottom: none; }
+.perf-row b { color: var(--txt); font-weight: 600; }
+
+.equipe-tabs { display: flex; gap: .2rem; border-bottom: var(--borda2); margin: 1rem 0 .9rem; overflow-x: auto; }
+.equipe-tab { font-family: var(--font-mono); font-size: .68rem; padding: .5rem .6rem; cursor: pointer; color: var(--txt4); border-bottom: 2px solid transparent; white-space: nowrap; transition: color .15s, border-color .15s; background: none; border-left: none; border-right: none; border-top: none; }
+.equipe-tab:hover { color: var(--txt3); }
+.equipe-tab.ativo { color: var(--ouro); border-bottom-color: var(--navy3); }
+.equipe-select { font-family: var(--font-sans); font-size: .76rem; color: var(--txt); background: var(--surface); border: var(--borda2); border-radius: 2px; padding: .45rem .6rem; cursor: pointer; }
+.equipe-layout { display: grid; grid-template-columns: 1fr 336px; gap: 1.1rem; align-items: start; }
+@media (max-width: 760px) { .equipe-layout { grid-template-columns: 1fr; } }
+
+.peca-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
+.peca-card { background: var(--surface); border: var(--borda); border-radius: 3px; padding: 1rem 1.1rem; }
+.peca-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: .6rem; margin-bottom: .6rem; }
+.peca-kicker { font-family: var(--font-mono); font-size: .6rem; letter-spacing: .05em; color: var(--txt4); margin-bottom: .3rem; }
+.peca-titulo { font-family: var(--font-serif); font-size: .92rem; font-weight: 600; color: var(--txt); line-height: 1.35; }
+
+.tag { font-family: var(--font-mono); font-size: .64rem; font-weight: 600; padding: .2rem .5rem; border-radius: 2px; text-align: center; letter-spacing: .02em; text-transform: uppercase; }
+.tag-ganho { background: var(--verde-bg); color: var(--verde2); }
+.tag-andamento { background: rgba(217,181,115,.14); color: var(--ouro); }
+
+.btn-avancar { display: inline-flex; align-items: center; gap: .4rem; background: linear-gradient(180deg, var(--navy3), var(--navy4)); color: var(--navy); border: 1px solid rgba(255,255,255,.14); font-weight: 600; font-size: .76rem; padding: .5rem 1rem; border-radius: 2px; cursor: pointer; box-shadow: var(--sombra-navy); }
+.btn-avancar:hover { filter: brightness(1.05); }
+.btn-avancar.oport-btn { padding: .4rem .7rem; font-size: .68rem; }
+.btn-sair { background: transparent; border: var(--borda2); color: var(--txt3); font-size: .72rem; padding: .4rem .7rem; border-radius: 2px; cursor: pointer; transition: border-color .15s, color .15s; }
+.btn-sair:hover { border-color: var(--txt3); color: var(--txt); }
+.btn-sair.oport-btn { padding: .3rem .6rem; font-size: .64rem; }
 
 /* ═══════════════════════════════════════════════════════════
    PROFILE HERO

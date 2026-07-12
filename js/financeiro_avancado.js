@@ -30,6 +30,30 @@ const _FIRMAS_NPC = [
   { id: 'ribeiro_trabalhista', nome: 'Ribeiro Trabalhista', setor: 'Trabalhista', min_inv: 20000, pct_base: 0.007, vol: 0.10, desc: 'Demanda estável, retorno conservador e previsível.' },
 ];
 
+// ── Ações (B3) e Criptomoedas — 📌 PROPOSTA COMPLETA, sem backing real
+// nenhum (não existe no jogo real). Preço/variação são ilustrativos,
+// sorteados uma vez ao carregar o módulo (não vêm de API nenhuma).
+// Carteira é 100% client-side, não persiste no Firestore, some ao
+// recarregar a página — igual ao mockup (.impeccable/preview/dossie-v1.html).
+const _INV_ACOES_TICKERS = ['PETR4','VALE3','ITUB4','BBDC4','ABEV3','WEGE3','BBAS3','RENT3','SUZB3','JBSS3','PRIO3','RADL3','RAIL3','VIVT3','ELET3','GGBR4','CSAN3','EQTL3','SBSP3','LREN3'];
+const _INV_ACOES_NOMES = { PETR4:'Petrobras', VALE3:'Vale', ITUB4:'Itaú Unibanco', BBDC4:'Bradesco', ABEV3:'Ambev', WEGE3:'WEG', BBAS3:'Banco do Brasil', RENT3:'Localiza', SUZB3:'Suzano', JBSS3:'JBS', PRIO3:'PRIO', RADL3:'Raia Drogasil', RAIL3:'Rumo', VIVT3:'Telefônica Brasil', ELET3:'Eletrobras', GGBR4:'Gerdau', CSAN3:'Cosan', EQTL3:'Equatorial', SBSP3:'Sabesp', LREN3:'Lojas Renner' };
+const _INV_ACOES = _INV_ACOES_TICKERS.map(t => ({ ticker:t, nome:_INV_ACOES_NOMES[t], preco:+(8+Math.random()*72).toFixed(2), variacao:+((Math.random()*10)-5).toFixed(2) }));
+const _INV_CRIPTOS_LISTA = [
+  { ticker:'BTC', nome:'Bitcoin',    preco: 340000+Math.random()*40000 },
+  { ticker:'ETH', nome:'Ethereum',   preco: 12000+Math.random()*3000 },
+  { ticker:'BNB', nome:'BNB',        preco: 2000+Math.random()*400 },
+  { ticker:'SOL', nome:'Solana',     preco: 600+Math.random()*150 },
+  { ticker:'XRP', nome:'XRP',        preco: 2.5+Math.random()*1.5 },
+  { ticker:'ADA', nome:'Cardano',    preco: 1.8+Math.random()*0.8 },
+  { ticker:'DOGE',nome:'Dogecoin',   preco: 0.6+Math.random()*0.4 },
+  { ticker:'DOT', nome:'Polkadot',   preco: 25+Math.random()*10 },
+  { ticker:'AVAX',nome:'Avalanche',  preco: 130+Math.random()*40 },
+  { ticker:'MATIC',nome:'Polygon',   preco: 3.5+Math.random()*1.5 },
+];
+const _INV_CRIPTOS = _INV_CRIPTOS_LISTA.map(c => ({ ...c, preco:+c.preco.toFixed(2), variacao:+((Math.random()*14)-7).toFixed(2) }));
+let _invCarteira = { acoes: [], cripto: [] };
+let _invTabAtiva = 'visao';
+
 // ════════════════════════════════════════════════════════
 // RENDERIZAR PAINEL FINANCEIRO AVANÇADO
 // ════════════════════════════════════════════════════════
@@ -69,101 +93,296 @@ window.renderFinanceiroAvancado = async function(j, el) {
   const dispLC   = Math.max(0, tetoLC - saldoLC);
   const jurosMes = saldoLC > 0 ? Math.ceil(saldoLC * 0.025) : 0;
 
+  const { rf, fd, im, fn, total } = _invTotais(inv);
+  const rend = _invRendimento(inv);
+  const count = (inv.renda_fixa||[]).length + (inv.fundos||[]).length + (inv.imovel_renda?1:0) + (inv.firma_npc||[]).length;
+
   el.innerHTML = `
-    <style>
-      .inv-item{display:flex;align-items:center;gap:.4rem;padding:.35rem 0;border-bottom:1px solid var(--borda-cor,#eee)}
-      .inv-item:last-child{border-bottom:none}
-      .inv-grid{display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin:.5rem 0}
-      .inv-tipo-card{border:1px solid var(--borda-cor,#ddd);border-radius:8px;padding:.55rem .4rem;text-align:center;cursor:pointer;transition:.15s}
-      .inv-tipo-card:hover{border-color:var(--azul-accent,#4A90E2);background:rgba(74,144,226,.06)}
-    </style>
+    ${window._capaHeader(`FINANCEIRO · ${(j.nome_personagem||'—').toUpperCase()}`, '📊 Investimentos', '')}
+    <div class="card" style="font-size:.7rem;color:var(--txt3);margin-bottom:1rem;line-height:1.6">
+      4 categorias reais (functions/financeiro.js, GDD Seção 32, rodam todo mês em avancar_mes.js): Renda Fixa, Fundos,
+      Imóvel para Renda, Firmas NPC. Ações (B3) e Criptomoedas são <b style="color:var(--ouro)">📌 proposta completa</b> —
+      não existem no jogo real, preços/variação são ilustrativos e a carteira não é salva.
+    </div>
 
-    ${window._capaHeader(`FINANCEIRO · ${(j.nome_personagem||'—').toUpperCase()}`, '📊 Investimentos & Financeiro', '')}
+    <div class="stat-row">
+      <div class="stat"><div class="stat-label">Total investido</div><div class="stat-value">${_fmtR(total)}</div></div>
+      <div class="stat"><div class="stat-label">Rendimento estimado/mês</div><div class="stat-value up">${_fmtR(rend)}</div></div>
+      <div class="stat"><div class="stat-label">Saldo disponível</div><div class="stat-value">${_fmtR(j.dinheiro||0)}</div></div>
+      <div class="stat"><div class="stat-label">Posições ativas</div><div class="stat-value">${count}</div></div>
+    </div>
 
-    ${_htmlPortfolio(inv)}
+    <div class="equipe-tabs">
+      <div class="equipe-tab${_invTabAtiva==='visao'?' ativo':''}" onclick="window._invTab(this,'visao')">Visão Geral</div>
+      <div class="equipe-tab${_invTabAtiva==='rf'?' ativo':''}" onclick="window._invTab(this,'rf')">Renda Fixa</div>
+      <div class="equipe-tab${_invTabAtiva==='fd'?' ativo':''}" onclick="window._invTab(this,'fd')">Fundos</div>
+      <div class="equipe-tab${_invTabAtiva==='im'?' ativo':''}" onclick="window._invTab(this,'im')">Imóvel p/ Renda</div>
+      <div class="equipe-tab${_invTabAtiva==='fn'?' ativo':''}" onclick="window._invTab(this,'fn')">Firmas (Ações reais)</div>
+      <div class="equipe-tab${_invTabAtiva==='acoes'?' ativo':''}" onclick="window._invTab(this,'acoes')">Ações (B3) 📌</div>
+      <div class="equipe-tab${_invTabAtiva==='cripto'?' ativo':''}" onclick="window._invTab(this,'cripto')">Criptomoedas 📌</div>
+    </div>
+    <div id="inv-conteudo"></div>
+
+    <div style="margin:1.6rem 0 .6rem;padding-top:.6rem;border-top:var(--borda)">
+      <div style="font-size:.66rem;color:var(--txt4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.6rem">Outras ferramentas financeiras</div>
+    </div>
     ${_htmlSocioInvestidor(esc, escTier, escId)}
     ${_htmlAntecipacao(totalHonPendente, maxAntecipavel, valorLiq, descPct, rep)}
     ${_htmlLinhaCredito(saldoLC, dispLC, tetoLC, jurosMes, rep)}
   `;
+
+  window._invRenderTab(_invTabAtiva);
 };
 
-// ────────────────────────────────────────────────────────
-// SEÇÃO: PORTFÓLIO DE INVESTIMENTOS
-// ────────────────────────────────────────────────────────
-function _htmlPortfolio(inv) {
-  const rf = inv.renda_fixa || [];
-  const fd = inv.fundos     || [];
-  const im = inv.imovel_renda;
-  const fn = inv.firma_npc  || [];
-
-  const totalInvestido = rf.reduce((s,i)=>s+i.valor_aplicado,0)
-    + fd.reduce((s,i)=>s+i.valor_aplicado,0)
-    + (im?.valor_aplicado||0)
-    + fn.reduce((s,i)=>s+i.valor_investido,0);
-
-  let items = '';
-
-  for (const i of rf) {
-    const rend = Math.floor(i.valor_aplicado * 0.008);
-    items += `<div class="inv-item">
-      <div style="flex:1">
-        <span style="font-size:.70rem;font-weight:600">📈 Renda Fixa</span>
-        <span style="font-size:.63rem;color:var(--txt3);margin-left:.3rem">${i.aplicado_em}</span>
-        <div style="font-size:.66rem;color:var(--txt4)">${_fmtR(i.valor_aplicado)} · <span style="color:var(--verde2)">+${_fmtR(rend)}/mês</span></div>
-      </div>
-      <button class="btn btn-ghost btn-xs" onclick="window._resgatarInv('renda_fixa','${i.id}',${i.valor_aplicado})">Resgatar</button>
-    </div>`;
-  }
-
-  for (const f of fd) {
-    const lbl = { conservador:'🛡️ Conservador', moderado:'⚖️ Moderado', arrojado:'🚀 Arrojado' }[f.subtipo] || f.subtipo || '';
-    const minR = Math.floor(f.valor_aplicado * (f.min || 0));
-    const maxR = Math.floor(f.valor_aplicado * (f.max || 0.008));
-    items += `<div class="inv-item">
-      <div style="flex:1">
-        <span style="font-size:.70rem;font-weight:600">💹 Fundo ${lbl}</span>
-        <span style="font-size:.63rem;color:var(--txt3);margin-left:.3rem">${f.aplicado_em}</span>
-        <div style="font-size:.66rem;color:var(--txt4)">${_fmtR(f.valor_aplicado)} · ${_fmtR(minR)} a <span style="color:var(--verde2)">${_fmtR(maxR)}/mês</span></div>
-      </div>
-      <button class="btn btn-ghost btn-xs" onclick="window._resgatarInv('fundo','${f.id}',${f.valor_aplicado})">Resgatar</button>
-    </div>`;
-  }
-
-  if (im) {
-    items += `<div class="inv-item">
-      <div style="flex:1">
-        <span style="font-size:.70rem;font-weight:600">🏠 Imóvel para Renda</span>
-        <span style="font-size:.63rem;color:var(--txt3);margin-left:.3rem">${im.aplicado_em}</span>
-        <div style="font-size:.66rem;color:var(--txt4)">${_fmtR(im.valor_aplicado)} · <span style="color:var(--verde2)">+${_fmtR(im.aluguel_mensal)}/mês</span></div>
-      </div>
-      <button class="btn btn-ghost btn-xs" onclick="window._resgatarInv('imovel_renda',null,${im.valor_aplicado})">Resgatar</button>
-    </div>`;
-  }
-
-  for (const p of fn) {
-    const minDiv = Math.floor(p.valor_investido * (p.pct_base||0.009) * (1-(p.volatilidade||0.20)));
-    const maxDiv = Math.floor(p.valor_investido * (p.pct_base||0.009) * (1+(p.volatilidade||0.20)));
-    items += `<div class="inv-item">
-      <div style="flex:1">
-        <span style="font-size:.70rem;font-weight:600">🏢 ${p.nome}</span>
-        <span style="font-size:.63rem;color:var(--txt3);margin-left:.3rem">${p.setor}</span>
-        <div style="font-size:.66rem;color:var(--txt4)">${_fmtR(p.valor_investido)} · ${_fmtR(minDiv)} a <span style="color:var(--verde2)">${_fmtR(maxDiv)}/mês</span></div>
-      </div>
-      <button class="btn btn-ghost btn-xs" onclick="window._resgatarInv('firma_npc','${p.id}',${p.valor_investido})">Resgatar</button>
-    </div>`;
-  }
-
-  return `<div class="card" style="margin-bottom:.7rem">
-    <div style="font-weight:700;font-size:.82rem;color:var(--txt);margin-bottom:.4rem">📊 Portfólio de Investimentos</div>
-    ${totalInvestido > 0 ? `
-      <div style="display:flex;justify-content:space-between;font-size:.72rem;margin-bottom:.3rem">
-        <span style="color:var(--txt3)">Total investido</span>
-        <span style="font-weight:600">${_fmtR(totalInvestido)}</span>
-      </div>` : ''}
-    ${items || `<div style="font-size:.72rem;color:var(--txt4);padding:.3rem 0">Nenhum investimento ativo.</div>`}
-    <button class="btn btn-prim btn-block" style="margin-top:.6rem" onclick="window._abrirModalInvestir()">＋ Novo Investimento</button>
-  </div>`;
+function _invTotais(inv) {
+  const rf = (inv.renda_fixa||[]).reduce((s,i)=>s+i.valor_aplicado,0);
+  const fd = (inv.fundos||[]).reduce((s,i)=>s+i.valor_aplicado,0);
+  const im = inv.imovel_renda?.valor_aplicado || 0;
+  const fn = (inv.firma_npc||[]).reduce((s,i)=>s+i.valor_investido,0);
+  return { rf, fd, im, fn, total: rf+fd+im+fn };
 }
+function _invRendimento(inv) {
+  const rendRf = (inv.renda_fixa||[]).reduce((s,i)=>s+i.valor_aplicado*(i.taxa_mensal||0.008),0);
+  const rendFd = (inv.fundos||[]).reduce((s,i)=>s+i.valor_aplicado*(((i.min||0)+(i.max||0.008))/2),0);
+  const rendIm = inv.imovel_renda?.aluguel_mensal || 0;
+  const rendFn = (inv.firma_npc||[]).reduce((s,i)=>s+i.valor_investido*(i.pct_base||0.009),0);
+  return rendRf+rendFd+rendIm+rendFn;
+}
+
+window._invTab = function(btn, tab) {
+  _invTabAtiva = tab;
+  btn.parentElement.querySelectorAll('.equipe-tab').forEach(t => t.classList.toggle('ativo', t === btn));
+  window._invRenderTab(tab);
+};
+
+window._invRenderTab = function(tab) {
+  const el = document.getElementById('inv-conteudo');
+  if (!el) return;
+  const j = window.JOGADOR || {};
+  const inv = j.investimentos || {};
+  const { rf, fd, im, fn, total } = _invTotais(inv);
+
+  if (tab === 'visao') {
+    const linhas = [
+      ['📈 Renda Fixa', rf, 'var(--verde2)'],
+      ['💹 Fundos', fd, 'var(--ouro)'],
+      ['🏠 Imóvel p/ Renda', im, 'var(--amber)'],
+      ['🏢 Firmas (Ações)', fn, 'var(--navy3)'],
+    ].filter(l => l[1] > 0);
+    let acumulado = 0;
+    const gradientParts = linhas.map(([,valor,cor]) => {
+      const pctStart = acumulado / total * 100;
+      acumulado += valor;
+      const pctEnd = acumulado / total * 100;
+      return `${cor} ${pctStart}% ${pctEnd}%`;
+    });
+    const donutBg = total > 0 ? `conic-gradient(${gradientParts.join(',')})` : 'var(--surface2)';
+    const todasPosicoes = [
+      ...(inv.renda_fixa||[]).map(i=>({ nome:'Tesouro/CDB', tipo:'Renda Fixa', valor:i.valor_aplicado, rend:`+${((i.taxa_mensal||0.008)*100).toFixed(1)}%/mês` })),
+      ...(inv.fundos||[]).map(i=>({ nome:'Fundo '+(i.subtipo?i.subtipo[0].toUpperCase()+i.subtipo.slice(1):'—'), tipo:'Fundos', valor:i.valor_aplicado, rend:`${((i.min||0)*100).toFixed(1)}% a ${((i.max||0)*100).toFixed(1)}%/mês` })),
+      ...(inv.imovel_renda ? [{ nome:'Imóvel p/ Renda', tipo:'Imóvel', valor:inv.imovel_renda.valor_aplicado, rend:`+${_fmtR(inv.imovel_renda.aluguel_mensal)}/mês` }] : []),
+      ...(inv.firma_npc||[]).map(i=>({ nome:i.nome, tipo:'Firma (Ação)', valor:i.valor_investido, rend:`±${((i.volatilidade||0.2)*100).toFixed(0)}% sobre ${((i.pct_base||0.009)*100).toFixed(1)}%/mês` })),
+    ];
+    el.innerHTML = `
+      <div class="equipe-layout" style="grid-template-columns:1fr 1fr">
+        <section class="painel">
+          <div class="painel-head"><span class="painel-titulo">Alocação da Carteira</span></div>
+          <div style="padding:1.2rem 1.1rem;display:flex;align-items:center;gap:1.2rem;flex-wrap:wrap">
+            <div style="width:120px;height:120px;border-radius:50%;background:${donutBg};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <div style="width:76px;height:76px;border-radius:50%;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center">
+                <div style="font-size:.58rem;color:var(--txt4)">Total</div>
+                <div style="font-size:.74rem;color:var(--txt);font-weight:600">${_fmtR(total)}</div>
+              </div>
+            </div>
+            <div style="flex:1;min-width:160px">
+              ${total===0?`<div style="font-size:.78rem;color:var(--txt4)">Nenhum investimento ativo.</div>`:
+                linhas.map(([nome,valor,cor]) => `<div class="perf-row"><span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${cor};margin-right:.4rem"></span>${nome}</span><b>${Math.round(valor/total*100)}%</b></div>`).join('')}
+            </div>
+          </div>
+        </section>
+        <section class="painel">
+          <div class="painel-head"><span class="painel-titulo">Evolução do Patrimônio</span><span class="painel-link">ilustrativo — sem histórico real salvo</span></div>
+          <div style="padding:1.5rem 1.1rem;font-size:.72rem;color:var(--txt4);text-align:center">Sem histórico de patrimônio salvo — o jogo real não guarda isso hoje.</div>
+        </section>
+      </div>
+      <section class="painel" style="margin-top:1.1rem">
+        <div class="painel-head"><span class="painel-titulo">Meus Investimentos</span></div>
+        <div style="padding:.4rem 1.1rem 1rem">
+          ${todasPosicoes.length===0?`<div style="font-size:.78rem;color:var(--txt4);padding:.6rem 0">Nenhum investimento ativo — use as abas acima.</div>`:
+            todasPosicoes.map(p=>`<div class="perf-row"><span>${p.nome} <em style="color:var(--txt4);font-style:normal">· ${p.tipo}</em></span><b>${_fmtR(p.valor)} <span style="color:var(--verde2);font-weight:400">· ${p.rend}</span></b></div>`).join('')}
+        </div>
+      </section>`;
+  } else if (tab === 'rf') {
+    el.innerHTML = `
+      <section class="painel" style="margin-bottom:1rem">
+        <div class="painel-head"><span class="painel-titulo">📈 Renda Fixa — 0,8%/mês fixo <span style="color:var(--verde2);font-size:.62rem">real</span></span></div>
+        <div style="padding:1rem 1.1rem">
+          ${(inv.renda_fixa||[]).length===0?`<div style="font-size:.78rem;color:var(--txt4);margin-bottom:.8rem">Nenhuma aplicação ativa.</div>`:
+            (inv.renda_fixa||[]).map(i=>`
+            <div class="perf-row"><span>${_fmtR(i.valor_aplicado)} aplicado</span><b style="color:var(--verde2)">+${_fmtR(i.valor_aplicado*(i.taxa_mensal||0.008))}/mês</b></div>
+            <div style="text-align:right;margin-bottom:.6rem"><button class="btn-sair oport-btn" onclick="window._resgatarInv('renda_fixa','${i.id}',${i.valor_aplicado})">Resgatar</button></div>`).join('')}
+          <div style="display:flex;gap:.5rem;align-items:center;margin-top:.6rem;flex-wrap:wrap">
+            <input type="number" id="inv-rf-valor" class="equipe-select" placeholder="Valor (mín. R$1.000)" style="flex:1;min-width:140px">
+            <button class="btn-avancar oport-btn" onclick="window._invAplicarInline('renda_fixa')">Aplicar</button>
+          </div>
+        </div>
+      </section>`;
+  } else if (tab === 'fd') {
+    el.innerHTML = `
+      <section class="painel" style="margin-bottom:1rem">
+        <div class="painel-head"><span class="painel-titulo">💹 Fundos — taxa sorteada por subtipo <span style="color:var(--verde2);font-size:.62rem">real</span></span></div>
+        <div style="padding:1rem 1.1rem">
+          ${(inv.fundos||[]).length===0?`<div style="font-size:.78rem;color:var(--txt4);margin-bottom:.8rem">Nenhum fundo ativo.</div>`:
+            (inv.fundos||[]).map(i=>`
+            <div class="perf-row"><span>${i.subtipo?i.subtipo[0].toUpperCase()+i.subtipo.slice(1):'—'} · ${_fmtR(i.valor_aplicado)}</span><b>${_fmtR(i.valor_aplicado*(i.min||0))} a ${_fmtR(i.valor_aplicado*(i.max||0))}/mês</b></div>
+            <div style="text-align:right;margin-bottom:.6rem"><button class="btn-sair oport-btn" onclick="window._resgatarInv('fundo','${i.id}',${i.valor_aplicado})">Resgatar</button></div>`).join('')}
+          <div style="display:flex;gap:.5rem;align-items:center;margin-top:.6rem;flex-wrap:wrap">
+            <select id="inv-fd-subtipo" class="equipe-select">
+              <option value="conservador">🛡️ Conservador (0,4% a 0,9%/mês)</option>
+              <option value="moderado">⚖️ Moderado (0,2% a 1,4%/mês)</option>
+              <option value="arrojado">🚀 Arrojado (-0,5% a 2,0%/mês)</option>
+            </select>
+            <input type="number" id="inv-fd-valor" class="equipe-select" placeholder="Valor (mín. R$2.000)" style="flex:1;min-width:140px">
+            <button class="btn-avancar oport-btn" onclick="window._invAplicarInline('fundo')">Aplicar</button>
+          </div>
+        </div>
+      </section>`;
+  } else if (tab === 'im') {
+    el.innerHTML = `
+      <section class="painel" style="margin-bottom:1rem">
+        <div class="painel-head"><span class="painel-titulo">🏠 Imóvel para Renda — só 1 por vez <span style="color:var(--verde2);font-size:.62rem">real</span></span></div>
+        <div style="padding:1rem 1.1rem">
+          ${inv.imovel_renda ? `
+            <div class="perf-row"><span>${_fmtR(inv.imovel_renda.valor_aplicado)} aplicado</span><b style="color:var(--verde2)">+${_fmtR(inv.imovel_renda.aluguel_mensal)}/mês</b></div>
+            <div style="text-align:right"><button class="btn-sair oport-btn" onclick="window._resgatarInv('imovel_renda',null,${inv.imovel_renda.valor_aplicado})">Resgatar</button></div>` : `
+            <div style="font-size:.78rem;color:var(--txt4);margin-bottom:.8rem">Nenhum imóvel para renda. Aluguel sorteado entre 0,4% e 0,6%/mês, fixado na compra.</div>
+            <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+              <input type="number" id="inv-im-valor" class="equipe-select" placeholder="Valor (mín. R$50.000)" style="flex:1;min-width:140px">
+              <button class="btn-avancar oport-btn" onclick="window._invAplicarInline('imovel_renda')">Comprar</button>
+            </div>`}
+        </div>
+      </section>`;
+  } else if (tab === 'fn') {
+    const investidas = (inv.firma_npc||[]).map(p=>p.firma_id);
+    el.innerHTML = `
+      <section class="painel" style="margin-bottom:1rem">
+        <div class="painel-head"><span class="painel-titulo">🏢 Firmas NPC — mais próximo de "ações" real <span style="color:var(--verde2);font-size:.62rem">real, 5 firmas</span></span></div>
+        <div style="padding:1rem 1.1rem">
+          ${(inv.firma_npc||[]).length===0?`<div style="font-size:.78rem;color:var(--txt4);margin-bottom:.8rem">Nenhuma participação ativa.</div>`:
+            (inv.firma_npc||[]).map(i=>{
+              const minD=i.valor_investido*(i.pct_base||0.009)*(1-(i.volatilidade||0.2)), maxD=i.valor_investido*(i.pct_base||0.009)*(1+(i.volatilidade||0.2));
+              return `<div class="perf-row"><span>${i.nome} · ${_fmtR(i.valor_investido)}</span><b>${_fmtR(minD)} a ${_fmtR(maxD)}/mês</b></div>
+              <div style="text-align:right;margin-bottom:.6rem"><button class="btn-sair oport-btn" onclick="window._resgatarInv('firma_npc','${i.id}',${i.valor_investido})">Resgatar</button></div>`;
+            }).join('')}
+        </div>
+      </section>
+      <div class="peca-grid">
+        ${_FIRMAS_NPC.filter(f=>!investidas.includes(f.id)).map(f => `
+          <div class="peca-card">
+            <div class="peca-topo"><div><div class="peca-kicker">🏢 ${f.setor.toUpperCase()}</div><div class="peca-titulo">${f.nome}</div></div></div>
+            <div class="perf-row"><span>Mínimo</span><b>${_fmtR(f.min_inv)}</b></div>
+            <div class="perf-row"><span>Dividendo base</span><b>${(f.pct_base*100).toFixed(1)}%/mês</b></div>
+            <div class="perf-row"><span>Volatilidade</span><b>${(f.vol*100).toFixed(0)}%</b></div>
+            <input type="number" id="inv-fn-valor-${f.id}" class="equipe-select" placeholder="Valor a investir" style="width:100%;margin:.5rem 0;box-sizing:border-box">
+            <button class="btn-avancar oport-btn" style="width:100%" onclick="window._invAplicarInline('firma_npc','${f.id}')">Investir</button>
+          </div>`).join('')}
+      </div>`;
+  } else if (tab === 'acoes' || tab === 'cripto') {
+    const lista = tab === 'acoes' ? _INV_ACOES : _INV_CRIPTOS;
+    const carteira = _invCarteira[tab];
+    const carteiraValor = carteira.reduce((s,h)=>{
+      const atual = lista.find(x=>x.ticker===h.ticker);
+      return s + (atual ? atual.preco*h.qtd : 0);
+    },0);
+    el.innerHTML = `
+      <div style="font-size:.7rem;color:var(--ouro);margin-bottom:.8rem">📌 Proposta completa — sem backing real nenhum. Preços/variação ilustrativos (sorteados uma vez ao carregar), carteira não é salva.</div>
+      ${carteira.length>0?`
+      <section class="painel" style="margin-bottom:1rem">
+        <div class="painel-head"><span class="painel-titulo">Minha Carteira — ${_fmtR(carteiraValor)}</span></div>
+        <div style="padding:.4rem 1.1rem 1rem">
+          ${carteira.map(h=>{
+            const atual = lista.find(x=>x.ticker===h.ticker);
+            return `<div class="perf-row"><span>${h.ticker} <em style="color:var(--txt4);font-style:normal">· ${h.qtd} ${tab==='acoes'?'ações':'unid.'}</em></span>
+              <span><b>${_fmtR(atual.preco*h.qtd)}</b> <button class="btn-sair oport-btn" style="margin-left:.6rem" onclick="window._invVender('${tab}','${h.id}')">Vender</button></span></div>`;
+          }).join('')}
+        </div>
+      </section>`:''}
+      <section class="painel">
+        <div class="painel-head"><span class="painel-titulo">${tab==='acoes'?'Top 20 Ações — B3':'Top 10 Criptomoedas'}</span></div>
+        <div style="padding:.4rem 1.1rem 1rem">
+          ${lista.map(a => `
+          <div class="perf-row">
+            <span>${a.ticker} <em style="color:var(--txt4);font-style:normal">${a.nome}</em></span>
+            <span style="display:flex;align-items:center;gap:.6rem">
+              <b>${_fmtR(a.preco)}</b>
+              <b style="color:${a.variacao>=0?'var(--verde2)':'var(--verm2)'};min-width:52px;text-align:right">${a.variacao>=0?'+':''}${a.variacao}%</b>
+              <input type="number" id="inv-${tab}-qtd-${a.ticker}" class="equipe-select" placeholder="Qtd" style="width:64px;padding:.3rem">
+              <button class="btn-avancar oport-btn" onclick="window._invComprarProposta('${tab}','${a.ticker}')">Comprar</button>
+            </span>
+          </div>`).join('')}
+        </div>
+      </section>`;
+  }
+};
+
+window._invAplicarInline = async function(tipo, firmaId) {
+  let valor, subtipo;
+  if (tipo === 'renda_fixa') valor = parseFloat(document.getElementById('inv-rf-valor')?.value);
+  else if (tipo === 'fundo') { valor = parseFloat(document.getElementById('inv-fd-valor')?.value); subtipo = document.getElementById('inv-fd-subtipo')?.value; }
+  else if (tipo === 'imovel_renda') valor = parseFloat(document.getElementById('inv-im-valor')?.value);
+  else if (tipo === 'firma_npc') valor = parseFloat(document.getElementById(`inv-fn-valor-${firmaId}`)?.value);
+  if (!valor || valor <= 0) { toast('Informe um valor válido.', 'ko'); return; }
+  try {
+    const fn = httpsCallable(window.FB_FUNCTIONS, 'aplicarInvestimento');
+    const r  = await fn({ tipo, valor, subtipo, firma_id: firmaId, nonce: _gerarNonce() });
+    toast(`✅ ${r.data.msg}`, 'ok', 4000);
+    setTimeout(() => window.navTo?.('financeiro', null), 500);
+  } catch (e) {
+    toast(e.message || 'Erro ao aplicar investimento.', 'ko');
+  }
+};
+
+window._resgatarInv = async function(tipo, id, valor) {
+  const label = { renda_fixa:'Renda Fixa', fundo:'Fundo', imovel_renda:'Imóvel', firma_npc:'Participação' }[tipo] || tipo;
+  abrirModal(`Resgatar ${label}?`, `
+    <div style="font-size:.74rem;color:var(--txt3);margin-bottom:1rem">
+      O capital de <b>${_fmtR(valor)}</b> será devolvido ao seu saldo. Os rendimentos acumulados já foram creditados normalmente.
+    </div>
+    <div style="display:flex;gap:.5rem">
+      <button class="btn btn-ghost btn-block" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-prim btn-block" onclick="window.__confirmarResgate('${tipo}','${id||''}',${valor})">Resgatar</button>
+    </div>
+  `);
+};
+
+window.__confirmarResgate = async function(tipo, id, valor) {
+  fecharModal();
+  try {
+    const fn = httpsCallable(window.FB_FUNCTIONS, 'resgatarInvestimento');
+    const r  = await fn({ tipo, id: id || null, nonce: _gerarNonce() });
+    toast(`✅ ${r.data.msg}`, 'ok', 5000);
+    setTimeout(() => window.navTo?.('financeiro', null), 500);
+  } catch (e) {
+    toast(e.message || 'Erro ao resgatar.', 'ko');
+  }
+};
+
+// ── Ações (B3) / Criptomoedas — 📌 proposta, client-side only ──
+window._invComprarProposta = function(tipo, ticker) {
+  const el = document.getElementById(`inv-${tipo}-qtd-${ticker}`);
+  const qtd = parseFloat(el?.value);
+  if (!qtd || qtd <= 0) { toast('Informe uma quantidade válida.', 'ko'); return; }
+  const existente = _invCarteira[tipo].find(h => h.ticker === ticker);
+  if (existente) existente.qtd += qtd;
+  else _invCarteira[tipo].push({ id: tipo+Date.now(), ticker, qtd });
+  toast(`✅ Comprado (proposta — não persiste).`, 'ok', 2500);
+  window._invRenderTab(tipo);
+};
+window._invVender = function(tipo, id) {
+  _invCarteira[tipo] = _invCarteira[tipo].filter(h => h.id !== id);
+  window._invRenderTab(tipo);
+};
+
 
 // ────────────────────────────────────────────────────────
 // SEÇÃO: SÓCIO INVESTIDOR
@@ -264,212 +483,6 @@ function _htmlLinhaCredito(saldo, disp, teto, juros, rep) {
     : `<div style="font-size:.72rem;color:var(--txt4);text-align:center;padding:.5rem 0">Reputação mínima 40 necessária (atual: ${rep}).</div>`}
   </div>`;
 }
-
-// ════════════════════════════════════════════════════════
-// MODAL: NOVO INVESTIMENTO
-// ════════════════════════════════════════════════════════
-window._abrirModalInvestir = function() {
-  const inv       = window.JOGADOR?.investimentos || {};
-  const investidas = (inv.firma_npc || []).map(p => p.firma_id);
-  const firmasDisp = _FIRMAS_NPC.filter(f => !investidas.includes(f.id));
-  const temImovel  = !!inv.imovel_renda;
-
-  abrirModal('📊 Novo Investimento', `
-    <div style="font-size:.74rem;color:var(--txt3);margin-bottom:.7rem">Escolha o tipo:</div>
-    <div class="inv-grid">
-      <div class="inv-tipo-card" onclick="window._modalTipoInv('renda_fixa')">
-        <div style="font-size:1rem">📈</div>
-        <div style="font-size:.72rem;font-weight:600;margin:.15rem 0">Renda Fixa</div>
-        <div style="font-size:.62rem;color:var(--txt3)">0,8%/mês fixo</div>
-        <div style="font-size:.60rem;color:var(--txt4)">mín. R$1.000</div>
-      </div>
-      <div class="inv-tipo-card" onclick="window._modalTipoInv('fundo')">
-        <div style="font-size:1rem">💹</div>
-        <div style="font-size:.72rem;font-weight:600;margin:.15rem 0">Fundos</div>
-        <div style="font-size:.62rem;color:var(--txt3)">0,4–2%/mês variável</div>
-        <div style="font-size:.60rem;color:var(--txt4)">mín. R$2.000</div>
-      </div>
-      ${temImovel
-        ? `<div class="inv-tipo-card" style="opacity:.4;pointer-events:none">
-            <div style="font-size:1rem">🏠</div>
-            <div style="font-size:.72rem;font-weight:600;margin:.15rem 0">Imóvel Renda</div>
-            <div style="font-size:.62rem;color:var(--txt3)">Já possui um</div>
-          </div>`
-        : `<div class="inv-tipo-card" onclick="window._modalTipoInv('imovel_renda')">
-            <div style="font-size:1rem">🏠</div>
-            <div style="font-size:.72rem;font-weight:600;margin:.15rem 0">Imóvel Renda</div>
-            <div style="font-size:.62rem;color:var(--txt3)">0,4–0,6%/mês fixo</div>
-            <div style="font-size:.60rem;color:var(--txt4)">mín. R$50.000</div>
-          </div>`}
-      ${firmasDisp.length === 0
-        ? `<div class="inv-tipo-card" style="opacity:.4;pointer-events:none">
-            <div style="font-size:1rem">🏢</div>
-            <div style="font-size:.72rem;font-weight:600;margin:.15rem 0">Firmas NPC</div>
-            <div style="font-size:.62rem;color:var(--txt3)">Todas as posições abertas</div>
-          </div>`
-        : `<div class="inv-tipo-card" onclick="window._modalTipoInv('firma_npc')">
-            <div style="font-size:1rem">🏢</div>
-            <div style="font-size:.72rem;font-weight:600;margin:.15rem 0">Firmas NPC</div>
-            <div style="font-size:.62rem;color:var(--txt3)">0,7–1,5%/mês · risco</div>
-            <div style="font-size:.60rem;color:var(--txt4)">${firmasDisp.length} disponíveis</div>
-          </div>`}
-    </div>
-  `);
-};
-
-window._modalTipoInv = function(tipo) {
-  const j        = window.JOGADOR || {};
-  const dinheiro = j.dinheiro || 0;
-  const inv      = j.investimentos || {};
-  const investidas = (inv.firma_npc || []).map(p => p.firma_id);
-  const firmasDisp = _FIRMAS_NPC.filter(f => !investidas.includes(f.id));
-
-  const _previewInput = (inputId, previewId, fn, onSetup) => {
-    setTimeout(() => {
-      const elI = document.getElementById(inputId);
-      const elP = document.getElementById(previewId);
-      if (elI && elP) {
-        elI.addEventListener('input', () => { elP.textContent = fn(parseInt(elI.value) || 0); });
-        elI.dispatchEvent(new Event('input'));
-        onSetup?.();
-      }
-    }, 50);
-  };
-
-  if (tipo === 'renda_fixa') {
-    abrirModal('📈 Renda Fixa', `
-      <div style="font-size:.74rem;color:var(--txt3);margin-bottom:.7rem">Rendimento garantido de <b>0,8%/mês</b> sobre o valor aplicado. Sem risco. Resgatável a qualquer momento (sem penalidade).</div>
-      <div style="font-size:.70rem;color:var(--txt3);margin-bottom:.3rem">Saldo disponível: <b>${_fmtR(dinheiro)}</b></div>
-      <label style="font-size:.72rem;color:var(--txt3)">Valor a aplicar</label>
-      <input id="inv-valor" type="number" min="1000" max="${dinheiro}" step="1000" value="${Math.min(10000, dinheiro)}"
-        style="width:100%;margin:.3rem 0 .3rem;padding:.5rem;border:1px solid var(--borda-cor,#ccc);border-radius:6px;font-size:.85rem;box-sizing:border-box">
-      <div id="inv-prev" style="font-size:.68rem;color:var(--verde2);min-height:1rem;margin-bottom:.8rem"></div>
-      <button class="btn btn-prim btn-block" onclick="window._confirmarInvestimento('renda_fixa')">Aplicar</button>
-    `);
-    _previewInput('inv-valor', 'inv-prev', v => `+${_fmtR(Math.floor(v * 0.008))}/mês garantido`);
-  }
-
-  else if (tipo === 'fundo') {
-    const taxas = { conservador:[0.004,0.009], moderado:[0.002,0.014], arrojado:[-0.005,0.020] };
-    abrirModal('💹 Fundos de Investimento', `
-      <div style="font-size:.74rem;color:var(--txt3);margin-bottom:.7rem">Retorno variável. Quanto maior o risco, maior o potencial — e o prejuízo possível.</div>
-      <div style="font-size:.70rem;color:var(--txt3);margin-bottom:.4rem">Saldo disponível: <b>${_fmtR(dinheiro)}</b></div>
-      <label style="font-size:.72rem;color:var(--txt3)">Tipo de fundo</label>
-      <div style="display:flex;gap:.4rem;margin:.3rem 0 .6rem">
-        ${[['conservador','🛡️','0,4–0,9%'],['moderado','⚖️','0,2–1,4%'],['arrojado','🚀','-0,5–2%']].map(([t,e,r],i)=>`
-          <label style="flex:1;cursor:pointer;display:block">
-            <input type="radio" name="fund-tipo" value="${t}" ${i===0?'checked':''} style="display:none">
-            <div class="inv-tipo-card" style="padding:.4rem .2rem;font-size:.64rem">
-              <div>${e}</div><div style="font-weight:600;font-size:.68rem">${t.charAt(0).toUpperCase()+t.slice(1)}</div><div style="color:var(--txt3)">${r}</div>
-            </div>
-          </label>`).join('')}
-      </div>
-      <label style="font-size:.72rem;color:var(--txt3)">Valor a aplicar</label>
-      <input id="inv-valor" type="number" min="2000" max="${dinheiro}" step="500" value="${Math.min(10000, dinheiro)}"
-        style="width:100%;margin:.3rem 0 .3rem;padding:.5rem;border:1px solid var(--borda-cor,#ccc);border-radius:6px;font-size:.85rem;box-sizing:border-box">
-      <div id="inv-prev" style="font-size:.68rem;color:var(--txt3);min-height:1rem;margin-bottom:.8rem"></div>
-      <button class="btn btn-prim btn-block" onclick="window._confirmarInvestimento('fundo')">Aplicar</button>
-    `);
-    _previewInput('inv-valor', 'inv-prev', v => {
-      const t = document.querySelector('[name="fund-tipo"]:checked')?.value || 'conservador';
-      const [mn, mx] = taxas[t];
-      return `Retorno: ${_fmtR(Math.floor(v*mn))} a ${_fmtR(Math.floor(v*mx))}/mês`;
-    }, () => {
-      document.querySelectorAll('[name="fund-tipo"]').forEach(r =>
-        r.addEventListener('change', () => document.getElementById('inv-valor')?.dispatchEvent(new Event('input')))
-      );
-    });
-  }
-
-  else if (tipo === 'imovel_renda') {
-    abrirModal('🏠 Imóvel para Renda', `
-      <div style="font-size:.74rem;color:var(--txt3);margin-bottom:.7rem">Invista em imóvel para aluguel. Retorno fixo de <b>0,4–0,6%/mês</b> determinado na compra.</div>
-      <div style="font-size:.70rem;color:var(--txt3);margin-bottom:.3rem">Saldo disponível: <b>${_fmtR(dinheiro)}</b></div>
-      <label style="font-size:.72rem;color:var(--txt3)">Valor do imóvel</label>
-      <input id="inv-valor" type="number" min="50000" max="${dinheiro}" step="5000" value="${Math.min(150000, dinheiro)}"
-        style="width:100%;margin:.3rem 0 .3rem;padding:.5rem;border:1px solid var(--borda-cor,#ccc);border-radius:6px;font-size:.85rem;box-sizing:border-box">
-      <div id="inv-prev" style="font-size:.68rem;color:var(--verde2);min-height:1rem;margin-bottom:.8rem"></div>
-      <button class="btn btn-prim btn-block" onclick="window._confirmarInvestimento('imovel_renda')">Comprar Imóvel</button>
-    `);
-    _previewInput('inv-valor', 'inv-prev', v => `Aluguel estimado: ${_fmtR(Math.floor(v*0.004))} a ${_fmtR(Math.floor(v*0.006))}/mês`);
-  }
-
-  else if (tipo === 'firma_npc') {
-    const primeiraFirma = firmasDisp[0];
-    abrirModal('🏢 Participação em Firma', `
-      <div style="font-size:.74rem;color:var(--txt3);margin-bottom:.5rem">Receba dividendos mensais variáveis de uma firma jurídica NPC.</div>
-      <div style="font-size:.70rem;color:var(--txt3);margin-bottom:.5rem">Saldo disponível: <b>${_fmtR(dinheiro)}</b></div>
-      ${firmasDisp.map((f,i) => `
-        <label style="display:flex;align-items:flex-start;gap:.4rem;cursor:pointer;margin-bottom:.4rem;padding:.35rem;border:1px solid var(--borda-cor,#ddd);border-radius:6px">
-          <input type="radio" name="firma-id" value="${f.id}" ${i===0?'checked':''} style="margin-top:.15rem;flex-shrink:0">
-          <div>
-            <div style="font-size:.72rem;font-weight:600">${f.nome} <span style="font-weight:400;color:var(--txt3)">— ${f.setor}</span></div>
-            <div style="font-size:.64rem;color:var(--txt4)">${f.desc}</div>
-            <div style="font-size:.64rem;color:var(--txt3)">Base ${(f.pct_base*100).toFixed(1)}%/mês · volatilidade ${(f.vol*100).toFixed(0)}% · mín. ${_fmtR(f.min_inv)}</div>
-          </div>
-        </label>`).join('')}
-      <label style="font-size:.72rem;color:var(--txt3)">Valor a investir</label>
-      <input id="inv-valor" type="number" min="${primeiraFirma?.min_inv||20000}" max="${dinheiro}" step="5000"
-        value="${Math.min(primeiraFirma?.min_inv||20000, dinheiro)}"
-        style="width:100%;margin:.3rem 0 .3rem;padding:.5rem;border:1px solid var(--borda-cor,#ccc);border-radius:6px;font-size:.85rem;box-sizing:border-box">
-      <div id="inv-prev" style="font-size:.68rem;color:var(--txt3);min-height:1rem;margin-bottom:.8rem"></div>
-      <button class="btn btn-prim btn-block" onclick="window._confirmarInvestimento('firma_npc')">Investir</button>
-    `);
-    _previewInput('inv-valor', 'inv-prev', v => {
-      const fId = document.querySelector('[name="firma-id"]:checked')?.value;
-      const f   = _FIRMAS_NPC.find(x => x.id === fId) || primeiraFirma;
-      if (!f || v < f.min_inv) return `Mínimo ${_fmtR(f?.min_inv || 0)}`;
-      const mnDiv = Math.floor(v * f.pct_base * (1 - f.vol));
-      const mxDiv = Math.floor(v * f.pct_base * (1 + f.vol));
-      return `Dividendos estimados: ${_fmtR(mnDiv)} a ${_fmtR(mxDiv)}/mês`;
-    }, () => {
-      document.querySelectorAll('[name="firma-id"]').forEach(r =>
-        r.addEventListener('change', () => document.getElementById('inv-valor')?.dispatchEvent(new Event('input')))
-      );
-    });
-  }
-};
-
-window._confirmarInvestimento = async function(tipo) {
-  const valor    = parseInt(document.getElementById('inv-valor')?.value) || 0;
-  const subtipo  = document.querySelector('[name="fund-tipo"]:checked')?.value;
-  const firma_id = document.querySelector('[name="firma-id"]:checked')?.value;
-  if (valor <= 0) { toast('Valor inválido.', 'ko'); return; }
-  try {
-    const fn = httpsCallable(window.FB_FUNCTIONS, 'aplicarInvestimento');
-    const r  = await fn({ tipo, valor, subtipo, firma_id, nonce: _gerarNonce() });
-    fecharModal();
-    toast(`✅ ${r.data.msg}`, 'ok', 5000);
-    setTimeout(() => window.navTo?.('financeiro', null), 500);
-  } catch (e) {
-    toast(e.message || 'Erro ao aplicar investimento.', 'ko');
-  }
-};
-
-window._resgatarInv = async function(tipo, id, valor) {
-  const label = { renda_fixa:'Renda Fixa', fundo:'Fundo', imovel_renda:'Imóvel', firma_npc:'Participação' }[tipo] || tipo;
-  abrirModal(`Resgatar ${label}?`, `
-    <div style="font-size:.74rem;color:var(--txt3);margin-bottom:1rem">
-      O capital de <b>${_fmtR(valor)}</b> será devolvido ao seu saldo. Os rendimentos acumulados já foram creditados normalmente.
-    </div>
-    <div style="display:flex;gap:.5rem">
-      <button class="btn btn-ghost btn-block" onclick="fecharModal()">Cancelar</button>
-      <button class="btn btn-prim btn-block" onclick="window.__confirmarResgate('${tipo}','${id||''}',${valor})">Resgatar</button>
-    </div>
-  `);
-};
-
-window.__confirmarResgate = async function(tipo, id, valor) {
-  fecharModal();
-  try {
-    const fn = httpsCallable(window.FB_FUNCTIONS, 'resgatarInvestimento');
-    const r  = await fn({ tipo, id: id || null, nonce: _gerarNonce() });
-    toast(`✅ ${r.data.msg}`, 'ok', 5000);
-    setTimeout(() => window.navTo?.('financeiro', null), 500);
-  } catch (e) {
-    toast(e.message || 'Erro ao resgatar.', 'ko');
-  }
-};
 
 // ════════════════════════════════════════════════════════
 // SÓCIO INVESTIDOR
