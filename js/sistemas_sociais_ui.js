@@ -129,7 +129,9 @@ window._ssCarregarAlumni = async function() {
     const r  = await fn({});
     const { faculdade, julgadores, seed_pendente } = r.data;
     if (seed_pendente) {
-      areaEl.innerHTML = `<div style="color:var(--txt4)">Roster de julgadores ainda não foi gerado neste servidor (admin precisa rodar o seed).</div>`;
+      areaEl.innerHTML = `
+        <div style="margin-bottom:.4rem">Sua faculdade: <b style="color:var(--txt)">${faculdade}</b></div>
+        <div style="color:var(--txt4)">Roster de julgadores ainda não foi gerado neste servidor (admin precisa rodar o seed em admin.html → Ferramentas Beta).</div>`;
       return;
     }
     const lista = _ssAlumniSoMinha ? julgadores.filter(jl => jl.mesma_faculdade) : julgadores;
