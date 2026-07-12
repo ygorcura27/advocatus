@@ -1169,6 +1169,29 @@ const _GESTAO_CAP  = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 }
 const _NETWORK_CAP = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
 const _CARGO_LABEL_JOGADOR = { est:'Estagiário', ass:'Assistente Jurídico', jnr:'Advogado Júnior', pln:'Advogado Pleno', snr:'Advogado Sênior', asc:'Associado', soc:'Sócio' };
 
+function _renderPickerGestor(funcs, escId, esc) {
+  const socios = esc.socios || [];
+  const ehDono = esc.dono_uid === (window.JOGADOR?.uid||window.JOGADOR_UID) || esc.fundador_uid === (window.JOGADOR?.uid||window.JOGADOR_UID);
+  const ehSocio = socios.some(s => s.uid === (window.JOGADOR?.uid||window.JOGADOR_UID)) || ehDono;
+  if (!ehSocio) return '';
+
+  const ativos = funcs.filter(f => f.ativo !== false && f.id !== esc.gestor_id);
+  const opcoes = ativos.map(f => `<option value="${f.id}">${f.nome || '—'} (${CARGO_INFO[f.cargo_id]?.l || f.cargo_id}${f.tipo==='npc'?' · NPC':''})</option>`).join('');
+
+  return `
+    <div style="margin-top:.6rem;padding-top:.5rem;border-top:1px solid var(--bg2)">
+      <div style="font-size:.68rem;color:var(--txt4);margin-bottom:.3rem">Designar manualmente (só NPC ativa o amortecimento de conflitos por Gestão):</div>
+      <div style="display:flex;gap:.4rem">
+        <select id="gestor-picker-${escId}" style="flex:1;background:var(--bg2);border:var(--borda);border-radius:var(--r);color:var(--txt);font-size:.72rem;padding:.3rem">
+          <option value="">— escolher funcionário —</option>
+          ${opcoes}
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="window.designarGestor('${escId}')">Designar</button>
+      </div>
+      ${esc.gestor_id ? `<button class="btn btn-ghost btn-sm btn-block" style="margin-top:.3rem;color:var(--verm3)" onclick="window.removerGestor('${escId}')">Remover gestor atual</button>` : ''}
+    </div>`;
+}
+
 function _renderCardGestao(j, esc, funcs, escId) {
   if (esc.gestor_id) {
     const meuUid = window.JOGADOR?.uid || window.JOGADOR_UID;
@@ -1177,12 +1200,13 @@ function _renderCardGestao(j, esc, funcs, escId) {
     <div class="card" style="margin-bottom:1rem;padding:.7rem 1rem">
       <div style="font-size:.78rem;font-weight:700;color:var(--txt);margin-bottom:.3rem">⚙️ Gestão do Escritório</div>
       <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.6rem">
-        Gestor: <b style="color:var(--txt)">${esc.gestor_nome || '—'}</b> (${_CARGO_LABEL_JOGADOR[esc.gestor_cargo] || esc.gestor_cargo || '—'})${souEu ? ' <span style="color:var(--verde2)">— é você</span>' : ''}
+        Gestor: <b style="color:var(--txt)">${esc.gestor_nome || '—'}</b> (${_CARGO_LABEL_JOGADOR[esc.gestor_cargo] || CARGO_INFO[esc.gestor_cargo]?.l || esc.gestor_cargo || '—'})${souEu ? ' <span style="color:var(--verde2)">— é você</span>' : ''}
       </div>
       ${_renderToggleGestor('📋 Delegar processos ao gestor', 'processos', esc.gestor_delega_processos !== false, escId)}
       ${_renderToggleGestor('🎓 Delegar mentoria ao gestor', 'mentoria', !!esc.gestor_delega_mentoria, escId)}
       ${_renderToggleGestor('⚖️ Delegar conflitos leves ao gestor', 'conflitos', !!esc.gestor_delega_conflitos, escId)}
       <div style="font-size:.6rem;color:var(--txt4);margin-top:.4rem">⚠️ Conflitos estruturais sempre escalam ao dono, independente das delegações.</div>
+      ${_renderPickerGestor(funcs, escId, esc)}
     </div>`;
   }
 
@@ -1214,8 +1238,34 @@ function _renderCardGestao(j, esc, funcs, escId) {
         <div class="skill-bar"><div class="skill-fill" style="width:${pctNet}%"></div></div>
       </div>
       <div style="font-size:.68rem;color:${souCargoMaisAlto?'var(--verde2)':'var(--txt4)'}">${souCargoMaisAlto ? '✅' : '○'} Ser o cargo mais alto do escritório</div>
+      ${_renderPickerGestor(funcs, escId, esc)}
     </div>`;
 }
+
+window.designarGestor = async function(escId) {
+  const sel = document.getElementById(`gestor-picker-${escId}`);
+  const funcId = sel?.value;
+  if (!funcId) { window.toast('Escolha um funcionário.', 'ko'); return; }
+  const fSnap = await getDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId));
+  if (!fSnap.exists()) { window.toast('Funcionário não encontrado.', 'ko'); return; }
+  const f = fSnap.data();
+  await updateDoc(doc(db, 'escritorios', escId), {
+    gestor_id: funcId,
+    gestor_nome: f.nome || 'Gestor',
+    gestor_cargo: f.cargo_id || null,
+  });
+  window.toast(`✅ ${f.nome} designado(a) gestor(a).`, 'ok', 2000);
+  setTimeout(() => window.navTo?.('equipe', null), 400);
+};
+
+window.removerGestor = async function(escId) {
+  await updateDoc(doc(db, 'escritorios', escId), {
+    gestor_id: null, gestor_nome: null, gestor_cargo: null,
+    gestor_delega_processos: false, gestor_delega_mentoria: false, gestor_delega_conflitos: false,
+  });
+  window.toast('Gestor removido.', 'ok', 1800);
+  setTimeout(() => window.navTo?.('equipe', null), 400);
+};
 
 function _renderToggleGestor(label, tipo, ativo, escId) {
   const cor = ativo ? 'var(--verde2)' : 'var(--txt4)';
