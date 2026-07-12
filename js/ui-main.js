@@ -84,6 +84,7 @@ function _navLateralPadrao(painel) {
       <div class="nav-item${ativo('patrimonio')}" onclick="navTo('patrimonio',this)"><span class="ni-icon">${icon('patrimonio')}</span> Patrimônio</div>
       <div class="nav-item${ativo('financeiro')}" onclick="navTo('financeiro',this)"><span class="ni-icon">${icon('financeiro')}</span> Finanças Avançadas</div>
       <div class="nav-item${ativo('assembleia')}" onclick="navTo('assembleia',this)"><span class="ni-icon">${icon('assembleia')||'🏛️'}</span> Assembleia de Sócios</div>
+      <div class="nav-item${ativo('marketing')}" onclick="navTo('marketing',this)"><span class="ni-icon">${icon('marketing')||'📣'}</span> Marketing</div>
       <div class="nav-item${ativo('loja')}" onclick="navTo('loja',this)"><span class="ni-icon">${icon('loja')}</span> Loja</div>
       <div class="nav-item${ativo('vida_pessoal')}" onclick="navTo('vida_pessoal',this)"><span class="ni-icon">${icon('vida_pessoal')}</span> Vida Pessoal</div>
     </div>
@@ -174,6 +175,7 @@ function _renderizar() {
     case 'foco':          renderFoco(j, main);          break;
     case 'redes':         renderRedes(j, main);         break;
     case 'assembleia':    window.renderAssembleiaSocios(j, main); break;
+    case 'marketing':     renderMarketing(j, main);     break;
     case 'progressao':   renderProgressao(j, main);    break;
     case 'habilidades':  renderHabilidades(j, main);   break;
     case 'cursos':       renderCursos(j, main);        break;
@@ -1497,6 +1499,57 @@ function renderRedes(j, el) {
     <div id="redes-feed-area" style="margin-top:1rem"></div>`;
 
   if (window.renderFeedPosts) window.renderFeedPosts(document.getElementById('redes-feed-area'));
+}
+
+// ════════════════════════════════════════════════════════
+// MARKETING & REPUTAÇÃO — hub real do escritório. Reputação/prestígio
+// já existiam no backend (processar_sentenca.js/processar_acordao.js)
+// mas esc.reputacao nunca aparecia em nenhuma tela (só esc.prestigio,
+// no hero do Escritório) — corrigido aqui. Campanhas segue proposta,
+// sem backend nenhum; Redes Sociais/Mídia linkam pras telas reais.
+// ════════════════════════════════════════════════════════
+async function renderMarketing(j, el) {
+  el.innerHTML = `<div class="secao-header"><div class="secao-titulo">📣 Marketing & Reputação</div></div><div class="card">Carregando...</div>`;
+
+  const escId = j.escritorio_id;
+  if (!escId || escId === 'solo') {
+    el.innerHTML = `<div class="secao-header"><div class="secao-titulo">📣 Marketing & Reputação</div></div>
+      <div class="card" style="color:var(--txt3)">Você precisa estar em um escritório pra ter reputação/prestígio de escritório.</div>`;
+    return;
+  }
+
+  const escSnap = await getDoc(doc(db, 'escritorios', escId));
+  const esc = escSnap.exists() ? escSnap.data() : {};
+  const rep = esc.reputacao || 0;
+  const repCap = 55; // functions/processar_sentenca.js:repCapDoCargo('escritorio') — 'escritorio' não tem chave própria, cai no fallback
+  const prestigio = esc.prestigio || 0;
+
+  el.innerHTML = `
+    <div class="secao-header"><div class="secao-titulo">📣 Marketing & Reputação — ${esc.nome || '—'}</div></div>
+    <div class="card" style="font-size:.72rem;color:var(--txt3);margin-bottom:1rem;line-height:1.6">
+      📌 Sem campanhas pagas/ROI de verdade no jogo — isso continua proposta. Reputação e Prestígio do escritório são reais
+      (sobem com vitórias em processos, prestígio cai com derrotas).
+    </div>
+    <div class="card" style="display:flex;gap:1.5rem;flex-wrap:wrap;justify-content:center;text-align:center;margin-bottom:1rem">
+      <div>
+        <div style="font-size:1.6rem;font-weight:700;color:var(--txt)">${rep}<span style="font-size:.8rem;color:var(--txt4)">/${repCap}</span></div>
+        <div style="font-size:.62rem;color:var(--txt3);text-transform:uppercase;letter-spacing:.08em">Reputação do Escritório</div>
+      </div>
+      <div>
+        <div style="font-size:1.6rem;font-weight:700;color:var(--navy3)">${prestigio}<span style="font-size:.8rem;color:var(--txt4)">/100</span></div>
+        <div style="font-size:.62rem;color:var(--txt3);text-transform:uppercase;letter-spacing:.08em">Prestígio</div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:.6rem">
+      <div style="font-size:.78rem;font-weight:600;margin-bottom:.5rem;color:var(--txt)">Canais reais</div>
+      <button class="btn btn-ghost btn-block" style="margin-bottom:.4rem" onclick="window.navTo('midia_convites',null)">🎙️ Convites de Mídia e Podcasts</button>
+      <button class="btn btn-ghost btn-block" onclick="window.navTo('redes',null)">📱 Minhas Redes Sociais</button>
+    </div>
+    <div class="card">
+      <div style="font-size:.78rem;font-weight:600;margin-bottom:.4rem;color:var(--txt)">Campanhas <span style="font-size:.62rem;color:var(--amber);font-weight:400">📌 proposta</span></div>
+      <div style="font-size:.72rem;color:var(--txt4);margin-bottom:.5rem">Investir em anúncios pra atrair clientes — não existe no jogo ainda.</div>
+      <button class="esc-acao-btn" disabled title="Não existe no jogo — proposta" style="width:100%"><span class="esc-acao-icone">📢</span><span>Nova Campanha</span></button>
+    </div>`;
 }
 
 // ════════════════════════════════════════════════════════
