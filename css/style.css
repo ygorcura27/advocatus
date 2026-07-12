@@ -1798,15 +1798,16 @@ a:hover { color: var(--txt); }
 .esc-kpis {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: .6rem;
+  gap: 1px;
+  background: var(--borda2);
+  border: var(--borda2);
+  border-radius: 3px;
+  overflow: hidden;
   margin-bottom: 1.1rem;
 }
 .esc-kpi-card {
   background: var(--surface);
-  border: var(--borda);
-  border-radius: var(--r2);
   padding: .85rem .9rem;
-  box-shadow: var(--sombra);
 }
 .esc-kpi-label {
   font-size: .62rem; color: var(--txt3);
@@ -1814,7 +1815,7 @@ a:hover { color: var(--txt); }
   margin-bottom: .35rem;
   display: flex; justify-content: space-between; align-items: center;
 }
-.esc-kpi-valor { font-size: 1.18rem; font-weight: 700; color: var(--txt); font-family: var(--font-sans); font-variant-numeric: tabular-nums; }
+.esc-kpi-valor { font-size: 1.2rem; font-weight: 500; color: var(--txt); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .esc-kpi-delta { font-size: .68rem; font-weight: 600; margin-top: .2rem; }
 .esc-kpi-delta.up   { color: var(--verde2); }
 .esc-kpi-delta.down { color: var(--verm2); }

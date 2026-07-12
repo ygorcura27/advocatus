@@ -1109,23 +1109,21 @@ function _escHero(j, esc) {
   const local = (esc && esc.bairro_sede) || j.escritorio_bairro || 'Rio de Janeiro';
 
   return `
-  <div class="esc-hero">
-    <div class="esc-hero-conteudo">
-      <div class="esc-hero-topo">
-        <div class="esc-hero-icone">🏛️</div>
-        <div>
-          <div class="esc-hero-nome">${escNome}</div>
-          <div class="esc-hero-sub">${TIER_TAG[tier]||'Boutique'} · ${esp}</div>
+  <section class="capa">
+    <div class="capa-kicker">REGISTRO DO ESCRITÓRIO · ADVOCATUS ONLINE</div>
+    <div class="capa-body">
+      <div>
+        <h1 class="capa-nome">${escNome}</h1>
+        <div class="capa-meta">
+          <span class="pill pill-cargo">${TIER_TAG[tier]||'Boutique'} · ${esp}</span>
+          <span class="pill pill-oab">📍 ${local}</span>
+          <span class="pill pill-oab">👥 ${numSocios} sócio${numSocios>1?'s':''}</span>
+          <span class="pill pill-oab">⚖️ ${totalCasos} processo${totalCasos===1?'':'s'} ativo${totalCasos===1?'':'s'}</span>
         </div>
       </div>
-      <div class="esc-hero-meta">
-        <span>📍 ${local}</span>
-        <span>👥 ${numSocios} sócio${numSocios>1?'s':''}</span>
-        <span>⚖️ ${totalCasos} processo${totalCasos===1?'':'s'} ativo${totalCasos===1?'':'s'}</span>
-      </div>
-      <div class="esc-hero-prestigio">Prestígio ${prestigio}</div>
     </div>
-  </div>`;
+    <div class="selo-stamp"><div class="selo-stamp-text">Prestígio<br>${prestigio}<span style="display:block;font-size:.42rem;margin-top:.1rem">/ 100</span></div></div>
+  </section>`;
 }
 
 // Linha de estatísticas do Escritório (estilo Popmundo: gênero+ranking / dinheiro / imóvel)
