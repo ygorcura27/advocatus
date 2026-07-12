@@ -244,6 +244,12 @@ a:hover { color: var(--txt); }
   gap: 1rem;
   z-index: 200;
   box-shadow: var(--sombra-navy);
+  /* Promove pra layer de composição própria (GPU) — sem isso, em scroll
+     rápido com a página cheia de conteúdo, o navegador atrasa 1 frame pra
+     repintar o fixed junto com o scroll e o conteúdo "escapa" por cima dele
+     por uma fração de segundo antes de se corrigir. */
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 .logo {
@@ -417,6 +423,8 @@ a:hover { color: var(--txt); }
   top: var(--topbar-h);
   height: calc(100vh - var(--topbar-h));
   box-shadow: 2px 0 8px rgba(0,0,0,.06);
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 .main-content { overflow-y: auto; padding: 1.5rem; min-width: 0; background: var(--bg); }
@@ -428,6 +436,8 @@ a:hover { color: var(--txt); }
   position: sticky;
   top: var(--topbar-h);
   height: calc(100vh - var(--topbar-h));
+  transform: translateZ(0);
+  will-change: transform;
   padding: 1.2rem 1rem;
   box-shadow: -2px 0 8px rgba(0,0,0,.06);
 }
