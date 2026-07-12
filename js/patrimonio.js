@@ -128,31 +128,6 @@ function _card(img, alt, nome, bodyHtml, ativo, mostrarImagem = true) {
   </div>`;
 }
 
-// Menu lateral categorizado do Patrimônio (mesmo padrão do Escritório: grupos de links)
-window._patSideMenu = _patSideMenu;
-function _patSideMenu(ativo, semWrapper) {
-  const GRUPOS = [
-    { titulo: 'Patrimônio', links: [
-      { id: 'visao-geral', icon:'🏦', label: 'Visão Geral', fn: "window.navTo('patrimonio',null)" },
-    ]},
-    { titulo: 'Moradia', links: [
-      { id: 'moradia', icon:'🏠', label: 'Ver Opções', fn: "document.getElementById('pat-moradia-secao')?.scrollIntoView({behavior:'smooth'})" },
-    ]},
-    { titulo: 'Transporte', links: [
-      { id: 'transporte', icon:'🚗', label: 'Ver Opções', fn: "document.getElementById('pat-transporte-secao')?.scrollIntoView({behavior:'smooth'})" },
-    ]},
-    { titulo: 'Escritório', links: [
-      { id: 'escritorio', icon:'💼', label: 'Espaço de Trabalho', fn: "window.navTo('escritorio',null)" },
-    ]},
-  ];
-  const grupos = GRUPOS.map(g => `
-      <div class="nav-grupo">
-        <div class="nav-grupo-titulo">${g.titulo}</div>
-        ${g.links.map(l => `<div class="nav-item${l.id===ativo?' ativo':''}" onclick="${l.fn}"><span class="ni-icon">${l.icon}</span> ${l.label}</div>`).join('')}
-      </div>`).join('');
-  return semWrapper ? grupos : `<aside class="esc-side-menu">${grupos}</aside>`;
-}
-
 // Card "Informações básicas" da moradia atual (estilo página "Local" do Popmundo — só texto)
 function _moradiaInfoCard(mor, propria, alug, deslocamento) {
   const ZONA_L = ZONAS[mor.zona]?.l || mor.zona || '—';

@@ -48,8 +48,13 @@ window.addEventListener('gamestate:ready', () => {
 // Menu lateral fixo (fallback) — cobre toda navegação que ainda não tem
 // menu contextual próprio (Petições, Habilidades, Cursos, Concurso,
 // Financeiro, Loja, Vida Pessoal, Vagas, Rankings, Mensagens).
+// Sub-páginas do Escritório sem view própria no mockup (navegadas por
+// dentro da tela de Escritório, não têm item de sidebar próprio) — o
+// item "Escritório" continua marcado ativo enquanto o jogador está nelas.
+const ESC_SUBPAINEIS = new Set(['processos','balancete','equipe','clientes','repertorio','midia_convites','marketing','assembleia','contratacao','treinamento','beneficios']);
+
 function _navLateralPadrao(painel) {
-  const ativo = (id) => id === painel ? ' ativo' : '';
+  const ativo = (id) => (id === painel || (id === 'escritorio' && ESC_SUBPAINEIS.has(painel))) ? ' ativo' : '';
   // "Meu Perfil" ganha um grupo extra de atalhos para a própria página —
   // mas usa o MESMO menu de navegação de todo o resto do app abaixo dele,
   // em vez de um menu duplicado e divergente (era a causa do bug de
@@ -102,35 +107,15 @@ function _navLateralPadrao(painel) {
     </div>`;
 }
 
-// Popula o menu lateral esquerdo de acordo com a categoria ativa — contextual
-// para Perfil/Escritório/Patrimônio/Equipe (que já têm menu próprio), com
-// fallback pro menu completo de sempre nas demais páginas.
-// Painéis que pertencem à "seção" Escritório — o menu lateral é fixo entre
-// eles (igual Popmundo: só o item ativo muda, nunca vira submenu diferente).
-const ESC_PAINEIS = {
-  escritorio:   'visao-geral',
-  processos:    'visao-geral',
-  balancete:    'balancete',
-  equipe:       'equipe',
-  clientes:     'clientes',
-  repertorio:   'repertorio',
-  midia_convites: 'midia',
-  marketing:    'marketing',
-  assembleia:   'assembleia',
-  contratacao:  'contratacao',
-  treinamento:  'treinamento',
-  beneficios:   'beneficios',
-};
-
 function _renderSidebarLateral(painel) {
   const nav = document.getElementById('nav-lateral-dynamic');
   if (!nav) return;
 
-  if (painel in ESC_PAINEIS) {
-    nav.innerHTML = _escSideMenu(ESC_PAINEIS[painel], true);
-  } else if (painel === 'patrimonio' && window._patSideMenu) {
-    nav.innerHTML = window._patSideMenu('visao-geral', true);
-  } else {
+  // Sidebar único e estático pra tudo, igual mockup (.impeccable/preview/
+  // dossie-v1.html: .nav-rail nunca troca de conteúdo por página — Escritório,
+  // Patrimônio etc. são navegados por dentro da própria tela, via âncora/
+  // botão, não por um sub-menu lateral próprio).
+  {
     nav.innerHTML = _navLateralPadrao(painel);
   }
 }
@@ -1083,50 +1068,6 @@ function _espLabel2(esp) {
 // Clientes / Societário / Ações Rápidas)
 // ════════════════════════════════════════════════════════
 
-// Menu lateral categorizado do Escritório (estilo Popmundo: grupos de links)
-function _escSideMenu(ativo, semWrapper) {
-  const GRUPOS = [
-    { titulo: 'Escritório', links: [
-      { id: 'visao-geral',      iconKey:'escritorio',      label: 'Visão Geral',           fn: "window.navTo('escritorio',null)" },
-      { id: 'balancete',        iconKey:'balancete',        label: 'Balancete',             fn: "window.navTo('balancete',null)" },
-      { id: 'especializacoes',  iconKey:'especializacoes',  label: 'Especializações',       fn: "document.getElementById('esc-especializacoes-bloco')?.scrollIntoView({behavior:'smooth'})" },
-      { id: 'workspace',        iconKey:'workspace',        label: 'Espaço de Trabalho',    fn: "document.getElementById('esc-workspace-bloco')?.scrollIntoView({behavior:'smooth'})" },
-    ]},
-    { titulo: 'Equipe', links: [
-      { id: 'equipe',       iconKey:'equipe',      label: 'Ver Equipe',   fn: "window.navTo('equipe',null)" },
-      { id: 'estagiarios',  iconKey:'cursos',      label: 'Estagiários',  fn: "window._pendingScrollId='equipe-grupo-estagiarios';window.switchEquipeTab&&window.switchEquipeTab('equipe');window.navTo('equipe',null)" },
-      { id: 'assistentes',  iconKey:'assistentes', label: 'Assistentes',  fn: "window._pendingScrollId='equipe-grupo-assistentes';window.switchEquipeTab&&window.switchEquipeTab('equipe');window.navTo('equipe',null)" },
-      { id: 'advogados',    iconKey:'advogados',   label: 'Advogados',    fn: "window._pendingScrollId='equipe-grupo-advogados';window.switchEquipeTab&&window.switchEquipeTab('equipe');window.navTo('equipe',null)" },
-      { id: 'diario',       iconKey:'diario',      label: 'Diário',       fn: "window.switchEquipeTab&&window.switchEquipeTab('diario');window.navTo('equipe',null)" },
-      { id: 'contratacao',  iconKey:'oportunidades', label: 'Contratação', fn: "window.navTo('contratacao',null)" },
-      { id: 'treinamento',  iconKey:'cursos',      label: 'Mentoria & Treinamento', fn: "window.navTo('treinamento',null)" },
-      { id: 'beneficios',   iconKey:'beneficios',  label: 'Benefícios', fn: "window.navTo('beneficios',null)" },
-    ]},
-    { titulo: 'Negócios', links: [
-      { id: 'clientes',       iconKey:'clientes',       label: 'Clientes',       fn: "window.navTo('clientes',null)" },
-      { id: 'oportunidades',  iconKey:'oportunidades',  label: 'Oportunidades',  fn: "document.getElementById('esc-oportunidades-bloco')?.scrollIntoView({behavior:'smooth'})" },
-      { id: 'processos',      iconKey:'documento',      label: 'Processos',      fn: "document.getElementById('esc-processos-bloco')?.scrollIntoView({behavior:'smooth'})" },
-      { id: 'marketing',      iconKey:'marketing',      label: 'Marketing',      fn: "window.navTo('marketing',null)" },
-    ]},
-    { titulo: 'Petições', links: [
-      { id: 'minhas-peticoes', iconKey:'peticoes',   label: 'Minhas Petições',           fn: "window.navTo('peticoes',null)" },
-      { id: 'repertorio',      iconKey:'vademecum',   label: 'Repertório do Escritório',  fn: "window.navTo('repertorio',null)" },
-    ]},
-    { titulo: 'Mídia', links: [
-      { id: 'midia', iconKey:'midia', label: 'Aparições na Internet', fn: "window.navTo('midia_convites',null)" },
-    ]},
-    { titulo: 'Sócios', links: [
-      { id: 'societario',  iconKey:'societario',  label: 'Estrutura Societária', fn: "document.querySelector('.esc-donut-wrap')?.scrollIntoView({behavior:'smooth'})" },
-      { id: 'assembleia',  iconKey:'assembleia',  label: 'Assembleia de Sócios', fn: "window.navTo('assembleia',null)" },
-    ]},
-  ];
-  const grupos = GRUPOS.map(g => `
-      <div class="nav-grupo">
-        <div class="nav-grupo-titulo">${g.titulo}</div>
-        ${g.links.map(l => `<div class="nav-item${l.id===ativo?' ativo':''}" onclick="${l.fn}"><span class="ni-icon">${icon(l.iconKey)}</span> ${l.label}</div>`).join('')}
-      </div>`).join('');
-  return semWrapper ? grupos : `<aside class="esc-side-menu">${grupos}</aside>`;
-}
 
 // Card de prévia — resumo rápido + link "Ver", igual ao mockup
 // (painel "Prévia de Ações Disponíveis" antes do Quadro de Pessoal).
@@ -1468,9 +1409,12 @@ function _escSocietarioCard(esc, j) {
           </div>`).join('')}
       </div>
     </div>
-    <button class="btn btn-sec btn-sm btn-block" style="margin-top:.6rem" onclick="window.navTo('equipe',null)">
-      Ver detalhes
-    </button>
+    <div style="display:flex;gap:.4rem;margin-top:.6rem">
+      <button class="btn btn-sec btn-sm" style="flex:1" onclick="window.navTo('equipe',null)">
+        Ver detalhes
+      </button>
+      ${socios.length >= 2 ? `<button class="btn btn-ghost btn-sm" style="flex:1" onclick="window.navTo('assembleia',null)">🏛️ Assembleia</button>` : ''}
+    </div>
     <div id="esc-especializacoes-bloco"></div>
   </div>`;
 }
@@ -1484,6 +1428,8 @@ function _escAcoesRapidas(j, esc) {
     { icone:'➕', label:'Contratar Advogado',      fn:"window.navTo('equipe',null)", habilitado: true },
     { icone:'🏢', label:'Abrir Filial',            fn:'', habilitado: false },
     { icone:'🎓', label:'Treinar Equipe',          fn:"window.navTo('habilidades',null)", habilitado: true },
+    { icone:'📣', label:'Marketing',                fn:"window.navTo('marketing',null)",  habilitado: temEscritorio },
+    { icone:'📖', label:'Repertório do Escritório', fn:"window.navTo('repertorio',null)", habilitado: temEscritorio },
   ];
 
   if (esc) {
