@@ -149,6 +149,7 @@ exports.publicarLivro = onCall({ region: 'southamerica-east1' }, async (request)
   // Registra publicação no jogador
   await db.collection('jogadores').doc(uid).update({
     livros_publicados: FieldValue.increment(1),
+    prestigio_academico: FieldValue.increment(5),
   });
 
   logger.info(`[LIVRO] ${uid} publicou "${pet.titulo}" por R$${preco}`);
@@ -194,6 +195,7 @@ exports.citarObra = onCall({ region: 'southamerica-east1' }, async (request) => 
       await autoRef.update({
         citacoes_totais:    FieldValue.increment(1),
         didatica_academica: Math.min(50, (autoD.didatica_academica || 0) + 1),
+        prestigio_academico: FieldValue.increment(1),
       });
     }
   }

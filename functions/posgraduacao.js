@@ -329,6 +329,7 @@ exports.submeterDissertacao = onCall({ region: 'southamerica-east1' }, async (re
     posgrad_nota_final:   notaEfetiva,
     posgrad_bonus_skill:  cfg.bonus_teto_skill_pct || 0,
     reputacao:            FieldValue.increment(10),
+    prestigio_academico:  FieldValue.increment(j.posgrad_programa === 'doutorado' ? 30 : 15),
   });
 
   await db.collection('jogadores').doc(uid).collection('inbox').add({
