@@ -25,6 +25,11 @@ const CARGOS = [
   {id:'snm', l:'Sócio Nominal',    xp:4500, sal_min:65000, sal_max:120000,anos:12,oab:true,  desc:'O escritório leva seu nome.', rep_min:85, rep_max:100, recursos_min:12},
 ];
 const CARGO_IDX = Object.fromEntries(CARGOS.map((c,i)=>[c.id,i]));
+// Exposto pra renderPerfil (ui-main.js) montar o painel "Nível de Carreira"
+// sem duplicar a trilha de cargos aqui — só cobre a trilha de advocacia,
+// igual renderCarreiraProgressao já fazia antes desta trilha ser exposta.
+window.CARREIRA_CARGOS   = CARGOS;
+window.CARREIRA_CARGO_IDX = CARGO_IDX;
 
 // ════════════════════════════════════════════════════════
 // CURSOS

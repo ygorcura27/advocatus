@@ -225,6 +225,38 @@ function _renderizar() {
 // ════════════════════════════════════════════════════════
 // PERFIL
 // ════════════════════════════════════════════════════════
+// Painel "Nível de Carreira" — igual mockup (.impeccable/preview/dossie-v1.html
+// data-view-content="perfil"): cargo atual + barra até a próxima promoção,
+// embutido direto no Perfil (não só na tela separada de Progressão).
+// Usa a trilha exposta por carreira.js (window.CARREIRA_CARGOS) — só cobre a
+// trilha de advocacia, mesma limitação que renderCarreiraProgressao já tinha.
+function _painelNivelCarreira(j, cap, repPct) {
+  const CARGOS   = window.CARREIRA_CARGOS;
+  const CARGO_IDX = window.CARREIRA_CARGO_IDX;
+  if (!CARGOS || !CARGO_IDX) return '';
+  const idx     = CARGO_IDX[j.cargo_id] ?? 0;
+  const cargo   = CARGOS[idx];
+  const proximo = CARGOS[idx+1];
+  if (!cargo) return '';
+  return `
+    <section class="painel" style="padding:1.2rem 1.3rem;margin-bottom:1.2rem">
+      <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:.9rem">
+        <div class="carreira-icone">⚖️</div>
+        <div style="flex:1;min-width:180px">
+          <div class="capa-kicker" style="margin-bottom:.2rem">NÍVEL DE CARREIRA</div>
+          <div style="font-family:var(--font-serif);font-size:1.15rem;font-weight:600;color:var(--txt)">${cargo.l}</div>
+        </div>
+        ${proximo ? `
+        <div style="text-align:right">
+          <div style="font-size:.7rem;color:var(--txt4)">Próxima promoção</div>
+          <div style="font-size:.82rem;color:var(--ouro2);font-weight:600">${proximo.l}</div>
+        </div>` : ''}
+      </div>
+      <div class="membro-prod-bar" style="height:6px"><div class="membro-prod-fill" style="width:${repPct}%;background:var(--ouro)"></div></div>
+      <div style="font-family:var(--font-mono);font-size:.68rem;color:var(--txt4);margin-top:.4rem">${j.reputacao||0} / ${cap} reputação no cargo atual</div>
+    </section>`;
+}
+
 function renderPerfil(j, el) {
   const cap    = window.REP_CAP[j.cargo_id] || 55;
   const label  = window.CARGO_LABEL[j.cargo_id] || j.cargo_id;
@@ -275,6 +307,8 @@ function renderPerfil(j, el) {
             </div>
           </div>
         </div>
+
+        ${_painelNivelCarreira(j, cap, repPct)}
 
         <div class="stat-row">
           <div class="stat">

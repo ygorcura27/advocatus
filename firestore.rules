@@ -45,6 +45,15 @@ service cloud.firestore {
         ('socios_uids' in escritorioData && request.auth.uid in escritorioData.socios_uids);
     }
 
+    // Verifica se o usuário é um funcionário (advogado jogador contratado,
+    // não dono/sócio) do escritório — mesmo array 'funcionarios_uids' que
+    // vagas.js::responderConvite popula ao aceitar um convite de emprego.
+    // Protegida contra o campo não existir, mesmo padrão de isSocio.
+    function isFuncionario(escritorioData) {
+      return isAuth() &&
+        ('funcionarios_uids' in escritorioData && request.auth.uid in escritorioData.funcionarios_uids);
+    }
+
     // Verifica se o campo não está sendo alterado
     function notChanging(field) {
       return !(field in request.resource.data) ||
@@ -335,7 +344,8 @@ service cloud.firestore {
       match /oportunidades/{opId} {
         allow read: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
-              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isFuncionario(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
         allow create: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
               || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
@@ -352,7 +362,8 @@ service cloud.firestore {
       match /clientes/{clienteId} {
         allow read: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
-              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isFuncionario(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
         allow create: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
               || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
@@ -368,7 +379,8 @@ service cloud.firestore {
       match /processos_pool/{procId} {
         allow read: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
-              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isFuncionario(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
         allow create: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
               || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
@@ -406,7 +418,8 @@ service cloud.firestore {
       match /log_equipe/{logId} {
         allow read: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
-              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isFuncionario(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
         allow create: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
               || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));

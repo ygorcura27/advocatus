@@ -964,6 +964,14 @@ a:hover { color: var(--txt); }
 @media (max-width: 720px) { .stat-row { grid-template-columns: repeat(3, 1fr); } .stat-row .stat:nth-child(n+4) { border-top: 1px solid var(--borda2); } }
 @media (max-width: 460px) { .stat-row { grid-template-columns: repeat(2, 1fr); } }
 
+.membro-prod-bar { height: 4px; background: var(--bg2); border-radius: 2px; overflow: hidden; }
+.membro-prod-fill { height: 100%; border-radius: 2px; }
+.carreira-icone {
+  width: 48px; height: 48px; border-radius: 2px; flex-shrink: 0;
+  background: var(--verde-bg); border: 1px solid var(--navy3);
+  display: flex; align-items: center; justify-content: center; font-size: 1.3rem;
+}
+
 /* ═══════════════════════════════════════════════════════════
    COMPONENTES DO MOCKUP — .painel/.peca/.perf-row/.equipe-tabs etc.
    Vocabulário do .impeccable/preview/dossie-v1.html que nunca tinha
