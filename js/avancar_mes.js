@@ -29,16 +29,20 @@ export function renderBlocoEnergia(j) {
   const bloqueadoAte = j.janeiro_bloqueado_ate ? new Date(j.janeiro_bloqueado_ate) : null;
   const emFerias     = mesAtual === 0 && bloqueadoAte && Date.now() < bloqueadoAte.getTime();
 
+  const btnTopo = document.getElementById('btn-avancar-topo');
+
   if (emFerias) {
     el.innerHTML = `<button class="btn btn-ghost btn-block" disabled style="opacity:.45;font-size:.78rem;cursor:not-allowed">
       <span class="ni-icon">${icon('cadeado')}</span> Recesso de Janeiro — aguarde
     </button>`;
+    if (btnTopo) { btnTopo.disabled = true; btnTopo.style.opacity = '.45'; btnTopo.style.cursor = 'not-allowed'; }
     return;
   }
 
   el.innerHTML = `<button id="btn-avancar" class="btn btn-prim btn-block" onclick="window.avancarMes()">
     ▶ Avançar mês
   </button>`;
+  if (btnTopo) { btnTopo.disabled = false; btnTopo.style.opacity = ''; btnTopo.style.cursor = ''; }
 }
 
 // ── Bloco visual de férias de janeiro ──
