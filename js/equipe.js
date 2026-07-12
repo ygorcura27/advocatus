@@ -765,6 +765,65 @@ function _gerarCandidatoNPC(cargo_id, fotosUsadas) {
   return { nome, cargo_id, skills, skills_jur, sexo, foto_npc, mediaGeral };
 }
 
+// ════════════════════════════════════════════════════════
+// CONTRATAÇÃO — tela dedicada (mockup: RH · Contratação). Real:
+// TIER_CAPACIDADE por cargo, contagem de funcionários atuais, triagem
+// de 3 candidatos já implementada em _contratarNPC/_gerarCandidatoNPC.
+// ════════════════════════════════════════════════════════
+window.renderContratacao = async function(j, el) {
+  const escId = j.escritorio_proprio_id || j.escritorio_empregado_id;
+  if (!escId) { el.innerHTML = `<div class="card" style="color:var(--txt3)">Você precisa de um escritório.</div>`; return; }
+
+  el.innerHTML = `<div class="secao-header"><div class="secao-titulo">Contratação</div></div><div class="card">Carregando...</div>`;
+
+  const escSnap = await getDoc(doc(db, 'escritorios', escId));
+  const esc = escSnap.exists() ? escSnap.data() : {};
+  const tier = esc.tier || 1;
+  const cap = TIER_CAPACIDADE[tier] || TIER_CAPACIDADE[1];
+
+  const fSnap = await getDocs(collection(db, 'escritorios', escId, 'funcionarios'));
+  const funcs = fSnap.docs.map(d => d.data()).filter(f => f.ativo !== false);
+  const nEst = funcs.filter(f => f.cargo_id === 'est').length;
+  const nAss = funcs.filter(f => f.cargo_id === 'ass').length;
+  const nAdv = funcs.filter(f => ['jnr','pln','snr'].includes(f.cargo_id)).length;
+
+  const vagasEst = Math.max(0, cap.estagiarios - nEst);
+  const vagasAss = Math.max(0, cap.assistentes - nAss);
+  const vagasAdv = Math.max(0, cap.advogados - nAdv);
+  const totalVagas = vagasEst + vagasAss + vagasAdv;
+  const totalEquipe = funcs.length;
+
+  const linha = (icone, label, atual, capMax, vagas, cargoKey, salLabel) => `
+    <div class="oport-row" style="${vagas===0?'opacity:.55':''}">
+      <div>
+        <div class="oport-kicker">${icone} ${label.toUpperCase()}</div>
+        <div class="oport-titulo">${vagas>0?`${vagas} vaga${vagas===1?'':'s'} disponível${vagas===1?'':'eis'}`:`Sem vagas — capacidade cheia (${atual}/${capMax})`}</div>
+        <div class="oport-desc">Salário fixo por cargo · sem custo de contratação — só +2 Gestão pra você.</div>
+      </div>
+      <div class="oport-valor"><div class="oport-preco" style="font-size:.8rem">${salLabel}</div></div>
+      <div class="oport-acoes">
+        ${vagas>0
+          ? `<button class="btn btn-sm btn-prim" onclick="window._contratarNPC('${cargoKey}','${escId}')">Ver candidatos</button>`
+          : `<button class="btn btn-sm btn-ghost" disabled>Indisponível</button>`}
+      </div>
+    </div>`;
+
+  el.innerHTML = `
+    <div style="margin-bottom:.8rem"><button class="btn btn-ghost btn-sm" onclick="window.navTo('escritorio',null)">← Escritório</button></div>
+    ${window._capaHeader(`RECURSOS HUMANOS · ${(esc.nome||'—').toUpperCase()}`, 'Contratação', '')}
+    <div class="stat-row">
+      <div class="stat"><div class="stat-label">Equipe atual</div><div class="stat-value">${totalEquipe}</div></div>
+      <div class="stat"><div class="stat-label">Vagas abertas</div><div class="stat-value up">${totalVagas}</div></div>
+      <div class="stat"><div class="stat-label">Capacidade do escritório</div><div class="stat-value">${cap.estagiarios+cap.assistentes+cap.advogados} <small>tier ${tier}</small></div></div>
+    </div>
+    <div class="esc-card-bloco">
+      <div class="secao-header" style="margin-bottom:.6rem"><div class="secao-titulo">Vagas Abertas</div></div>
+      ${linha('🎓','Estagiário', nEst, cap.estagiarios, vagasEst, 'est', `R$ ${CARGO_INFO.est.sal.toLocaleString('pt-BR')}/mês`)}
+      ${linha('📋','Assistente Jurídico', nAss, cap.assistentes, vagasAss, 'ass', `R$ ${CARGO_INFO.ass.sal.toLocaleString('pt-BR')}/mês`)}
+      ${linha('⚖️','Advogado', nAdv, cap.advogados, vagasAdv, 'jnr', `R$ ${CARGO_INFO.jnr.sal.toLocaleString('pt-BR')}–${CARGO_INFO.snr.sal.toLocaleString('pt-BR')}/mês`)}
+    </div>`;
+};
+
 window._contratarNPC = async function(cargo_min, escId) {
   const CARGOS_DISPONIVEIS = { est: ['est'], ass: ['ass'], jnr: ['jnr','pln','snr'] };
   const cargos = CARGOS_DISPONIVEIS[cargo_min] || ['est'];

@@ -1845,6 +1845,17 @@ a:hover { color: var(--txt); }
 }
 .esc-card-bloco .secao-titulo { font-size: .8rem; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: .04em; }
 .esc-card-bloco .secao-header .esc-ver-todos { color: var(--ouro); }
+
+/* Linha de oportunidade/vaga (Contratação, Clientes) — do mockup */
+.oport-row { display: grid; grid-template-columns: 1fr 128px 108px; gap: 1rem; align-items: center; padding: .9rem 1.1rem; border-bottom: 1px solid var(--borda); }
+.oport-row:last-child { border-bottom: none; }
+.oport-kicker { font-family: var(--font-mono); font-size: .6rem; letter-spacing: .06em; color: var(--txt4); margin-bottom: .3rem; }
+.oport-titulo { font-size: .85rem; color: var(--txt); }
+.oport-desc { font-size: .72rem; color: var(--txt3); margin-top: .2rem; }
+.oport-valor { text-align: right; }
+.oport-preco { font-family: var(--font-mono); font-size: .92rem; font-weight: 500; color: var(--verde2); }
+.oport-acoes { display: flex; flex-direction: column; gap: .4rem; }
+@media (max-width: 600px) { .oport-row { grid-template-columns: 1fr; gap: .5rem; } .oport-acoes { flex-direction: row; } }
 .esc-card-bloco .secao-header .esc-ver-todos:hover { color: var(--navy4); }
 .esc-card-bloco .secao-header .secao-badge { background: rgba(255,255,255,.15); color: var(--ouro); }
 .esc-card-bloco .secao-header .btn-sec,
