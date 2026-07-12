@@ -1142,6 +1142,23 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
           }
           escUpdReset.campanhas_ativas = campanhasRestantes;
         }
+
+        // Prazo da Delegação de Gestão (js/processos_escritorio.js:_dgSalvarGeral)
+        // — mesma lógica de contagem regressiva das campanhas (meses_restantes),
+        // sem depender de esc.mes_global (nem sempre confiável/sincronizado).
+        // null = "até revogação", nunca expira sozinho.
+        if (escPre.gestor_id && escPre.gestor_prazo_meses_restantes != null) {
+          const restam = escPre.gestor_prazo_meses_restantes - 1;
+          if (restam <= 0) {
+            escUpdReset.gestor_id = null; escUpdReset.gestor_nome = null; escUpdReset.gestor_cargo = null;
+            escUpdReset.gestor_escopo = null; escUpdReset.gestor_nivel = null; escUpdReset.gestor_permissoes = null;
+            escUpdReset.gestor_prazo_meses = null; escUpdReset.gestor_prazo_meses_restantes = null;
+            escUpdReset.gestor_delega_processos = null; escUpdReset.gestor_delega_mentoria = null; escUpdReset.gestor_delega_conflitos = null;
+            mensagens.push({ assunto: '👤 Delegação de Gestão Expirada', corpo: `Prazo de ${escPre.gestor_nome||'gestor'} acabou — você voltou a gerenciar pessoalmente.`, tipo: 'neutro' });
+          } else {
+            escUpdReset.gestor_prazo_meses_restantes = restam;
+          }
+        }
       }
       await escRefProprio.update(escUpdReset);
       const funcSnap = await escRefProprio.collection('funcionarios').get();

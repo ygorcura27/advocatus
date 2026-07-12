@@ -156,8 +156,6 @@ window.renderGestaoProcessos = async function(j, el) {
 
   const escSnap = await getDoc(doc(db, 'escritorios', escId));
   const esc = escSnap.exists() ? escSnap.data() : {};
-  const fSnap = await getDocs(collection(db, 'escritorios', escId, 'funcionarios'));
-  const funcs = fSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
   const uid = j.uid || window.JOGADOR_UID;
   const socios = esc.socios || [];
@@ -166,7 +164,10 @@ window.renderGestaoProcessos = async function(j, el) {
   el.innerHTML = `
     <div style="margin-bottom:.8rem"><button class="btn btn-ghost btn-sm" onclick="window.navTo('escritorio',null)">← Escritório</button></div>
     ${window._capaHeader(`GESTÃO · ${(esc.nome||'—').toUpperCase()}`, '⚖️ Gestão de Processos', '')}
-    ${podeGerenciar && window._renderCardGestao ? window._renderCardGestao(j, esc, funcs, escId) : ''}
+    ${podeGerenciar ? `<div class="card" style="margin-bottom:1rem;font-size:.74rem;color:var(--txt3);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
+      <span>Delegação de gestão foi pra Gestão de Pessoas — junto com contratação e equipe.</span>
+      <button class="btn btn-ghost btn-sm" onclick="window.navTo('equipe',null)">👤 Gestão de Pessoas →</button>
+    </div>` : ''}
     <div id="gestao-processos-pool"></div>`;
 
   const elPool = document.getElementById('gestao-processos-pool');
@@ -291,10 +292,6 @@ window.renderProcessosPool = async function(j, escId, el) {
             <button class="btn btn-sm btn-ghost" style="font-size:.62rem;padding:.18rem .5rem"
               onclick="window.gerarProcessosMensais('${escId}',${tierEsc})">
               🔄 Gerar do mês
-            </button>
-            <button class="btn btn-sm btn-sec" style="font-size:.62rem;padding:.18rem .5rem"
-              onclick="window.abrirDelegacaoGestao('${escId}')">
-              👤 Delegar Gestão
             </button>
           </div>
         </div>
@@ -1170,6 +1167,14 @@ window.gerarProcessosMensais = async function(escId, tierEscritorio) {
 };
 
 // ─── Delegar Gestão ───────────────────────────────────────────────────────────
+// Layout/interação seguem a prévia de direção aprovada (.impeccable/preview/
+// dossie-v1.html — Escopo / Responsável+domínio / Nível+Prazo / Permissões+
+// Resumo). Real por baixo: Nível de Gestão escreve nos 3 flags reais que
+// avancar_mes.js já consome (gestor_delega_processos/_mentoria/_conflitos) e
+// Prazo agenda uma revogação automática real (checada no tick mensal, ver
+// avancar_mes.js). As 8 permissões individuais são derivadas do Nível e
+// salvas pra referência, mas só as 3 alavancas acima têm efeito real hoje —
+// não inventar enforcement por permissão sem reforçar o backend primeiro.
 
 // Departamentos reais (agrupam as 11 áreas de processo — mesmo agrupamento
 // de functions/avancar_mes.js::DEPTO_AREA_AGRUPADA, precisa ficar em sincronia).
@@ -1181,10 +1186,50 @@ const _DG_DEPARTAMENTOS = [
   { k: 'criminal',     l: '🚨 Criminal',    skill: 'area_criminal'   },
 ];
 const _DG_CARGO_L = { est:'Estagiário', ass:'Assistente', jnr:'Júnior', pln:'Pleno', snr:'Sênior', asc:'Associado', soc:'Sócio' };
+const _DG_LIMIAR_FRACO = 25;
+
+const _DG_PERMISSOES_DEF = [
+  { k:'visualizar', l:'Visualizar autos e documentos' },
+  { k:'protocolar', l:'Protocolar petições' },
+  { k:'movimentar', l:'Movimentar o processo' },
+  { k:'decisoes',   l:'Tomar decisões estratégicas' },
+  { k:'acordos',    l:'Firmar acordos' },
+  { k:'encerrar',   l:'Encerrar / Arquivar processo' },
+  { k:'citacoes',   l:'Receber citações e intimações' },
+  { k:'atribuir',   l:'Atribuir tarefas para terceiros' },
+];
+const _DG_NIVEIS = [
+  { k:'acompanhamento', l:'Acompanhamento', desc:'Só acompanha — não decide nada, não firma acordo, não movimenta.' },
+  { k:'parcial',        l:'Gestão Parcial',  desc:'Protocola e movimenta o processo, mas decisões estratégicas e acordos ainda passam por você.' },
+  { k:'total',          l:'Gestão Total',    desc:'Pode tomar decisões estratégicas, firmar acordos e concluir o processo.' },
+];
+// Nível → as 3 alavancas reais que avancar_mes.js lê de verdade.
+const _DG_NIVEL_FLAGS = {
+  acompanhamento: { processos:false, mentoria:false, conflitos:false },
+  parcial:        { processos:true,  mentoria:false, conflitos:false },
+  total:          { processos:true,  mentoria:true,  conflitos:true  },
+};
+// Nível → preset das 8 permissões (visual/informativo, ver nota acima).
+const _DG_NIVEL_PERMISSOES = {
+  acompanhamento: { visualizar:true,  protocolar:false, movimentar:false, decisoes:false, acordos:false, encerrar:false, citacoes:true,  atribuir:false },
+  parcial:        { visualizar:true,  protocolar:true,  movimentar:true,  decisoes:false, acordos:false, encerrar:false, citacoes:true,  atribuir:false },
+  total:          { visualizar:true,  protocolar:true,  movimentar:true,  decisoes:true,  acordos:true,  encerrar:true,  citacoes:true,  atribuir:true  },
+};
+const _DG_PRAZO_OPCOES = [
+  { v:'revogacao', l:'Até revogação' },
+  { v:'3',  l:'3 meses' },
+  { v:'6',  l:'6 meses' },
+  { v:'12', l:'12 meses' },
+];
+
 let _dgEscId = null;
 let _dgNpcs  = [];
-let _dgEscopo = 'geral';
+let _dgEscopo = 'geral';           // 'jogador' | 'geral' | 'departamento'
 let _dgDeptosSel = {};
+let _dgResponsavelId = null;
+let _dgNivel  = 'parcial';
+let _dgPrazo  = 'revogacao';
+let _dgPermissoes = { ..._DG_NIVEL_PERMISSOES.parcial };
 
 window.abrirDelegacaoGestao = async function(escId) {
   const fSnap = await getDocs(query(
@@ -1194,57 +1239,123 @@ window.abrirDelegacaoGestao = async function(escId) {
   const npcs = fSnap.docs.map(d => ({id: d.id, ...d.data()}))
     .filter(f => f.ativo !== false && !f.burnout_npc);
 
-  if (npcs.length === 0) {
-    toast('Nenhum NPC disponivel para assumir a gestao.', 'ko');
-    return;
-  }
-
   const escSnap = await getDoc(doc(db, 'escritorios', escId));
   const esc = escSnap.exists() ? escSnap.data() : {};
 
   _dgEscId     = escId;
   _dgNpcs      = npcs;
-  _dgEscopo    = esc.gestor_escopo === 'departamento' ? 'departamento' : 'geral';
+  _dgEscopo    = esc.gestor_escopo === 'departamento' ? 'departamento' : (esc.gestor_id ? 'geral' : 'jogador');
   _dgDeptosSel = { ...(esc.gestores_departamento || {}) };
+  _dgResponsavelId = esc.gestor_id || null;
+  _dgNivel     = esc.gestor_nivel || 'parcial';
+  _dgPrazo     = esc.gestor_prazo_meses ? String(esc.gestor_prazo_meses) : 'revogacao';
+  _dgPermissoes = { ...(esc.gestor_permissoes || _DG_NIVEL_PERMISSOES[_dgNivel]) };
 
   abrirModal('👤 Delegar Gestão do Escritório', _dgRenderModal(esc));
 };
 
 function _dgRenderModal(esc) {
-  const escopoBtn = (v, label, desc) => `
+  const meuNome = (window.JOGADOR?.nome_personagem || 'Você').split(' ')[0];
+  const escopoBtn = (v, icone, label, desc) => `
     <div class="card" style="flex:1;min-width:180px;cursor:pointer;padding:.7rem .8rem;border-color:${_dgEscopo===v?'var(--navy3)':'var(--borda2)'};background:${_dgEscopo===v?'var(--verde-bg)':'var(--surface)'}"
       onclick="window._dgSetEscopo('${v}')">
-      <div style="font-weight:600;font-size:.8rem;color:var(--txt)">${label}</div>
+      <div style="font-weight:600;font-size:.8rem;color:var(--txt)">${icone} ${label}</div>
       <div style="font-size:.66rem;color:var(--txt3);margin-top:.2rem">${desc}</div>
     </div>`;
 
   return `
-    <div style="font-size:.78rem;color:var(--txt2);margin-bottom:.8rem">
-      Processos disponíveis são atribuídos automaticamente à equipe no início de cada mês.
-      O dono ainda controla recursos e execução de sentenças.
+    <div style="font-size:.7rem;color:var(--txt4);margin-bottom:.6rem">
+      Processos disponíveis são atribuídos automaticamente à equipe no início de cada mês. Nível de Gestão e Prazo
+      escrevem nos flags reais que o avanço de mês já usa; as 8 permissões abaixo refletem o nível escolhido
+      (informativas — só as 3 alavancas de processos/mentoria/conflitos têm efeito real hoje).
     </div>
+    <div style="font-size:.78rem;font-weight:700;color:var(--txt);margin-bottom:.4rem">Escopo da Gestão</div>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem">
-      ${escopoBtn('geral', '🏢 Escritório Todo', 'Um gestor único distribui tudo, priorizando o NPC mais eficiente disponível.')}
-      ${escopoBtn('departamento', '🗂️ Por Departamento', 'Um gestor por área — processos vão direto pro especialista daquele departamento.')}
+      ${escopoBtn('jogador', '🧑', `Você (${meuNome})`, 'Distribui processos e tarefas manualmente, um por um.')}
+      ${escopoBtn('geral', '📘', 'NPC — Escritório Todo', 'Um responsável único assume a gestão, com nível e permissões configuráveis abaixo.')}
+      ${escopoBtn('departamento', '🗂️', 'NPC — Por Departamento', 'Um gestor por área — processos vão direto pro especialista daquele departamento.')}
     </div>
-    <div id="dg-conteudo">${_dgEscopo === 'departamento' ? _dgRenderDepartamentos(esc) : _dgRenderGeral(esc)}</div>`;
+    <div id="dg-conteudo">${_dgRenderConteudo(esc)}</div>`;
 }
 
-function _dgRenderGeral(esc) {
+function _dgRenderConteudo(esc) {
+  if (_dgEscopo === 'jogador') {
+    return `
+      <div class="card" style="text-align:center;padding:1.2rem;color:var(--txt3);font-size:.78rem">
+        Você mesmo distribui processos e decide tudo — nenhuma delegação ativa.
+      </div>
+      ${esc.gestor_id || esc.gestor_escopo ? `<button class="btn btn-prim btn-block" style="margin-top:.6rem" onclick="window._dgConfirmarJogador()">✓ Voltar a gerenciar você mesmo</button>` : ''}`;
+  }
+  if (_dgEscopo === 'departamento') return _dgRenderDepartamentos();
+  return _dgRenderGeral();
+}
+
+function _dgPillDominio(f) {
+  return `<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.5rem">
+    ${_DG_DEPARTAMENTOS.map(dep => {
+      const nivel = (f.skills_jur||{})[dep.skill] || 0;
+      const fraco = nivel < _DG_LIMIAR_FRACO;
+      return `<span style="font-size:.62rem;padding:.15rem .5rem;border-radius:99px;background:${fraco?'rgba(214,90,60,.12)':'rgba(22,214,168,.12)'};color:${fraco?'var(--verm2)':'var(--verde2)'}">${fraco?'⚠️':'✓'} ${dep.l.replace(/^\S+\s/,'')} ${nivel}/50</span>`;
+    }).join('')}
+  </div>
+  <div style="font-size:.6rem;color:var(--txt4);margin-top:.4rem">⚠️ domínio fraco = processo futuro nesse ramo teria chance de vitória reduzida sob esse gestor (ideia de design, não simulado).</div>`;
+}
+
+function _dgRenderGeral() {
+  const respSelecionado = _dgNpcs.find(f => f.id === _dgResponsavelId);
   return `
-    <div style="display:flex;flex-direction:column;gap:.4rem">
-      ${esc.gestor_id ? `
-      <button class="btn btn-ghost btn-block" style="text-align:left;padding:.6rem .8rem;color:var(--verm2)"
-        onclick="window.removerGestor('${_dgEscId}')">
-        ❌ Remover gestor atual (${esc.gestor_nome||'—'})
-      </button>` : ''}
-      ${_dgNpcs.map(f => `
-        <button class="btn btn-ghost btn-block" style="text-align:left;padding:.6rem .8rem"
-          onclick="window.salvarGestor('${_dgEscId}','${f.id}','${(f.nome||'').replace(/'/g,"\\'")}')">
-          <div style="font-weight:600;font-size:.82rem">${f.nome} ${esc.gestor_id===f.id?'✓':''}</div>
-          <div style="font-size:.65rem;color:var(--txt3)">${_DG_CARGO_L[f.cargo_id]||f.cargo_id}</div>
-        </button>`).join('')}
-    </div>`;
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <div>
+        <div style="font-size:.78rem;font-weight:700;color:var(--txt);margin-bottom:.5rem">Responsável</div>
+        <div style="display:flex;flex-direction:column;gap:.4rem;max-height:220px;overflow-y:auto">
+          ${_dgNpcs.map(f => `
+            <div class="card" style="cursor:pointer;padding:.55rem .7rem;border-color:${_dgResponsavelId===f.id?'var(--navy3)':'var(--borda2)'};background:${_dgResponsavelId===f.id?'var(--verde-bg)':'var(--surface)'}"
+              onclick="window._dgSetResponsavel('${f.id}')">
+              <div style="font-weight:600;font-size:.8rem;color:var(--txt)">${f.nome}</div>
+              <div style="font-size:.64rem;color:var(--txt3)">${_DG_CARGO_L[f.cargo_id]||f.cargo_id}</div>
+            </div>`).join('')}
+        </div>
+        ${respSelecionado ? `<div style="font-size:.66rem;color:var(--txt4);margin-top:.6rem">Domínio por área (real, escala /50)</div>${_dgPillDominio(respSelecionado)}` : ''}
+      </div>
+      <div>
+        <div style="font-size:.78rem;font-weight:700;color:var(--txt);margin-bottom:.5rem">Nível de Gestão</div>
+        <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.5rem">
+          ${_DG_NIVEIS.map(n => `
+            <div class="card" style="flex:1;min-width:100px;cursor:pointer;text-align:center;padding:.5rem .3rem;border-color:${_dgNivel===n.k?'var(--navy3)':'var(--borda2)'};background:${_dgNivel===n.k?'var(--verde-bg)':'var(--surface)'}"
+              onclick="window._dgSetNivel('${n.k}')">
+              <div style="font-weight:600;font-size:.74rem;color:var(--txt)">${n.l}</div>
+            </div>`).join('')}
+        </div>
+        <div style="font-size:.68rem;color:var(--txt3);margin-bottom:.8rem">${_DG_NIVEIS.find(n=>n.k===_dgNivel)?.desc||''}</div>
+        <div style="font-size:.7rem;color:var(--txt3);margin-bottom:.3rem">Prazo da Delegação</div>
+        <select style="width:100%;font-size:.76rem;padding:.4rem .5rem;background:var(--surface2);color:var(--txt);border:var(--borda-sub);border-radius:var(--r)"
+          onchange="window._dgSetPrazo(this.value)">
+          ${_DG_PRAZO_OPCOES.map(p => `<option value="${p.v}" ${_dgPrazo===p.v?'selected':''}>${p.l}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:1rem">
+      <div style="font-size:.78rem;font-weight:700;color:var(--txt);margin-bottom:.5rem">Permissões</div>
+      <div style="display:flex;flex-direction:column;gap:.4rem">
+        ${_DG_PERMISSOES_DEF.map(p => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:.25rem 0">
+            <span style="font-size:.74rem;color:var(--txt2)">${p.l}</span>
+            <label style="position:relative;display:inline-block;width:36px;height:20px;cursor:pointer">
+              <input type="checkbox" ${_dgPermissoes[p.k]?'checked':''} onchange="window._dgTogglePermissao('${p.k}')" style="opacity:0;width:0;height:0">
+              <span style="position:absolute;inset:0;background:${_dgPermissoes[p.k]?'var(--navy3)':'var(--borda2)'};border-radius:99px;transition:.15s"></span>
+              <span style="position:absolute;top:2px;left:${_dgPermissoes[p.k]?'18px':'2px'};width:16px;height:16px;background:#fff;border-radius:50%;transition:.15s"></span>
+            </label>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div class="card" style="margin-top:1rem;background:var(--surface2)">
+      <div style="font-size:.66rem;color:var(--txt4);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem">Resumo</div>
+      <div style="display:flex;justify-content:space-between;font-size:.74rem;padding:.15rem 0"><span style="color:var(--txt3)">Escopo</span><b>Escritório Todo</b></div>
+      <div style="display:flex;justify-content:space-between;font-size:.74rem;padding:.15rem 0"><span style="color:var(--txt3)">Responsável</span><b>${respSelecionado?.nome || '—'}</b></div>
+      <div style="display:flex;justify-content:space-between;font-size:.74rem;padding:.15rem 0"><span style="color:var(--txt3)">Nível</span><b>${_DG_NIVEIS.find(n=>n.k===_dgNivel)?.l}</b></div>
+      <div style="display:flex;justify-content:space-between;font-size:.74rem;padding:.15rem 0"><span style="color:var(--txt3)">Permissões ativas</span><b>${Object.values(_dgPermissoes).filter(Boolean).length}/${_DG_PERMISSOES_DEF.length}</b></div>
+    </div>
+    <button class="btn btn-prim btn-block" style="margin-top:.8rem" ${!_dgResponsavelId?'disabled':''} onclick="window._dgSalvarGeral()">✓ Delegar Gestão</button>`;
 }
 
 function _dgRenderDepartamentos() {
@@ -1252,7 +1363,7 @@ function _dgRenderDepartamentos() {
     const atualId = _dgDeptosSel[dep.k] || '';
     const opts = _dgNpcs.map(f => {
       const nivel = (f.skills_jur||{})[dep.skill] || 0;
-      const fraco = nivel < 25 ? ' ⚠️ fraco' : '';
+      const fraco = nivel < _DG_LIMIAR_FRACO ? ' ⚠️ fraco' : '';
       return `<option value="${f.id}" ${atualId===f.id?'selected':''}>${f.nome} — ${_DG_CARGO_L[f.cargo_id]||f.cargo_id} (${nivel}/50${fraco})</option>`;
     }).join('');
     return `
@@ -1266,61 +1377,91 @@ function _dgRenderDepartamentos() {
       </div>`;
   }).join('');
   return `
-    <div style="font-size:.66rem;color:var(--txt4);margin-bottom:.4rem">Domínio de área é real (skills_jur do NPC) — abaixo de 25/50 marca ⚠️ fraco, esse gestor ainda recebe o processo mas o resultado não é reforçado por especialização.</div>
+    <div style="font-size:.66rem;color:var(--txt4);margin-bottom:.4rem">Domínio de área é real (skills_jur do NPC) — abaixo de ${_DG_LIMIAR_FRACO}/50 marca ⚠️ fraco, esse gestor ainda recebe o processo mas o resultado não é reforçado por especialização.</div>
     ${rows}
     <button class="btn btn-prim btn-block" style="margin-top:.8rem" onclick="window._dgSalvarDepartamentos()">✓ Salvar Delegação por Departamento</button>`;
 }
 
-window._dgSetEscopo = function(v) {
-  _dgEscopo = v;
-  // Reabre o modal inteiro (não só #dg-conteudo) pra recolorir os cards
-  // de escopo selecionado, que vivem fora desse container.
-  abrirModal('👤 Delegar Gestão do Escritório', _dgRenderModal({ gestores_departamento: _dgDeptosSel }));
+function _dgReabrirModal() {
+  abrirModal('👤 Delegar Gestão do Escritório', _dgRenderModal({ gestor_id: _dgResponsavelId, gestores_departamento: _dgDeptosSel }));
+}
+
+window._dgSetEscopo = function(v) { _dgEscopo = v; _dgReabrirModal(); };
+window._dgSetResponsavel = function(id) { _dgResponsavelId = id; _dgReabrirModal(); };
+window._dgSetNivel = function(nivel) {
+  _dgNivel = nivel;
+  _dgPermissoes = { ..._DG_NIVEL_PERMISSOES[nivel] };
+  _dgReabrirModal();
 };
+window._dgSetPrazo = function(v) { _dgPrazo = v; };
+window._dgTogglePermissao = function(k) { _dgPermissoes[k] = !_dgPermissoes[k]; _dgReabrirModal(); };
 
 window._dgSetDepto = function(area, funcId) {
   if (funcId) _dgDeptosSel[area] = funcId;
   else delete _dgDeptosSel[area];
 };
 
+async function _dgAtualizarTelas() {
+  const elProc = document.getElementById('esc-processos-bloco');
+  if (elProc && window.JOGADOR) window.renderProcessosPool(window.JOGADOR, _dgEscId, elProc);
+  if (window.navTo) setTimeout(() => window.navTo('equipe', null), 300);
+}
+
 window._dgSalvarDepartamentos = async function() {
   try {
     await updateDoc(doc(db, 'escritorios', _dgEscId), {
       gestor_escopo: 'departamento',
       gestores_departamento: _dgDeptosSel,
+      gestor_id: null, gestor_nome: null,
     });
     fecharModal();
     toast('✅ Delegação por departamento salva.', 'ok', 4000);
-    const elProc = document.getElementById('esc-processos-bloco');
-    if (elProc && window.JOGADOR) window.renderProcessosPool(window.JOGADOR, _dgEscId, elProc);
+    _dgAtualizarTelas();
   } catch(e) {
     toast('Erro ao salvar: ' + e.message, 'ko');
   }
 };
 
-window.salvarGestor = async function(escId, funcId, nome) {
+window._dgSalvarGeral = async function() {
+  const f = _dgNpcs.find(x => x.id === _dgResponsavelId);
+  if (!f) return;
+  const flags = _DG_NIVEL_FLAGS[_dgNivel];
+  const prazoMeses = _dgPrazo === 'revogacao' ? null : parseInt(_dgPrazo, 10);
   try {
-    await updateDoc(doc(db, 'escritorios', escId), {
-      gestor_id: funcId,
-      gestor_nome: nome,
+    await updateDoc(doc(db, 'escritorios', _dgEscId), {
+      gestor_id: f.id,
+      gestor_nome: f.nome,
+      gestor_cargo: f.cargo_id,
       gestor_escopo: 'geral',
+      gestor_nivel: _dgNivel,
+      gestor_permissoes: _dgPermissoes,
+      gestor_prazo_meses: prazoMeses,
+      gestor_prazo_meses_restantes: prazoMeses,
+      gestor_delega_processos: flags.processos,
+      gestor_delega_mentoria: flags.mentoria,
+      gestor_delega_conflitos: flags.conflitos,
+      gestores_departamento: null,
     });
     fecharModal();
-    toast(`✅ ${nome} e o novo gestor do escritorio.`, 'ok', 4000);
-    const elProc = document.getElementById('esc-processos-bloco');
-    if (elProc && window.JOGADOR) window.renderProcessosPool(window.JOGADOR, escId, elProc);
+    toast(`✅ ${f.nome} é o novo gestor do escritório.`, 'ok', 4000);
+    _dgAtualizarTelas();
   } catch(e) {
     toast('Erro ao salvar gestor: ' + e.message, 'ko');
   }
 };
 
-window.removerGestor = async function(escId) {
+window._dgConfirmarJogador = async function() {
   try {
-    await updateDoc(doc(db, 'escritorios', escId), { gestor_id: null, gestor_nome: null });
+    await updateDoc(doc(db, 'escritorios', _dgEscId), {
+      gestor_id: null, gestor_nome: null, gestor_cargo: null,
+      gestor_escopo: null, gestor_nivel: null, gestor_permissoes: null,
+      gestor_prazo_meses: null, gestor_prazo_meses_restantes: null,
+      gestor_delega_processos: null, gestor_delega_mentoria: null, gestor_delega_conflitos: null,
+      gestores_departamento: null,
+    });
     fecharModal();
-    toast('Gestor removido.', 'ok');
-    const elProc = document.getElementById('esc-processos-bloco');
-    if (elProc && window.JOGADOR) window.renderProcessosPool(window.JOGADOR, escId, elProc);
+    toast('Você voltou a gerenciar tudo pessoalmente.', 'ok');
+    _dgAtualizarTelas();
   } catch(e) {
     toast('Erro: ' + e.message, 'ko');
   }

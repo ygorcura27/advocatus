@@ -1136,7 +1136,7 @@ async function _carregarBeneficiosPreview(escId) {
 }
 
 // Card de prévia — resumo rápido + link "Ver", igual ao mockup
-// (painel "Prévia de Ações Disponíveis" antes do Quadro de Pessoal).
+// (painel "Prévia de Ações Disponíveis" antes de Gestão de Pessoas).
 // Números reais: consulta leve na mesma processos_pool que
 // js/processos_escritorio.js:renderProcessosPool usa de verdade.
 function _escProcessosPreviewCard(escId) {
@@ -1397,12 +1397,12 @@ function _escEquipeCard(escId) {
   return `
   <div class="esc-card-bloco" style="margin-bottom:1.1rem">
     <div class="secao-header" style="margin-bottom:.6rem">
-      <div class="secao-titulo">Quadro de Pessoal</div>
+      <div class="secao-titulo">Gestão de Pessoas</div>
     </div>
     <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.8rem">
       <button class="btn btn-sm btn-prim" onclick="window.navTo('contratacao',null)">+ contratar</button>
       <button class="btn btn-sm btn-ghost" onclick="window.navTo('treinamento',null)">mentoria</button>
-      <button class="btn btn-sm btn-ghost" onclick="window.navTo('equipe',null)">gerenciar equipe →</button>
+      <button class="btn btn-sm btn-ghost" onclick="window.navTo('equipe',null)">gerenciar pessoas →</button>
     </div>
     <div id="esc-equipe-embed">
       <div style="font-size:.78rem;color:var(--txt3);padding:.5rem 0">Carregando equipe...</div>

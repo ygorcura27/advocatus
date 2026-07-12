@@ -208,6 +208,8 @@ window.renderEquipe = async function(j, el) {
           </div>
         </div>
 
+        ${ehSocioOuAssociado && window._renderCardGestao ? window._renderCardGestao(j, esc, funcs, escId) : ''}
+
         <!-- Abas: Equipe | Diário -->
         <div style="display:flex;gap:0;margin-bottom:1rem;border-bottom:1px solid var(--navy-light)">
           <button class="equipe-tab-btn" data-tab="equipe" onclick="window.switchEquipeTab('equipe')"
@@ -1440,6 +1442,19 @@ function _renderCardGestao(j, esc, funcs, escId) {
       ${_renderToggleGestor('🎓 Delegar mentoria ao gestor', 'mentoria', !!esc.gestor_delega_mentoria, escId)}
       ${_renderToggleGestor('⚖️ Delegar conflitos leves ao gestor', 'conflitos', !!esc.gestor_delega_conflitos, escId)}
       <div style="font-size:.6rem;color:var(--txt4);margin-top:.4rem">⚠️ Conflitos estruturais sempre escalam ao dono, independente das delegações.</div>
+      ${_renderPickerGestor(escId)}
+    </div>`;
+  }
+
+  if (esc.gestor_escopo === 'departamento' && esc.gestores_departamento && Object.keys(esc.gestores_departamento).length > 0) {
+    const nomesPorId = {}; for (const f of funcs) nomesPorId[f.id] = f.nome;
+    const linhas = Object.entries(esc.gestores_departamento)
+      .map(([area, funcId]) => `<div style="display:flex;justify-content:space-between;font-size:.72rem;padding:.15rem 0"><span style="color:var(--txt3)">${area}</span><b>${nomesPorId[funcId] || '—'}</b></div>`)
+      .join('');
+    return `
+    <div class="card" style="margin-bottom:1rem;padding:.7rem 1rem">
+      <div style="font-size:.78rem;font-weight:700;color:var(--txt);margin-bottom:.3rem">⚙️ Gestão do Escritório — Por Departamento</div>
+      ${linhas}
       ${_renderPickerGestor(escId)}
     </div>`;
   }
