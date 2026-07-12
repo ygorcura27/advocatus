@@ -219,14 +219,7 @@ window.renderEquipe = async function(j, el) {
             📓 Diário
           </button>
         </div>
-        ${esc.gestor_id ? `
-        <div class="card" style="margin-bottom:1rem;padding:.7rem 1rem">
-          <div style="font-size:.78rem;font-weight:700;color:var(--txt);margin-bottom:.5rem">⚙️ Delegações ao Gestor</div>
-          ${_renderToggleGestor('📋 Delegar processos ao gestor', 'processos', esc.gestor_delega_processos !== false, escId)}
-          ${_renderToggleGestor('🎓 Delegar mentoria ao gestor', 'mentoria', !!esc.gestor_delega_mentoria, escId)}
-          ${_renderToggleGestor('⚖️ Delegar conflitos leves ao gestor', 'conflitos', !!esc.gestor_delega_conflitos, escId)}
-          <div style="font-size:.6rem;color:var(--txt4);margin-top:.4rem">⚠️ Conflitos estruturais sempre escalam ao dono, independente das delegações.</div>
-        </div>` : ''}
+        ${_renderCardGestao(j, esc, funcs, escId)}
 
         <!-- Pane: Equipe -->
         <div class="equipe-tab-pane" data-tab="equipe" ${_activeEquipeTab==='diario'?'style="display:none"':''}>
@@ -1161,6 +1154,67 @@ function _fmtK(n) {
 function _skillLabel(k) {
   const m = { pesquisa:'Pesq', escrita:'Escr', argumentacao:'Arg', oratoria:'Orat', persuasao:'Pers', negociacao:'Neg', gestao:'Gest' };
   return m[k] || k;
+}
+
+// ════════════════════════════════════════════════════════
+// GESTÃO DO ESCRITÓRIO — real: functions/avancar_mes.js
+// _verificarElegibilidadeGestorCF promove automaticamente o próprio
+// jogador a gestor (não um NPC) quando gestão/networking batem o cap
+// do cargo e ele é o cargo mais alto do escritório. Espelha os mesmos
+// números aqui só pra mostrar progresso — a promoção real acontece
+// no avançar mês, não por um botão nesta tela.
+// ════════════════════════════════════════════════════════
+const _CARGO_ORDEM_GESTAO = { est:0, ass:1, jnr:2, pln:3, snr:4, asc:5, soc:6 };
+const _GESTAO_CAP  = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
+const _NETWORK_CAP = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
+const _CARGO_LABEL_JOGADOR = { est:'Estagiário', ass:'Assistente Jurídico', jnr:'Advogado Júnior', pln:'Advogado Pleno', snr:'Advogado Sênior', asc:'Associado', soc:'Sócio' };
+
+function _renderCardGestao(j, esc, funcs, escId) {
+  if (esc.gestor_id) {
+    const meuUid = window.JOGADOR?.uid || window.JOGADOR_UID;
+    const souEu = esc.gestor_id === meuUid;
+    return `
+    <div class="card" style="margin-bottom:1rem;padding:.7rem 1rem">
+      <div style="font-size:.78rem;font-weight:700;color:var(--txt);margin-bottom:.3rem">⚙️ Gestão do Escritório</div>
+      <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.6rem">
+        Gestor: <b style="color:var(--txt)">${esc.gestor_nome || '—'}</b> (${_CARGO_LABEL_JOGADOR[esc.gestor_cargo] || esc.gestor_cargo || '—'})${souEu ? ' <span style="color:var(--verde2)">— é você</span>' : ''}
+      </div>
+      ${_renderToggleGestor('📋 Delegar processos ao gestor', 'processos', esc.gestor_delega_processos !== false, escId)}
+      ${_renderToggleGestor('🎓 Delegar mentoria ao gestor', 'mentoria', !!esc.gestor_delega_mentoria, escId)}
+      ${_renderToggleGestor('⚖️ Delegar conflitos leves ao gestor', 'conflitos', !!esc.gestor_delega_conflitos, escId)}
+      <div style="font-size:.6rem;color:var(--txt4);margin-top:.4rem">⚠️ Conflitos estruturais sempre escalam ao dono, independente das delegações.</div>
+    </div>`;
+  }
+
+  if (!j.escritorio_empregado_id && !j.escritorio_proprio_id) return '';
+
+  const cargoId = j.cargo_id;
+  const gestaoCap  = _GESTAO_CAP[cargoId] || 55;
+  const networkCap = _NETWORK_CAP[cargoId] || 55;
+  const gestaoAtual = (j.skills || {}).gestao || 0;
+  const netAtual = j.networking || 0;
+  const pctGestao = Math.min(100, Math.round(gestaoAtual / gestaoCap * 100));
+  const pctNet = Math.min(100, Math.round(netAtual / (networkCap * 0.7) * 100));
+
+  const funcsAtivos = funcs.filter(f => f.ativo !== false);
+  const maiorOrdem = Math.max(...funcsAtivos.map(f => _CARGO_ORDEM_GESTAO[f.cargo_id] ?? 0), 0);
+  const meuOrdem = _CARGO_ORDEM_GESTAO[cargoId] ?? 0;
+  const souCargoMaisAlto = meuOrdem >= maiorOrdem;
+
+  return `
+    <div class="card" style="margin-bottom:1rem;padding:.7rem 1rem">
+      <div style="font-size:.78rem;font-weight:700;color:var(--txt);margin-bottom:.3rem">⚙️ Gestão do Escritório</div>
+      <div style="font-size:.7rem;color:var(--txt3);margin-bottom:.6rem">Ninguém é gestor ainda. Você é promovido automaticamente ao virar o mês, se bater os critérios:</div>
+      <div style="margin-bottom:.4rem">
+        <div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--txt3)"><span>Gestão (skill)</span><span>${gestaoAtual}/${gestaoCap}</span></div>
+        <div class="skill-bar"><div class="skill-fill" style="width:${pctGestao}%"></div></div>
+      </div>
+      <div style="margin-bottom:.4rem">
+        <div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--txt3)"><span>Networking (mín. 70% do cap)</span><span>${netAtual}/${Math.round(networkCap*0.7)}</span></div>
+        <div class="skill-bar"><div class="skill-fill" style="width:${pctNet}%"></div></div>
+      </div>
+      <div style="font-size:.68rem;color:${souCargoMaisAlto?'var(--verde2)':'var(--txt4)'}">${souCargoMaisAlto ? '✅' : '○'} Ser o cargo mais alto do escritório</div>
+    </div>`;
 }
 
 function _renderToggleGestor(label, tipo, ativo, escId) {
