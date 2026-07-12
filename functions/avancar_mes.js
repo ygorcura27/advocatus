@@ -1196,6 +1196,20 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
   if (energiaGasta > 70)       { saudeMental = Math.max(0, saudeMental - 5); }
   else if (energiaGasta < 30)  { saudeMental = Math.min(100, saudeMental + 3); disposicao = Math.min(100, disposicao + 3); }
   disposicao = Math.max(0, disposicao - 2);
+  // Disposição virou mecânica real em 2026-07-11 (antes só decaía/regenerava
+  // sem efeito nenhum). Frequentar a academia é o jeito ativo de recuperar —
+  // some com o -2 passivo e ainda soma. Efeito prático: modifica o
+  // orçamento de energia do próximo mês via window.bonusEnergiaDisposicao
+  // (js/relacionamento_dados.js:getEnergiaTotal) — ≥80 dá +10⚡, 50-79
+  // neutro, 20-49 -10⚡, <20 -20⚡ (e emite aviso abaixo).
+  if (j.academia_ativa && j.academia_usada_mes) disposicao = Math.min(100, disposicao + 2);
+  if (disposicao < 20 && (j.disposicao ?? 80) >= 20) {
+    mensagens.push({
+      assunto: '😩 Esgotamento físico',
+      corpo: 'Sua Disposição caiu abaixo de 20 — você vai sentir isso no orçamento de energia do próximo mês (-20⚡). Frequente a academia ou vá com calma.',
+      tipo: 'urgente',
+    });
+  }
 
   if ((IMOVEL_PERIGO[morId] || 0) === 2 && Math.random() < 0.01) {
     const perda = Math.floor((updates.dinheiro || 0) * 0.10);
@@ -2454,6 +2468,15 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
   const updatesJogador = {};
 
   // ── Academia: bônus ou perda de energia ──
+  // Disposição por frequência de academia NÃO entra aqui — este bloco roda
+  // dentro de _processarRelacionamentosMensalCF, que faz seu próprio
+  // .update() e é chamado (linha ~1360) ANTES do _commit() da função
+  // principal (linha ~1459). Como o _commit() final grava updates.disposicao
+  // calculado a partir do MESMO snapshot pré-tick de `j`, qualquer alteração
+  // de disposição feita aqui seria sobrescrita silenciosamente. Fica no
+  // bloco de energia/saúde mental/disposição da função principal (ver
+  // updates.disposicao logo abaixo de ENERGIA_TOTAL) pra entrar no mesmo
+  // objeto `updates` que de fato survives até o commit.
   if (j.academia_ativa) {
     const bonusAtual = j.academia_bonus_energia || 0;
     if (j.academia_usada_mes) {

@@ -455,12 +455,30 @@ export function custoFilhoPorIdade(idade) {
   return 0; // independente após 22
 }
 
-/** Energia total disponível considerando bônus da academia e penalidade de exaustão */
+/**
+ * Bônus/penalidade de energia mensal pela Disposição do jogador (0-100).
+ * Disposição virou mecânica real em 2026-07-11 — antes só decaía/regenerava
+ * sem nenhum efeito (achado ao investigar o pedido do usuário). Faixas
+ * espelham o mesmo padrão de degraus já usado pra Saúde Mental em
+ * functions/peticoes.js:modEstadoJogador, mas aqui mexendo em ENERGIA
+ * (estamina física de curto prazo) em vez de qualidade do trabalho
+ * (psicológico de longo prazo, que é o papel da Saúde Mental).
+ */
+window.bonusEnergiaDisposicao = function(disposicao) {
+  const d = disposicao ?? 80;
+  if (d >= 80) return 10;
+  if (d >= 50) return 0;
+  if (d >= 20) return -10;
+  return -20;
+};
+
+/** Energia total disponível considerando bônus da academia, Disposição e penalidade de exaustão */
 window.getEnergiaTotal = function(j) {
   if (!j) return 100;
   const bonus = j.academia_ativa ? (j.academia_bonus_energia || 0) : 0;
+  const dispBonus = window.bonusEnergiaDisposicao(j.disposicao);
   const pen   = j.penalidade_energia_val || 0;
-  return Math.max(10, 100 + bonus - pen);
+  return Math.max(10, 100 + bonus + dispBonus - pen);
 };
 
 /** Custo de adesão à academia, escalando com reputação */

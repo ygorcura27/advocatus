@@ -23,7 +23,7 @@
  * módulo ainda dependa deles, mas o novo fluxo de processos não os chama.
  */
 
-import { collection, addDoc, doc, updateDoc, getDoc, getDocs, query, where }
+import { collection, addDoc, doc, updateDoc, getDoc, getDocs, query, where, runTransaction }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { httpsCallable }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
@@ -1532,6 +1532,25 @@ const TEMPLATES_RESPOSTA_PASSIVA = [
   () => 'Esse detalhe pode ficar com eles. O caso, no todo, continua sendo nosso.',
 ];
 
+// Número único do processo — contador global incremental no Firestore
+// (doc contadores/processos, campo seq), não mais sorteado local por
+// cliente. Formato enxuto sem sufixo de tribunal/vara regionalizado
+// (o processo já tem o campo `tribunal` separado pra isso): 7 dígitos
+// sequenciais + 2 dígitos verificadores + ano, ex. 0000001-10.2026.
+async function _proximoNumeroProcesso() {
+  const ref = doc(db, 'contadores', 'processos');
+  const seq = await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    const atual = (snap.exists() ? snap.data().seq : 0) || 0;
+    const proximo = atual + 1;
+    tx.set(ref, { seq: proximo }, { merge: true });
+    return proximo;
+  });
+  const dv  = String(seq % 97).padStart(2, '0');
+  const ano = 2024 + Math.floor(Math.random() * 3);
+  return `${String(seq).padStart(7, '0')}-${dv}.${ano}`;
+}
+
 function gerarTextoLocal(PROC) {
   const meuLado = PROC.meuLado || 'autor';
 
@@ -1578,12 +1597,6 @@ function gerarTextoLocal(PROC) {
   const perfil = sortear(perfis);
   const juiz = { nome: sortear(NOMES_JUIZ), perfil_oculto: perfil, hint: PERFIL_HINT[perfil] };
 
-  // Número CNJ sintético — formato n7-dv.AAAA.J.TR.OOOO
-  const seq = String(Math.floor(Math.random()*9999999)).padStart(7,'0');
-  const dv  = String(Math.floor(Math.random()*99)).padStart(2,'0');
-  const ano = 2024 + Math.floor(Math.random()*3);
-  const numero = `${seq}-${dv}.${ano}.8.19.0001`;
-
   const tesesDisponiveis = PROC.teses || [];
   const tipos = ['tecnica','agressiva','passiva'];
 
@@ -1617,7 +1630,7 @@ function gerarTextoLocal(PROC) {
     passiva: [0,1,2].map(i => poolPassiva[i % poolPassiva.length]()),
   };
 
-  return { numero, autor_nome, reu_nome, fatos, juiz, args, resps };
+  return { autor_nome, reu_nome, fatos, juiz, args, resps };
 }
 function calcularPrazosRecurso(mesBase, anoBase){
   const bloqueioMeses = 2 + Math.floor(Math.random()*2); // 2 ou 3
@@ -1896,15 +1909,16 @@ function _escolherAreaPool(areas) {
 // do motor v8 + persistência em Firestore), substituindo o antigo
 // _gerarProcesso (sorteio solto de tipo/autor/réu sem tese/prova).
 // ════════════════════════════════════════════════════════
-function _gerarProcessoCompleto(j, distribuidoPeloEscritorio = false, areaEscolhida = null) {
+async function _gerarProcessoCompleto(j, distribuidoPeloEscritorio = false, areaEscolhida = null) {
   const area = areaEscolhida || j.especialidade || 'civil';
   const areaBanco = _areaBancoParaEspecialidade(area);
   const PROC = gerarProcesso(areaBanco, 'media');
   const TXT  = gerarTextoLocal(PROC);
+  const numero = await _proximoNumeroProcesso();
 
   const mesG = j.mes_global_pessoal || 1;
   return {
-    numero: TXT.numero,
+    numero,
     tipo: PROC.conflito.nome,
     autor: TXT.autor_nome,
     reu: TXT.reu_nome,
@@ -1969,10 +1983,11 @@ window.criarProcessoDoPool = async function(escId, poolProcId, poolProc) {
   const dif = TIER_DIF[poolProc.tier || 'D'] || 'media';
   const PROC = gerarProcesso(areaBanco, dif);
   const TXT  = gerarTextoLocal(PROC);
+  const numero = await _proximoNumeroProcesso();
   const mesG = mesTotalPessoalProc(j);
 
   const proc = {
-    numero: TXT.numero,
+    numero,
     tipo: PROC.conflito.nome,
     autor: TXT.autor_nome,
     reu: TXT.reu_nome,
@@ -3065,7 +3080,7 @@ window.novoProcesso = async function() {
   // Solo (sem escritório): único caso em que o processo continua individual.
   if (energiaDisp < 5) { toast('⚡ Energia insuficiente para novos casos.', 'ko'); return; }
 
-  const proc = _gerarProcessoCompleto(j);
+  const proc = await _gerarProcessoCompleto(j);
   try {
     await addDoc(collection(db, 'processos'), proc);
     toast(`📁 Novo caso: ${proc.tipo}`, 'ok');
@@ -3126,7 +3141,7 @@ window.novoProcessoPoolEmpregado = async function() {
   const areaEscolhida = await _escolherAreaPool(areas);
   if (!areaEscolhida) return;
 
-  const proc = _gerarProcessoCompleto(j, false, areaEscolhida);
+  const proc = await _gerarProcessoCompleto(j, false, areaEscolhida);
   proc.pool_escritorio_id = j.escritorio_empregado_id;
   proc.escritorio_nome_etiqueta = esc.nome || j.escritorio_nome || null;
   proc.distribuido_pelo_escritorio = true;
@@ -3200,7 +3215,7 @@ window.novoProcessoPool = async function() {
   const areaEscolhida = await _escolherAreaPool(areas);
   if (!areaEscolhida) return; // usuário cancelou
 
-  const proc = _gerarProcessoCompleto(j, false, areaEscolhida);
+  const proc = await _gerarProcessoCompleto(j, false, areaEscolhida);
   proc.pool_escritorio_id = j.escritorio_proprio_id;
   proc.escritorio_nome_etiqueta = esc.nome || j.escritorio_nome || null;
   proc.distribuido_pelo_escritorio = true;

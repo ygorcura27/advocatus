@@ -19,6 +19,7 @@ const { getFirestore }       = require('firebase-admin/firestore');
 const { logger }             = require('firebase-functions');
 const banco                  = require('./shared/banco_juridico.js');
 const { aplicarXpPracticeArea, normalizarSkillsJur } = require('./skills');
+const { modEstadoJogador } = require('./peticoes');
 const sk = require('./investigacao_skills');
 
 // ─── Config (Parte II/III/VI do GDD — "pendências de calibração" Parte VIII) ──
@@ -34,7 +35,11 @@ const CUSTO_TURNO = {                    // calibrar
   favor: 1,
 };
 const ACOES_DIRETAS = new Set(['consulta', 'analise_documental', 'entrevista', 'pericia']);
-const LIMIAR_VITORIA_BASE = 20;          // calibrar — Parte VIII
+// Recalibrado junto com forcaBaseAleatoria() (ver comentário lá) — no
+// piso da nova escala, uma peça isolada boa fica ~25-40 de força; o
+// limiar de 45 exige combinar pelo menos 2 peças decentes (ou 1 ótima +
+// 1 fraca) pra vencer, em vez de qualquer peça isolada já bastar.
+const LIMIAR_VITORIA_BASE = 45;          // calibrar — Parte VIII (1ª recalibração 2026-07-11, não simulada)
 const VELOCIDADE_ADVERSARIA_BASE = 5;    // calibrar — +5/turno, +3 se prova suja revelada
 
 // ─── Helpers reaproveitados do padrão de processar_sentenca.js ─────────────
@@ -188,7 +193,15 @@ function gerarGrafoDeNos(p) {
 
 // ─── Força de peça gerada por nó ───────────────────────────────────────────
 
-function forcaBaseAleatoria() { return Math.round(rand(30, 70)); }
+// Recalibrado 2026-07-11 — a escala anterior (30-70 de base, +20/+25 de
+// offset, ×1.8/×2 de multiplicador ao acertar) gerava peças de 100-180 de
+// força contra um limiar de vitória de 20: qualquer peça isolada já
+// vencia o caso sozinha, tornando o Julgamento praticamente imperdível
+// (bug reportado em produção). Nova escala mantém consulta como a mais
+// fraca (sem multiplicador) e perícia/análise como as mais fortes ao
+// acertar, mas nenhuma peça isolada basta pra bater LIMIAR_VITORIA_BASE
+// sozinha — precisa combinar 2-3 peças boas, como pretendido.
+function forcaBaseAleatoria() { return Math.round(rand(6, 18)); }
 
 // ─── 1. Iniciar caso investigativo (Intake) ────────────────────────────────
 
@@ -291,31 +304,40 @@ exports.executarAcaoInvestigacao = onCall({ region: 'southamerica-east1' }, asyn
     resultado = { peca: no.peca };
   } else if (no.tipo === 'analise_documental') {
     const dp = no.dados_puzzle;
-    const forcaCerta = forcaBaseAleatoria() + 20;
+    const forcaCerta = forcaBaseAleatoria() + 8;
     const acertou = Number(escolha) === dp.campo_suspeito;
-    const forca = acertou ? forcaCerta * 2 : sk.forcaAoErrar(4, forcaCerta, skJur.analise_forense);
+    const forca = acertou ? forcaCerta * 1.6 : sk.forcaAoErrar(4, forcaCerta, skJur.analise_forense);
     no.peca = { forca: Math.round(forca), suja: Math.random() < 0.2, pilar: false, origem_no: no.id };
     resultado = { acertou, peca: no.peca };
   } else if (no.tipo === 'entrevista') {
     const dp = no.dados_puzzle;
     const { declaracao_escolhida, tom } = escolha || {};
     const acertouDeclaracao = Number(declaracao_escolhida) === dp.evasiva;
-    let forca = acertouDeclaracao ? 55 : 35;
-    if (tom === 'pressionar') forca += 15 + sk.bonusOratoria(skJur.oral_advocacy);
-    else if (tom === 'empatia') forca += 8 + sk.bonusPersuasao(skJur.negotiation) * 0.3;
-    else forca += 3; // silêncio
+    let forca = acertouDeclaracao ? 22 : 12;
+    if (tom === 'pressionar') forca += 6 + sk.bonusOratoria(skJur.oral_advocacy);
+    else if (tom === 'empatia') forca += 3 + sk.bonusPersuasao(skJur.negotiation) * 0.3;
+    else forca += 1; // silêncio
     const arriscado = tom === 'pressionar' && !acertouDeclaracao;
     no.peca = { forca: Math.round(forca), suja: arriscado && Math.random() < 0.4, pilar: false, origem_no: no.id };
     resultado = { acertouDeclaracao, arriscado, peca: no.peca };
   } else if (no.tipo === 'pericia') {
     const dp = no.dados_puzzle;
-    const forcaCerta = forcaBaseAleatoria() + 25;
+    const forcaCerta = forcaBaseAleatoria() + 10;
     const acertou = Number(escolha) === dp.certa;
-    const forca = acertou ? forcaCerta * 1.8 : sk.forcaAoErrar(6, forcaCerta, skJur.analise_forense);
+    const forca = acertou ? forcaCerta * 1.5 : sk.forcaAoErrar(6, forcaCerta, skJur.analise_forense);
     no.peca = { forca: Math.round(forca), suja: Math.random() < 0.25, pilar: true, origem_no: no.id };
     resultado = { acertou, peca: no.peca };
   } else {
     throw new HttpsError('failed-precondition', 'Este tipo de nó não usa turno direto.');
+  }
+
+  // Saúde Mental agora também pesa na força da peça (2026-07-11) — antes
+  // só afetava a nota de Petições no fluxo Setlist legado, nunca o
+  // Julgamento atual. Mesmas faixas de functions/peticoes.js:modEstadoJogador,
+  // reaproveitadas pra manter as duas mecânicas consistentes: burnout ×0,75,
+  // SM>70 ×1,10, SM 40-70 neutro, SM<40 ×0,90.
+  if (no.peca) {
+    no.peca.forca = Math.round(no.peca.forca * modEstadoJogador(j));
   }
 
   no.status = 'revelado';

@@ -1328,11 +1328,16 @@ function gerarTextoLocal(PROC) {
   const perfil = sortear(perfis);
   const juiz = { nome: sortear(NOMES_JUIZ), perfil_oculto: perfil, hint: PERFIL_HINT[perfil] };
 
-  // Número CNJ sintético — formato n7-dv.AAAA.J.TR.OOOO
+  // Número único do processo — mesmo formato de js/processos.js
+  // (7 dígitos + 2 dígitos verificadores + ano, sem sufixo de
+  // tribunal/vara). Esta função não está em uso (a geração real de
+  // processo roda em js/processos.js, com número tirado de um contador
+  // global no Firestore); mantido só para não divergir do formato caso
+  // seja reativada.
   const seq = String(Math.floor(Math.random()*9999999)).padStart(7,'0');
   const dv  = String(Math.floor(Math.random()*99)).padStart(2,'0');
   const ano = 2024 + Math.floor(Math.random()*3);
-  const numero = `${seq}-${dv}.${ano}.8.19.0001`;
+  const numero = `${seq}-${dv}.${ano}`;
 
   const tesesDisponiveis = PROC.teses || [];
   const tipos = ['tecnica','agressiva','passiva'];
