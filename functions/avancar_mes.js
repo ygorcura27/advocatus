@@ -1117,6 +1117,31 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
             tipo: novosMeses <= 0 ? 'positivo' : 'neutro',
           });
         }
+
+        // Campanhas de Marketing (functions/financeiro.js:lancarCampanha) —
+        // ganho de prestígio distribuído em partes iguais ao longo da duração
+        // (arredondado, sobra vai pro último mês pra bater o total exato).
+        const campanhas = escPre.campanhas_ativas || [];
+        if (campanhas.length > 0) {
+          let prestigioGanho = 0;
+          const campanhasRestantes = [];
+          for (const camp of campanhas) {
+            const ultimaParcela = camp.meses_restantes <= 1;
+            const parcela = ultimaParcela
+              ? camp.ganho_prestigio_total - camp.ganho_aplicado
+              : Math.round(camp.ganho_prestigio_total / camp.meses_total);
+            prestigioGanho += parcela;
+            if (!ultimaParcela) {
+              campanhasRestantes.push({ ...camp, meses_restantes: camp.meses_restantes - 1, ganho_aplicado: camp.ganho_aplicado + parcela });
+            } else {
+              mensagens.push({ assunto: '📣 Campanha Concluída', corpo: `${camp.nome} terminou: +${camp.ganho_prestigio_total} prestígio no total.`, tipo: 'positivo' });
+            }
+          }
+          if (prestigioGanho > 0) {
+            escUpdReset.prestigio = Math.min(100, (escPre.prestigio || 0) + prestigioGanho);
+          }
+          escUpdReset.campanhas_ativas = campanhasRestantes;
+        }
       }
       await escRefProprio.update(escUpdReset);
       const funcSnap = await escRefProprio.collection('funcionarios').get();

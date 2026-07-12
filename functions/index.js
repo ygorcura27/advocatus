@@ -57,7 +57,8 @@ const {
   obterObrasPublicas,
 } = require('./artigos_livros');
 const { anteciparHonorarios, contratarLinhaCredito, pagarLinhaCredito,
-        contratarSocioInvestidor, aplicarInvestimento, resgatarInvestimento } = require('./financeiro');
+        contratarSocioInvestidor, aplicarInvestimento, resgatarInvestimento,
+        lancarCampanha } = require('./financeiro');
 const { comprarAtivo, venderAtivo } = require('./investimentos_mercado');
 // GDD v5.1 — Podcasts / Aparições na Internet
 const { responderConviteMidia } = require('./podcasts_social');
@@ -127,6 +128,7 @@ exports.anteciparHonorarios      = anteciparHonorarios;
 exports.contratarLinhaCredito    = contratarLinhaCredito;
 exports.pagarLinhaCredito        = pagarLinhaCredito;
 exports.contratarSocioInvestidor = contratarSocioInvestidor;
+exports.lancarCampanha           = lancarCampanha;
 exports.aplicarInvestimento      = aplicarInvestimento;
 exports.resgatarInvestimento     = resgatarInvestimento;
 exports.comprarAtivo             = comprarAtivo;

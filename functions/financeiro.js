@@ -27,6 +27,16 @@ const _FIRMAS_NPC = [
   { id: 'ribeiro_trabalhista', nome: 'Ribeiro Trabalhista', setor: 'trabalhista', min_inv: 20000, pct_base: 0.007, volatilidade: 0.10 },
 ];
 
+// Campanhas de Marketing (GDD Seção 33-bis) — custo pago à vista do caixa do
+// escritório, ganho de prestígio (esc.prestigio, o mesmo campo que já
+// multiplica geração de oportunidades em avancar_mes.js:_multiplicadorPrestigioCF)
+// distribuído ao longo da duração. Espelhado no frontend (js/ui-main.js).
+const _CAMPANHAS_TIERS = {
+  local:    { nome: 'Campanha Local',    custo: 5000,  meses: 2, ganho_prestigio: 3  },
+  regional: { nome: 'Campanha Regional', custo: 15000, meses: 3, ganho_prestigio: 8  },
+  nacional: { nome: 'Campanha Nacional', custo: 40000, meses: 4, ganho_prestigio: 18 },
+};
+
 // ════════════════════════════════════════════════════════
 // ANTECIPAÇÃO DE HONORÁRIOS (GDD Seção 31)
 // Até 60% do total de hon_pendente nos processos ativos.
@@ -248,6 +258,57 @@ exports.contratarSocioInvestidor = onCall({ region: 'southamerica-east1' }, asyn
   return {
     ok: true, nome, capital,
     msg: `${nome} aportou R$${capital.toLocaleString('pt-BR')} em troca de 20% dos honorários por 36 meses.`,
+  };
+  });
+});
+
+// ════════════════════════════════════════════════════════
+// LANÇAR CAMPANHA DE MARKETING
+// Custo à vista do caixa do escritório; ganho de prestígio distribuído ao
+// longo da duração, processado em avancar_mes.js (bloco escritorio_proprio_id).
+// ════════════════════════════════════════════════════════
+exports.lancarCampanha = onCall({ region: 'southamerica-east1' }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
+  const uid = request.auth.uid;
+  const { tier, nonce } = request.data || {};
+  const cfg = _CAMPANHAS_TIERS[tier];
+  if (!cfg) throw new HttpsError('invalid-argument', 'Tier de campanha inválido.');
+
+  const db = getFirestore();
+  return comIdempotencia(db, { uid, nonce, acao: 'lancarCampanha' }, async () => {
+  const jogRef  = db.collection('jogadores').doc(uid);
+  const jogSnap = await jogRef.get();
+  if (!jogSnap.exists) throw new HttpsError('not-found', 'Jogador não encontrado.');
+  const j = jogSnap.data();
+
+  if (!j.escritorio_proprio_id) throw new HttpsError('failed-precondition', 'Necessário ter escritório próprio para lançar campanhas.');
+
+  const escRef  = db.collection('escritorios').doc(j.escritorio_proprio_id);
+  const escSnap = await escRef.get();
+  if (!escSnap.exists) throw new HttpsError('not-found', 'Escritório não encontrado.');
+  const esc = escSnap.data();
+
+  if ((esc.caixa || 0) < cfg.custo) throw new HttpsError('failed-precondition', `Caixa insuficiente (necessário R$${cfg.custo.toLocaleString('pt-BR')}).`);
+
+  const campanhas = esc.campanhas_ativas || [];
+  const id = `camp_${Date.now()}`;
+  campanhas.push({
+    id, tier, nome: cfg.nome,
+    custo: cfg.custo,
+    meses_restantes: cfg.meses,
+    meses_total: cfg.meses,
+    ganho_prestigio_total: cfg.ganho_prestigio,
+    ganho_aplicado: 0,
+  });
+
+  await escRef.update({
+    caixa: (esc.caixa || 0) - cfg.custo,
+    campanhas_ativas: campanhas,
+  });
+
+  return {
+    ok: true, tier,
+    msg: `${cfg.nome} lançada: R$${cfg.custo.toLocaleString('pt-BR')}, +${cfg.ganho_prestigio} prestígio ao longo de ${cfg.meses} meses.`,
   };
   });
 });

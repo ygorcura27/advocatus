@@ -7,6 +7,8 @@
 import { collection, query, where, orderBy, limit,
          getDocs, getDoc, doc, updateDoc, addDoc }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { httpsCallable }
+  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
 import { db } from './firebase-init.js';
 import { icon } from './icons.js';
 import { renderAvatarJogador } from './avatar_svg.js';
@@ -1723,9 +1725,26 @@ function renderRedes(j, el) {
 // MARKETING & REPUTAÇÃO — hub real do escritório. Reputação/prestígio
 // já existiam no backend (processar_sentenca.js/processar_acordao.js)
 // mas esc.reputacao nunca aparecia em nenhuma tela (só esc.prestigio,
-// no hero do Escritório) — corrigido aqui. Campanhas segue proposta,
-// sem backend nenhum; Redes Sociais/Mídia linkam pras telas reais.
+// no hero do Escritório) — corrigido aqui. Campanhas virou real (custo do
+// caixa, ganho de prestígio via functions/financeiro.js:lancarCampanha,
+// espelho abaixo). Redes Sociais/Mídia linkam pras telas reais.
 // ════════════════════════════════════════════════════════
+const _CAMPANHAS_TIERS = {
+  local:    { nome: 'Campanha Local',    custo: 5000,  meses: 2, ganho_prestigio: 3  },
+  regional: { nome: 'Campanha Regional', custo: 15000, meses: 3, ganho_prestigio: 8  },
+  nacional: { nome: 'Campanha Nacional', custo: 40000, meses: 4, ganho_prestigio: 18 },
+};
+window._lancarCampanha = async function(tier) {
+  try {
+    const fn = httpsCallable(window.FB_FUNCTIONS, 'lancarCampanha');
+    const r  = await fn({ tier, nonce: crypto.randomUUID() });
+    window.toast(`✅ ${r.data.msg}`, 'ok', 5000);
+    setTimeout(() => window._mktRenderTab('campanhas'), 500);
+  } catch (e) {
+    window.toast(e.message || 'Erro ao lançar campanha.', 'ko');
+  }
+};
+
 async function renderMarketing(j, el) {
   el.innerHTML = `<div class="secao-header"><div class="secao-titulo">📣 Marketing & Reputação</div></div><div class="card">Carregando...</div>`;
 
@@ -1817,13 +1836,31 @@ window._mktRenderTab = async function(tab, escCached) {
   }
 
   if (tab === 'campanhas') {
+    const caixa = esc.caixa || 0;
+    const ativas = esc.campanhas_ativas || [];
     el.innerHTML = `
-      <div class="card" style="font-size:.7rem;color:var(--txt4);margin-bottom:.7rem">
-        📌 Mecânica proposta — orçamento/ROI de campanhas pagas não existe no jogo real, só o repertório de mídia (convites de podcast).
+      <div class="card" style="font-size:.7rem;color:var(--txt3);margin-bottom:.7rem">
+        Real: custo sai do caixa do escritório (${_fmtExt(caixa)} disponível), ganho de prestígio distribuído ao longo da
+        duração — prestígio multiplica geração de oportunidades (functions/avancar_mes.js:_multiplicadorPrestigioCF).
       </div>
-      <div class="esc-card-bloco" style="text-align:center;padding:1.5rem">
-        <div style="font-size:.82rem;color:var(--txt3)">Nenhuma campanha — mecânica não implementada.</div>
-        <button class="btn btn-ghost btn-sm" style="margin-top:.6rem" disabled title="Proposta">+ Nova Campanha</button>
+      ${ativas.length > 0 ? `
+      <div class="esc-card-bloco" style="margin-bottom:1rem">
+        <div class="secao-header" style="margin-bottom:.4rem"><div class="secao-titulo">Campanhas Ativas</div></div>
+        ${ativas.map(c => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem 0;font-size:.78rem;border-bottom:1px solid var(--borda-cor,#2a2a2e)">
+            <span>${c.nome}</span>
+            <span style="color:var(--txt3)">${c.meses_restantes}/${c.meses_total} meses · +${c.ganho_prestigio_total} prestígio total</span>
+          </div>`).join('')}
+      </div>` : ''}
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.8rem">
+        ${Object.entries(_CAMPANHAS_TIERS).map(([tier, c]) => `
+          <div class="peca-card">
+            <div class="peca-topo"><div><div class="peca-kicker">📣 ${c.nome.toUpperCase()}</div></div></div>
+            <div class="perf-row"><span>Custo</span><b>${_fmtExt(c.custo)}</b></div>
+            <div class="perf-row"><span>Duração</span><b>${c.meses} meses</b></div>
+            <div class="perf-row"><span>Ganho de prestígio</span><b>+${c.ganho_prestigio}</b></div>
+            <button class="btn-avancar oport-btn" style="width:100%;margin-top:.5rem" ${caixa < c.custo ? 'disabled title="Caixa insuficiente"' : ''} onclick="window._lancarCampanha('${tier}')">Lançar</button>
+          </div>`).join('')}
       </div>`;
     return;
   }
