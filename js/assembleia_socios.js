@@ -45,7 +45,7 @@ window.renderAssembleiaSocios = async function(j, el) {
   el.innerHTML = `<div class="secao-header"><div class="secao-titulo">🏛️ Assembleia de Sócios</div></div><div class="card">Carregando...</div>`;
 
   const escId = j.escritorio_id;
-  if (!escId) {
+  if (!escId || escId === 'solo') {
     el.innerHTML = `<div class="secao-header"><div class="secao-titulo">🏛️ Assembleia de Sócios</div></div>
       <div class="card" style="color:var(--txt3)">Você precisa estar em um escritório para participar de uma assembleia.</div>`;
     return;
