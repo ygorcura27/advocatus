@@ -66,11 +66,37 @@ window.addEventListener('jogador:update', (e) => {
   _atualizarSidebarEsquerda(j);
   _atualizarSidebarDireita(j);
   _atualizarTopbar(j);
+  _iniciarListenerInbox(j.uid);
   // Atualizar calendário com dados pessoais do jogador (mais precisos que o server)
   _atualizarRelógio(window.SERVER || {}, j);
   // Notificar ui-main.js para re-renderizar o painel ativo
   window.dispatchEvent(new CustomEvent('gamestate:ready', { detail: j }));
 });
+
+// ════════════════════════════════════════════════════════
+// BADGE DE MENSAGENS NÃO LIDAS — em tempo real.
+// j.notificacoes_nao_lidas é um campo morto (inicializado na criação
+// do personagem, nunca incrementado em lugar nenhum — inbox inteiro
+// já roda por query where('lida','==',false), ver js/ui-main.js
+// renderInbox/marcarTodasLidas). O badge lia esse campo morto e por
+// isso nunca aparecia mesmo com mensagens não lidas de verdade.
+// ════════════════════════════════════════════════════════
+let _inboxListenerUid = null;
+function _iniciarListenerInbox(uid) {
+  if (!uid || uid === _inboxListenerUid) return;
+  _inboxListenerUid = uid;
+  const q = query(collection(db, 'jogadores', uid, 'inbox'), where('lida', '==', false));
+  onSnapshot(q, (snap) => _atualizarBadgeInbox(snap.size));
+}
+
+function _atualizarBadgeInbox(naoLidas) {
+  ['badge-inbox', 'badge-inbox-nav'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = naoLidas > 0 ? '' : 'none';
+    el.textContent   = naoLidas > 9 ? '9+' : String(naoLidas);
+  });
+}
 
 // ════════════════════════════════════════════════════════
 // LISTENER: SERVIDOR
@@ -154,15 +180,7 @@ function _atualizarSidebarDireita(j) {
 function _atualizarTopbar(j) {
   _set('tb-rep',   String(j.reputacao || 0));
   _set('tb-saldo', fmt(j.dinheiro || 0));
-
-  // Badge inbox
-  const naoLidas = j.notificacoes_nao_lidas || 0;
-  ['badge-inbox','badge-inbox-nav'].forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.style.display = naoLidas > 0 ? '' : 'none';
-    el.textContent   = naoLidas > 9 ? '9+' : String(naoLidas);
-  });
+  // Badge de inbox: ver _iniciarListenerInbox — roda por listener próprio em tempo real.
 }
 
 // ════════════════════════════════════════════════════════
