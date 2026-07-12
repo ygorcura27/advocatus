@@ -239,8 +239,10 @@ function renderPerfil(j, el) {
           ${fotoHtml}
           <div>
             <div class="profile-hero-nome">${j.nome_personagem || '—'}</div>
-            <div class="profile-hero-titulo">${label} · ${esp} · Rio de Janeiro</div>
-            <div class="profile-hero-desc">${j.descricao_personagem || `${label} atuando em ${esp}, ${escNome}.`}</div>
+            <div class="profile-hero-titulo">${label} · ${esp} · ${j.escritorio_bairro || 'Rio de Janeiro'}</div>
+            <div class="profile-hero-desc">${j.descricao_personagem || `${label} atuando em ${esp}, ${escNome}.`}
+              <span style="cursor:pointer;color:var(--navy3);font-size:.68rem;margin-left:.4rem" onclick="window._perfilEditarDescricao()">✏️ editar</span>
+            </div>
             <div class="profile-hero-meta">
               <span class="meta-tag">📅 ${j.anos_carreira || 0} anos de carreira</span>
               <span class="meta-tag">⚖️ ${total} casos no total</span>
@@ -300,6 +302,33 @@ function renderPerfil(j, el) {
   _carregarFeedAtividade(j.uid);
 }
 
+
+window._perfilEditarDescricao = function() {
+  const j = window.JOGADOR;
+  window.abrirModal('✏️ Editar Descrição',
+    `<div class="campo">
+      <label>Bio do personagem</label>
+      <textarea id="perfil-desc-input" maxlength="200" rows="4" placeholder="Conte um pouco sobre sua trajetória...">${j.descricao_personagem || ''}</textarea>
+    </div>
+    <div style="display:flex;gap:.5rem;margin-top:.6rem">
+      <button class="btn btn-ghost" style="flex:1" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-prim" style="flex:1" onclick="window._perfilSalvarDescricao()">Salvar</button>
+    </div>`);
+};
+
+window._perfilSalvarDescricao = async function() {
+  const texto = (document.getElementById('perfil-desc-input')?.value || '').trim().slice(0, 200);
+  const uid = window.JOGADOR?.uid || window.JOGADOR_UID;
+  try {
+    await updateDoc(doc(db, 'jogadores', uid), { descricao_personagem: texto });
+    if (window.JOGADOR) window.JOGADOR.descricao_personagem = texto;
+    window.fecharModal();
+    window.toast('✅ Descrição atualizada.', 'ok', 2000);
+    setTimeout(() => window.navTo?.('perfil', null), 300);
+  } catch (e) {
+    window.toast(e.message || 'Erro ao salvar.', 'ko');
+  }
+};
 
 async function _carregarFeedAtividade(uid) {
   try {
