@@ -552,11 +552,9 @@ function renderEscritorio(j, el) {
       ${_escAtividadeCard()}
       ${_escProcessosPreviewCard(j.escritorio_proprio_id)}
       ${_escKpisPlaceholder()}
-      <div class="esc-grid-3">
-        ${_escEquipeCard(j.escritorio_proprio_id)}
-        ${_escClientesCard()}
-        ${_escSocietarioCard(null, j)}
-      </div>
+      ${_escEquipeCard(j.escritorio_proprio_id)}
+      ${_escClientesCard()}
+      ${_escSocietarioCard(null, j)}
       <div id="esc-oportunidades-bloco"></div>
       <div id="esc-financas-upgrade"></div>
       ${_escAcoesRapidas(j, null)}
@@ -694,11 +692,9 @@ async function _carregarEscritorioProprio(escId, j) {
         ${_escAtividadeCard()}
         ${_escProcessosPreviewCard(esc.id)}
         <div id="esc-kpis-placeholder">${_escKpisPlaceholder()}</div>
-        <div class="esc-grid-3">
-          ${_escEquipeCard(esc.id)}
-          ${_escClientesCard()}
-          ${_escSocietarioCard(esc, j)}
-        </div>
+        ${_escEquipeCard(esc.id)}
+        ${_escClientesCard()}
+        ${_escSocietarioCard(esc, j)}
         <div id="esc-processos-bloco"></div>
         <div id="esc-oportunidades-bloco"></div>
         <div id="esc-workspace-bloco"></div>
@@ -925,34 +921,32 @@ async function _renderEscritorioFuncionario(j, el, escId) {
   el.innerHTML = `
     ${_escHero(j, null)}
     ${_escAtividadeCard()}
-    <div class="esc-grid-3">
-      <div class="esc-card-bloco">
-        <div class="secao-header" style="margin-bottom:.8rem">
-          <div class="secao-titulo">Equipe do Escritório</div>
-          ${podeCtrt
-            ? `<button class="btn btn-sm btn-prim" onclick="window.navTo('equipe',null)" style="font-size:.7rem">+ Contratar</button>`
-            : `<span style="font-size:.65rem;color:var(--txt3)">Só o dono ou Pleno+ alto</span>`}
-        </div>
-        <div id="esc-equipe-embed"><div style="font-size:.78rem;color:var(--txt3)">Carregando...</div></div>
+    <div class="esc-card-bloco" style="margin-bottom:1.1rem">
+      <div class="secao-header" style="margin-bottom:.8rem">
+        <div class="secao-titulo">Equipe do Escritório</div>
+        ${podeCtrt
+          ? `<button class="btn btn-sm btn-prim" onclick="window.navTo('equipe',null)" style="font-size:.7rem">+ Contratar</button>`
+          : `<span style="font-size:.65rem;color:var(--txt3)">Só o dono ou Pleno+ alto</span>`}
       </div>
-      <div class="esc-card-bloco">
-        <div class="secao-header" style="margin-bottom:.8rem">
-          <div class="secao-titulo">Clientes</div>
-        </div>
-        <div id="esc-clientes-embed"><div style="font-size:.78rem;color:var(--txt3)">Carregando...</div></div>
+      <div id="esc-equipe-embed"><div style="font-size:.78rem;color:var(--txt3)">Carregando...</div></div>
+    </div>
+    <div class="esc-card-bloco" style="margin-bottom:1.1rem">
+      <div class="secao-header" style="margin-bottom:.8rem">
+        <div class="secao-titulo">Clientes</div>
       </div>
-      <div class="esc-card-bloco">
-        <div class="secao-header" style="margin-bottom:.8rem">
-          <div class="secao-titulo">Sua Posição</div>
-        </div>
-        <div style="font-size:.8rem;color:var(--txt);font-weight:600">${j.nome_personagem||'—'}</div>
-        <div style="font-size:.7rem;color:var(--txt3)">${j.cargo_id?.toUpperCase()||'—'} · Tier ${tier}</div>
-        <div style="font-size:.7rem;color:var(--txt3);margin-top:.3rem">${j.escritorio_nome||'—'}</div>
-        ${podeCtrt ? `<div style="font-size:.65rem;color:var(--verde2);margin-top:.5rem">✅ Poder de contratar ativo</div>` : ''}
-        <button class="btn btn-ghost btn-sm btn-block" style="margin-top:.8rem" onclick="window.sairEscritorio&&window.sairEscritorio()">
-          Sair do escritório
-        </button>
+      <div id="esc-clientes-embed"><div style="font-size:.78rem;color:var(--txt3)">Carregando...</div></div>
+    </div>
+    <div class="esc-card-bloco" style="margin-bottom:1.1rem">
+      <div class="secao-header" style="margin-bottom:.8rem">
+        <div class="secao-titulo">Sua Posição</div>
       </div>
+      <div style="font-size:.8rem;color:var(--txt);font-weight:600">${j.nome_personagem||'—'}</div>
+      <div style="font-size:.7rem;color:var(--txt3)">${j.cargo_id?.toUpperCase()||'—'} · Tier ${tier}</div>
+      <div style="font-size:.7rem;color:var(--txt3);margin-top:.3rem">${j.escritorio_nome||'—'}</div>
+      ${podeCtrt ? `<div style="font-size:.65rem;color:var(--verde2);margin-top:.5rem">✅ Poder de contratar ativo</div>` : ''}
+      <button class="btn btn-ghost btn-sm btn-block" style="margin-top:.8rem" onclick="window.sairEscritorio&&window.sairEscritorio()">
+        Sair do escritório
+      </button>
     </div>
     <div id="esc-processos-bloco"></div>
     <div id="esc-oportunidades-bloco"></div>`;
@@ -1080,9 +1074,11 @@ function _escProcessosPreviewCard(escId) {
       <div class="secao-titulo">⚖️ Gestão de Processos</div>
       <a href="#" class="esc-ver-todos" onclick="document.getElementById('esc-processos-bloco')?.scrollIntoView({behavior:'smooth'});return false">Ver →</a>
     </div>
-    <div id="esc-processos-preview" style="font-size:.68rem;color:var(--txt4)">Carregando...</div>
+    <div id="esc-processos-preview" style="font-size:.78rem;color:var(--txt3);padding:.5rem 0">Carregando...</div>
   </div>`;
 }
+
+const _PROC_STATUSES_RECURSAL = ['recurso_pendente','aguardando_decisao_sentenca','aguardando_decisao_recurso','aguardando_evento','pronto_para_sentenca'];
 
 async function _carregarProcessosPreview(escId) {
   const el = document.getElementById('esc-processos-preview');
@@ -1090,10 +1086,37 @@ async function _carregarProcessosPreview(escId) {
   try {
     const poolSnap = await getDocs(collection(db, 'escritorios', escId, 'processos_pool'));
     const todos = poolSnap.docs.map(d => d.data());
-    const ativos = todos.filter(p => p.status === 'em_andamento' || p.status === 'disponivel').length;
-    const STATUSES_RECURSAL = ['recurso_pendente','aguardando_decisao_sentenca','aguardando_decisao_recurso','aguardando_evento','pronto_para_sentenca'];
-    const recursal = todos.filter(p => STATUSES_RECURSAL.includes(p.status)).length;
-    el.textContent = `${ativos} processo${ativos===1?'':'s'} ativo${ativos===1?'':'s'} · ${recursal} em fase recursal`;
+    const disponiveis = todos.filter(p => p.status === 'disponivel');
+    const emAndamento = todos.filter(p => p.status === 'em_andamento');
+    const ativos   = disponiveis.length + emAndamento.length;
+    const recursal = todos.filter(p => _PROC_STATUSES_RECURSAL.includes(p.status));
+    const irVerTodos = `document.getElementById('esc-processos-bloco')?.scrollIntoView({behavior:'smooth'})`;
+
+    const novo = disponiveis[0];
+    const rec  = recursal[0];
+    const rows = [
+      novo ? `
+      <div class="oport-row" style="padding:.9rem 0">
+        <div>
+          <div class="oport-kicker">📁 NOVO PROCESSO</div>
+          <div class="oport-titulo">${novo.titulo||'—'} <span class="oport-area">· ${novo.cliente_nome||'—'}</span></div>
+          <div class="oport-desc">Aguardando início · clique pra investigar</div>
+        </div>
+        <div class="oport-valor"><div class="oport-preco" style="font-size:.8rem">${_fmtExt(novo.honorarios||0)}</div></div>
+        <div class="oport-acoes"><button class="btn-avancar oport-btn" onclick="${irVerTodos}">Continuar</button></div>
+      </div>` : '',
+      rec ? `
+      <div class="oport-row" style="padding:.9rem 0">
+        <div>
+          <div class="oport-kicker">⏰ FASE RECURSAL</div>
+          <div class="oport-titulo">${rec.titulo||'—'} <span class="oport-area">· ${rec.cliente_nome||'—'}</span></div>
+        </div>
+        <div class="oport-acoes"><button class="btn-sair oport-btn" onclick="${irVerTodos}">Ver</button></div>
+      </div>` : '',
+    ].filter(Boolean).join('');
+
+    el.innerHTML = (rows || '<div style="font-size:.78rem;color:var(--txt4)">Nenhum processo no pool ainda.</div>') +
+      `<div style="font-size:.68rem;color:var(--txt4);padding-top:.5rem">${ativos} processo${ativos===1?'':'s'} ativo${ativos===1?'':'s'} · ${recursal.length} em fase recursal</div>`;
   } catch (e) { el.textContent = ''; }
 }
 
@@ -1324,7 +1347,7 @@ async function _escKpis(esc, j) {
 
 function _escEquipeCard(escId) {
   return `
-  <div class="esc-card-bloco">
+  <div class="esc-card-bloco" style="margin-bottom:1.1rem">
     <div class="secao-header" style="margin-bottom:.6rem">
       <div class="secao-titulo">Quadro de Pessoal</div>
     </div>
@@ -1342,7 +1365,7 @@ function _escEquipeCard(escId) {
 
 function _escClientesCard() {
   return `
-  <div class="esc-card-bloco">
+  <div class="esc-card-bloco" style="margin-bottom:1.1rem">
     <div class="secao-header" style="margin-bottom:.8rem">
       <div class="secao-titulo">Carteira de Clientes</div>
       <a href="#" class="esc-ver-todos" onclick="window.navTo('clientes',null);return false">ver todos →</a>
@@ -1386,7 +1409,7 @@ function _escSocietarioCard(esc, j) {
   const principal = socios[0]?.participacao_pct || 100;
 
   return `
-  <div class="esc-card-bloco">
+  <div class="esc-card-bloco" style="margin-bottom:1.1rem">
     <div class="secao-header" style="margin-bottom:.6rem">
       <div class="secao-titulo">Estrutura Societária</div>
     </div>

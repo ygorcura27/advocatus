@@ -1992,14 +1992,6 @@ a:hover { color: var(--txt); }
 .esc-kpi-delta.down { color: var(--verm2); }
 .esc-kpi-delta.flat { color: var(--txt4); }
 
-/* ── Grid principal (equipe / clientes / societário) ── */
-.esc-grid-3 {
-  display: grid;
-  grid-template-columns: 1.3fr 1.3fr 1fr;
-  gap: .7rem;
-  margin-bottom: 1.1rem;
-  align-items: start;
-}
 
 .esc-card-bloco {
   background: var(--surface);
@@ -2026,6 +2018,7 @@ a:hover { color: var(--txt); }
 .oport-valor { text-align: right; }
 .oport-preco { font-family: var(--font-mono); font-size: .92rem; font-weight: 500; color: var(--verde2); }
 .oport-acoes { display: flex; flex-direction: column; gap: .4rem; }
+.oport-area { color: var(--txt4); font-weight: 400; }
 @media (max-width: 600px) { .oport-row { grid-template-columns: 1fr; gap: .5rem; } .oport-acoes { flex-direction: row; } }
 .esc-card-bloco .secao-header .esc-ver-todos:hover { color: var(--navy4); }
 .esc-card-bloco .secao-header .secao-badge { background: rgba(255,255,255,.15); color: var(--ouro); }
@@ -2256,14 +2249,8 @@ a:hover { color: var(--txt); }
 }
 
 /* ── Responsivo ── */
-@media (max-width: 1180px) {
-  .esc-grid-3 { grid-template-columns: 1fr 1fr; }
-  .esc-grid-3 > :nth-child(3) { grid-column: span 2; }
-}
 @media (max-width: 860px) {
   .esc-kpis { grid-template-columns: 1fr 1fr; }
-  .esc-grid-3 { grid-template-columns: 1fr; }
-  .esc-grid-3 > :nth-child(3) { grid-column: span 1; }
   .esc-acoes-grid { grid-template-columns: repeat(3, 1fr); }
   .esc-hero { height: auto; padding: 1.1rem 1.1rem; }
   .esc-hero-nome { font-size: 1.2rem; }
