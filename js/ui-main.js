@@ -5,7 +5,7 @@
  */
 
 import { collection, query, where, orderBy, limit,
-         getDocs, doc, updateDoc, addDoc }
+         getDocs, getDoc, doc, updateDoc, addDoc }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { db } from './firebase-init.js';
 import { icon } from './icons.js';
