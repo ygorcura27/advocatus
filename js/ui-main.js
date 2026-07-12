@@ -1344,8 +1344,8 @@ function _escClientesCard() {
   return `
   <div class="esc-card-bloco">
     <div class="secao-header" style="margin-bottom:.8rem">
-      <div class="secao-titulo">Clientes Corporativos</div>
-      <a href="#" class="esc-ver-todos" onclick="window.navTo('clientes',null);return false">Ver todos</a>
+      <div class="secao-titulo">Carteira de Clientes</div>
+      <a href="#" class="esc-ver-todos" onclick="window.navTo('clientes',null);return false">ver todos →</a>
     </div>
     <div id="esc-clientes-embed">
       <div style="font-size:.78rem;color:var(--txt3);padding:.5rem 0">Carregando clientes...</div>

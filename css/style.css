@@ -957,6 +957,41 @@ a:hover { color: var(--txt); }
 
 .membro-prod-bar { height: 4px; background: var(--bg2); border-radius: 2px; overflow: hidden; }
 .membro-prod-fill { height: 100%; border-radius: 2px; }
+
+.membro-row { display: grid; grid-template-columns: 1fr 150px 130px 92px; gap: 1rem; align-items: center; padding: .72rem 0; border-bottom: 1px solid var(--borda); }
+.membro-row:last-child { border-bottom: none; }
+.membro-quem { display: flex; align-items: center; gap: .7rem; min-width: 0; }
+.membro-avatar {
+  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+  background: var(--surface2); border: 1px solid var(--borda2);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-serif); font-size: .72rem; color: var(--ouro2);
+  object-fit: cover;
+}
+.membro-avatar.npc { color: var(--txt3); }
+.membro-nome { font-size: .82rem; color: var(--txt); display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+.membro-cargo { font-size: .7rem; color: var(--txt4); margin-top: .1rem; }
+.tag-voce, .tag-npc, .tag-alerta {
+  font-family: var(--font-mono); font-size: .56rem; font-weight: 600; padding: .1rem .4rem;
+  border-radius: 2px; letter-spacing: .03em; text-transform: uppercase;
+}
+.tag-voce { background: var(--verde-bg); color: var(--verde2); }
+.tag-npc { background: var(--bg2); color: var(--txt4); }
+.tag-alerta { background: var(--amber-bg); color: var(--amber); text-transform: none; font-weight: 500; }
+.membro-gestor-tag { font-size: .62rem; color: var(--ouro2); margin-top: .25rem; }
+.membro-prod { min-width: 0; }
+.membro-prod-label { font-family: var(--font-mono); font-size: .6rem; letter-spacing: .06em; text-transform: uppercase; color: var(--txt4); margin-bottom: .35rem; }
+.membro-acoes { display: flex; gap: .4rem; justify-content: flex-end; }
+.membro-btn {
+  width: 26px; height: 26px; border-radius: 2px;
+  background: transparent; border: 1px solid var(--borda2); color: var(--txt3);
+  font-size: .76rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: border-color .15s, color .15s;
+}
+.membro-btn:hover { border-color: var(--txt3); color: var(--txt); }
+.membro-btn-demitir:hover { border-color: var(--verm3); color: var(--verm3); }
+@media (max-width: 640px) { .membro-row { grid-template-columns: 1fr; gap: .4rem; } .membro-acoes { justify-content: flex-start; } }
+
 .carreira-icone {
   width: 48px; height: 48px; border-radius: 2px; flex-shrink: 0;
   background: var(--verde-bg); border: 1px solid var(--navy3);
@@ -999,6 +1034,15 @@ a:hover { color: var(--txt); }
 .tag { font-family: var(--font-mono); font-size: .64rem; font-weight: 600; padding: .2rem .5rem; border-radius: 2px; text-align: center; letter-spacing: .02em; text-transform: uppercase; }
 .tag-ganho { background: var(--verde-bg); color: var(--verde2); }
 .tag-andamento { background: rgba(217,181,115,.14); color: var(--ouro); }
+.tag-prazo { background: var(--verm-bg); color: var(--verm3); }
+
+.docket-row { display: grid; grid-template-columns: 1fr 96px 108px; gap: 1rem; align-items: center; padding: .72rem 0; border-bottom: 1px solid var(--borda); font-size: .8rem; }
+.docket-row:last-child { border-bottom: none; }
+.docket-num { font-family: var(--font-mono); font-size: .72rem; color: var(--txt3); }
+.docket-titulo { color: var(--txt); }
+.docket-titulo span { display: block; font-size: .68rem; color: var(--txt4); margin-top: .1rem; }
+.docket-instancia { font-family: var(--font-mono); font-size: .68rem; color: var(--txt3); text-align: center; }
+@media (max-width: 600px) { .docket-row { grid-template-columns: 1fr; gap: .3rem; } .docket-instancia { text-align: left; } }
 
 .btn-avancar { display: inline-flex; align-items: center; gap: .4rem; background: linear-gradient(180deg, var(--navy3), var(--navy4)); color: var(--navy); border: 1px solid rgba(255,255,255,.14); font-weight: 600; font-size: .76rem; padding: .5rem 1rem; border-radius: 2px; cursor: pointer; box-shadow: var(--sombra-navy); }
 .btn-avancar:hover { filter: brightness(1.05); }

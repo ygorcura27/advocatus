@@ -190,9 +190,6 @@ window.renderEquipePainel = async function(j, escId, el) {
       const esp       = ESP_LABEL[func.especialidade] || func.especialidade || '—';
       const prod      = calcProdutividade(func);
       const prodColor = prod >= 80 ? 'var(--verde2)' : prod >= 60 ? 'var(--amber)' : 'var(--verm2)';
-      const dots      = [1,2,3].map(i =>
-        `<span style="width:6px;height:6px;border-radius:50%;background:${i<=Math.ceil(prod/34)?prodColor:'var(--bg3)'}"></span>`
-      ).join('');
 
       const temProc = !!func.processo_id;
       const emBurnout = !!func.burnout_npc;
@@ -206,30 +203,30 @@ window.renderEquipePainel = async function(j, escId, el) {
       const eficColor = efic >= 80 ? 'var(--verde2)' : efic >= 55 ? 'var(--amber)' : 'var(--verm2)';
 
       return `
-      <div class="esc-membro${emBurnout?' npc-em-burnout':sobrecarregado?' npc-sobrecarregado-card':''}" id="membro-${func.id}">
-        <img class="esc-membro-avatar" src="${_avatarSrc(func)}" alt="${nome}"
-             onerror="window._svgNpcFallback(this,'${nome.replace(/'/g,"\\'")}')">
-        <div class="esc-membro-info">
-          <div class="esc-membro-nome">${nome} ${energiaBadge}</div>
-          <div class="esc-membro-cargo">${cargo}</div>
-          <div class="esc-membro-esp">${esp}</div>
-          ${emBurnout
-            ? `<div style="font-size:.6rem;color:var(--verm2)">Burnout — ${func.burnout_npc_restante||0} mês(es) afastado</div>`
-            : `<div style="font-size:.6rem;color:var(--txt4)">NPC⚡ ${npcDisp}/100</div>`}
+      <div class="membro-row${emBurnout?' npc-em-burnout':sobrecarregado?' npc-sobrecarregado-card':''}" id="membro-${func.id}">
+        <div class="membro-quem">
+          <img class="membro-avatar${isNpc?' npc':''}" src="${_avatarSrc(func)}" alt="${nome}"
+               onerror="window._svgNpcFallback(this,'${nome.replace(/'/g,"\\'")}')">
+          <div>
+            <div class="membro-nome">${nome} ${isNpc?'<span class="tag-npc">NPC</span>':''} ${energiaBadge}</div>
+            <div class="membro-cargo">${cargo} · ${esp}</div>
+            ${emBurnout
+              ? `<div class="membro-gestor-tag" style="color:var(--verm3)">Burnout — ${func.burnout_npc_restante||0} mês(es) afastado</div>`
+              : `<div class="membro-gestor-tag">NPC⚡ ${npcDisp}/100</div>`}
+          </div>
         </div>
-        <div class="esc-membro-prod">
-          <div class="esc-membro-prod-label">Produtividade</div>
-          <div class="esc-membro-prod-val" style="color:${prodColor}">${prod}%</div>
-          <div style="display:flex;gap:3px;margin-top:2px">${dots}</div>
+        <div class="membro-prod">
+          <div class="membro-prod-label">Produtividade</div>
+          <div class="membro-prod-bar"><div class="membro-prod-fill" style="width:${prod}%;background:${prodColor}"></div></div>
         </div>
         ${isNpc ? `
-        <div class="esc-membro-prod" style="min-width:62px">
-          <div class="esc-membro-prod-label">Eficiência</div>
-          <div class="esc-membro-prod-val" style="color:${eficColor}">${efic}%</div>
-        </div>` : ''}
-        <div class="esc-membro-acoes">
-          <button class="esc-membro-btn" title="Ver perfil" onclick="window._abrirPerfilFuncionario('${escId}','${func.id}')">👤</button>
-          <button class="esc-membro-btn${temProc?' em-proc':''}${emBurnout?' em-proc':''}"
+        <div class="membro-prod">
+          <div class="membro-prod-label">Eficiência</div>
+          <div class="membro-prod-bar"><div class="membro-prod-fill" style="width:${efic}%;background:${eficColor}"></div></div>
+        </div>` : '<div></div>'}
+        <div class="membro-acoes">
+          <button class="membro-btn" title="Ver perfil" onclick="window._abrirPerfilFuncionario('${escId}','${func.id}')">👤</button>
+          <button class="membro-btn${temProc?' em-proc':''}${emBurnout?' em-proc':''}"
             title="${emBurnout?'Em burnout':'Designar processo'}"
             onclick="${emBurnout
               ? `toast('${nome.replace(/'/g,"\\'")} está em burnout e não pode trabalhar.','ko')`
@@ -238,7 +235,7 @@ window.renderEquipePainel = async function(j, escId, el) {
                 : `window._abrirDesignarParaFunc('${escId}','${func.id}','${func.cargo_id}','membro-${func.id}')`}">
             📋
           </button>
-          <button class="esc-membro-btn demitir" title="Demitir" onclick="window._demitirFuncionario('${escId}','${func.id}','${nome.replace(/'/g,"\\'")}')">✕</button>
+          <button class="membro-btn membro-btn-demitir" title="Demitir" onclick="window._demitirFuncionario('${escId}','${func.id}','${nome.replace(/'/g,"\\'")}')">✕</button>
         </div>
       </div>`;
     }).join('');
@@ -294,23 +291,16 @@ window.renderClientesPainel = async function(j, escId, el) {
     }
 
     const rows = top5.map(c => {
-      const area    = ESP_LABEL[c.area || c.especialidade] || c.area || c.especialidade || '—';
-      const tipo    = c.tipo === 'PJ' ? (c.porte ? `PJ · ${c.porte[0].toUpperCase()+c.porte.slice(1)}` : 'PJ') : (c.tipo || '—');
-      const recBadge = c.recorrente
-        ? `<div style="font-size:.6rem;color:var(--verde2);font-weight:600">🔁 Recorrente</div>`
-        : '';
+      const area = ESP_LABEL[c.area || c.especialidade] || c.area || c.especialidade || '—';
+      const tipo = c.tipo === 'PJ' ? (c.porte ? `PJ · ${c.porte[0].toUpperCase()+c.porte.slice(1)}` : 'PJ') : (c.tipo || '—');
+      const tagHtml = c.recorrente
+        ? `<span class="tag tag-ganho">🔁 Recorrente</span>`
+        : `<span class="tag tag-andamento">Pontual</span>`;
       return `
-      <div class="esc-cliente">
-        ${_logoEmpresa(c.nome)}
-        <div class="esc-cliente-info">
-          <div class="esc-cliente-nome">${c.nome}</div>
-          <div class="esc-cliente-tipo">${tipo}</div>
-        </div>
-        <div class="esc-cliente-stats">
-          ${c.valor_mensal ? `<div class="esc-cliente-pag">${_fmt(c.valor_mensal)}/mês</div>` : ''}
-          <div class="esc-cliente-area">${area}</div>
-          ${recBadge}
-        </div>
+      <div class="docket-row" style="grid-template-columns:1fr 96px 108px">
+        <span class="docket-titulo">${c.nome}<span>${tipo} · ${area}</span></span>
+        <span class="docket-num" style="text-align:right">${c.valor_mensal ? _fmt(c.valor_mensal)+'/mês' : '—'}</span>
+        ${tagHtml}
       </div>`;
     }).join('');
 
