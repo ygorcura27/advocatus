@@ -88,6 +88,7 @@ function _navLateralPadrao(painel) {
     </div>
     <div class="nav-grupo">
       <div class="nav-grupo-titulo">Social</div>
+      <div class="nav-item${ativo('redes')}" onclick="navTo('redes',this)"><span class="ni-icon">${icon('redes')||'📱'}</span> Redes Sociais</div>
       <div class="nav-item${ativo('vagas')}" onclick="navTo('vagas',this)"><span class="ni-icon">${icon('vagas')}</span> Vagas</div>
       <div class="nav-item${ativo('ranking')}" onclick="navTo('ranking',this)"><span class="ni-icon">${icon('ranking')}</span> Rankings</div>
       <div class="nav-item${ativo('inbox')}" onclick="navTo('inbox',this)">
@@ -170,6 +171,7 @@ function _renderizar() {
       else main.innerHTML = '<div class="card" style="color:var(--txt3)">Carregando investigação...</div>';
       break;
     case 'foco':          renderFoco(j, main);          break;
+    case 'redes':         renderRedes(j, main);         break;
     case 'progressao':   renderProgressao(j, main);    break;
     case 'habilidades':  renderHabilidades(j, main);   break;
     case 'cursos':       renderCursos(j, main);        break;
@@ -1448,6 +1450,48 @@ function renderFoco(j, el) {
       <button class="esc-acao-btn" disabled title="Jogador não tem stat de produtividade — proposta"><span class="esc-acao-icone">💼</span><span>Trabalhar Intensamente<br><small style="opacity:.7">📌 proposta</small></span></button>
       <button class="esc-acao-btn" disabled title="Não existe como ação isolada — proposta"><span class="esc-acao-icone">🔨</span><span>Preparar Audiência<br><small style="opacity:.7">📌 proposta</small></span></button>
     </div>`;
+}
+
+// ════════════════════════════════════════════════════════
+// REDES SOCIAIS — perfil de mídia do jogador. Real: skill
+// comunicacao_midiatica e views de podcast/mídia (functions/podcasts_social.js).
+// Não existe feed, seguidores por plataforma, posts — isso é proposta
+// visual do mockup dossiê, não implementado aqui de propósito (não dá
+// pra fingir um feed que não existe).
+// ════════════════════════════════════════════════════════
+function renderRedes(j, el) {
+  const com = (j.skills_jur || {}).comunicacao_midiatica || 0;
+  const viewsMes = j.podcast_views_mes || 0;
+  const viewsAcumul = j.podcast_views_acumul || 0;
+  const autoridade = Math.min(100, Math.round(com * 2));
+
+  el.innerHTML = `
+    <div class="secao-header"><div class="secao-titulo">📱 Redes Sociais</div></div>
+    <div class="card" style="font-size:.74rem;color:var(--txt3);margin-bottom:1rem;line-height:1.6">
+      📌 Não existe feed, posts ou seguidores por plataforma no jogo real — isso ficaria de proposta.
+      O que é real: a skill <code>comunicacao_midiatica</code> e os views acumulados de mídia/podcast.
+    </div>
+    <div class="card" style="display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap;text-align:center;justify-content:center">
+      <div>
+        <div style="font-size:1.6rem;font-weight:700;color:var(--txt)">${com}<span style="font-size:.8rem;color:var(--txt4)">/50</span></div>
+        <div style="font-size:.62rem;color:var(--txt3);text-transform:uppercase;letter-spacing:.08em">Comunicação Midiática</div>
+      </div>
+      <div>
+        <div style="font-size:1.6rem;font-weight:700;color:var(--navy3)">${autoridade}<span style="font-size:.8rem;color:var(--txt4)">/100</span></div>
+        <div style="font-size:.62rem;color:var(--txt3);text-transform:uppercase;letter-spacing:.08em">Autoridade (com. × 2)</div>
+      </div>
+      <div>
+        <div style="font-size:1.6rem;font-weight:700;color:var(--txt)">${viewsMes.toLocaleString('pt-BR')}</div>
+        <div style="font-size:.62rem;color:var(--txt3);text-transform:uppercase;letter-spacing:.08em">Views este mês</div>
+      </div>
+      <div>
+        <div style="font-size:1.6rem;font-weight:700;color:var(--txt)">${viewsAcumul.toLocaleString('pt-BR')}</div>
+        <div style="font-size:.62rem;color:var(--txt3);text-transform:uppercase;letter-spacing:.08em">Views acumulados</div>
+      </div>
+    </div>
+    <button class="btn btn-prim btn-block" style="margin-top:1rem" onclick="window.navTo('midia_convites',null)">
+      🎙️ Ver Convites de Mídia e Podcasts →
+    </button>`;
 }
 
 // ════════════════════════════════════════════════════════
