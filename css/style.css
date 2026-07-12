@@ -954,6 +954,8 @@ a:hover { color: var(--txt); }
 .stat-row .stat-bar-fill { height: 100%; border-radius: 2px; }
 @media (max-width: 720px) { .stat-row { grid-template-columns: repeat(3, 1fr); } .stat-row .stat:nth-child(n+4) { border-top: 1px solid var(--borda2); } }
 @media (max-width: 460px) { .stat-row { grid-template-columns: repeat(2, 1fr); } }
+.stat-row-4 { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 720px) { .stat-row-4 { grid-template-columns: 1fr 1fr; } }
 
 .membro-prod-bar { height: 4px; background: var(--bg2); border-radius: 2px; overflow: hidden; }
 .membro-prod-fill { height: 100%; border-radius: 2px; }

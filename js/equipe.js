@@ -946,6 +946,13 @@ const BENEFICIOS_CATALOGO = {
   bonus_perform:  { label: 'Bônus por Performance',  icone: '⭐', custo_por_func: 400, efeito_estresse: -5, efeito_rep_interna: 5 },
 };
 
+// Usado pela prévia de Benefícios no dashboard do Escritório (js/ui-main.js).
+window._beneficiosCatalogoResumo = function(esc, nFuncs) {
+  const ativosIds = esc.beneficios_ativos || [];
+  const custoMensal = ativosIds.reduce((s, bid) => s + ((BENEFICIOS_CATALOGO[bid]||{}).custo_por_func||0), 0) * nFuncs;
+  return { custoMensal, ativos: ativosIds };
+};
+
 window.renderBeneficios = async function(j, el) {
   const escId = j.escritorio_proprio_id;
   if (!escId) { el.innerHTML = `<div class="card" style="color:var(--txt3)">Só o dono/sócio do escritório gerencia benefícios.</div>`; return; }

@@ -548,14 +548,17 @@ function renderEscritorio(j, el) {
   if (j.escritorio_proprio_id) {
     el.innerHTML = `
       ${_escHero(j, null)}
-      ${_escStatRow(null, j)}
-      ${_escAtividadeCard()}
-      ${_escProcessosPreviewCard(j.escritorio_proprio_id)}
       ${_escKpisPlaceholder()}
+      ${_escStatRow(null, j)}
+      ${_escMarketingPreviewCard(j.escritorio_proprio_id)}
+      ${_escAtividadeCard()}
+      <div id="esc-workspace-bloco"></div>
+      ${_escProcessosPreviewCard(j.escritorio_proprio_id)}
       ${_escEquipeCard(j.escritorio_proprio_id)}
+      ${_escBeneficiosPreviewCard(j.escritorio_proprio_id)}
       ${_escClientesCard()}
-      ${_escSocietarioCard(null, j)}
       <div id="esc-oportunidades-bloco"></div>
+      ${_escSocietarioCard(null, j)}
       <div id="esc-financas-upgrade"></div>
       ${_escAcoesRapidas(j, null)}
     `;
@@ -688,16 +691,18 @@ async function _carregarEscritorioProprio(escId, j) {
     if (main) {
       main.innerHTML = `
         ${_escHero(j, esc)}
-        ${_escStatRow(esc, j)}
-        ${_escAtividadeCard()}
-        ${_escProcessosPreviewCard(esc.id)}
         <div id="esc-kpis-placeholder">${_escKpisPlaceholder()}</div>
+        ${_escStatRow(esc, j)}
+        ${_escMarketingPreviewCard(esc.id)}
+        ${_escAtividadeCard()}
+        <div id="esc-workspace-bloco"></div>
+        ${_escProcessosPreviewCard(esc.id)}
         ${_escEquipeCard(esc.id)}
+        ${_escBeneficiosPreviewCard(esc.id)}
         ${_escClientesCard()}
-        ${_escSocietarioCard(esc, j)}
         <div id="esc-processos-bloco"></div>
         <div id="esc-oportunidades-bloco"></div>
-        <div id="esc-workspace-bloco"></div>
+        ${_escSocietarioCard(esc, j)}
         <div id="esc-financas-upgrade">
           ${window.renderBlocoFinancas ? window.renderBlocoFinancas(esc, j) : ''}
         </div>
@@ -711,6 +716,8 @@ async function _carregarEscritorioProprio(escId, j) {
 
       _escCarregarRankPos(escId);
       _carregarProcessosPreview(esc.id);
+      _carregarMarketingPreview(esc.id);
+      _carregarBeneficiosPreview(esc.id);
 
       const elAtividade = document.getElementById('esc-atividade-embed');
       if (elAtividade && window.renderAtividadeEscritorioPainel) window.renderAtividadeEscritorioPainel(escId, elAtividade);
@@ -1063,6 +1070,72 @@ function _espLabel2(esp) {
 // ════════════════════════════════════════════════════════
 
 
+// Prévia de Marketing no dashboard — igual mockup, mas com dados reais
+// (reputação/prestígio do escritório, convites de mídia pendentes).
+// "Investido no mês" não existe como campo real (sem campanha paga
+// rastreada) — mostrado como "—" em vez de inventar um número.
+function _escMarketingPreviewCard(escId) {
+  return `
+  <div class="esc-card-bloco" style="margin-bottom:1.1rem">
+    <div class="secao-header" style="margin-bottom:.4rem">
+      <div class="secao-titulo">📣 Marketing</div>
+      <a href="#" class="esc-ver-todos" onclick="window.navTo('marketing',null);return false">ver tudo →</a>
+    </div>
+    <div class="stat-row stat-row-4" id="esc-marketing-preview" style="margin-bottom:0">
+      <div class="stat"><div class="stat-label">Investido no mês</div><div class="stat-value">—</div></div>
+      <div class="stat"><div class="stat-label">Reputação</div><div class="stat-value">—</div></div>
+      <div class="stat"><div class="stat-label">Prestígio</div><div class="stat-value">—</div></div>
+      <div class="stat"><div class="stat-label">Convites pendentes</div><div class="stat-value">—</div></div>
+    </div>
+  </div>`;
+}
+
+async function _carregarMarketingPreview(escId) {
+  const el = document.getElementById('esc-marketing-preview');
+  if (!el || !escId) return;
+  try {
+    const escSnap = await getDoc(doc(db, 'escritorios', escId));
+    const esc = escSnap.exists() ? escSnap.data() : {};
+    const conviteSnap = await getDocs(query(
+      collection(db, 'escritorios', escId, 'convites_midia'),
+      where('status', '==', 'pendente')
+    ));
+    el.innerHTML = `
+      <div class="stat"><div class="stat-label">Investido no mês</div><div class="stat-value" style="font-size:1.1rem">—</div></div>
+      <div class="stat"><div class="stat-label">Reputação</div><div class="stat-value up" style="font-size:1.1rem">${esc.reputacao||0}</div></div>
+      <div class="stat"><div class="stat-label">Prestígio</div><div class="stat-value" style="font-size:1.1rem">${esc.prestigio||0}</div></div>
+      <div class="stat"><div class="stat-label">Convites pendentes</div><div class="stat-value" style="font-size:1.1rem;color:${conviteSnap.size?'var(--amber)':'var(--txt)'}">${conviteSnap.size}</div></div>`;
+  } catch (e) { /* silencioso, mantém placeholder */ }
+}
+
+// Prévia de Benefícios no dashboard — igual mockup, 1 linha compacta com
+// custo mensal real + quantos ativos (mesmo catálogo de js/equipe.js).
+function _escBeneficiosPreviewCard(escId) {
+  return `
+  <div class="esc-card-bloco" style="padding:1rem;display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1.1rem" id="esc-beneficios-preview">
+    <div>
+      <div style="font-size:.85rem;font-weight:600;color:var(--txt)">💙 Benefícios dos Funcionários</div>
+      <div style="font-size:.72rem;color:var(--txt3);margin-top:.2rem" id="esc-beneficios-preview-texto">Carregando...</div>
+    </div>
+    <button class="btn btn-sm btn-ghost" onclick="window.navTo('beneficios',null)">gerenciar →</button>
+  </div>`;
+}
+
+async function _carregarBeneficiosPreview(escId) {
+  const el = document.getElementById('esc-beneficios-preview-texto');
+  if (!el || !escId || !window._beneficiosCatalogoResumo) return;
+  try {
+    const escSnap = await getDoc(doc(db, 'escritorios', escId));
+    const esc = escSnap.exists() ? escSnap.data() : {};
+    const fSnap = await getDocs(collection(db, 'escritorios', escId, 'funcionarios'));
+    const nFuncs = fSnap.docs.filter(d => d.data().tipo === 'npc' && d.data().ativo !== false).length;
+    const { custoMensal, ativos } = window._beneficiosCatalogoResumo(esc, nFuncs);
+    el.textContent = ativos.length
+      ? `${_fmtExt(custoMensal)}/mês · ${ativos.length} ativo${ativos.length===1?'':'s'}`
+      : 'Nenhum benefício ativo ainda.';
+  } catch (e) { el.textContent = ''; }
+}
+
 // Card de prévia — resumo rápido + link "Ver", igual ao mockup
 // (painel "Prévia de Ações Disponíveis" antes do Quadro de Pessoal).
 // Números reais: consulta leve na mesma processos_pool que
@@ -1232,27 +1305,11 @@ async function _escCarregarRankPos(escId) {
 
 function _escKpisPlaceholder() {
   return `
-  <div class="esc-kpis">
-    <div class="esc-kpi-card">
-      <div class="esc-kpi-label">Receita do mês</div>
-      <div class="esc-kpi-valor">—</div>
-      <div class="esc-kpi-delta flat">carregando...</div>
-    </div>
-    <div class="esc-kpi-card">
-      <div class="esc-kpi-label">Despesas do mês</div>
-      <div class="esc-kpi-valor">—</div>
-      <div class="esc-kpi-delta flat">carregando...</div>
-    </div>
-    <div class="esc-kpi-card">
-      <div class="esc-kpi-label">Lucro líquido</div>
-      <div class="esc-kpi-valor">—</div>
-      <div class="esc-kpi-delta flat">carregando...</div>
-    </div>
-    <div class="esc-kpi-card">
-      <div class="esc-kpi-label">Caixa disponível</div>
-      <div class="esc-kpi-valor">—</div>
-      <div class="esc-kpi-delta flat">carregando...</div>
-    </div>
+  <div class="stat-row stat-row-4" style="margin-bottom:1.1rem">
+    <div class="stat"><div class="stat-label">Receita do mês</div><div class="stat-value">—</div></div>
+    <div class="stat"><div class="stat-label">Despesas do mês</div><div class="stat-value">—</div></div>
+    <div class="stat"><div class="stat-label">Lucro líquido</div><div class="stat-value">—</div></div>
+    <div class="stat"><div class="stat-label">Caixa disponível</div><div class="stat-value">—</div></div>
   </div>`;
 }
 
@@ -1315,32 +1372,24 @@ async function _escKpis(esc, j) {
     tier, funcionarios: listaFuncionarios, escId: esc?.id, caixa,
   };
 
-  const deltaIcon = v => v > 0 ? 'up' : v < 0 ? 'down' : 'flat';
-
   return `
-  <div class="esc-kpis">
-    <div class="esc-kpi-card">
-      <div class="esc-kpi-label">Receita do mês</div>
-      <div class="esc-kpi-valor">${_fmtExt(rendaMes)}</div>
-      <div class="esc-kpi-delta flat">honorários recebidos até agora</div>
+  <div class="stat-row stat-row-4" style="margin-bottom:1.1rem">
+    <div class="stat">
+      <div class="stat-label">Receita do mês</div>
+      <div class="stat-value up">${_fmtExt(rendaMes)}</div>
     </div>
-    <div class="esc-kpi-card">
-      <div class="esc-kpi-label">Despesas do mês</div>
-      <div class="esc-kpi-valor" style="color:var(--verm2)">${_fmtExt(despMes)}</div>
-      <div class="esc-kpi-delta flat">folha + custos fixos vigentes</div>
+    <div class="stat">
+      <div class="stat-label">Despesas do mês</div>
+      <div class="stat-value" style="color:var(--verm2)">${_fmtExt(despMes)}</div>
     </div>
-    <div class="esc-kpi-card">
-      <div class="esc-kpi-label">Lucro líquido</div>
-      <div class="esc-kpi-valor" style="color:${lucroMes>=0?'var(--verde2)':'var(--verm2)'}">${_fmtExt(lucroMes)}</div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:.35rem">
-        <div class="esc-kpi-delta ${deltaIcon(lucroMes)}">${lucroMes>=0?'Acima das despesas':'Abaixo das despesas'}</div>
-        <button class="btn-balancete" onclick="window.navTo('balancete',null)">Ver balancete</button>
-      </div>
+    <div class="stat">
+      <div class="stat-label">Lucro líquido</div>
+      <div class="stat-value ${lucroMes>=0?'up':''}" style="color:${lucroMes>=0?'var(--verde2)':'var(--verm2)'}">${_fmtExt(lucroMes)}</div>
+      <button class="btn btn-sm btn-ghost" style="margin-top:.4rem" onclick="window.navTo('balancete',null)">Ver balancete →</button>
     </div>
-    <div class="esc-kpi-card">
-      <div class="esc-kpi-label">Caixa disponível</div>
-      <div class="esc-kpi-valor" style="color:${caixa>=0?'var(--txt)':'var(--verm2)'}">${_fmtExt(caixa)}</div>
-      <div class="esc-kpi-delta flat">sua cota: ${minhaCota}%</div>
+    <div class="stat">
+      <div class="stat-label">Caixa disponível</div>
+      <div class="stat-value" style="color:${caixa>=0?'var(--txt)':'var(--verm2)'}">${_fmtExt(caixa)} <small>cota ${minhaCota}%</small></div>
     </div>
   </div>`;
 }
