@@ -185,6 +185,7 @@ function _renderizar() {
     case 'sistemas_sociais': window.renderSistemasSociais(j, main); break;
     case 'imprensa':      window.renderImprensa(j, main); break;
     case 'contratacao':   window.renderContratacao(j, main); break;
+    case 'treinamento':   window.renderTreinamento(j, main); break;
     case 'progressao':   renderProgressao(j, main);    break;
     case 'habilidades':  renderHabilidades(j, main);   break;
     case 'cursos':       renderCursos(j, main);        break;
@@ -1345,7 +1346,7 @@ function _escEquipeCard(escId) {
     </div>
     <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.8rem">
       <button class="btn btn-sm btn-prim" onclick="window.navTo('contratacao',null)">+ contratar</button>
-      <button class="btn btn-sm btn-ghost" onclick="window.toast('Escolha um funcionário na lista e clique em 🎓 Mentoria.','',3000);window.navTo('equipe',null)">mentoria</button>
+      <button class="btn btn-sm btn-ghost" onclick="window.navTo('treinamento',null)">mentoria</button>
       <button class="btn btn-sm btn-ghost" onclick="window.navTo('equipe',null)">gerenciar equipe →</button>
     </div>
     <div id="esc-equipe-embed">

@@ -824,6 +824,68 @@ window.renderContratacao = async function(j, el) {
     </div>`;
 };
 
+// ════════════════════════════════════════════════════════
+// MENTORIA & TREINAMENTO — tela dedicada (mockup: RH · Mentoria &
+// Treinamento). Real: mentoria 1-a-1 (mentor Pleno+, aprendiz até
+// Júnior, 3-6 meses, 30⚡/mês do mentor). Não existe catálogo de
+// cursos/instrutor pra NPC — isso é proposta, marcado à parte.
+// ════════════════════════════════════════════════════════
+window.renderTreinamento = async function(j, el) {
+  const escId = j.escritorio_proprio_id || j.escritorio_empregado_id;
+  if (!escId) { el.innerHTML = `<div class="card" style="color:var(--txt3)">Você precisa de um escritório.</div>`; return; }
+
+  el.innerHTML = `<div class="secao-header"><div class="secao-titulo">Mentoria & Treinamento</div></div><div class="card">Carregando...</div>`;
+
+  const escSnap = await getDoc(doc(db, 'escritorios', escId));
+  const esc = escSnap.exists() ? escSnap.data() : {};
+
+  const fSnap = await getDocs(collection(db, 'escritorios', escId, 'funcionarios'));
+  const funcs = fSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(f => f.ativo !== false);
+
+  const ativas = funcs.filter(f => f.mentor_id);
+  const mentores = funcs.filter(f => f.tipo === 'npc' && _CARGO_MENTOR_EQ.has(f.cargo_id) && !f.burnout_npc && !f.em_ferias && (f.aprendizes_ids||[]).length < 2);
+  const aprendizesElegiveis = funcs.filter(f => f.tipo === 'npc' && _CARGO_APRENDIZ_EQ.has(f.cargo_id) && !f.mentor_id && !f.burnout_npc && !f.em_ferias);
+
+  const ativasHtml = ativas.length ? ativas.map(f => {
+    const dur = f.meses_mentoria_restantes || 0;
+    const skillLabel = _SKILL_FULL_LBL[f.skill_sendo_treinada] || f.skill_sendo_treinada || '—';
+    const pct = dur > 0 ? Math.round((1 - dur / 6) * 100) : 0;
+    return `<div class="esc-card-bloco" style="margin-bottom:.6rem">
+      <div style="font-size:.85rem;color:var(--txt)">${f.mentor_nome || '—'} <span style="color:var(--txt4)">ensinando</span> ${f.nome}</div>
+      <div style="font-size:.72rem;color:var(--ouro);margin-top:.15rem">Skill: ${skillLabel} · 30⚡/mês do mentor</div>
+      <div style="font-size:.68rem;color:var(--txt3);margin-top:.4rem;display:flex;justify-content:space-between"><span>Progresso</span><span>${dur} mês(es) restante(s)</span></div>
+      <div class="skill-bar" style="margin-top:.2rem"><div class="skill-fill" style="width:${Math.max(5,pct)}%"></div></div>
+    </div>`;
+  }).join('') : `<div class="card" style="color:var(--txt4)">Nenhuma mentoria ativa.</div>`;
+
+  const mentoresHtml = mentores.length ? mentores.map(f => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem 0;border-bottom:1px solid var(--bg2)">
+      <span style="font-size:.78rem;color:var(--txt)">${f.nome} <span style="color:var(--txt4)">(${(CARGO_INFO[f.cargo_id]||{}).l||f.cargo_id})</span></span>
+      <button class="btn btn-sm btn-prim" onclick="window.abrirModalMentoria('${f.id}','${escId}')">Iniciar mentoria</button>
+    </div>`).join('') : `<div style="font-size:.75rem;color:var(--txt4)">Nenhum mentor disponível agora (precisa ser Pleno+, sem burnout/férias, com menos de 2 aprendizes).</div>`;
+
+  el.innerHTML = `
+    <div style="margin-bottom:.8rem"><button class="btn btn-ghost btn-sm" onclick="window.navTo('escritorio',null)">← Escritório</button></div>
+    ${window._capaHeader(`RECURSOS HUMANOS · ${(esc.nome||'—').toUpperCase()}`, 'Mentoria & Treinamento', '')}
+    <div class="card" style="font-size:.7rem;color:var(--txt3);margin-bottom:1rem">
+      📌 Não existe catálogo de cursos, instrutor ou certificação pra NPC — só mentoria 1-a-1 é real.
+    </div>
+    <div class="stat-row">
+      <div class="stat"><div class="stat-label">Mentorias ativas</div><div class="stat-value">${ativas.length}</div></div>
+      <div class="stat"><div class="stat-label">Energia investida/mês</div><div class="stat-value">${ativas.length*30}⚡</div></div>
+      <div class="stat"><div class="stat-label">Mentores disponíveis</div><div class="stat-value up">${mentores.length}</div></div>
+      <div class="stat"><div class="stat-label">Aprendizes elegíveis</div><div class="stat-value up">${aprendizesElegiveis.length}</div></div>
+    </div>
+    <div class="esc-card-bloco" style="margin-bottom:1rem">
+      <div class="secao-header" style="margin-bottom:.6rem"><div class="secao-titulo">Mentorias Ativas</div></div>
+      ${ativasHtml}
+    </div>
+    <div class="esc-card-bloco">
+      <div class="secao-header" style="margin-bottom:.6rem"><div class="secao-titulo">Iniciar Nova Mentoria</div></div>
+      ${mentoresHtml}
+    </div>`;
+};
+
 window._contratarNPC = async function(cargo_min, escId) {
   const CARGOS_DISPONIVEIS = { est: ['est'], ass: ['ass'], jnr: ['jnr','pln','snr'] };
   const cargos = CARGOS_DISPONIVEIS[cargo_min] || ['est'];
