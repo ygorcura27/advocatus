@@ -1079,7 +1079,7 @@ function _escMarketingPreviewCard(escId) {
   <div class="esc-card-bloco" style="margin-bottom:1.1rem">
     <div class="secao-header" style="margin-bottom:.4rem">
       <div class="secao-titulo">📣 Marketing</div>
-      <a href="#" class="esc-ver-todos" onclick="window.navTo('marketing',null);return false">ver tudo →</a>
+      <button class="painel-btn" onclick="window.navTo('marketing',null)">ver tudo →</button>
     </div>
     <div class="stat-row stat-row-4" id="esc-marketing-preview" style="margin-bottom:0">
       <div class="stat"><div class="stat-label">Investido no mês</div><div class="stat-value">—</div></div>
@@ -1117,7 +1117,7 @@ function _escBeneficiosPreviewCard(escId) {
       <div style="font-size:.85rem;font-weight:600;color:var(--txt)">💙 Benefícios dos Funcionários</div>
       <div style="font-size:.72rem;color:var(--txt3);margin-top:.2rem" id="esc-beneficios-preview-texto">Carregando...</div>
     </div>
-    <button class="btn btn-sm btn-ghost" onclick="window.navTo('beneficios',null)">gerenciar →</button>
+    <button class="painel-btn" onclick="window.navTo('beneficios',null)">gerenciar →</button>
   </div>`;
 }
 
@@ -1145,7 +1145,7 @@ function _escProcessosPreviewCard(escId) {
   <div class="esc-card-bloco" style="margin-bottom:1.1rem">
     <div class="secao-header" style="margin-bottom:.4rem">
       <div class="secao-titulo">⚖️ Gestão de Processos</div>
-      <a href="#" class="esc-ver-todos" onclick="document.getElementById('esc-processos-bloco')?.scrollIntoView({behavior:'smooth'});return false">Ver →</a>
+      <button class="painel-btn" onclick="document.getElementById('esc-processos-bloco')?.scrollIntoView({behavior:'smooth'})">gerenciar processos →</button>
     </div>
     <div id="esc-processos-preview" style="font-size:.78rem;color:var(--txt3);padding:.5rem 0">Carregando...</div>
   </div>`;
@@ -1403,7 +1403,6 @@ function _escEquipeCard(escId) {
     <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.8rem">
       <button class="btn btn-sm btn-prim" onclick="window.navTo('contratacao',null)">+ contratar</button>
       <button class="btn btn-sm btn-ghost" onclick="window.navTo('treinamento',null)">mentoria</button>
-      <button class="btn btn-sm btn-ghost" onclick="window.navTo('beneficios',null)">benefícios</button>
       <button class="btn btn-sm btn-ghost" onclick="window.navTo('equipe',null)">gerenciar equipe →</button>
     </div>
     <div id="esc-equipe-embed">
@@ -1417,7 +1416,7 @@ function _escClientesCard() {
   <div class="esc-card-bloco" style="margin-bottom:1.1rem">
     <div class="secao-header" style="margin-bottom:.8rem">
       <div class="secao-titulo">Carteira de Clientes</div>
-      <a href="#" class="esc-ver-todos" onclick="window.navTo('clientes',null);return false">ver todos →</a>
+      <button class="painel-btn" onclick="window.navTo('clientes',null)">ver todos →</button>
     </div>
     <div id="esc-clientes-embed">
       <div style="font-size:.78rem;color:var(--txt3);padding:.5rem 0">Carregando clientes...</div>
@@ -1744,34 +1743,144 @@ async function renderMarketing(j, el) {
   const repCap = 55; // functions/processar_sentenca.js:repCapDoCargo('escritorio') — 'escritorio' não tem chave própria, cai no fallback
   const prestigio = esc.prestigio || 0;
 
+  let convitesPendentes = 0;
+  try {
+    const cSnap = await getDocs(query(collection(db, 'escritorios', escId, 'convites_midia'), where('status', '==', 'pendente')));
+    convitesPendentes = cSnap.size;
+  } catch (e) { /* silencioso */ }
+
+  window._mktEscId = escId;
+
   el.innerHTML = `
-    ${_capaHeader(`GESTÃO DE MARKETING · ${(esc.nome||'—').toUpperCase()}`, '📣 Marketing & Reputação',
-      `<span class="pill pill-cargo">Reputação ${rep}/${repCap}</span><span class="pill pill-oab">Prestígio ${prestigio}/100</span>`)}
-    <div class="card" style="font-size:.72rem;color:var(--txt3);margin-bottom:1rem;line-height:1.6">
-      📌 Sem campanhas pagas/ROI de verdade no jogo — isso continua proposta. Reputação e Prestígio do escritório são reais
-      (sobem com vitórias em processos, prestígio cai com derrotas).
+    ${_capaHeader(`GESTÃO DE MARKETING · ${(esc.nome||'—').toUpperCase()}`, '📣 Marketing & Reputação', '')}
+    <div class="stat-row stat-row-4">
+      <div class="stat"><div class="stat-label">Investido no mês</div><div class="stat-value">—</div></div>
+      <div class="stat"><div class="stat-label">Reputação</div><div class="stat-value up">${rep}<small>/${repCap}</small></div></div>
+      <div class="stat"><div class="stat-label">Prestígio</div><div class="stat-value">${prestigio}<small>/100</small></div></div>
+      <div class="stat"><div class="stat-label">Convites pendentes</div><div class="stat-value" style="color:${convitesPendentes?'var(--amber)':'var(--txt)'}">${convitesPendentes}</div></div>
     </div>
-    <div class="card" style="display:flex;gap:1.5rem;flex-wrap:wrap;justify-content:center;text-align:center;margin-bottom:1rem">
-      <div>
-        <div style="font-size:1.6rem;font-weight:700;color:var(--txt)">${rep}<span style="font-size:.8rem;color:var(--txt4)">/${repCap}</span></div>
-        <div style="font-size:.62rem;color:var(--txt3);text-transform:uppercase;letter-spacing:.08em">Reputação do Escritório</div>
-      </div>
-      <div>
-        <div style="font-size:1.6rem;font-weight:700;color:var(--navy3)">${prestigio}<span style="font-size:.8rem;color:var(--txt4)">/100</span></div>
-        <div style="font-size:.62rem;color:var(--txt3);text-transform:uppercase;letter-spacing:.08em">Prestígio</div>
-      </div>
+    <div class="equipe-tabs" id="mkt-tabs" style="margin-top:.4rem">
+      <div class="equipe-tab ativo" data-mktab="geral" onclick="window._mktTab(this,'geral')">Visão Geral</div>
+      <div class="equipe-tab" data-mktab="campanhas" onclick="window._mktTab(this,'campanhas')">Campanhas</div>
+      <div class="equipe-tab" data-mktab="redes" onclick="window._mktTab(this,'redes')">Redes Sociais</div>
+      <div class="equipe-tab" data-mktab="midia" onclick="window._mktTab(this,'midia')">Mídia &amp; Podcasts</div>
+      <div class="equipe-tab" data-mktab="reputacao" onclick="window._mktTab(this,'reputacao')">Reputação</div>
     </div>
-    <div class="card" style="margin-bottom:.6rem">
-      <div style="font-size:.78rem;font-weight:600;margin-bottom:.5rem;color:var(--txt)">Canais reais</div>
-      <button class="btn btn-ghost btn-block" style="margin-bottom:.4rem" onclick="window.navTo('midia_convites',null)">🎙️ Convites de Mídia e Podcasts</button>
-      <button class="btn btn-ghost btn-block" onclick="window.navTo('redes',null)">📱 Minhas Redes Sociais</button>
-    </div>
-    <div class="card">
-      <div style="font-size:.78rem;font-weight:600;margin-bottom:.4rem;color:var(--txt)">Campanhas <span style="font-size:.62rem;color:var(--amber);font-weight:400">📌 proposta</span></div>
-      <div style="font-size:.72rem;color:var(--txt4);margin-bottom:.5rem">Investir em anúncios pra atrair clientes — não existe no jogo ainda.</div>
-      <button class="esc-acao-btn" disabled title="Não existe no jogo — proposta" style="width:100%"><span class="esc-acao-icone">📢</span><span>Nova Campanha</span></button>
-    </div>`;
+    <div id="mkt-conteudo"></div>`;
+
+  window._mktRenderTab('geral', esc, rep, repCap, prestigio, convitesPendentes);
 }
+
+window._mktTab = function(btn, tab) {
+  btn.parentElement.querySelectorAll('.equipe-tab').forEach(t => t.classList.toggle('ativo', t === btn));
+  window._mktRenderTab(tab, window._mktEscCache);
+};
+
+window._mktRenderTab = async function(tab, escCached) {
+  const el = document.getElementById('mkt-conteudo');
+  if (!el) return;
+  const escId = window._mktEscId;
+  let esc = escCached;
+  if (!esc) {
+    const s = await getDoc(doc(db, 'escritorios', escId));
+    esc = s.exists() ? s.data() : {};
+    window._mktEscCache = esc;
+  }
+  const rep = esc.reputacao || 0;
+  const repCap = 55;
+  const prestigio = esc.prestigio || 0;
+
+  if (tab === 'geral') {
+    let pendentesSnap;
+    try {
+      pendentesSnap = await getDocs(query(collection(db, 'escritorios', escId, 'convites_midia'), where('status', '==', 'pendente')));
+    } catch (e) { pendentesSnap = { size: 0 }; }
+    el.innerHTML = `
+      <div class="esc-card-bloco" style="margin-bottom:1.1rem">
+        <div class="secao-header" style="margin-bottom:.4rem">
+          <div class="secao-titulo">Convites de Mídia</div>
+          <span style="font-size:.72rem;color:var(--txt3)">${pendentesSnap.size||0} pendente(s)</span>
+        </div>
+        <div style="font-size:.78rem;color:var(--txt3);margin-bottom:.6rem">Reais — chegam pro escritório ou direto a um advogado quando uma petição viraliza.</div>
+        <button class="btn btn-prim btn-block" onclick="window.navTo('midia_convites',null)">🎙️ Ver Convites de Mídia e Podcasts →</button>
+      </div>
+      <div class="esc-card-bloco">
+        <div class="secao-header" style="margin-bottom:.4rem">
+          <div class="secao-titulo">Próximas Ações Sugeridas</div>
+          <span style="font-size:.62rem;color:var(--txt4)">proposta</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:.6rem">
+          <div style="display:flex;gap:.6rem;align-items:flex-start"><span>🎙️</span><div><div style="font-size:.8rem;color:var(--txt)">Aumentar frequência de podcasts</div><div style="font-size:.7rem;color:var(--txt4)">Convites de mídia têm o melhor ROI em reputação por real investido.</div></div></div>
+          <div style="display:flex;gap:.6rem;align-items:flex-start"><span>🤝</span><div><div style="font-size:.8rem;color:var(--txt)">Investir em parcerias</div><div style="font-size:.7rem;color:var(--txt4)">Proposta — parcerias institucionais não existem como mecânica ainda.</div></div></div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  if (tab === 'campanhas') {
+    el.innerHTML = `
+      <div class="card" style="font-size:.7rem;color:var(--txt4);margin-bottom:.7rem">
+        📌 Mecânica proposta — orçamento/ROI de campanhas pagas não existe no jogo real, só o repertório de mídia (convites de podcast).
+      </div>
+      <div class="esc-card-bloco" style="text-align:center;padding:1.5rem">
+        <div style="font-size:.82rem;color:var(--txt3)">Nenhuma campanha — mecânica não implementada.</div>
+        <button class="btn btn-ghost btn-sm" style="margin-top:.6rem" disabled title="Proposta">+ Nova Campanha</button>
+      </div>`;
+    return;
+  }
+
+  if (tab === 'redes') {
+    el.innerHTML = `
+      <div class="card" style="font-size:.7rem;color:var(--txt4);margin-bottom:.7rem">
+        📌 Mecânica proposta — o jogo só rastreia comunicação_midiatica e views de podcast por jogador, sem perfis de rede social dedicados.
+      </div>
+      <button class="btn btn-prim btn-block" onclick="window.navTo('redes',null)">📱 Ver Redes Sociais →</button>`;
+    return;
+  }
+
+  if (tab === 'midia') {
+    let historico = [];
+    try {
+      const logSnap = await getDocs(query(collection(db, 'escritorios', escId, 'log_gestao'), orderBy('criado_em', 'desc'), limit(40)));
+      historico = logSnap.docs.map(d => d.data())
+        .filter(l => /podcast|mídia|viralizou|entrevista/i.test(l.texto||'')).slice(0, 8);
+    } catch (e) { /* silencioso */ }
+    el.innerHTML = `
+      <div class="esc-card-bloco" style="margin-bottom:1.1rem">
+        <div class="secao-header" style="margin-bottom:.4rem"><div class="secao-titulo">Convites Disponíveis</div></div>
+        <button class="btn btn-prim btn-block" onclick="window.navTo('midia_convites',null)">🎙️ Ver Convites de Mídia e Podcasts →</button>
+      </div>
+      <div class="esc-card-bloco">
+        <div class="secao-header" style="margin-bottom:.4rem"><div class="secao-titulo">Histórico de Aparições</div></div>
+        ${historico.length ? historico.map(l => `
+          <div class="equipe-hist-item">
+            <span class="equipe-hist-icone">🎙️</span>
+            <span class="equipe-hist-texto">${l.texto}</span>
+            <span class="equipe-hist-data">${l.criado_em ? new Date(l.criado_em).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}) : ''}</span>
+          </div>`).join('') : `<div style="font-size:.76rem;color:var(--txt4);padding:.5rem 0">Nenhuma aparição registrada ainda.</div>`}
+      </div>`;
+    return;
+  }
+
+  if (tab === 'reputacao') {
+    el.innerHTML = `
+      <div class="equipe-layout" style="grid-template-columns:220px 1fr">
+        <div class="equipe-detalhe" style="position:static;text-align:center">
+          <div class="donut" style="width:104px;height:104px;margin:0 auto;background:conic-gradient(var(--ouro2) 0% ${Math.round(rep/repCap*100)}%, var(--bg2) ${Math.round(rep/repCap*100)}% 100%)">
+            <div class="donut-hole"><div class="donut-pct">${rep}</div><div class="donut-lbl">/ ${repCap}</div></div>
+          </div>
+          <div style="margin-top:.7rem;font-size:.82rem;color:var(--txt)">Reputação do Escritório</div>
+          <div style="font-size:.78rem;color:var(--txt3);margin-top:.6rem">Prestígio: <b style="color:var(--txt)">${prestigio}/100</b></div>
+        </div>
+        <div class="card" style="font-size:.74rem;color:var(--txt3);line-height:1.6">
+          Reputação e Prestígio são reais — sobem com vitórias em processos, prestígio cai com derrotas
+          (functions/processar_sentenca.js). Sem histórico mensal salvo ainda, então não dá pra mostrar
+          evolução mês a mês nem distribuição por canal — isso seria proposta.
+        </div>
+      </div>`;
+    return;
+  }
+};
 
 // ════════════════════════════════════════════════════════
 // PROGRESSÃO
