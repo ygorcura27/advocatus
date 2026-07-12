@@ -886,6 +886,82 @@ window.renderTreinamento = async function(j, el) {
     </div>`;
 };
 
+// ════════════════════════════════════════════════════════
+// BENEFÍCIOS DOS FUNCIONÁRIOS
+// Espelha functions/avancar_mes.js::BENEFICIOS_CATALOGO — precisa ficar em
+// sincronia manual (efeito real é aplicado lá; aqui só é catálogo pra UI).
+// ════════════════════════════════════════════════════════
+const BENEFICIOS_CATALOGO = {
+  plano_saude:    { label: 'Plano de Saúde',        icone: '❤️', custo_por_func: 300, efeito_estresse: -8, efeito_rep_interna: 3 },
+  vale_refeicao:  { label: 'Vale-Refeição',         icone: '🍽️', custo_por_func: 150, efeito_estresse: -3, efeito_rep_interna: 2 },
+  plano_odonto:   { label: 'Plano Odontológico',    icone: '🦷', custo_por_func: 80,  efeito_estresse: -2, efeito_rep_interna: 1 },
+  gympass:        { label: 'Gympass',               icone: '💪', custo_por_func: 120, efeito_estresse: -5, efeito_rep_interna: 2 },
+  bonus_perform:  { label: 'Bônus por Performance',  icone: '⭐', custo_por_func: 400, efeito_estresse: -5, efeito_rep_interna: 5 },
+};
+
+window.renderBeneficios = async function(j, el) {
+  const escId = j.escritorio_proprio_id;
+  if (!escId) { el.innerHTML = `<div class="card" style="color:var(--txt3)">Só o dono/sócio do escritório gerencia benefícios.</div>`; return; }
+
+  el.innerHTML = `<div class="secao-header"><div class="secao-titulo">Benefícios dos Funcionários</div></div><div class="card">Carregando...</div>`;
+
+  const escSnap = await getDoc(doc(db, 'escritorios', escId));
+  const esc = escSnap.exists() ? escSnap.data() : {};
+  const ativos = esc.beneficios_ativos || [];
+
+  const fSnap = await getDocs(collection(db, 'escritorios', escId, 'funcionarios'));
+  const npcsAtivos = fSnap.docs.map(d => d.data()).filter(f => f.tipo === 'npc' && f.ativo !== false);
+  const nFuncs = npcsAtivos.length;
+
+  const custoMensal = ativos.reduce((s, bid) => s + ((BENEFICIOS_CATALOGO[bid]||{}).custo_por_func||0), 0) * nFuncs;
+
+  const cardsHtml = Object.entries(BENEFICIOS_CATALOGO).map(([bid, cfg]) => {
+    const ligado = ativos.includes(bid);
+    return `
+    <div class="peca-card">
+      <div class="peca-topo">
+        <div class="peca-kicker">${cfg.icone} ${ligado ? '<span class="tag tag-ganho">ATIVO</span>' : ''}</div>
+      </div>
+      <div class="peca-titulo">${cfg.label}</div>
+      <div style="font-size:.72rem;color:var(--txt3);margin:.3rem 0">
+        ${window.fmtFull(cfg.custo_por_func)}/func · mês
+      </div>
+      <div style="font-size:.68rem;color:var(--txt4);line-height:1.6">
+        Estresse ${cfg.efeito_estresse}/mês · Reputação interna +${cfg.efeito_rep_interna}/mês
+      </div>
+      <button class="btn btn-sm ${ligado ? 'btn-ghost' : 'btn-prim'}" style="margin-top:.6rem;width:100%"
+        onclick="window._toggleBeneficio('${escId}','${bid}',${ligado})">
+        ${ligado ? 'Desativar' : 'Ativar'}
+      </button>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div style="margin-bottom:.8rem"><button class="btn btn-ghost btn-sm" onclick="window.navTo('escritorio',null)">← Escritório</button></div>
+    ${window._capaHeader(`RECURSOS HUMANOS · ${(esc.nome||'—').toUpperCase()}`, 'Benefícios dos Funcionários', '')}
+    <div class="card" style="font-size:.7rem;color:var(--txt3);margin-bottom:1rem">
+      Cada benefício ativo custa por funcionário/mês (cobrado do caixa no avanço de mês) e reduz estresse
+      + aumenta reputação interna de todos os NPCs ativos do escritório.
+    </div>
+    <div class="stat-row">
+      <div class="stat"><div class="stat-label">Custo mensal total</div><div class="stat-value">${window.fmtFull(custoMensal)}</div></div>
+      <div class="stat"><div class="stat-label">Benefícios ativos</div><div class="stat-value up">${ativos.length} <small>/ ${Object.keys(BENEFICIOS_CATALOGO).length}</small></div></div>
+      <div class="stat"><div class="stat-label">Funcionários cobertos</div><div class="stat-value">${nFuncs}</div></div>
+    </div>
+    <div class="peca-grid">${cardsHtml}</div>`;
+};
+
+window._toggleBeneficio = async function(escId, bid, estavaLigado) {
+  const escRef = doc(db, 'escritorios', escId);
+  const escSnap = await getDoc(escRef);
+  if (!escSnap.exists()) return;
+  const ativos = escSnap.data().beneficios_ativos || [];
+  const novos = estavaLigado ? ativos.filter(x => x !== bid) : [...ativos, bid];
+  await updateDoc(escRef, { beneficios_ativos: novos });
+  window.toast && window.toast(estavaLigado ? 'Benefício desativado.' : 'Benefício ativado.', 'ok');
+  window.navTo && window.navTo('beneficios', null);
+};
+
 window._contratarNPC = async function(cargo_min, escId) {
   const CARGOS_DISPONIVEIS = { est: ['est'], ass: ['ass'], jnr: ['jnr','pln','snr'] };
   const cargos = CARGOS_DISPONIVEIS[cargo_min] || ['est'];

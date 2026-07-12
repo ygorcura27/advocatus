@@ -119,6 +119,7 @@ const ESC_PAINEIS = {
   assembleia:   'assembleia',
   contratacao:  'contratacao',
   treinamento:  'treinamento',
+  beneficios:   'beneficios',
 };
 
 function _renderSidebarLateral(painel) {
@@ -188,6 +189,7 @@ function _renderizar() {
     case 'imprensa':      window.renderImprensa(j, main); break;
     case 'contratacao':   window.renderContratacao(j, main); break;
     case 'treinamento':   window.renderTreinamento(j, main); break;
+    case 'beneficios':    window.renderBeneficios(j, main);  break;
     case 'progressao':   renderProgressao(j, main);    break;
     case 'habilidades':  renderHabilidades(j, main);   break;
     case 'cursos':       renderCursos(j, main);        break;
@@ -1098,6 +1100,7 @@ function _escSideMenu(ativo, semWrapper) {
       { id: 'diario',       iconKey:'diario',      label: 'Diário',       fn: "window.switchEquipeTab&&window.switchEquipeTab('diario');window.navTo('equipe',null)" },
       { id: 'contratacao',  iconKey:'oportunidades', label: 'Contratação', fn: "window.navTo('contratacao',null)" },
       { id: 'treinamento',  iconKey:'cursos',      label: 'Mentoria & Treinamento', fn: "window.navTo('treinamento',null)" },
+      { id: 'beneficios',   iconKey:'beneficios',  label: 'Benefícios', fn: "window.navTo('beneficios',null)" },
     ]},
     { titulo: 'Negócios', links: [
       { id: 'clientes',       iconKey:'clientes',       label: 'Clientes',       fn: "window.navTo('clientes',null)" },
@@ -1387,6 +1390,7 @@ function _escEquipeCard(escId) {
     <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.8rem">
       <button class="btn btn-sm btn-prim" onclick="window.navTo('contratacao',null)">+ contratar</button>
       <button class="btn btn-sm btn-ghost" onclick="window.navTo('treinamento',null)">mentoria</button>
+      <button class="btn btn-sm btn-ghost" onclick="window.navTo('beneficios',null)">benefícios</button>
       <button class="btn btn-sm btn-ghost" onclick="window.navTo('equipe',null)">gerenciar equipe →</button>
     </div>
     <div id="esc-equipe-embed">

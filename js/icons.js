@@ -67,6 +67,7 @@ const PATHS = {
   artigos_livros:  `<path ${S} d="M12 6c-2-1.5-5-2-8-1.5v13c3-.5 6 0 8 1.5c2-1.5 5-2 8-1.5v-13c-3-.5-6 0-8 1.5z"/><path ${S} d="M12 6v13"/>`,
   sistemas_sociais:`<circle ${S} cx="12" cy="12" r="8.5"/><path ${S} d="M3.5 12h17"/><path ${S} d="M12 3.5c3 3 3 14 0 17M12 3.5c-3 3-3 14 0 17"/>`,
   imprensa:        `<path ${S} d="M4 5h13v14a1.5 1.5 0 0 1-1.5 1.5H5.5A1.5 1.5 0 0 1 4 19z"/><path ${S} d="M17 8h3v10a1.5 1.5 0 0 1-1.5 1.5"/><path ${S} d="M7 8.5h6M7 11.5h6M7 14.5h4"/>`,
+  beneficios:      `<path ${S} d="M12 20.5s-7.5-4.4-7.5-10A4.3 4.3 0 0 1 12 7.3 4.3 4.3 0 0 1 19.5 10.5c0 5.6-7.5 10-7.5 10z"/>`,
 
   // Chrome persistente (topbar/sidebars/bottom nav) — substituem emojis crus
   alerta:       `<path ${S} d="M12 3.5 21 19H3z"/><path ${S} d="M12 9.5v4.2M12 16.8h.01"/>`,
