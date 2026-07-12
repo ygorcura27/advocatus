@@ -730,62 +730,88 @@ window.abrirModalContratar = function(cargo_min, escId) {
   );
 };
 
-window._contratarNPC = async function(cargo_min, escId) {
-  const j   = window.JOGADOR;
-  const uid = j?.uid || window.JOGADOR_UID;
+const _EQ_BASE_SKILLS_CARGO = {
+  est: { pesquisa:12, escrita:10, argumentacao:10, oratoria:8  },
+  ass: { pesquisa:22, escrita:20, argumentacao:18, oratoria:15 },
+  jnr: { pesquisa:30, escrita:28, argumentacao:28, oratoria:25 },
+  pln: { pesquisa:40, escrita:38, argumentacao:38, oratoria:35 },
+  snr: { pesquisa:50, escrita:48, argumentacao:48, oratoria:45 },
+};
 
-  // Escolher cargo disponível (pode ser o mínimo ou acima)
-  const CARGOS_DISPONIVEIS = {
-    est: ['est'],
-    ass: ['ass'],
-    jnr: ['jnr','pln','snr'],
-  };
-  const cargos   = CARGOS_DISPONIVEIS[cargo_min] || ['est'];
-  const cargo_id = cargos[Math.floor(Math.random() * Math.min(2, cargos.length))];
-  const ci       = CARGO_INFO[cargo_id];
-
-  // Gerar NPC
-  const sexo      = Math.random() < 0.5 ? 'm' : 'f';
+function _gerarCandidatoNPC(cargo_id, fotosUsadas) {
+  const sexo         = Math.random() < 0.5 ? 'm' : 'f';
   const primeiroNome = NOMES_NPC[sexo][Math.floor(Math.random() * NOMES_NPC[sexo].length)];
   const sobrenome    = NOMES_NPC.sobrenomes[Math.floor(Math.random() * NOMES_NPC.sobrenomes.length)];
   const nome         = primeiroNome + ' ' + sobrenome;
 
-  // Atribuir foto cartoon única dentro deste escritório (20 por sexo, sem repetir)
-  let foto_npc = null;
-  try {
-    const fSnap = await getDocs(collection(db, 'escritorios', escId, 'funcionarios'));
-    const fotosUsadas = new Set(fSnap.docs.map(d => d.data().foto_npc).filter(Boolean));
-    const pool = NPC_CARTOON_SPECS[sexo].map(_nomeArquivoCartoon).filter(f => !fotosUsadas.has(f));
-    if (pool.length > 0) foto_npc = pool[Math.floor(Math.random() * pool.length)];
-  } catch(e) { /* segue sem foto */ }
+  const pool = NPC_CARTOON_SPECS[sexo].map(_nomeArquivoCartoon).filter(f => !fotosUsadas.has(f));
+  const foto_npc = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null;
+  if (foto_npc) fotosUsadas.add(foto_npc);
 
-  // Skills baseadas no cargo (com variação ±30%)
-  const BASE_SKILLS = {
-    est: { pesquisa:12, escrita:10, argumentacao:10, oratoria:8  },
-    ass: { pesquisa:22, escrita:20, argumentacao:18, oratoria:15 },
-    jnr: { pesquisa:30, escrita:28, argumentacao:28, oratoria:25 },
-    pln: { pesquisa:40, escrita:38, argumentacao:38, oratoria:35 },
-    snr: { pesquisa:50, escrita:48, argumentacao:48, oratoria:45 },
-  };
-  const base   = BASE_SKILLS[cargo_id] || BASE_SKILLS.est;
+  const base   = _EQ_BASE_SKILLS_CARGO[cargo_id] || _EQ_BASE_SKILLS_CARGO.est;
   const skills = {};
   Object.entries(base).forEach(([k,v]) => {
     skills[k] = Math.max(1, Math.round(v * (0.7 + Math.random() * 0.6)));
   });
 
-  // Skills jurídicas / documentos / áreas — mesma variação ±30-60% das
-  // gerais, escaladas por cargo, cap fixo de 50 (sem bônus de pós-grad,
-  // que só existe pro jogador).
   const baseJur   = _CARGO_JUR_BASE_EQ[cargo_id] || _CARGO_JUR_BASE_EQ.est;
   const skills_jur = {};
   Object.keys(_SKILL_JUR_TODAS_LBL).forEach(k => {
     skills_jur[k] = Math.max(0, Math.min(CAP_JUR_NPC, Math.round(baseJur * (0.6 + Math.random() * 0.6))));
   });
 
+  const mediaGeral = Math.round(Object.values(skills).reduce((a,b)=>a+b,0) / Object.values(skills).length);
+
+  return { nome, cargo_id, skills, skills_jur, sexo, foto_npc, mediaGeral };
+}
+
+window._contratarNPC = async function(cargo_min, escId) {
+  const CARGOS_DISPONIVEIS = { est: ['est'], ass: ['ass'], jnr: ['jnr','pln','snr'] };
+  const cargos = CARGOS_DISPONIVEIS[cargo_min] || ['est'];
+
+  let fotosUsadas = new Set();
+  try {
+    const fSnap = await getDocs(collection(db, 'escritorios', escId, 'funcionarios'));
+    fotosUsadas = new Set(fSnap.docs.map(d => d.data().foto_npc).filter(Boolean));
+  } catch(e) { /* segue sem checar fotos */ }
+
+  const candidatos = [0,1,2].map(() => {
+    const cargo_id = cargos[Math.floor(Math.random() * Math.min(2, cargos.length))];
+    return _gerarCandidatoNPC(cargo_id, fotosUsadas);
+  });
+  window._eqCandidatos = candidatos;
+  window._eqCandidatosEscId = escId;
+
+  const cardHtml = candidatos.map((c, i) => {
+    const ci = CARGO_INFO[c.cargo_id];
+    return `<div class="card" style="margin-bottom:.5rem">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-weight:600;font-size:.82rem;color:var(--txt)">${c.nome}</div>
+          <div style="font-size:.68rem;color:var(--txt3)">${ci.l} · skill média ${c.mediaGeral} · R$ ${ci.sal.toLocaleString('pt-BR')}/mês</div>
+        </div>
+        <button class="btn btn-prim btn-sm" onclick="window._finalizarContratacaoNPC(${i})">Contratar</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  abrirModal('👤 Escolher Candidato',
+    `<div style="font-size:.72rem;color:var(--txt3);margin-bottom:.8rem">Salário é o mesmo fixo do cargo — só a skill varia entre candidatos.</div>
+     ${cardHtml}`);
+};
+
+window._finalizarContratacaoNPC = async function(idx) {
+  const j     = window.JOGADOR;
+  const uid   = j?.uid || window.JOGADOR_UID;
+  const escId = window._eqCandidatosEscId;
+  const c     = (window._eqCandidatos || [])[idx];
+  if (!c) return;
+  const ci = CARGO_INFO[c.cargo_id];
+
   const funcionario = {
-    nome, cargo_id, skills, skills_jur, sexo,
+    nome: c.nome, cargo_id: c.cargo_id, skills: c.skills, skills_jur: c.skills_jur, sexo: c.sexo,
     tipo:       'npc',
-    foto_npc,
+    foto_npc:   c.foto_npc,
     escritorio_id: escId,
     dono_uid:   uid,
     ativo:      true,
@@ -812,21 +838,21 @@ window._contratarNPC = async function(cargo_min, escId) {
   };
 
   try {
-    const ref = await addDoc(collection(db, 'escritorios', escId, 'funcionarios'), funcionario);
-    // +2 gestao por contratar um funcionário
-    const uid = j?.uid || window.JOGADOR_UID;
+    await addDoc(collection(db, 'escritorios', escId, 'funcionarios'), funcionario);
     const gestaoAtual = (j?.skills_jur?.gestao || 0);
     await updateDoc(doc(db, 'jogadores', uid), {
       'skills_jur.gestao': Math.min(50, gestaoAtual + 2),
     });
     if (window.JOGADOR?.skills_jur) window.JOGADOR.skills_jur.gestao = Math.min(50, gestaoAtual + 2);
     fecharModal();
-    toast(`✅ ${nome} (${ci.l}) contratado! Salário: R$ ${ci.sal.toLocaleString('pt-BR')}/mês · +2 Gestão`, 'ok', 5000);
-    // Recarregar equipe
+    toast(`✅ ${c.nome} (${ci.l}) contratado! Salário: R$ ${ci.sal.toLocaleString('pt-BR')}/mês · +2 Gestão`, 'ok', 5000);
     setTimeout(() => window.navTo && window.navTo('equipe', null), 600);
   } catch(err) {
     toast('Erro ao contratar: ' + err.message, 'ko');
     console.error(err);
+  } finally {
+    window._eqCandidatos = null;
+    window._eqCandidatosEscId = null;
   }
 };
 
