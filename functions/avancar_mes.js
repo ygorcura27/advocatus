@@ -215,8 +215,13 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid, esc) {
       const novoProg = Math.min(100, (p.progresso || 0) + ganho);
 
       if (novoProg >= 100 && podeProcessarSentenca) {
-        // Jnr+ processa sentença automaticamente com suas próprias skills
-        const resultado  = _sentencaOutcomeNPC(eff);
+        // Jnr+ processa sentença automaticamente com suas próprias skills.
+        // "Domínio fraco" (js/processos_escritorio.js:_dgPillDominio, definido
+        // no momento da designação por departamento — ver designado_area_fraca
+        // acima) agora reduz de verdade a eficiência usada no roll de sentença;
+        // antes só era um aviso visual sem efeito nenhum no resultado.
+        const eficSentenca = p.designado_area_fraca ? Math.max(0.15, eff * 0.6) : eff;
+        const resultado  = _sentencaOutcomeNPC(eficSentenca);
         const hon        = p.honorarios || 0;
         const valorRecebido = resultado === 'procedente' ? hon
           : resultado === 'parcial' ? Math.round(hon * 0.55)

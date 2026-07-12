@@ -1297,7 +1297,7 @@ function _dgPillDominio(f) {
       return `<span style="font-size:.62rem;padding:.15rem .5rem;border-radius:99px;background:${fraco?'rgba(214,90,60,.12)':'rgba(22,214,168,.12)'};color:${fraco?'var(--verm2)':'var(--verde2)'}">${fraco?'⚠️':'✓'} ${dep.l.replace(/^\S+\s/,'')} ${nivel}/50</span>`;
     }).join('')}
   </div>
-  <div style="font-size:.6rem;color:var(--txt4);margin-top:.4rem">⚠️ domínio fraco = processo futuro nesse ramo teria chance de vitória reduzida sob esse gestor (ideia de design, não simulado).</div>`;
+  <div style="font-size:.6rem;color:var(--txt4);margin-top:.4rem">⚠️ domínio fraco = processo futuro nesse ramo tem chance de vitória reduzida sob esse gestor (real — reduz a eficiência usada no roll de sentença em avancar_mes.js).</div>`;
 }
 
 function _dgRenderGeral() {
@@ -1376,7 +1376,7 @@ function _dgRenderDepartamentos() {
       </div>`;
   }).join('');
   return `
-    <div style="font-size:.66rem;color:var(--txt4);margin-bottom:.4rem">Domínio de área é real (skills_jur do NPC) — abaixo de ${_DG_LIMIAR_FRACO}/50 marca ⚠️ fraco, esse gestor ainda recebe o processo mas o resultado não é reforçado por especialização.</div>
+    <div style="font-size:.66rem;color:var(--txt4);margin-bottom:.4rem">Domínio de área é real (skills_jur do NPC) — abaixo de ${_DG_LIMIAR_FRACO}/50 marca ⚠️ fraco: esse gestor ainda recebe o processo, mas a chance de vitória na sentença sai reduzida (efeito real, não só aviso).</div>
     ${rows}
     <button class="btn btn-prim btn-block" style="margin-top:.8rem" onclick="window._dgSalvarDepartamentos()">✓ Salvar Delegação por Departamento</button>`;
 }
