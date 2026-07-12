@@ -27,7 +27,7 @@ const ESP_LABEL = {
 
 function _avatarSvg(nome) {
   const ini = (nome||'?').split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase().slice(0,2);
-  return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='153' height='153'%3E%3Ccircle cx='76' cy='76' r='76' fill='%232E4270'/%3E%3Ctext x='76' y='96' font-size='36' font-weight='700' fill='%23C9A227' text-anchor='middle' font-family='DM Sans,Arial'%3E${ini}%3C/text%3E%3C/svg%3E`;
+  return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='153' height='153'%3E%3Ccircle cx='76' cy='76' r='76' fill='%231E293C'/%3E%3Ctext x='76' y='96' font-size='36' font-weight='700' fill='%23D9B573' text-anchor='middle' font-family='IBM Plex Sans,Arial'%3E${ini}%3C/text%3E%3C/svg%3E`;
 }
 
 // Função global de fallback: garante que quotes no SVG não quebrem o onerror
@@ -36,8 +36,8 @@ window._svgNpcFallback = function(el, nome) {
   const ini = (nome||'?').split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase().slice(0,2);
   el.src = 'data:image/svg+xml,' + encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" width="153" height="153">' +
-    '<circle cx="76" cy="76" r="76" fill="#2E4270"/>' +
-    '<text x="76" y="96" font-size="36" font-weight="700" fill="#C9A227" text-anchor="middle" font-family="DM Sans,Arial">' + ini + '</text>' +
+    '<circle cx="76" cy="76" r="76" fill="#1E293C"/>' +
+    '<text x="76" y="96" font-size="36" font-weight="700" fill="#D9B573" text-anchor="middle" font-family="IBM Plex Sans,Arial">' + ini + '</text>' +
     '</svg>'
   );
 };
@@ -55,7 +55,7 @@ function _avatarSrc(func) {
 function _fotoClientePF(nome) {
   const ini = (nome||'?').split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase().slice(0,2);
   return `<div class="esc-cliente-logo">
-    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='153' height='153'%3E%3Ccircle cx='76' cy='76' r='76' fill='%232E4270'/%3E%3Ctext x='76' y='96' font-size='36' font-weight='700' fill='%23C9A227' text-anchor='middle' font-family='DM Sans,Arial'%3E${ini}%3C/text%3E%3C/svg%3E"
+    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='153' height='153'%3E%3Ccircle cx='76' cy='76' r='76' fill='%231E293C'/%3E%3Ctext x='76' y='96' font-size='36' font-weight='700' fill='%23D9B573' text-anchor='middle' font-family='IBM Plex Sans,Arial'%3E${ini}%3C/text%3E%3C/svg%3E"
          alt="${nome}" style="width:100%;height:100%;object-fit:cover;border-radius:0">
   </div>`;
 }

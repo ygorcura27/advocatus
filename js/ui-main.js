@@ -1265,7 +1265,7 @@ function _normalizarSociosUI(esc) {
   return [{ uid: donoFallback, participacao_pct: 100 }];
 }
 
-const _DONUT_CORES = ['#C9A227','#2E4270','#4AAB77','#3A5080','#B7791F','#9A7820'];
+const _DONUT_CORES = ['#D9B573','#16D6A8','#6B9760','#5CE0B8','#8A6A38','#93C488'];
 
 function _escSocietarioCard(esc, j) {
   const socios   = esc ? _normalizarSociosUI(esc) : [{ uid: j.uid, participacao_pct: 100 }];

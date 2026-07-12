@@ -428,7 +428,7 @@ function _cardFuncionario(f, escId, energiaDisp, procCount = {}, mesGlobal = 0) 
   const status    = _statusFuncionario(f);
 
   const ini = (f.nome||'?').split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase().slice(0,2);
-  const svgSrc = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='153' height='153'%3E%3Ccircle cx='76' cy='76' r='76' fill='%232E4270'/%3E%3Ctext x='76' y='96' font-size='36' font-weight='700' fill='%23C9A227' text-anchor='middle' font-family='DM Sans,Arial'%3E${ini}%3C/text%3E%3C/svg%3E`;
+  const svgSrc = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='153' height='153'%3E%3Ccircle cx='76' cy='76' r='76' fill='%231E293C'/%3E%3Ctext x='76' y='96' font-size='36' font-weight='700' fill='%23D9B573' text-anchor='middle' font-family='IBM Plex Sans,Arial'%3E${ini}%3C/text%3E%3C/svg%3E`;
   const nomeEsc = f.nome.replace(/'/g, "\\'");
   const fotoHtml = (f.tipo === 'npc' && f.foto_npc)
     ? `<img class="func-avatar" src="img/npcs%20cartoon/${f.foto_npc}" alt="${f.nome}" onerror="window._svgNpcFallback(this,'${nomeEsc}')">`
