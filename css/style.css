@@ -190,6 +190,7 @@ a:hover { color: var(--txt); }
 }
 .logo em { font-style: italic; color: var(--ouro); }
 
+.topbar-spacer { flex: 1; }
 .nav-top { display: flex; gap: .15rem; flex: 1; }
 .nav-top a {
   font-size: .7rem;
