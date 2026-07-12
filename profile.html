@@ -188,20 +188,24 @@ function _renderPerfil(d) {
   const premios = d.premios ? Object.keys(d.premios) : [];
 
   el.innerHTML = `
-    <div class="profile-card">
-      <div class="profile-header">
-        <div class="profile-avatar">${renderAvatarJogador({ uid: String(d.profile_id||d.nome||'x'), cargo_id: d.cargo_id }, { size: 72 })}</div>
-        <div>
-          <div class="profile-id">#${d.profile_id}</div>
-          <div class="profile-nome">
-            ${d.nome || '—'}
-            ${d.intercambio_badge ? `<span class="badge-intercambio">${d.intercambio_badge}</span>` : ''}
+    <section class="capa" style="margin-bottom:1.2rem">
+      <div class="capa-kicker">PERFIL PÚBLICO · #${d.profile_id}</div>
+      <div class="capa-body">
+        <div style="display:flex;align-items:center;gap:1rem">
+          <div class="profile-avatar">${renderAvatarJogador({ uid: String(d.profile_id||d.nome||'x'), cargo_id: d.cargo_id }, { size: 64 })}</div>
+          <div>
+            <h1 class="capa-nome" style="font-size:1.5rem">${d.nome || '—'}${d.intercambio_badge ? ` <span class="badge-intercambio">${d.intercambio_badge}</span>` : ''}</h1>
+            <div class="capa-meta">
+              <span class="pill pill-cargo">${cargo}</span>
+              ${d.escritorio_nome ? `<span class="pill pill-oab">${d.escritorio_nome}</span>` : ''}
+              ${d.especialidade ? `<span class="pill pill-oab">${d.especialidade}</span>` : ''}
+            </div>
           </div>
-          <div class="profile-cargo">${cargo}${d.escritorio_nome ? ` · ${d.escritorio_nome}` : ''}</div>
-          <div style="font-size:.75rem;color:var(--ardosia2);margin-top:.2rem">${d.especialidade || ''}</div>
         </div>
       </div>
+    </section>
 
+    <div class="profile-card">
       <div class="profile-stats">
         <div class="stat-box">
           <span class="stat-val">${d.reputacao || 0}</span>
