@@ -193,7 +193,7 @@ function _renderAcademia(j) {
       <div class="card" style="background:var(--surface2)">
         <div style="display:flex;align-items:center;justify-content:space-between">
           <div>
-            <div style="font-weight:700;color:var(--navy);font-size:.85rem">🏋️ Academia</div>
+            <div style="font-weight:700;color:var(--txt);font-size:.85rem">🏋️ Academia</div>
             <div style="font-size:.7rem;color:var(--txt3);margin-top:.2rem">
               Ganhe até +25 de energia bônus mensal frequentando regularmente.
             </div>
@@ -247,7 +247,7 @@ function _cardRelacionamento(r, j) {
           <img src="${_avatarUrlNpc(r)}" alt="${r.nome}" class="rel-avatar-mini"
                onerror="this.onerror=null;this.src='img/npcs/_placeholder.png'">
           <div style="flex:1;min-width:0">
-            <div style="font-weight:700;font-size:.92rem;color:var(--navy)">${r.nome}</div>
+            <div style="font-weight:700;font-size:.92rem;color:var(--txt)">${r.nome}</div>
             <div style="font-size:.68rem;color:var(--ouro2);margin-bottom:.3rem">${label} · ${_formatarIdade(meses)} · ${tracosLabel}</div>
             <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem">
               <div style="flex:1;height:6px;background:var(--bg2);border-radius:3px;overflow:hidden">
@@ -305,7 +305,7 @@ function _cardFilho(f) {
     <div class="card" style="margin-bottom:.5rem">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div>
-          <div style="font-weight:700;color:var(--navy);font-size:.85rem">${f.sexo==='m'?'👦':'👧'} ${f.nome}</div>
+          <div style="font-weight:700;color:var(--txt);font-size:.85rem">${f.sexo==='m'?'👦':'👧'} ${f.nome}</div>
           <div style="font-size:.68rem;color:var(--txt3)">${_formatarIdade(idadeMeses)} ${f.faculdade?`· Cursando ${f.faculdade}`:''}</div>
         </div>
         <div style="text-align:right">
@@ -340,7 +340,7 @@ function _cardExConjuge(r, j) {
         <img src="${avatarUrl}" alt="${r.nome}" class="rel-avatar-mini"
              onerror="this.onerror=null;this.src='img/npcs/_placeholder.png'">
         <div style="flex:1;min-width:0">
-          <div style="font-weight:700;font-size:.92rem;color:var(--navy)">${r.nome}</div>
+          <div style="font-weight:700;font-size:.92rem;color:var(--txt)">${r.nome}</div>
           <div style="font-size:.68rem;color:var(--txt3);margin-bottom:.25rem">
             ${_formatarIdade(meses)} de casamento · Afinidade restante: ${afinidade}
           </div>
@@ -420,7 +420,7 @@ window.abrirConhecerPessoas = function() {
         <button class="btn btn-ghost btn-block" style="text-align:left;padding:.65rem .85rem" onclick="window.irParaLocal('${k}')">
           <div style="display:flex;justify-content:space-between;align-items:center">
             <div>
-              <div style="font-weight:600;font-size:.82rem;color:var(--navy)">${v.icone} ${v.l}</div>
+              <div style="font-weight:600;font-size:.82rem;color:var(--txt)">${v.icone} ${v.l}</div>
               <div style="font-size:.65rem;color:var(--txt3)">${v.desc}</div>
             </div>
             <div style="font-size:.7rem;color:var(--amber);flex-shrink:0;margin-left:.5rem">-${v.energia}⚡</div>
@@ -495,7 +495,7 @@ window.irParaLocal = async function(localKey) {
           <img src="img/npcs/${c.foto}" alt="${c.nome}" class="rel-avatar-mini"
                onerror="this.onerror=null;this.src='img/npcs/_placeholder.png'">
           <div style="flex:1">
-            <div style="font-weight:700;color:var(--navy);font-size:.85rem">${c.nome}, ${c.idade} anos</div>
+            <div style="font-weight:700;color:var(--txt);font-size:.85rem">${c.nome}, ${c.idade} anos</div>
             <div style="font-size:.65rem;color:var(--txt4);margin-bottom:.15rem">📍 ${c.regiao}</div>
             <div style="font-size:.68rem;color:var(--ouro2);margin:.2rem 0">
               ${c.tracos.map(t=>TRACOS[t]?.icone+' '+TRACOS[t]?.l).join(' · ')}
@@ -688,7 +688,7 @@ window.abrirLojaPresentes = function(relId, nome) {
         <button class="btn btn-ghost btn-block" style="text-align:left;padding:.65rem .85rem" onclick="window.darPresente('${relId}','${k}')">
           <div style="display:flex;justify-content:space-between;align-items:center">
             <div>
-              <div style="font-weight:600;font-size:.82rem;color:var(--navy)">${v.icone} ${v.l}</div>
+              <div style="font-weight:600;font-size:.82rem;color:var(--txt)">${v.icone} ${v.l}</div>
               <div style="font-size:.65rem;color:var(--txt3)">+${v.afinidade} afinidade base</div>
             </div>
             <div style="font-size:.72rem;color:var(--ouro2);flex-shrink:0;margin-left:.5rem">R$ ${v.custo.toLocaleString('pt-BR')}</div>

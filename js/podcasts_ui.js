@@ -74,7 +74,7 @@ async function _carregarConvitesEscritorio(escId) {
           return `
           <div style="display:flex;align-items:center;gap:.6rem;padding:.55rem 0;border-bottom:1px solid var(--borda-sub)">
             <div style="flex:1;min-width:0">
-              <div style="font-weight:600;font-size:.8rem;color:var(--navy)">${c.podcast_nome}</div>
+              <div style="font-weight:600;font-size:.8rem;color:var(--txt)">${c.podcast_nome}</div>
               <div style="font-size:.65rem;color:var(--txt3)">${AREA_LABELS_CURTO[c.area]||c.area} · Tier ${c.tier}</div>
             </div>
             <select id="midia-sel-${d.id}" style="font-size:.72rem;padding:.3rem .5rem;border-radius:var(--r);border:var(--borda);background:var(--surface);color:var(--txt)">
@@ -119,7 +119,7 @@ async function _carregarConvitesDiretos(uid) {
           return `
           <div style="display:flex;align-items:center;gap:.6rem;padding:.55rem 0;border-bottom:1px solid var(--borda-sub)">
             <div style="flex:1;min-width:0">
-              <div style="font-weight:600;font-size:.8rem;color:var(--navy)">${c.podcast_nome}</div>
+              <div style="font-weight:600;font-size:.8rem;color:var(--txt)">${c.podcast_nome}</div>
               <div style="font-size:.65rem;color:var(--txt3)">${AREA_LABELS_CURTO[c.area]||c.area} · Tier ${c.tier}${c.peticao_titulo?` · por "${c.peticao_titulo}"`:''}</div>
             </div>
             <button class="btn btn-sm btn-prim" onclick="window._responderConviteMidia(null,'${d.id}',true)">Aceitar</button>

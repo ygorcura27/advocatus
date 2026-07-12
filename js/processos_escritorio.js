@@ -377,7 +377,7 @@ function _renderColPool(disponiveis, emAndamento, aguardSent, j, escId, investig
         ${_barraProgresso(p.progresso||0)}
       </div>
       <div style="text-align:right;flex-shrink:0">
-        <div style="font-size:.68rem;font-weight:700;color:var(--navy)">${p.progresso||0}%</div>
+        <div style="font-size:.68rem;font-weight:700;color:var(--txt)">${p.progresso||0}%</div>
         <div style="font-size:.6rem;color:var(--txt4)">${_fmtP(p.honorarios)}</div>
         <div style="font-size:.55rem;color:var(--verde2);margin-top:.1rem">gestão auto</div>
       </div>
@@ -453,7 +453,7 @@ function _renderColRecursal(recursais, mesAtualTotal) {
       return `
       <div class="proc-recursal-row">
         <div style="font-size:.6rem;color:var(--txt4);font-family:monospace">${p.numero||'—'}</div>
-        <div style="font-size:.75rem;font-weight:600;color:var(--navy);margin:.1rem 0">${p.autor||'—'} vs ${p.reu||'—'}</div>
+        <div style="font-size:.75rem;font-weight:600;color:var(--txt);margin:.1rem 0">${p.autor||'—'} vs ${p.reu||'—'}</div>
         <div style="font-size:.63rem;color:var(--txt4)">${p.tipo||'—'} · sentença desfavorável</div>
         <div style="display:flex;gap:.35rem;margin-top:.5rem">
           <button class="btn btn-sm btn-prim" style="flex:1;font-size:.62rem"
@@ -486,7 +486,7 @@ function _renderColRecursal(recursais, mesAtualTotal) {
     return `
     <div class="proc-recursal-row">
       <div style="font-size:.6rem;color:var(--txt4);font-family:monospace">${p.numero||'—'}</div>
-      <div style="font-size:.75rem;font-weight:600;color:var(--navy);margin:.1rem 0">${p.autor||'—'} vs ${p.reu||'—'}</div>
+      <div style="font-size:.75rem;font-weight:600;color:var(--txt);margin:.1rem 0">${p.autor||'—'} vs ${p.reu||'—'}</div>
       <div style="font-size:.63rem;color:var(--txt4)">${label} · ${p.instancia_seguinte||'—'}</div>
       ${disponivel
         ? `<div style="font-size:.6rem;color:${prazoExpirado?'var(--verm2)':'var(--txt4)'};margin-top:.2rem">

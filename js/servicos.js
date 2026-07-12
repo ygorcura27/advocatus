@@ -150,7 +150,7 @@ window.renderClientes = async function(j, el) {
  
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-bottom:1.2rem">
       <div class="stat-mini">
-        <div class="v" style="color:var(--navy)">${clientes.length}</div>
+        <div class="v" style="color:var(--txt)">${clientes.length}</div>
         <div class="l">👥 Carteira total</div>
       </div>
       <div class="stat-mini">
@@ -193,7 +193,7 @@ function _cardOportunidade(o, j, tier) {
     <div class="card" style="margin-bottom:.5rem;border-left:3px solid var(--ouro2)">
       <div style="display:flex;justify-content:space-between;align-items:start;gap:.8rem">
         <div style="flex:1">
-          <div style="font-weight:700;font-size:.85rem;color:var(--navy)">${tipo.icone} ${tipo.l}</div>
+          <div style="font-weight:700;font-size:.85rem;color:var(--txt)">${tipo.icone} ${tipo.l}</div>
           <div style="font-size:.7rem;color:var(--ouro2);margin:.15rem 0">
             ${o.cliente_nome} · ${o.cliente_tipo}${o.cliente_porte?` (${o.cliente_porte})`:''}
           </div>
@@ -237,7 +237,7 @@ function _cardCliente(c, escId) {
     <div class="card" style="margin-bottom:.5rem">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div style="flex:1;min-width:0">
-          <div style="font-weight:700;font-size:.85rem;color:var(--navy)">${c.nome}</div>
+          <div style="font-weight:700;font-size:.85rem;color:var(--txt)">${c.nome}</div>
           <div style="font-size:.68rem;color:var(--txt3);margin-top:.15rem">
             ${c.tipo}${c.porte?` · ${c.porte}`:''}${perfilBadge}${redeBadge}
           </div>
@@ -305,7 +305,7 @@ window.abrirModalDelegarServico = async function(opId) {
           onclick="window.delegarServico('${opId}','${f.id}','${escId}')">
           <div style="display:flex;justify-content:space-between">
             <div>
-              <div style="font-weight:600;color:var(--navy);font-size:.8rem">${f.nome}</div>
+              <div style="font-weight:600;color:var(--txt);font-size:.8rem">${f.nome}</div>
               <div style="font-size:.65rem;color:var(--txt3)">Produtividade: ${pct}% da receita</div>
             </div>
             <div style="font-size:.68rem;color:var(--amber)">-${custoCoord}⚡ coord.</div>

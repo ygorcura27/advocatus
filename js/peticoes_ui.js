@@ -115,7 +115,7 @@ window.renderPeticoes = async function(j, el) {
           ? emComposicao.map(p => `
             <div style="display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-top:1px solid var(--borda-sub);margin-top:.6rem">
               <div>
-                <div style="font-weight:600;font-size:.82rem;color:var(--navy)">${p.titulo || p.nome}</div>
+                <div style="font-weight:600;font-size:.82rem;color:var(--txt)">${p.titulo || p.nome}</div>
                 <div style="font-size:.7rem;color:var(--txt3)">${DOC_LABELS[p.document_type]||p.document_type} · ${AREA_LABELS[p.practice_area]||p.practice_area}</div>
               </div>
               <span style="font-size:.72rem;color:var(--ouro2);font-weight:600">⏳ Finaliza no mês ${p.mes_conclusao}</span>

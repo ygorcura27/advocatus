@@ -357,7 +357,7 @@ async function _renderPopupBloqueio(no) {
         : 'Este nó exige um nível de confiança alto com o NPC responsável.'}
     </p>
     <div style="background:var(--surface2);border:var(--borda);border-radius:var(--r);padding:.6rem .75rem;margin-bottom:.85rem">
-      <div style="font-size:.8rem;font-weight:700;color:var(--navy)">🤝 ${nomeNpc}</div>
+      <div style="font-size:.8rem;font-weight:700;color:var(--txt)">🤝 ${nomeNpc}</div>
       <div style="font-size:.72rem;color:var(--txt3);margin-top:.2rem">
         Confiança atual: <b>${confianca}/100</b>${no.bloqueio.minimo ? ` · mínimo exigido: <b>${no.bloqueio.minimo}</b>` : ''}
       </div>

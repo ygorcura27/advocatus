@@ -221,7 +221,7 @@ window.renderEquipe = async function(j, el) {
         </div>
         ${esc.gestor_id ? `
         <div class="card" style="margin-bottom:1rem;padding:.7rem 1rem">
-          <div style="font-size:.78rem;font-weight:700;color:var(--navy);margin-bottom:.5rem">⚙️ Delegações ao Gestor</div>
+          <div style="font-size:.78rem;font-weight:700;color:var(--txt);margin-bottom:.5rem">⚙️ Delegações ao Gestor</div>
           ${_renderToggleGestor('📋 Delegar processos ao gestor', 'processos', esc.gestor_delega_processos !== false, escId)}
           ${_renderToggleGestor('🎓 Delegar mentoria ao gestor', 'mentoria', !!esc.gestor_delega_mentoria, escId)}
           ${_renderToggleGestor('⚖️ Delegar conflitos leves ao gestor', 'conflitos', !!esc.gestor_delega_conflitos, escId)}
@@ -635,7 +635,7 @@ const qSnap = { docs: [...qSnap1.docs, ...qSnap2.docs], empty: qSnap1.empty && q
           <div class="card" style="margin-bottom:.4rem;border-left:3px solid var(--verde2)">
             <div style="display:flex;align-items:center;justify-content:space-between">
               <div>
-                <div style="font-size:.82rem;font-weight:600;color:var(--navy)">${p.autor||'—'} vs ${p.reu||'—'}</div>
+                <div style="font-size:.82rem;font-weight:600;color:var(--txt)">${p.autor||'—'} vs ${p.reu||'—'}</div>
                 <div style="font-size:.68rem;color:var(--ouro2)">${p.tipo||'—'} · ${p.progresso||0}% concluído pelo funcionário</div>
                 <div style="font-size:.65rem;color:var(--verde2)">Pronto para revisão e sentença</div>
               </div>
@@ -678,7 +678,7 @@ async function _renderDiarioEquipe(escId) {
         : '';
       return `<div class="card" style="margin-bottom:.4rem;border-left:3px solid var(--navy-light)">
         <div style="display:flex;justify-content:space-between;align-items:start;gap:.5rem">
-          <div style="font-size:.78rem;color:var(--navy)">${msg}</div>
+          <div style="font-size:.78rem;color:var(--txt)">${msg}</div>
           <span style="font-size:.6rem;color:var(--txt4);white-space:nowrap">${data}</span>
         </div>
       </div>`;
@@ -904,7 +904,7 @@ window.abrirModalDesignar = async function(funcId, escId) {
           style="text-align:left;padding:.65rem .85rem"
           onclick="window._confirmarDesignar('${funcId}','${p.id}','${escId}')">
 
-          <div style="font-weight:600;font-size:.82rem;color:var(--navy)">
+          <div style="font-weight:600;font-size:.82rem;color:var(--txt)">
             ${p.autor || '—'} vs ${p.reu || '—'}
           </div>
 
@@ -1168,7 +1168,7 @@ function _renderToggleGestor(label, tipo, ativo, escId) {
   return `<div style="display:flex;align-items:center;justify-content:space-between;padding:.25rem 0;border-bottom:1px solid var(--bg2)">
     <span style="font-size:.72rem;color:var(--txt2)">${label}</span>
     <button onclick="window.toggleGestorDelegacao('${escId}','${tipo}')"
-      style="padding:.2rem .6rem;border-radius:20px;border:1px solid ${cor};background:${ativo?'var(--verde-bg)':'transparent'};color:${cor};font-size:.65rem;cursor:pointer">
+      style="padding:.2rem .6rem;border-radius:2px;border:1px solid ${cor};background:${ativo?'var(--verde-bg)':'transparent'};color:${cor};font-size:.65rem;cursor:pointer">
       ${ativo ? '✅ Ativo' : '○ Inativo'}
     </button>
   </div>`;

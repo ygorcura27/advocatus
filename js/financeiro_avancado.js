@@ -156,7 +156,7 @@ function _htmlPortfolio(inv) {
   }
 
   return `<div class="card" style="margin-bottom:.7rem">
-    <div style="font-weight:700;font-size:.82rem;color:var(--navy);margin-bottom:.4rem">📊 Portfólio de Investimentos</div>
+    <div style="font-weight:700;font-size:.82rem;color:var(--txt);margin-bottom:.4rem">📊 Portfólio de Investimentos</div>
     ${totalInvestido > 0 ? `
       <div style="display:flex;justify-content:space-between;font-size:.72rem;margin-bottom:.3rem">
         <span style="color:var(--txt3)">Total investido</span>
@@ -180,7 +180,7 @@ function _htmlSocioInvestidor(esc, tier, escId) {
     const restant  = invEsc.meses_restantes || 0;
     const progPct  = Math.round(((total - restant) / total) * 100);
     return `<div class="card" style="margin-bottom:.7rem">
-      <div style="font-weight:700;font-size:.82rem;color:var(--navy);margin-bottom:.4rem">🤝 Sócio Investidor</div>
+      <div style="font-weight:700;font-size:.82rem;color:var(--txt);margin-bottom:.4rem">🤝 Sócio Investidor</div>
       <div style="font-size:.73rem;font-weight:600;margin-bottom:.15rem">${invEsc.nome}</div>
       <div style="font-size:.68rem;color:var(--txt3);margin-bottom:.5rem">
         Capital aportado: <b>${_fmtR(invEsc.capital_aportado)}</b> · ${Math.round((invEsc.pct||0.20)*100)}% dos honorários mensais<br>
@@ -196,7 +196,7 @@ function _htmlSocioInvestidor(esc, tier, escId) {
   if (tier >= 3) {
     const faixas = { 3:'R$80k–200k', 4:'R$200k–600k', 5:'R$600k–2M' };
     return `<div class="card" style="margin-bottom:.7rem">
-      <div style="font-weight:700;font-size:.82rem;color:var(--navy);margin-bottom:.4rem">🤝 Sócio Investidor</div>
+      <div style="font-weight:700;font-size:.82rem;color:var(--txt);margin-bottom:.4rem">🤝 Sócio Investidor</div>
       <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.5rem">
         Atraia um investidor para aportar capital no escritório em troca de <b>20% dos honorários</b> por <b>36 meses</b>.<br>
         Capital esperado para Tier ${tier}: <b>${faixas[Math.min(tier,5)]}</b>.
@@ -206,7 +206,7 @@ function _htmlSocioInvestidor(esc, tier, escId) {
   }
 
   return `<div class="card" style="margin-bottom:.7rem;opacity:.55">
-    <div style="font-weight:700;font-size:.82rem;color:var(--navy);margin-bottom:.4rem">🤝 Sócio Investidor</div>
+    <div style="font-weight:700;font-size:.82rem;color:var(--txt);margin-bottom:.4rem">🤝 Sócio Investidor</div>
     <div style="font-size:.72rem;color:var(--txt4)">Disponível a partir do Tier 3 (escritório atual: Tier ${tier}).</div>
   </div>`;
 }
@@ -216,7 +216,7 @@ function _htmlSocioInvestidor(esc, tier, escId) {
 // ────────────────────────────────────────────────────────
 function _htmlAntecipacao(total, maxAnt, valorLiq, descPct, rep) {
   return `<div class="card" style="margin-bottom:.7rem">
-    <div style="font-weight:700;font-size:.82rem;color:var(--navy);margin-bottom:.4rem">⏩ Antecipação de Honorários</div>
+    <div style="font-weight:700;font-size:.82rem;color:var(--txt);margin-bottom:.4rem">⏩ Antecipação de Honorários</div>
     <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.5rem">
       Receba até <b>60%</b> dos honorários pendentes agora, com desconto de <b>${descPct}%</b>
       ${rep >= 60 ? '(rep ≥ 60 — tarifa mínima)' : rep >= 40 ? '(rep 40-59)' : '(rep < 40 — tarifa máxima)'}.
@@ -240,7 +240,7 @@ function _htmlAntecipacao(total, maxAnt, valorLiq, descPct, rep) {
 // ────────────────────────────────────────────────────────
 function _htmlLinhaCredito(saldo, disp, teto, juros, rep) {
   return `<div class="card" style="margin-bottom:.7rem">
-    <div style="font-weight:700;font-size:.82rem;color:var(--navy);margin-bottom:.4rem">🏦 Linha de Crédito</div>
+    <div style="font-weight:700;font-size:.82rem;color:var(--txt);margin-bottom:.4rem">🏦 Linha de Crédito</div>
     <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.5rem">
       Juros de <b>2,5%/mês</b> sobre saldo. Teto: <b>Rep × 500</b>${rep >= 40 ? ` = ${_fmtR(teto)}` : ' (reputação mínima 40)'}.
     </div>

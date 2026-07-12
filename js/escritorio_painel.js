@@ -676,7 +676,7 @@ window._abrirPerfilFuncionario = async function(escId, funcId) {
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem';
   overlay.innerHTML = `
-    <div style="background:var(--surface);border:1px solid var(--borda-navy);border-radius:10px;width:100%;max-width:440px;max-height:88vh;overflow-y:auto;box-shadow:var(--sombra2);color:var(--txt)">
+    <div style="background:var(--surface);border:1px solid var(--borda-navy);border-radius:var(--r2);width:100%;max-width:440px;max-height:88vh;overflow-y:auto;box-shadow:var(--sombra2);color:var(--txt)">
       <!-- Header -->
       <div style="display:flex;align-items:center;gap:.9rem;padding:1.2rem 1.2rem .8rem;border-bottom:1px solid var(--bg2)">
         <img src="${avatarSrc}" alt="${nome}"
@@ -687,8 +687,8 @@ window._abrirPerfilFuncionario = async function(escId, funcId) {
           <div style="font-size:.75rem;color:var(--txt3)">${cargo} · ${esp}</div>
           <div style="display:flex;gap:.4rem;margin-top:.3rem;flex-wrap:wrap">
             ${emBurnout
-              ? `<span style="font-size:.65rem;background:var(--verm2);color:#fff;padding:.15rem .5rem;border-radius:10px">Burnout</span>`
-              : `<span style="font-size:.65rem;background:var(--bg2);color:var(--txt3);padding:.15rem .5rem;border-radius:10px">⚡ ${npcDisp}/100</span>`}
+              ? `<span style="font-size:.65rem;background:var(--verm2);color:#fff;padding:.15rem .5rem;border-radius:2px">Burnout</span>`
+              : `<span style="font-size:.65rem;background:var(--bg2);color:var(--txt3);padding:.15rem .5rem;border-radius:2px">⚡ ${npcDisp}/100</span>`}
           </div>
         </div>
         <button onclick="this.closest('[style*=fixed]').remove()"
@@ -779,7 +779,7 @@ window.renderEspecializacoesEsc = async function(escId, el) {
         <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.6rem">
           ${areas.map(a => {
             const lbl = TODAS_AREAS.find(x => x.k === a)?.l || a;
-            return `<span style="display:inline-flex;align-items:center;gap:.3rem;background:var(--navy3);color:#fff;font-size:.72rem;padding:.2rem .6rem;border-radius:12px">
+            return `<span style="display:inline-flex;align-items:center;gap:.3rem;background:var(--navy3);color:#fff;font-size:.72rem;padding:.2rem .6rem;border-radius:2px">
               ${lbl}
               ${podeRemover ? `<button onclick="window._removerAreaEsc('${escId}','${a}')" style="background:transparent;border:none;color:rgba(255,255,255,.7);cursor:pointer;font-size:.75rem;padding:0;line-height:1">✕</button>` : ''}
             </span>`;

@@ -76,7 +76,7 @@ window.renderVagas = async function(j, el) {
       <span class="secao-badge">${comVaga.length} vaga(s) abertas</span>
     </div>
     <div style="font-size:.75rem;color:var(--txt3);margin-bottom:1rem;padding:.6rem;background:var(--surface2);border:var(--borda);border-radius:var(--r)">
-      📊 Prestígio no seu nível atual: <b style="color:var(--navy)">${presPerc}%</b> —
+      📊 Prestígio no seu nível atual: <b style="color:var(--txt)">${presPerc}%</b> —
       ${presPerc >= 90 ? '⭐ Você pode receber convites de promoção do próprio escritório!' :
         presPerc >= 80 ? '✨ Escritórios Tier superior podem te convidar via inbox!' :
         'Continue crescendo para desbloquear oportunidades exclusivas.'}
@@ -109,14 +109,14 @@ function _cardEscritorio(esc, j) {
       <div style="display:flex;align-items:start;gap:.8rem">
         <div style="flex-shrink:0;width:36px;height:36px;background:var(--navy-light);border-radius:var(--r);display:flex;align-items:center;justify-content:center;font-size:1.1rem">🏛️</div>
         <div style="flex:1">
-          <div style="font-weight:700;font-size:.9rem;color:var(--navy);margin-bottom:.15rem">${esc.nome}</div>
+          <div style="font-weight:700;font-size:.9rem;color:var(--txt);margin-bottom:.15rem">${esc.nome}</div>
           <div style="font-size:.7rem;color:var(--txt3);margin-bottom:.4rem">
             📍 ${esc.bairro} · Tier ${esc.tier} · ${_espLabel(esc.esp)}
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.5rem">
-            ${bonus.rep_passivo > 0 ? `<span style="font-size:.62rem;padding:.1rem .4rem;background:var(--verde-bg);color:var(--verde);border-radius:20px;font-weight:600">+${bonus.rep_passivo} rep/mês</span>` : ''}
-            ${bonus.networking_passivo > 0 ? `<span style="font-size:.62rem;padding:.1rem .4rem;background:var(--navy-light);color:var(--navy3);border-radius:20px;font-weight:600">+${bonus.networking_passivo} networking/mês</span>` : ''}
-            ${bonus.bonus_chance_esp > 0 ? `<span style="font-size:.62rem;padding:.1rem .4rem;background:var(--amber-bg);color:var(--amber);border-radius:20px;font-weight:600">+${bonus.bonus_chance_esp}% chance vitória (${_espLabel(esc.esp)})</span>` : ''}
+            ${bonus.rep_passivo > 0 ? `<span style="font-size:.62rem;padding:.1rem .4rem;background:var(--verde-bg);color:var(--verde);border-radius:2px;font-weight:600">+${bonus.rep_passivo} rep/mês</span>` : ''}
+            ${bonus.networking_passivo > 0 ? `<span style="font-size:.62rem;padding:.1rem .4rem;background:var(--navy-light);color:var(--navy3);border-radius:2px;font-weight:600">+${bonus.networking_passivo} networking/mês</span>` : ''}
+            ${bonus.bonus_chance_esp > 0 ? `<span style="font-size:.62rem;padding:.1rem .4rem;background:var(--amber-bg);color:var(--amber);border-radius:2px;font-weight:600">+${bonus.bonus_chance_esp}% chance vitória (${_espLabel(esc.esp)})</span>` : ''}
           </div>
           <div style="font-size:.68rem;color:var(--txt3);margin-bottom:.5rem">
             Causas: ${_fmtFaixa(bonus.caso_min, bonus.caso_max)}
@@ -129,7 +129,7 @@ function _cardEscritorio(esc, j) {
                 return `
                   <div style="display:flex;align-items:center;justify-content:space-between;padding:.45rem .6rem;background:var(--surface2);border:var(--borda-sub);border-radius:var(--r);margin-bottom:.3rem">
                     <div>
-                      <div style="font-size:.78rem;font-weight:600;color:var(--navy)">${vaga.l}</div>
+                      <div style="font-size:.78rem;font-weight:600;color:var(--txt)">${vaga.l}</div>
                       <div style="font-size:.65rem;color:var(--txt3)">${vaga.desc}</div>
                       <div style="font-size:.65rem;color:var(--verde2);font-weight:600;margin-top:.1rem">R$ ${sal.toLocaleString('pt-BR')}/mês</div>
                     </div>
@@ -154,7 +154,7 @@ function _cardEscritorioAtual(j) {
       <div class="secao-titulo">🏢 Seu Escritório Atual</div>
     </div>
     <div class="card" style="border-left:3px solid ${_corTier(escNPC.tier)};background:var(--navy-light)">
-      <div style="font-weight:700;color:var(--navy);margin-bottom:.3rem">${escNPC.nome}</div>
+      <div style="font-weight:700;color:var(--txt);margin-bottom:.3rem">${escNPC.nome}</div>
       <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.5rem">
         📍 ${escNPC.bairro} · Tier ${escNPC.tier} · Vaga: ${TIPOS_VAGA[j.vaga_tipo]?.l || j.vaga_tipo}
       </div>
@@ -201,7 +201,7 @@ window.candidatarVaga = async function(escId, vagaId) {
   abrirModal(
     `📋 Candidatura — ${esc.nome}`,
     `<div style="margin-bottom:1rem">
-      <div style="font-weight:700;font-size:1rem;color:var(--navy);margin-bottom:.3rem">${vaga.l}</div>
+      <div style="font-weight:700;font-size:1rem;color:var(--txt);margin-bottom:.3rem">${vaga.l}</div>
       <div style="font-size:.75rem;color:var(--txt3);margin-bottom:.6rem">${vaga.desc}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;font-size:.78rem">
         <div style="padding:.5rem;background:var(--surface2);border:var(--borda-sub);border-radius:var(--r)">
@@ -245,7 +245,7 @@ function _cardConvite(c) {
       <div class="card" style="border-left:3px solid var(--verde2)">
         <div style="display:flex;align-items:start;justify-content:space-between;gap:.8rem">
           <div style="flex:1">
-            <div style="font-weight:700;font-size:.85rem;color:var(--navy)">🏛️ Convite de Sócio — ${esc.nome}</div>
+            <div style="font-weight:700;font-size:.85rem;color:var(--txt)">🏛️ Convite de Sócio — ${esc.nome}</div>
             <div style="font-size:.7rem;color:var(--ouro2);margin:.2rem 0">${cargoLabel} · Escritório de jogador real</div>
             <div style="font-size:.72rem;color:var(--txt3)">Salário: <b style="color:var(--verde2)">R$ ${sal.toLocaleString('pt-BR')}/mês</b></div>
           </div>
@@ -266,7 +266,7 @@ function _cardConvite(c) {
     <div class="card" style="border-left:3px solid ${isPromo?'var(--ouro2)':'var(--navy3)'}">
       <div style="display:flex;align-items:start;justify-content:space-between;gap:.8rem">
         <div style="flex:1">
-          <div style="font-weight:700;font-size:.85rem;color:var(--navy)">
+          <div style="font-weight:700;font-size:.85rem;color:var(--txt)">
             ${isPromo?'⭐':'📬'} ${isPromo?'Promoção':'Convite'} — ${esc.nome}
           </div>
           <div style="font-size:.7rem;color:var(--ouro2);margin:.2rem 0">${vaga.l} · Tier ${esc.tier} · ${esc.bairro}</div>

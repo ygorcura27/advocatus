@@ -2137,7 +2137,7 @@ function _renderModalProcesso(id, p) {
   abrirModal(`⚖️ ${p.tipo || '—'}`,
     `<div style="background:var(--surface2);border:var(--borda);border-radius:var(--r);padding:.75rem;margin-bottom:.85rem">
       <div style="font-family:var(--font-mono);font-size:.6rem;color:var(--txt4);margin-bottom:.25rem">${p.numero || '—'}</div>
-      <div style="font-weight:700;font-size:.9rem;color:var(--navy);margin-bottom:.15rem">${p.autor || '—'} <span style="opacity:.4">vs</span> ${p.reu || '—'}</div>
+      <div style="font-weight:700;font-size:.9rem;color:var(--txt);margin-bottom:.15rem">${p.autor || '—'} <span style="opacity:.4">vs</span> ${p.reu || '—'}</div>
       <div style="font-size:.7rem;color:var(--ouro2)">${p.tribunal || '—'} · ${p.instancia === '1grau' ? '1ª Instância' : p.instancia}</div>
       <div style="font-size:.68rem;color:var(--navy3);margin-top:.25rem">${ladoLabel}</div>
       <div style="font-size:.7rem;color:var(--verde2);margin-top:.25rem">${fmt(p.valor)} · ${honInfo}</div>
@@ -2423,7 +2423,7 @@ window.renderCarteiraProcessual = async function(el) {
           return `
           <div class="card" style="margin-bottom:.6rem;border-left:3px solid var(--amber)">
             <div style="font-family:var(--font-mono);font-size:.6rem;color:var(--txt4)">${p.numero}</div>
-            <div style="font-weight:700;font-size:.85rem;color:var(--navy)">${p.autor} vs ${p.reu}</div>
+            <div style="font-weight:700;font-size:.85rem;color:var(--txt)">${p.autor} vs ${p.reu}</div>
             <div style="font-size:.68rem;color:var(--txt3)">${p.tipo} · sentença desfavorável · score ${p.score_anterior}</div>
             <div style="display:flex;gap:.5rem;margin-top:.6rem">
               <button class="btn btn-sm btn-prim" style="flex:1" onclick="window.decidirRecursoSentencaProducao('${p.id}', true)">⚖️ Recorrer</button>
@@ -2466,7 +2466,7 @@ window.renderCarteiraProcessual = async function(el) {
           <div style="display:flex;justify-content:space-between;align-items:start">
             <div>
               <div style="font-family:var(--font-mono);font-size:.6rem;color:var(--txt4)">${p.numero}</div>
-              <div style="font-weight:700;font-size:.85rem;color:var(--navy)">${p.autor} vs ${p.reu}</div>
+              <div style="font-weight:700;font-size:.85rem;color:var(--txt)">${p.autor} vs ${p.reu}</div>
               <div style="font-size:.68rem;color:var(--txt3)">${p.tipo} · ${recorrenteLbl} · score base: ${p.score_anterior}</div>
             </div>
             <span style="font-size:.65rem;font-weight:600;color:${disponivel?'var(--verde2)':'var(--txt4)'}">${disponivel?'⚖️ Recurso disponível':'Aguardando movimentação'}</span>
@@ -2511,7 +2511,7 @@ window.renderPoolEscritorio = async function(el) {
           <div style="display:flex;justify-content:space-between;align-items:start">
             <div>
               <div style="font-family:var(--font-mono);font-size:.6rem;color:var(--txt4)">${p.numero}</div>
-              <div style="font-weight:700;font-size:.85rem;color:var(--navy)">${p.autor} vs ${p.reu}</div>
+              <div style="font-weight:700;font-size:.85rem;color:var(--txt)">${p.autor} vs ${p.reu}</div>
               <div style="font-size:.68rem;color:var(--txt3)">${p.tipo} · progresso ${progresso}%${jaContribui ? ' · você já contribuiu' : ''}</div>
               ${progresso >= PROGRESSO_MAX_SEM_ADVOGADO
                 ? `<div style="font-size:.68rem;color:var(--ouro2);font-weight:600;margin-top:.15rem">📋 Instrução concluída — pronto para sentença</div>`
@@ -3279,7 +3279,7 @@ function _painelContextoProcesso(p) {
       <div style="display:flex;justify-content:space-between;align-items:start;gap:.6rem;flex-wrap:wrap">
         <div style="min-width:0">
           <div style="font-family:var(--font-mono);font-size:.58rem;color:var(--txt4)">${p.numero || '—'}</div>
-          <div style="font-weight:700;font-size:.82rem;color:var(--navy);line-height:1.3">${p.autor || '—'} <span style="opacity:.4">vs</span> ${p.reu || '—'}</div>
+          <div style="font-weight:700;font-size:.82rem;color:var(--txt);line-height:1.3">${p.autor || '—'} <span style="opacity:.4">vs</span> ${p.reu || '—'}</div>
           <div style="font-size:.66rem;color:var(--ouro2);margin-top:.1rem">${p.tipo || '—'} · ${p.tribunal || '—'}</div>
         </div>
         <div style="text-align:right;flex-shrink:0">

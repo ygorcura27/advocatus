@@ -856,7 +856,7 @@ async function _renderEscritorioFuncionario(j, el, escId) {
         <div class="secao-header" style="margin-bottom:.8rem">
           <div class="secao-titulo">Sua Posição</div>
         </div>
-        <div style="font-size:.8rem;color:var(--navy);font-weight:600">${j.nome_personagem||'—'}</div>
+        <div style="font-size:.8rem;color:var(--txt);font-weight:600">${j.nome_personagem||'—'}</div>
         <div style="font-size:.7rem;color:var(--txt3)">${j.cargo_id?.toUpperCase()||'—'} · Tier ${tier}</div>
         <div style="font-size:.7rem;color:var(--txt3);margin-top:.3rem">${j.escritorio_nome||'—'}</div>
         ${podeCtrt ? `<div style="font-size:.65rem;color:var(--verde2);margin-top:.5rem">✅ Poder de contratar ativo</div>` : ''}
@@ -923,13 +923,13 @@ function _renderEscritorioNPC(j, el) {
       <div style="display:flex;align-items:center;gap:.8rem;margin-bottom:.8rem">
         <div style="font-size:2rem">🏛️</div>
         <div>
-          <div style="font-family:var(--font-serif);font-size:1.1rem;font-weight:700;color:var(--navy)">${j.escritorio_nome || '—'}</div>
+          <div style="font-family:var(--font-serif);font-size:1.1rem;font-weight:700;color:var(--txt)">${j.escritorio_nome || '—'}</div>
           <div style="font-size:.72rem;color:var(--txt3)">📍 ${j.escritorio_bairro||'—'} · ${_espLabel2(j.escritorio_esp)} · Tier ${tier}</div>
         </div>
       </div>
       <div style="background:var(--surface2);border:var(--borda-sub);border-radius:var(--r);padding:.7rem;margin-bottom:.7rem">
         <div style="font-size:.62rem;color:var(--txt4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">Sua vaga</div>
-        <div style="font-weight:700;color:var(--navy);font-size:.9rem">${VAGA_LABEL[vagaTipo]||vagaTipo}</div>
+        <div style="font-weight:700;color:var(--txt);font-size:.9rem">${VAGA_LABEL[vagaTipo]||vagaTipo}</div>
         <div style="font-size:.75rem;color:var(--verde2);font-weight:600;margin-top:.15rem">R$ ${(j.sal_base_escritorio||0).toLocaleString('pt-BR')}/mês</div>
       </div>
 
@@ -1291,7 +1291,7 @@ function _escSocietarioCard(esc, j) {
       <div style="position:relative;width:130px;height:130px">
         <div style="width:130px;height:130px;border-radius:50%;background:conic-gradient(${stops || 'var(--navy) 0% 100%'})"></div>
         <div style="position:absolute;inset:18px;border-radius:50%;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center">
-          <div style="font-size:1.2rem;font-weight:700;color:var(--navy);font-family:var(--font-serif)">${principal}%</div>
+          <div style="font-size:1.2rem;font-weight:700;color:var(--txt);font-family:var(--font-serif)">${principal}%</div>
           <div style="font-size:.58rem;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em">Participação</div>
         </div>
       </div>
