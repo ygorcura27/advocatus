@@ -233,8 +233,9 @@ a:hover { color: var(--txt); }
    TOPBAR
    ═══════════════════════════════════════════════════════════ */
 .topbar {
-  position: fixed;
-  top: 0; left: 0; right: 0;
+  /* Sem position:fixed de propósito — igual mockup (.impeccable/preview/
+     dossie-v1.html: .topbar é grid-area normal dentro de .shell, rola pra
+     fora da tela junto com o resto da página, não fica pinado no topo). */
   height: var(--topbar-h);
   background: var(--navy);
   border-bottom: 2px solid var(--ouro2);
@@ -242,14 +243,7 @@ a:hover { color: var(--txt); }
   align-items: center;
   padding: 0 1.2rem;
   gap: 1rem;
-  z-index: 200;
   box-shadow: var(--sombra-navy);
-  /* Promove pra layer de composição própria (GPU) — sem isso, em scroll
-     rápido com a página cheia de conteúdo, o navegador atrasa 1 frame pra
-     repintar o fixed junto com o scroll e o conteúdo "escapa" por cima dele
-     por uma fração de segundo antes de se corrigir. */
-  transform: translateZ(0);
-  will-change: transform;
 }
 
 .logo {
@@ -412,32 +406,19 @@ a:hover { color: var(--txt); }
   display: grid;
   grid-template-columns: var(--sidebar-l) 1fr var(--sidebar-r);
   min-height: calc(100vh - var(--topbar-h));
-  margin-top: var(--topbar-h);
 }
 
 .sidebar-left {
   border-right: var(--borda);
   background: var(--surface);
-  overflow-y: auto;
-  position: sticky;
-  top: var(--topbar-h);
-  height: calc(100vh - var(--topbar-h));
   box-shadow: 2px 0 8px rgba(0,0,0,.06);
-  transform: translateZ(0);
-  will-change: transform;
 }
 
-.main-content { overflow-y: auto; padding: 1.5rem; min-width: 0; background: var(--bg); }
+.main-content { padding: 1.5rem; min-width: 0; background: var(--bg); }
 
 .sidebar-right {
   border-left: var(--borda);
   background: var(--surface);
-  overflow-y: auto;
-  position: sticky;
-  top: var(--topbar-h);
-  height: calc(100vh - var(--topbar-h));
-  transform: translateZ(0);
-  will-change: transform;
   padding: 1.2rem 1rem;
   box-shadow: -2px 0 8px rgba(0,0,0,.06);
 }
@@ -1121,9 +1102,7 @@ a:hover { color: var(--txt); }
    centro, como uma janela do Popmundo, em vez de esticar a tela toda.
    Não afeta telas menores/tablet/mobile — lá o conteúdo já precisa do espaço. */
 @media (min-width: 1600px) {
-  .layout, .topbar { max-width: 1400px; }
-  .layout { margin: var(--topbar-h) auto 0; }
-  .topbar { left: 50%; right: auto; transform: translateX(-50%); }
+  .layout, .topbar { max-width: 1400px; margin-left: auto; margin-right: auto; }
 }
 
 /* Tablet */
@@ -1138,7 +1117,6 @@ a:hover { color: var(--txt); }
 
   .layout {
     grid-template-columns: 1fr;
-    margin-top: var(--topbar-h);
   }
 
   /* Sidebar vira drawer lateral — SEMPRE VISÍVEL mas fora da tela */
@@ -2194,7 +2172,7 @@ a:hover { color: var(--txt); }
 .esc-main-col { min-width: 0; }
 .esc-side-menu {
   position: sticky;
-  top: calc(var(--topbar-h) + 1rem);
+  top: 1rem;
   background: var(--surface);
   border: var(--borda);
   border-radius: var(--r2);
