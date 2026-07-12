@@ -69,6 +69,8 @@ const {
 } = require('./investigacao');
 // Assembleia de Sócios — votação ponderada por participação
 const { abrirVotacao, votar, encerrarVotacao } = require('./assembleia_socios');
+// Posts (Redes Sociais) — feed real
+const { publicarPost, curtirPost, deletarPost } = require('./posts_sociais');
 
 exports.avancarMes              = avancarMes;
 exports.processarSentenca       = processarSentenca;
@@ -140,3 +142,7 @@ exports.finalizarJulgamento      = finalizarJulgamento;
 exports.abrirVotacao             = abrirVotacao;
 exports.votar                    = votar;
 exports.encerrarVotacao          = encerrarVotacao;
+// Posts (Redes Sociais)
+exports.publicarPost             = publicarPost;
+exports.curtirPost               = curtirPost;
+exports.deletarPost              = deletarPost;

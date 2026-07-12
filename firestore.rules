@@ -512,6 +512,17 @@ service cloud.firestore {
     }
 
     // ══════════════════════════════════════════════════════
+    // POSTS (Redes Sociais do jogador) — feed real e persistido.
+    // Escrita só via Cloud Functions (publicarPost/curtirPost/deletarPost
+    // no Admin SDK) pra impedir curtida duplicada e limite de frequência
+    // sendo burlados no cliente; cliente só lê.
+    // ══════════════════════════════════════════════════════
+    match /posts/{postId} {
+      allow read: if isAuth();
+      allow write: if false;
+    }
+
+    // ══════════════════════════════════════════════════════
     // BLOQUEAR TUDO QUE NÃO FOI EXPLICITAMENTE PERMITIDO
     // ══════════════════════════════════════════════════════
     match /{document=**} {

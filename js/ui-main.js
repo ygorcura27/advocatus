@@ -1469,9 +1469,9 @@ function renderRedes(j, el) {
 
   el.innerHTML = `
     <div class="secao-header"><div class="secao-titulo">📱 Redes Sociais</div></div>
-    <div class="card" style="font-size:.74rem;color:var(--txt3);margin-bottom:1rem;line-height:1.6">
-      📌 Não existe feed, posts ou seguidores por plataforma no jogo real — isso ficaria de proposta.
-      O que é real: a skill <code>comunicacao_midiatica</code> e os views acumulados de mídia/podcast.
+    <div class="card" style="font-size:.72rem;color:var(--txt3);margin-bottom:1rem;line-height:1.6">
+      📌 Sem seguidores por plataforma ou DMs — isso continua fora do jogo real.
+      O feed abaixo é real e persistido (Firestore); Comunicação Midiática/views vêm do sistema de mídia/podcast.
     </div>
     <div class="card" style="display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap;text-align:center;justify-content:center">
       <div>
@@ -1491,9 +1491,12 @@ function renderRedes(j, el) {
         <div style="font-size:.62rem;color:var(--txt3);text-transform:uppercase;letter-spacing:.08em">Views acumulados</div>
       </div>
     </div>
-    <button class="btn btn-prim btn-block" style="margin-top:1rem" onclick="window.navTo('midia_convites',null)">
+    <button class="btn btn-ghost btn-block" style="margin-top:.7rem" onclick="window.navTo('midia_convites',null)">
       🎙️ Ver Convites de Mídia e Podcasts →
-    </button>`;
+    </button>
+    <div id="redes-feed-area" style="margin-top:1rem"></div>`;
+
+  if (window.renderFeedPosts) window.renderFeedPosts(document.getElementById('redes-feed-area'));
 }
 
 // ════════════════════════════════════════════════════════
