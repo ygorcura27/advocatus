@@ -525,9 +525,10 @@ function renderEscritorio(j, el) {
       ${_escHero(j, null)}
       ${_escStatRow(null, j)}
       ${_escAtividadeCard()}
+      ${_escProcessosPreviewCard(j.escritorio_proprio_id)}
       ${_escKpisPlaceholder()}
       <div class="esc-grid-3">
-        ${_escEquipeCard()}
+        ${_escEquipeCard(j.escritorio_proprio_id)}
         ${_escClientesCard()}
         ${_escSocietarioCard(null, j)}
       </div>
@@ -536,6 +537,7 @@ function renderEscritorio(j, el) {
       ${_escAcoesRapidas(j, null)}
     `;
     _carregarEscritorioProprio(j.escritorio_proprio_id, j);
+    _carregarProcessosPreview(j.escritorio_proprio_id);
     return;
   }
 
@@ -665,9 +667,10 @@ async function _carregarEscritorioProprio(escId, j) {
         ${_escHero(j, esc)}
         ${_escStatRow(esc, j)}
         ${_escAtividadeCard()}
+        ${_escProcessosPreviewCard(esc.id)}
         <div id="esc-kpis-placeholder">${_escKpisPlaceholder()}</div>
         <div class="esc-grid-3">
-          ${_escEquipeCard()}
+          ${_escEquipeCard(esc.id)}
           ${_escClientesCard()}
           ${_escSocietarioCard(esc, j)}
         </div>
@@ -686,6 +689,7 @@ async function _carregarEscritorioProprio(escId, j) {
       if (kpisEl) kpisEl.innerHTML = kpisHtml;
 
       _escCarregarRankPos(escId);
+      _carregarProcessosPreview(esc.id);
 
       const elAtividade = document.getElementById('esc-atividade-embed');
       if (elAtividade && window.renderAtividadeEscritorioPainel) window.renderAtividadeEscritorioPainel(escId, elAtividade);
@@ -1079,6 +1083,34 @@ function _escSideMenu(ativo, semWrapper) {
   return semWrapper ? grupos : `<aside class="esc-side-menu">${grupos}</aside>`;
 }
 
+// Card de prévia — resumo rápido + link "Ver", igual ao mockup
+// (painel "Prévia de Ações Disponíveis" antes do Quadro de Pessoal).
+// Números reais: consulta leve na mesma processos_pool que
+// js/processos_escritorio.js:renderProcessosPool usa de verdade.
+function _escProcessosPreviewCard(escId) {
+  return `
+  <div class="esc-card-bloco" style="margin-bottom:1.1rem">
+    <div class="secao-header" style="margin-bottom:.4rem">
+      <div class="secao-titulo">⚖️ Gestão de Processos</div>
+      <a href="#" class="esc-ver-todos" onclick="document.getElementById('esc-processos-bloco')?.scrollIntoView({behavior:'smooth'});return false">Ver →</a>
+    </div>
+    <div id="esc-processos-preview" style="font-size:.68rem;color:var(--txt4)">Carregando...</div>
+  </div>`;
+}
+
+async function _carregarProcessosPreview(escId) {
+  const el = document.getElementById('esc-processos-preview');
+  if (!el || !escId) return;
+  try {
+    const poolSnap = await getDocs(collection(db, 'escritorios', escId, 'processos_pool'));
+    const todos = poolSnap.docs.map(d => d.data());
+    const ativos = todos.filter(p => p.status === 'em_andamento' || p.status === 'disponivel').length;
+    const STATUSES_RECURSAL = ['recurso_pendente','aguardando_decisao_sentenca','aguardando_decisao_recurso','aguardando_evento','pronto_para_sentenca'];
+    const recursal = todos.filter(p => STATUSES_RECURSAL.includes(p.status)).length;
+    el.textContent = `${ativos} processo${ativos===1?'':'s'} ativo${ativos===1?'':'s'} · ${recursal} em fase recursal`;
+  } catch (e) { el.textContent = ''; }
+}
+
 // Card de "Atividade Recente" do escritório (diário compacto, topo da visão geral)
 function _escAtividadeCard() {
   return `
@@ -1304,12 +1336,16 @@ async function _escKpis(esc, j) {
   </div>`;
 }
 
-function _escEquipeCard() {
+function _escEquipeCard(escId) {
   return `
   <div class="esc-card-bloco">
-    <div class="secao-header" style="margin-bottom:.8rem">
-      <div class="secao-titulo">Equipe do Escritório</div>
-      <a href="#" class="esc-ver-todos" onclick="window.navTo('equipe',null);return false">Ver todos</a>
+    <div class="secao-header" style="margin-bottom:.6rem">
+      <div class="secao-titulo">Quadro de Pessoal</div>
+    </div>
+    <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.8rem">
+      <button class="btn btn-sm btn-prim" onclick="window._contratarNPC('est','${escId||''}')">+ contratar</button>
+      <button class="btn btn-sm btn-ghost" onclick="window.toast('Escolha um funcionário na lista e clique em 🎓 Mentoria.','',3000);window.navTo('equipe',null)">mentoria</button>
+      <button class="btn btn-sm btn-ghost" onclick="window.navTo('equipe',null)">gerenciar equipe →</button>
     </div>
     <div id="esc-equipe-embed">
       <div style="font-size:.78rem;color:var(--txt3);padding:.5rem 0">Carregando equipe...</div>

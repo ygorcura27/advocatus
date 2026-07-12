@@ -58,6 +58,16 @@ const PATHS = {
   midia:           `<rect ${S} x="9" y="3" width="6" height="11" rx="3"/><path ${S} d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path ${S} d="M12 17.5V21"/><path ${S} d="M9 21h6"/>`,
   societario:      `<circle ${S} cx="12" cy="4.5" r="2"/><path ${S} d="M12 6.5v3.5"/><path ${S} d="M6 17v-3.5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2V17"/><circle ${S} cx="6" cy="19.3" r="2"/><circle ${S} cx="12" cy="19.3" r="2"/><circle ${S} cx="18" cy="19.3" r="2"/>`,
 
+  // Telas novas desta sessão — mesma linguagem visual, nunca emoji cru
+  foco:            `<circle ${S} cx="12" cy="12" r="7.2"/><circle ${S} cx="12" cy="12" r="2.4"/><path ${S} d="M12 2v3M12 19v3M2 12h3M19 12h3"/>`,
+  redes:           `<circle ${S} cx="6" cy="7" r="2.2"/><circle ${S} cx="18" cy="7" r="2.2"/><circle ${S} cx="12" cy="18" r="2.2"/><path ${S} d="M7.7 8.4 10.3 16M16.3 8.4 13.7 16M8.2 7h7.6"/>`,
+  assembleia:      `<rect ${S} x="5" y="4" width="14" height="17" rx="1.5"/><path ${S} d="M9 11.3l2 2 4-4"/><path ${S} d="M8 16.5h8"/>`,
+  marketing:       `<path ${S} d="M3 10v4h3l6 4V6l-6 4z"/><path ${S} d="M15 9a4 4 0 0 1 0 6"/><path ${S} d="M18 7a7.5 7.5 0 0 1 0 10"/>`,
+  posgraduacao:    `<rect ${S} x="4" y="3" width="16" height="12" rx="1.5"/><path ${S} d="M8 7h8M8 10h5"/><path ${S} d="M9 15l-1.5 6 3.5-2 3.5 2-1.5-6"/>`,
+  artigos_livros:  `<path ${S} d="M12 6c-2-1.5-5-2-8-1.5v13c3-.5 6 0 8 1.5c2-1.5 5-2 8-1.5v-13c-3-.5-6 0-8 1.5z"/><path ${S} d="M12 6v13"/>`,
+  sistemas_sociais:`<circle ${S} cx="12" cy="12" r="8.5"/><path ${S} d="M3.5 12h17"/><path ${S} d="M12 3.5c3 3 3 14 0 17M12 3.5c-3 3-3 14 0 17"/>`,
+  imprensa:        `<path ${S} d="M4 5h13v14a1.5 1.5 0 0 1-1.5 1.5H5.5A1.5 1.5 0 0 1 4 19z"/><path ${S} d="M17 8h3v10a1.5 1.5 0 0 1-1.5 1.5"/><path ${S} d="M7 8.5h6M7 11.5h6M7 14.5h4"/>`,
+
   // Chrome persistente (topbar/sidebars/bottom nav) — substituem emojis crus
   alerta:       `<path ${S} d="M12 3.5 21 19H3z"/><path ${S} d="M12 9.5v4.2M12 16.8h.01"/>`,
   menu:         `<path ${S} d="M4 6h16M4 12h16M4 18h16"/>`,
