@@ -594,9 +594,26 @@ a:hover { color: var(--txt); }
 .secao-header {
   display: flex; align-items: center; gap: .7rem;
   margin-bottom: 1rem; padding-bottom: .6rem;
-  border-bottom: 2px solid var(--navy-light);
+  border-bottom: var(--borda2);
 }
 .secao-titulo { font-family: var(--font-serif); font-size: 1rem; color: var(--txt); font-weight: 700; }
+
+/* Funde .secao-header + o .card que vem logo depois numa moldura só,
+   igual .painel/.painel-head do mockup — sem reescrever a marcação de
+   cada tela (o par solto .secao-header + .card é o padrão mais comum,
+   ~40% das ocorrências reais). Telas com .secao-header seguido de
+   algo diferente (tabela, grid, div solta) continuam com o visual
+   separado até serem portadas manualmente pra .painel de verdade. */
+.secao-header:has(+ .card) {
+  background: var(--surface); border: var(--borda);
+  border-bottom: var(--borda2);
+  border-radius: 3px 3px 0 0;
+  margin-bottom: 0; padding: .9rem 1.1rem .7rem;
+}
+.secao-header:has(+ .card) + .card {
+  border-top: none; border-radius: 0 0 3px 3px;
+  margin-top: 0; box-shadow: none;
+}
 .secao-badge {
   margin-left: auto; font-size: .62rem; padding: .12rem .5rem;
   background: var(--navy-light); color: var(--txt2);
