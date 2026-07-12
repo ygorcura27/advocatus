@@ -1613,6 +1613,7 @@ function renderFoco(j, el) {
     { k:'concurso',  icone:'🏛️', label:'Concurso Público',    tag:'real, travado', tela:'concurso' },
     { k:'redes',     icone:'📣', label:'Postar em Redes Sociais', tag:'real', tela:'redes' },
     { k:'audiencia', icone:'🔨', label:'Preparar Audiência',  tag:'real (via Investigação)', tela:'investigacao' },
+    { k:'trabalhar_intensamente', icone:'💼', label:'Trabalhar Intensamente', tag:'real', tela:null },
   ];
   const focoLockedHtml = focoAtual
     ? `<div class="card" style="margin-bottom:1rem;border-color:var(--navy3);background:rgba(22,214,168,.06)">
@@ -1634,15 +1635,16 @@ function renderFoco(j, el) {
 
   const propostaHtml = `
     <div class="esc-acao-btn" style="opacity:.5;cursor:not-allowed" title="Só aparece no recesso mensal, não é ação avulsa"><span class="esc-acao-icone">🍷</span><span>Networking<br><small style="opacity:.7">real (recesso)</small></span></div>
-    <div class="esc-acao-btn" style="opacity:.5;cursor:not-allowed" title="Só aparece no recesso mensal, não é ação avulsa"><span class="esc-acao-icone">🛋️</span><span>Descansar<br><small style="opacity:.7">real (recesso)</small></span></div>
-    <div class="esc-acao-btn" style="opacity:.5;cursor:not-allowed" title="Jogador não tem stat de produtividade — proposta"><span class="esc-acao-icone">💼</span><span>Trabalhar Intensamente<br><small style="opacity:.7">📌 proposta</small></span></div>`;
+    <div class="esc-acao-btn" style="opacity:.5;cursor:not-allowed" title="Só aparece no recesso mensal, não é ação avulsa"><span class="esc-acao-icone">🛋️</span><span>Descansar<br><small style="opacity:.7">real (recesso)</small></span></div>`;
 
   el.innerHTML = `
     ${_capaHeader(`CARREIRA · ${(j.escritorio_nome||'ADVOCACIA SOLO').toUpperCase()}`, '🎯 Foco do Personagem', '')}
     <div class="card" style="font-size:.74rem;color:var(--txt3);margin-bottom:1rem;line-height:1.6">
       Clique num card pra travar como seu foco do mês — fica marcado até você trocar, não navega pra outra tela.
       Pra executar a ação de verdade (escrever a petição, etc), use "abrir tela →" dentro do card. "Estudar habilidade" é o
-      <code>study_queue</code> real (R$500, +3 fixo, resultado em 1 mês). O resto marcado 📌 é proposta, sem efeito real.
+      <code>study_queue</code> real (R$500, +3 fixo, resultado em 1 mês). "Trabalhar Intensamente" dá +50% de XP de
+      skill (Document Type/Practice Area) em toda petição/caso que você concluir enquanto travado, custando disposição
+      extra no mês. O resto marcado 📌 é proposta, sem efeito real.
     </div>
 
     ${focoLockedHtml}

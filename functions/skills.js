@@ -208,15 +208,20 @@ async function processarEvolucaoSkillsJurMensalCF(db, uid, jogadorData) {
  * Aplica XP de Document Type Mastery após composição de uma petição.
  * Chamado por peticoes.js ao concluir composição.
  * +1 por composição; +2 bônus de vitória (aplicado em atualizarFama).
+ * +50% (arredondado) se o jogador tem "Trabalhar Intensamente" travado como
+ * foco do mês (js/ui-main.js:renderFoco, `foco_atual` na jogador doc) — custo
+ * em disposição é cobrado à parte, no tick mensal (avancar_mes.js).
  */
 async function aplicarXpDocType(db, uid, docType, vitoria) {
   const ref  = db.collection('jogadores').doc(uid);
   const snap = await ref.get();
   if (!snap.exists) return;
-  const skJur = normalizarSkillsJur(snap.data().skills_jur);
+  const dados = snap.data();
+  const skJur = normalizarSkillsJur(dados.skills_jur);
   const campo = `doc_${docType}`;
   if (!(campo in skJur)) return;
-  const ganho = vitoria ? 2 : 1;
+  let ganho = vitoria ? 2 : 1;
+  if (dados.foco_atual === 'trabalhar_intensamente') ganho = Math.round(ganho * 1.5);
   await ref.update({ [`skills_jur.${campo}`]: capSkill(skJur[campo] + ganho) });
 }
 
@@ -224,15 +229,18 @@ async function aplicarXpDocType(db, uid, docType, vitoria) {
  * Aplica XP de Practice Area Mastery ao concluir um caso.
  * +2 por caso concluído; +3 bônus vitória; +1 bônus derrota.
  * Chamado por processarSentenca/peticoes ao fechar o processo.
+ * Mesmo bônus de "Trabalhar Intensamente" do aplicarXpDocType acima.
  */
 async function aplicarXpPracticeArea(db, uid, area, resultado) {
   const ref  = db.collection('jogadores').doc(uid);
   const snap = await ref.get();
   if (!snap.exists) return;
-  const skJur = normalizarSkillsJur(snap.data().skills_jur);
+  const dados = snap.data();
+  const skJur = normalizarSkillsJur(dados.skills_jur);
   const campo = `area_${area}`;
   if (!(campo in skJur)) return;
-  const ganho = resultado === 'procedente' ? 3 : resultado === 'improcedente' ? 1 : 2;
+  let ganho = resultado === 'procedente' ? 3 : resultado === 'improcedente' ? 1 : 2;
+  if (dados.foco_atual === 'trabalhar_intensamente') ganho = Math.round(ganho * 1.5);
   await ref.update({ [`skills_jur.${campo}`]: capSkill(skJur[campo] + ganho) });
 }
 

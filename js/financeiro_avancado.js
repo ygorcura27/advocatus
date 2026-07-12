@@ -1,6 +1,6 @@
 /**
  * FINANCEIRO AVANÇADO — Advocatus Online (GDD Seção 31-33)
- * Antecipação de honorários, linha de crédito, sócio investidor, investimentos.
+ * Venda de precatórios (honorários pendentes), linha de crédito, sócio investidor, investimentos.
  */
 
 import { httpsCallable }
@@ -30,12 +30,13 @@ const _FIRMAS_NPC = [
   { id: 'ribeiro_trabalhista', nome: 'Ribeiro Trabalhista', setor: 'Trabalhista', min_inv: 20000, pct_base: 0.007, vol: 0.10, desc: 'Demanda estável, retorno conservador e previsível.' },
 ];
 
-// ── Ações (B3) e Criptomoedas — 📌 compra/venda/carteira ainda são proposta
-// (não persistem, sem backing real no jogo), mas preço/variação agora são
-// 100% reais (_invCarregarPrecosReais, abaixo): cripto via CoinGecko (10/10),
-// ações via brapi.dev (só 3 tickers — PETR4/VALE3/ITUB4/MGLU3 são os únicos
-// cobertos pelo sandbox grátis sem token; lista fica só nesses 3 em vez de
-// misturar com ilustrativo).
+// ── Ações (B3) e Criptomoedas — real: compra/venda persiste em
+// investimentos.carteira_mercado (functions/investimentos_mercado.js,
+// comprarAtivo/venderAtivo, preço sempre re-buscado no servidor, nunca
+// confia no preço que o cliente mandar). Preço/variação exibidos vêm de
+// API pública gratuita (_invCarregarPrecosReais, abaixo): cripto via
+// CoinGecko (10/10), ações via brapi.dev (só 3 tickers — PETR4/VALE3/ITUB4
+// são os únicos cobertos pelo sandbox grátis sem token).
 const _INV_ACOES_TICKERS = ['PETR4','VALE3','ITUB4'];
 const _INV_ACOES_NOMES = { PETR4:'Petrobras', VALE3:'Vale', ITUB4:'Itaú Unibanco' };
 const _INV_ACOES = _INV_ACOES_TICKERS.map(t => ({ ticker:t, nome:_INV_ACOES_NOMES[t], preco:+(8+Math.random()*72).toFixed(2), variacao:+((Math.random()*10)-5).toFixed(2), real:false }));
@@ -52,7 +53,6 @@ const _INV_CRIPTOS_LISTA = [
   { ticker:'MATIC',nome:'Polygon',   coingeckoId:'polygon-ecosystem-token', preco: 3.5+Math.random()*1.5 }, // MATIC migrou pra POL em 2024, id antigo 'matic-network' não retorna mais preço
 ];
 const _INV_CRIPTOS = _INV_CRIPTOS_LISTA.map(c => ({ ...c, preco:+c.preco.toFixed(2), variacao:+((Math.random()*14)-7).toFixed(2), real:false }));
-let _invCarteira = { acoes: [], cripto: [] };
 let _invTabAtiva = 'visao';
 let _invPrecosReaisCarregados = false;
 
@@ -133,9 +133,9 @@ window.renderFinanceiroAvancado = async function(j, el) {
     ${window._capaHeader(`FINANCEIRO · ${(j.nome_personagem||'—').toUpperCase()}`, '📊 Investimentos', '')}
     <div class="card" style="font-size:.7rem;color:var(--txt3);margin-bottom:1rem;line-height:1.6">
       4 categorias reais (functions/financeiro.js, GDD Seção 32, rodam todo mês em avancar_mes.js): Renda Fixa, Fundos,
-      Imóvel para Renda, Firmas NPC. Ações (B3) e Criptomoedas são <b style="color:var(--ouro)">📌 proposta</b> — não
-      existem no jogo real e a carteira não é salva, mas os preços são 100% reais via API pública grátis (CoinGecko
-      pra cripto, brapi.dev pra ações — 3 tickers, único plano sem custo dessa API).
+      Imóvel para Renda, Firmas NPC. Ações (B3) e Criptomoedas (functions/investimentos_mercado.js) também são reais —
+      compra/venda persiste, preço sempre re-checado no servidor via API pública grátis (CoinGecko pra cripto,
+      brapi.dev pra ações — 3 tickers, único plano sem custo dessa API).
     </div>
 
     <div class="stat-row">
@@ -151,8 +151,8 @@ window.renderFinanceiroAvancado = async function(j, el) {
       <div class="equipe-tab${_invTabAtiva==='fd'?' ativo':''}" onclick="window._invTab(this,'fd')">Fundos</div>
       <div class="equipe-tab${_invTabAtiva==='im'?' ativo':''}" onclick="window._invTab(this,'im')">Imóvel p/ Renda</div>
       <div class="equipe-tab${_invTabAtiva==='fn'?' ativo':''}" onclick="window._invTab(this,'fn')">Firmas (Ações reais)</div>
-      <div class="equipe-tab${_invTabAtiva==='acoes'?' ativo':''}" onclick="window._invTab(this,'acoes')">Ações (B3) 📌</div>
-      <div class="equipe-tab${_invTabAtiva==='cripto'?' ativo':''}" onclick="window._invTab(this,'cripto')">Criptomoedas 📌</div>
+      <div class="equipe-tab${_invTabAtiva==='acoes'?' ativo':''}" onclick="window._invTab(this,'acoes')">Ações (B3)</div>
+      <div class="equipe-tab${_invTabAtiva==='cripto'?' ativo':''}" onclick="window._invTab(this,'cripto')">Criptomoedas</div>
     </div>
     <div id="inv-conteudo"></div>
 
@@ -323,23 +323,25 @@ window._invRenderTab = function(tab) {
       </div>`;
   } else if (tab === 'acoes' || tab === 'cripto') {
     const lista = tab === 'acoes' ? _INV_ACOES : _INV_CRIPTOS;
-    const carteira = _invCarteira[tab];
+    const carteira = j.investimentos?.carteira_mercado?.[tab] || [];
     const carteiraValor = carteira.reduce((s,h)=>{
       const atual = lista.find(x=>x.ticker===h.ticker);
-      return s + (atual ? atual.preco*h.qtd : 0);
+      return s + (atual ? atual.preco*h.qtd : h.preco_medio*h.qtd);
     },0);
     const carregado = lista.every(a=>a.real);
     el.innerHTML = `
-      <div style="font-size:.7rem;color:var(--ouro);margin-bottom:.8rem">📌 Compra/venda/carteira são proposta (não persistem, não existem no jogo real).
-        Preço: ${carregado?`<b style="color:var(--verde2)">100% real, ao vivo (${tab==='acoes'?'brapi.dev':'CoinGecko'})</b>`:'carregando preços reais…'}.</div>
+      <div style="font-size:.7rem;color:var(--txt3);margin-bottom:.8rem">Preço: ${carregado?`<b style="color:var(--verde2)">100% real, ao vivo (${tab==='acoes'?'brapi.dev':'CoinGecko'})</b>`:'carregando preços reais…'} — compra/venda persiste, valor sempre re-checado no servidor.</div>
       ${carteira.length>0?`
       <section class="painel" style="margin-bottom:1rem">
         <div class="painel-head"><span class="painel-titulo">Minha Carteira — ${_fmtR(carteiraValor)}</span></div>
         <div style="padding:.4rem 1.1rem 1rem">
           ${carteira.map(h=>{
             const atual = lista.find(x=>x.ticker===h.ticker);
-            return `<div class="perf-row"><span>${h.ticker} <em style="color:var(--txt4);font-style:normal">· ${h.qtd} ${tab==='acoes'?'ações':'unid.'}</em></span>
-              <span><b>${_fmtR(atual.preco*h.qtd)}</b> <button class="btn-sair oport-btn" style="margin-left:.6rem" onclick="window._invVender('${tab}','${h.id}')">Vender</button></span></div>`;
+            const precoAtual = atual ? atual.preco : h.preco_medio;
+            return `<div class="perf-row"><span>${h.ticker} <em style="color:var(--txt4);font-style:normal">· ${h.qtd} ${tab==='acoes'?'ações':'unid.'} · PM ${_fmtR(h.preco_medio)}</em></span>
+              <span style="display:flex;align-items:center;gap:.4rem"><b>${_fmtR(precoAtual*h.qtd)}</b>
+              <input type="number" id="inv-${tab}-vend-${h.ticker}" class="equipe-select" placeholder="${h.qtd}" style="width:56px;padding:.2rem" max="${h.qtd}">
+              <button class="btn-sair oport-btn" onclick="window._invVender('${tab}','${h.ticker}',${h.qtd})">Vender</button></span></div>`;
           }).join('')}
         </div>
       </section>`:''}
@@ -348,12 +350,12 @@ window._invRenderTab = function(tab) {
         <div style="padding:.4rem 1.1rem 1rem">
           ${lista.map(a => `
           <div class="perf-row">
-            <span>${a.ticker} <em style="color:var(--txt4);font-style:normal">${a.nome}</em>${a.real?' <b style="color:var(--verde2);font-size:.6rem">● real</b>':''}</span>
+            <span>${a.ticker} <em style="color:var(--txt4);font-style:normal">${a.nome}</em></span>
             <span style="display:flex;align-items:center;gap:.6rem">
               <b>${_fmtR(a.preco)}</b>
               <b style="color:${a.variacao>=0?'var(--verde2)':'var(--verm2)'};min-width:52px;text-align:right">${a.variacao>=0?'+':''}${a.variacao}%</b>
               <input type="number" id="inv-${tab}-qtd-${a.ticker}" class="equipe-select" placeholder="Qtd" style="width:64px;padding:.3rem">
-              <button class="btn-avancar oport-btn" onclick="window._invComprarProposta('${tab}','${a.ticker}')">Comprar</button>
+              <button class="btn-avancar oport-btn" onclick="window._invComprar('${tab}','${a.ticker}')">Comprar</button>
             </span>
           </div>`).join('')}
         </div>
@@ -403,20 +405,34 @@ window.__confirmarResgate = async function(tipo, id, valor) {
   }
 };
 
-// ── Ações (B3) / Criptomoedas — 📌 proposta, client-side only ──
-window._invComprarProposta = function(tipo, ticker) {
-  const el = document.getElementById(`inv-${tipo}-qtd-${ticker}`);
+// ── Ações (B3) / Criptomoedas — real, persiste via comprarAtivo/venderAtivo
+// (functions/investimentos_mercado.js). Preço é sempre re-buscado no servidor,
+// nunca confia em valor calculado no cliente.
+window._invComprar = async function(tab, ticker) {
+  const el = document.getElementById(`inv-${tab}-qtd-${ticker}`);
   const qtd = parseFloat(el?.value);
   if (!qtd || qtd <= 0) { toast('Informe uma quantidade válida.', 'ko'); return; }
-  const existente = _invCarteira[tipo].find(h => h.ticker === ticker);
-  if (existente) existente.qtd += qtd;
-  else _invCarteira[tipo].push({ id: tipo+Date.now(), ticker, qtd });
-  toast(`✅ Comprado (proposta — não persiste).`, 'ok', 2500);
-  window._invRenderTab(tipo);
+  try {
+    const fn = httpsCallable(window.FB_FUNCTIONS, 'comprarAtivo');
+    const r  = await fn({ tipo: tab === 'acoes' ? 'acao' : 'cripto', ticker, qtd, nonce: _gerarNonce() });
+    toast(`✅ ${r.data.msg}`, 'ok', 4000);
+    setTimeout(() => window.navTo?.('financeiro', null), 500);
+  } catch (e) {
+    toast(e.message || 'Erro ao comprar.', 'ko');
+  }
 };
-window._invVender = function(tipo, id) {
-  _invCarteira[tipo] = _invCarteira[tipo].filter(h => h.id !== id);
-  window._invRenderTab(tipo);
+window._invVender = async function(tab, ticker, qtdMax) {
+  const el  = document.getElementById(`inv-${tab}-vend-${ticker}`);
+  const qtd = parseFloat(el?.value) || qtdMax;
+  if (!qtd || qtd <= 0 || qtd > qtdMax) { toast('Quantidade inválida.', 'ko'); return; }
+  try {
+    const fn = httpsCallable(window.FB_FUNCTIONS, 'venderAtivo');
+    const r  = await fn({ tipo: tab === 'acoes' ? 'acao' : 'cripto', ticker, qtd, nonce: _gerarNonce() });
+    toast(`✅ ${r.data.msg}`, 'ok', 4000);
+    setTimeout(() => window.navTo?.('financeiro', null), 500);
+  } catch (e) {
+    toast(e.message || 'Erro ao vender.', 'ko');
+  }
 };
 
 
@@ -465,14 +481,16 @@ function _htmlSocioInvestidor(esc, tier, escId) {
 }
 
 // ────────────────────────────────────────────────────────
-// SEÇÃO: ANTECIPAÇÃO DE HONORÁRIOS
+// SEÇÃO: VENDER PRECATÓRIOS (era "Antecipação de Honorários" —
+// nome trocado pra bater com o termo real do mercado jurídico
+// brasileiro; mecânica/callable por baixo continuam as mesmas)
 // ────────────────────────────────────────────────────────
 function _htmlAntecipacao(total, maxAnt, valorLiq, descPct, rep) {
   return `<div class="card" style="margin-bottom:.7rem">
-    <div style="font-weight:700;font-size:.82rem;color:var(--txt);margin-bottom:.4rem">⏩ Antecipação de Honorários</div>
+    <div style="font-weight:700;font-size:.82rem;color:var(--txt);margin-bottom:.4rem">⏩ Vender Precatórios</div>
     <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.5rem">
-      Receba até <b>60%</b> dos honorários pendentes agora, com desconto de <b>${descPct}%</b>
-      ${rep >= 60 ? '(rep ≥ 60 — tarifa mínima)' : rep >= 40 ? '(rep 40-59)' : '(rep < 40 — tarifa máxima)'}.
+      Venda até <b>60%</b> dos honorários pendentes agora, com deságio de <b>${descPct}%</b>
+      ${rep >= 60 ? '(rep ≥ 60 — deságio mínimo)' : rep >= 40 ? '(rep 40-59)' : '(rep < 40 — deságio máximo)'}.
     </div>
     ${total > 0 ? `
       <div style="display:flex;justify-content:space-between;font-size:.72rem;margin-bottom:.3rem">
@@ -483,7 +501,7 @@ function _htmlAntecipacao(total, maxAnt, valorLiq, descPct, rep) {
         <span style="color:var(--txt3)">Você recebe (líquido)</span>
         <span style="font-weight:700;color:var(--verde2)">${_fmtR(valorLiq)}</span>
       </div>
-      <button class="btn btn-prim btn-block" onclick="window.solicitarAntecipacaoHonorarios()">⏩ Antecipar ${_fmtR(valorLiq)}</button>`
+      <button class="btn btn-prim btn-block" onclick="window.solicitarAntecipacaoHonorarios()">⏩ Vender por ${_fmtR(valorLiq)}</button>`
     : `<div style="font-size:.72rem;color:var(--txt4);text-align:center;padding:.5rem 0">Nenhum honorário pendente no momento.</div>`}
   </div>`;
 }
@@ -540,14 +558,14 @@ window._contratarInvestidor = async function() {
 window.solicitarAntecipacaoHonorarios = async function() {
   const j   = window.JOGADOR;
   const rep = j?.reputacao || 0;
-  if (rep < 20) { toast('Reputação mínima 20 para antecipação.', 'ko'); return; }
+  if (rep < 20) { toast('Reputação mínima 20 para vender precatórios.', 'ko'); return; }
   try {
     const fn = httpsCallable(window.FB_FUNCTIONS, 'anteciparHonorarios');
     const r  = await fn({ nonce: _gerarNonce() });
     toast(`✅ ${r.data.msg}`, 'ok', 6000);
     setTimeout(() => window.navTo?.('financeiro', null), 600);
   } catch (e) {
-    toast(e.message || 'Erro ao antecipar honorários.', 'ko');
+    toast(e.message || 'Erro ao vender precatórios.', 'ko');
   }
 };
 

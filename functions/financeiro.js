@@ -108,7 +108,7 @@ exports.anteciparHonorarios = onCall({ region: 'southamerica-east1' }, async (re
     valorBruto:   maxAntecipavel,
     desconto:     descPctDisplay,
     valorLiquido,
-    msg: `R$ ${valorLiquido.toLocaleString('pt-BR')} antecipados (desconto ${descPctDisplay}% sobre R$ ${maxAntecipavel.toLocaleString('pt-BR')}).`,
+    msg: `R$ ${valorLiquido.toLocaleString('pt-BR')} recebidos pela venda de precatórios (deságio ${descPctDisplay}% sobre R$ ${maxAntecipavel.toLocaleString('pt-BR')}).`,
   };
   });
 });

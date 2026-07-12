@@ -1248,6 +1248,12 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
   if (energiaGasta > 70)       { saudeMental = Math.max(0, saudeMental - 5); }
   else if (energiaGasta < 30)  { saudeMental = Math.min(100, saudeMental + 3); disposicao = Math.min(100, disposicao + 3); }
   disposicao = Math.max(0, disposicao - 2);
+  // "Trabalhar Intensamente" (foco_atual, js/ui-main.js:renderFoco) dá +50%
+  // de XP de skill em toda petição/caso concluído no mês (functions/skills.js:
+  // aplicarXpDocType/aplicarXpPracticeArea) — custo é decaimento extra de
+  // disposição aqui, no mesmo bloco outer que grava updates.disposicao (ver
+  // nota grande sobre dual-write hazard logo abaixo, linha ~2576).
+  if (j.foco_atual === 'trabalhar_intensamente') disposicao = Math.max(0, disposicao - 3);
   // Disposição virou mecânica real em 2026-07-11 (antes só decaía/regenerava
   // sem efeito nenhum). Frequentar a academia é o jeito ativo de recuperar —
   // some com o -2 passivo e ainda soma. Efeito prático: modifica o

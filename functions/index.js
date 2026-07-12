@@ -58,6 +58,7 @@ const {
 } = require('./artigos_livros');
 const { anteciparHonorarios, contratarLinhaCredito, pagarLinhaCredito,
         contratarSocioInvestidor, aplicarInvestimento, resgatarInvestimento } = require('./financeiro');
+const { comprarAtivo, venderAtivo } = require('./investimentos_mercado');
 // GDD v5.1 — Podcasts / Aparições na Internet
 const { responderConviteMidia } = require('./podcasts_social');
 // GDD addendum v1.0 — Investigação, Favores e Julgamento
@@ -128,6 +129,8 @@ exports.pagarLinhaCredito        = pagarLinhaCredito;
 exports.contratarSocioInvestidor = contratarSocioInvestidor;
 exports.aplicarInvestimento      = aplicarInvestimento;
 exports.resgatarInvestimento     = resgatarInvestimento;
+exports.comprarAtivo             = comprarAtivo;
+exports.venderAtivo              = venderAtivo;
 // GDD addendum v1.0 — Investigação, Favores e Julgamento
 exports.iniciarCasoInvestigativo = iniciarCasoInvestigativo;
 exports.executarAcaoInvestigacao = executarAcaoInvestigacao;
