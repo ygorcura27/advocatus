@@ -551,7 +551,6 @@ function renderEscritorio(j, el) {
       ${_escKpisPlaceholder()}
       ${_escStatRow(null, j)}
       ${_escMarketingPreviewCard(j.escritorio_proprio_id)}
-      ${_escAtividadeCard()}
       <div id="esc-workspace-bloco"></div>
       ${_escProcessosPreviewCard(j.escritorio_proprio_id)}
       ${_escEquipeCard(j.escritorio_proprio_id)}
@@ -559,6 +558,7 @@ function renderEscritorio(j, el) {
       ${_escClientesCard()}
       <div id="esc-oportunidades-bloco"></div>
       ${_escSocietarioCard(null, j)}
+      ${_escAtividadeCard()}
       <div id="esc-financas-upgrade"></div>
       ${_escAcoesRapidas(j, null)}
     `;
@@ -694,7 +694,6 @@ async function _carregarEscritorioProprio(escId, j) {
         <div id="esc-kpis-placeholder">${_escKpisPlaceholder()}</div>
         ${_escStatRow(esc, j)}
         ${_escMarketingPreviewCard(esc.id)}
-        ${_escAtividadeCard()}
         <div id="esc-workspace-bloco"></div>
         ${_escProcessosPreviewCard(esc.id)}
         ${_escEquipeCard(esc.id)}
@@ -703,6 +702,7 @@ async function _carregarEscritorioProprio(escId, j) {
         <div id="esc-processos-bloco"></div>
         <div id="esc-oportunidades-bloco"></div>
         ${_escSocietarioCard(esc, j)}
+        ${_escAtividadeCard()}
         <div id="esc-financas-upgrade">
           ${window.renderBlocoFinancas ? window.renderBlocoFinancas(esc, j) : ''}
         </div>
