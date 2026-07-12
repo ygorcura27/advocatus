@@ -740,10 +740,7 @@ async function renderBalancete(j, el) {
     <div style="margin-bottom:.8rem">
       <button class="btn btn-ghost btn-sm" onclick="window.navTo('escritorio',null)">← Escritório</button>
     </div>
-    <div class="secao-header" style="margin-bottom:1rem">
-      <div class="secao-titulo" style="font-size:1rem">📊 Balancete — ${mNome}, Ano ${ano}</div>
-      <span style="font-size:.72rem;color:var(--txt3);font-style:italic">${data.escNome}</span>
-    </div>
+    ${_capaHeader(`BALANCETE MENSAL · ${(data.escNome||'—').toUpperCase()}`, `📊 ${mNome}, Ano ${ano}`, '')}
 
     <div class="card blcte-card" style="margin-bottom:.7rem">
       <div class="blcte-secao-titulo receita">RECEITAS</div>
@@ -1094,6 +1091,27 @@ function _escAtividadeCard() {
       <div style="font-size:.78rem;color:var(--txt3);padding:.5rem 0">Carregando atividade...</div>
     </div>
   </div>`;
+}
+
+// ════════════════════════════════════════════════════════
+// CAPA — cabeçalho "capa do processo" reutilizável, igual ao mockup
+// (.impeccable/preview/dossie-v1.html) em quase toda tela. kicker é a
+// linha mono no topo (ex: "BALANCETE MENSAL · NOME DO ESCRITÓRIO"),
+// pillsHtml são os <span class="pill ...">, seloHtml é opcional
+// (círculo rotacionado — só quando faz sentido, ex: prestígio/OAB).
+// ════════════════════════════════════════════════════════
+function _capaHeader(kicker, nome, pillsHtml, seloHtml) {
+  return `
+  <section class="capa">
+    <div class="capa-kicker">${kicker}</div>
+    <div class="capa-body">
+      <div>
+        <h1 class="capa-nome">${nome}</h1>
+        <div class="capa-meta">${pillsHtml || ''}</div>
+      </div>
+    </div>
+    ${seloHtml || ''}
+  </section>`;
 }
 
 function _escHero(j, esc) {
@@ -1491,7 +1509,7 @@ function renderFoco(j, el) {
     </details>`).join('');
 
   el.innerHTML = `
-    <div class="secao-header"><div class="secao-titulo">🎯 Foco do Personagem</div></div>
+    ${_capaHeader(`CARREIRA · ${(j.escritorio_nome||'ADVOCACIA SOLO').toUpperCase()}`, '🎯 Foco do Personagem', '')}
     <div class="card" style="font-size:.74rem;color:var(--txt3);margin-bottom:1rem;line-height:1.6">
       Reúne ações reais que já existem em telas separadas — não é mecânica nova. "Estudar habilidade" é o
       <code>study_queue</code> real (R$500, +3 fixo, resultado em 1 mês). O resto são atalhos ou está marcado 📌 quando não existe de verdade.
@@ -1529,7 +1547,7 @@ function renderRedes(j, el) {
   const autoridade = Math.min(100, Math.round(com * 2));
 
   el.innerHTML = `
-    <div class="secao-header"><div class="secao-titulo">📱 Redes Sociais</div></div>
+    ${_capaHeader(`MARCA PESSOAL · ${(j.nome_personagem||'—').toUpperCase()}`, '📱 Redes Sociais', '')}
     <div class="card" style="font-size:.72rem;color:var(--txt3);margin-bottom:1rem;line-height:1.6">
       📌 Sem seguidores por plataforma ou DMs — isso continua fora do jogo real.
       O feed abaixo é real e persistido (Firestore); Comunicação Midiática/views vêm do sistema de mídia/podcast.
@@ -1584,7 +1602,8 @@ async function renderMarketing(j, el) {
   const prestigio = esc.prestigio || 0;
 
   el.innerHTML = `
-    <div class="secao-header"><div class="secao-titulo">📣 Marketing & Reputação — ${esc.nome || '—'}</div></div>
+    ${_capaHeader(`GESTÃO DE MARKETING · ${(esc.nome||'—').toUpperCase()}`, '📣 Marketing & Reputação',
+      `<span class="pill pill-cargo">Reputação ${rep}/${repCap}</span><span class="pill pill-oab">Prestígio ${prestigio}/100</span>`)}
     <div class="card" style="font-size:.72rem;color:var(--txt3);margin-bottom:1rem;line-height:1.6">
       📌 Sem campanhas pagas/ROI de verdade no jogo — isso continua proposta. Reputação e Prestígio do escritório são reais
       (sobem com vitórias em processos, prestígio cai com derrotas).
@@ -1730,10 +1749,8 @@ function renderHabilidades(j, el) {
   const emEstDid = queue.some(q => q.skill === 'didatica_academica');
 
   el.innerHTML = `
-    <div class="secao-header">
-      <div class="secao-titulo">⚡ Habilidades</div>
-      <span class="secao-badge">Cap geral: ${cap} · Vaga: ${_vagaLabel(vaga)}</span>
-    </div>
+    ${_capaHeader('FICHA DE QUALIFICAÇÃO · ADVOCATUS ONLINE', '⚡ Habilidades',
+      `<span class="pill pill-cargo">Cap geral ${cap}</span><span class="pill pill-oab">Vaga: ${_vagaLabel(vaga)}</span>`)}
 
     <table class="skills-table">
       <thead>
@@ -1848,8 +1865,8 @@ function renderConcurso(j, el) {
 // ════════════════════════════════════════════════════════
 function renderInbox(j, el) {
   el.innerHTML = `
-    <div class="secao-header">
-      <div class="secao-titulo">📬 Mensagens</div>
+    ${_capaHeader('CAIXA DE ENTRADA · ADVOCATUS ONLINE', '📬 Mensagens', '')}
+    <div style="display:flex;justify-content:flex-end;margin-bottom:.6rem">
       <button class="btn btn-sm btn-ghost" onclick="marcarTodasLidas('${j.uid}')">Marcar todas como lidas</button>
     </div>
     <div id="inbox-lista"><div style="font-size:.78rem;color:var(--ardosia)">Carregando...</div></div>`;
