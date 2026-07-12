@@ -83,6 +83,7 @@ function _navLateralPadrao(painel) {
       <div class="nav-grupo-titulo">Vida</div>
       <div class="nav-item${ativo('patrimonio')}" onclick="navTo('patrimonio',this)"><span class="ni-icon">${icon('patrimonio')}</span> Patrimônio</div>
       <div class="nav-item${ativo('financeiro')}" onclick="navTo('financeiro',this)"><span class="ni-icon">${icon('financeiro')}</span> Finanças Avançadas</div>
+      <div class="nav-item${ativo('assembleia')}" onclick="navTo('assembleia',this)"><span class="ni-icon">${icon('assembleia')||'🏛️'}</span> Assembleia de Sócios</div>
       <div class="nav-item${ativo('loja')}" onclick="navTo('loja',this)"><span class="ni-icon">${icon('loja')}</span> Loja</div>
       <div class="nav-item${ativo('vida_pessoal')}" onclick="navTo('vida_pessoal',this)"><span class="ni-icon">${icon('vida_pessoal')}</span> Vida Pessoal</div>
     </div>
@@ -172,6 +173,7 @@ function _renderizar() {
       break;
     case 'foco':          renderFoco(j, main);          break;
     case 'redes':         renderRedes(j, main);         break;
+    case 'assembleia':    window.renderAssembleiaSocios(j, main); break;
     case 'progressao':   renderProgressao(j, main);    break;
     case 'habilidades':  renderHabilidades(j, main);   break;
     case 'cursos':       renderCursos(j, main);        break;

@@ -67,6 +67,8 @@ const {
   abrirVadeMecum, aplicarTeseVademecum,
   executarRodadaJulgamento, finalizarJulgamento,
 } = require('./investigacao');
+// Assembleia de Sócios — votação ponderada por participação
+const { abrirVotacao, votar, encerrarVotacao } = require('./assembleia_socios');
 
 exports.avancarMes              = avancarMes;
 exports.processarSentenca       = processarSentenca;
@@ -134,3 +136,7 @@ exports.abrirVadeMecum           = abrirVadeMecum;
 exports.aplicarTeseVademecum     = aplicarTeseVademecum;
 exports.executarRodadaJulgamento = executarRodadaJulgamento;
 exports.finalizarJulgamento      = finalizarJulgamento;
+// Assembleia de Sócios
+exports.abrirVotacao             = abrirVotacao;
+exports.votar                    = votar;
+exports.encerrarVotacao          = encerrarVotacao;

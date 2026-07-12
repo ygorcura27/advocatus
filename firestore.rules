@@ -393,6 +393,16 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
+      // Assembleia de sócios — votações ponderadas por participacao_pct.
+      // Escrita só via Cloud Functions (Admin SDK ignora estas regras) para
+      // garantir integridade da apuração; cliente só lê.
+      match /votacoes/{votId} {
+        allow read: if isAuth()
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+        allow write: if false;
+      }
+
       match /log_equipe/{logId} {
         allow read: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
