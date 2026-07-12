@@ -139,6 +139,10 @@ window.renderVidaPessoal = async function(j, el) {
   const filhosSnap = await getDocs(collection(db, 'jogadores', uid, 'filhos'));
   const filhos = filhosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
+  // Amigos de trabalho/amizades (js/amigos.js) — sistema independente do
+  // namoro, sem exclusividade/lock global, sem estágios.
+  const amigosHtml = window.renderAmigosSecao ? await window.renderAmigosSecao(uid) : '';
+
   const felicidade = j.felicidade !== undefined ? j.felicidade : 50;
   const corFel = felicidade >= 80 ? 'var(--verde2)' : felicidade >= 60 ? 'var(--navy3)' :
                  felicidade >= 40 ? 'var(--amber)' : 'var(--verm2)';
@@ -178,6 +182,9 @@ window.renderVidaPessoal = async function(j, el) {
         <span class="secao-badge">${filhos.length}</span>
       </div>
       ${filhos.map(f => _cardFilho(f)).join('')}` : ''}
+
+    <!-- Amigos -->
+    ${amigosHtml}
   `;
 };
 
