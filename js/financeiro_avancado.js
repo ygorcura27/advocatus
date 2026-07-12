@@ -30,29 +30,62 @@ const _FIRMAS_NPC = [
   { id: 'ribeiro_trabalhista', nome: 'Ribeiro Trabalhista', setor: 'Trabalhista', min_inv: 20000, pct_base: 0.007, vol: 0.10, desc: 'Demanda estável, retorno conservador e previsível.' },
 ];
 
-// ── Ações (B3) e Criptomoedas — 📌 PROPOSTA COMPLETA, sem backing real
-// nenhum (não existe no jogo real). Preço/variação são ilustrativos,
-// sorteados uma vez ao carregar o módulo (não vêm de API nenhuma).
-// Carteira é 100% client-side, não persiste no Firestore, some ao
-// recarregar a página — igual ao mockup (.impeccable/preview/dossie-v1.html).
+// ── Ações (B3) e Criptomoedas — 📌 PROPOSTA (compra/venda/carteira não
+// persistem, sem backing real no jogo). Preço/variação partem de um sorteio
+// mas são substituídos por dados reais de API gratuita quando disponível
+// (_invCarregarPrecosReais, abaixo) — cripto 100% real via CoinGecko,
+// ações 3 de 20 reais via brapi.dev (sandbox sem token só cobre PETR4/
+// VALE3/ITUB4/MGLU3; as outras 17 continuam ilustrativas até virar plano pago).
 const _INV_ACOES_TICKERS = ['PETR4','VALE3','ITUB4','BBDC4','ABEV3','WEGE3','BBAS3','RENT3','SUZB3','JBSS3','PRIO3','RADL3','RAIL3','VIVT3','ELET3','GGBR4','CSAN3','EQTL3','SBSP3','LREN3'];
 const _INV_ACOES_NOMES = { PETR4:'Petrobras', VALE3:'Vale', ITUB4:'Itaú Unibanco', BBDC4:'Bradesco', ABEV3:'Ambev', WEGE3:'WEG', BBAS3:'Banco do Brasil', RENT3:'Localiza', SUZB3:'Suzano', JBSS3:'JBS', PRIO3:'PRIO', RADL3:'Raia Drogasil', RAIL3:'Rumo', VIVT3:'Telefônica Brasil', ELET3:'Eletrobras', GGBR4:'Gerdau', CSAN3:'Cosan', EQTL3:'Equatorial', SBSP3:'Sabesp', LREN3:'Lojas Renner' };
-const _INV_ACOES = _INV_ACOES_TICKERS.map(t => ({ ticker:t, nome:_INV_ACOES_NOMES[t], preco:+(8+Math.random()*72).toFixed(2), variacao:+((Math.random()*10)-5).toFixed(2) }));
+const _INV_ACOES_BRAPI = ['PETR4','VALE3','ITUB4']; // únicos cobertos pelo sandbox grátis da brapi.dev
+const _INV_ACOES = _INV_ACOES_TICKERS.map(t => ({ ticker:t, nome:_INV_ACOES_NOMES[t], preco:+(8+Math.random()*72).toFixed(2), variacao:+((Math.random()*10)-5).toFixed(2), real:false }));
 const _INV_CRIPTOS_LISTA = [
-  { ticker:'BTC', nome:'Bitcoin',    preco: 340000+Math.random()*40000 },
-  { ticker:'ETH', nome:'Ethereum',   preco: 12000+Math.random()*3000 },
-  { ticker:'BNB', nome:'BNB',        preco: 2000+Math.random()*400 },
-  { ticker:'SOL', nome:'Solana',     preco: 600+Math.random()*150 },
-  { ticker:'XRP', nome:'XRP',        preco: 2.5+Math.random()*1.5 },
-  { ticker:'ADA', nome:'Cardano',    preco: 1.8+Math.random()*0.8 },
-  { ticker:'DOGE',nome:'Dogecoin',   preco: 0.6+Math.random()*0.4 },
-  { ticker:'DOT', nome:'Polkadot',   preco: 25+Math.random()*10 },
-  { ticker:'AVAX',nome:'Avalanche',  preco: 130+Math.random()*40 },
-  { ticker:'MATIC',nome:'Polygon',   preco: 3.5+Math.random()*1.5 },
+  { ticker:'BTC', nome:'Bitcoin',    coingeckoId:'bitcoin',                 preco: 340000+Math.random()*40000 },
+  { ticker:'ETH', nome:'Ethereum',   coingeckoId:'ethereum',                preco: 12000+Math.random()*3000 },
+  { ticker:'BNB', nome:'BNB',        coingeckoId:'binancecoin',             preco: 2000+Math.random()*400 },
+  { ticker:'SOL', nome:'Solana',     coingeckoId:'solana',                  preco: 600+Math.random()*150 },
+  { ticker:'XRP', nome:'XRP',        coingeckoId:'ripple',                  preco: 2.5+Math.random()*1.5 },
+  { ticker:'ADA', nome:'Cardano',    coingeckoId:'cardano',                 preco: 1.8+Math.random()*0.8 },
+  { ticker:'DOGE',nome:'Dogecoin',   coingeckoId:'dogecoin',                preco: 0.6+Math.random()*0.4 },
+  { ticker:'DOT', nome:'Polkadot',   coingeckoId:'polkadot',                preco: 25+Math.random()*10 },
+  { ticker:'AVAX',nome:'Avalanche',  coingeckoId:'avalanche-2',             preco: 130+Math.random()*40 },
+  { ticker:'MATIC',nome:'Polygon',   coingeckoId:'polygon-ecosystem-token', preco: 3.5+Math.random()*1.5 }, // MATIC migrou pra POL em 2024, id antigo 'matic-network' não retorna mais preço
 ];
-const _INV_CRIPTOS = _INV_CRIPTOS_LISTA.map(c => ({ ...c, preco:+c.preco.toFixed(2), variacao:+((Math.random()*14)-7).toFixed(2) }));
+const _INV_CRIPTOS = _INV_CRIPTOS_LISTA.map(c => ({ ...c, preco:+c.preco.toFixed(2), variacao:+((Math.random()*14)-7).toFixed(2), real:false }));
 let _invCarteira = { acoes: [], cripto: [] };
 let _invTabAtiva = 'visao';
+let _invPrecosReaisCarregados = false;
+
+// Preços reais via APIs públicas gratuitas, sem chave/token:
+// brapi.dev (Bovespa, sandbox sem token = só PETR4/VALE3/ITUB4/MGLU3) e
+// CoinGecko (cripto, endpoint público). Roda 1x por sessão (guard acima),
+// silencioso em erro/timeout — se a API cair, fica no valor ilustrativo.
+async function _invCarregarPrecosReais() {
+  if (_invPrecosReaisCarregados) return;
+  _invPrecosReaisCarregados = true;
+
+  try {
+    const r = await fetch(`https://brapi.dev/api/quote/${_INV_ACOES_BRAPI.join(',')}`);
+    const d = await r.json();
+    for (const res of (d.results || [])) {
+      const alvo = _INV_ACOES.find(a => a.ticker === res.symbol);
+      if (alvo) { alvo.preco = res.regularMarketPrice; alvo.variacao = +res.regularMarketChangePercent.toFixed(2); alvo.real = true; }
+    }
+  } catch (e) { /* silencioso — mantém preço ilustrativo */ }
+
+  try {
+    const ids = _INV_CRIPTOS.map(c => c.coingeckoId).join(',');
+    const r = await fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=brl&ids=${ids}`);
+    const d = await r.json();
+    for (const coin of d) {
+      const alvo = _INV_CRIPTOS.find(c => c.coingeckoId === coin.id);
+      if (alvo && coin.current_price != null) { alvo.preco = coin.current_price; alvo.variacao = +(coin.price_change_percentage_24h ?? 0).toFixed(2); alvo.real = true; }
+    }
+  } catch (e) { /* silencioso — mantém preço ilustrativo */ }
+
+  if (_invTabAtiva === 'acoes' || _invTabAtiva === 'cripto') window._invRenderTab(_invTabAtiva);
+}
 
 // ════════════════════════════════════════════════════════
 // RENDERIZAR PAINEL FINANCEIRO AVANÇADO
@@ -101,8 +134,9 @@ window.renderFinanceiroAvancado = async function(j, el) {
     ${window._capaHeader(`FINANCEIRO · ${(j.nome_personagem||'—').toUpperCase()}`, '📊 Investimentos', '')}
     <div class="card" style="font-size:.7rem;color:var(--txt3);margin-bottom:1rem;line-height:1.6">
       4 categorias reais (functions/financeiro.js, GDD Seção 32, rodam todo mês em avancar_mes.js): Renda Fixa, Fundos,
-      Imóvel para Renda, Firmas NPC. Ações (B3) e Criptomoedas são <b style="color:var(--ouro)">📌 proposta completa</b> —
-      não existem no jogo real, preços/variação são ilustrativos e a carteira não é salva.
+      Imóvel para Renda, Firmas NPC. Ações (B3) e Criptomoedas são <b style="color:var(--ouro)">📌 proposta</b> — não
+      existem no jogo real e a carteira não é salva, mas os preços já vêm de API pública grátis (CoinGecko pra cripto,
+      brapi.dev pra 3 das 20 ações) em vez de sorteio.
     </div>
 
     <div class="stat-row">
@@ -132,6 +166,7 @@ window.renderFinanceiroAvancado = async function(j, el) {
   `;
 
   window._invRenderTab(_invTabAtiva);
+  _invCarregarPrecosReais();
 };
 
 function _invTotais(inv) {
@@ -294,8 +329,10 @@ window._invRenderTab = function(tab) {
       const atual = lista.find(x=>x.ticker===h.ticker);
       return s + (atual ? atual.preco*h.qtd : 0);
     },0);
+    const qtdReais = lista.filter(a=>a.real).length;
     el.innerHTML = `
-      <div style="font-size:.7rem;color:var(--ouro);margin-bottom:.8rem">📌 Proposta completa — sem backing real nenhum. Preços/variação ilustrativos (sorteados uma vez ao carregar), carteira não é salva.</div>
+      <div style="font-size:.7rem;color:var(--ouro);margin-bottom:.8rem">📌 Compra/venda/carteira são proposta (não persistem, não existem no jogo real).
+        Preço: ${qtdReais===lista.length?`<b style="color:var(--verde2)">${qtdReais}/${lista.length} reais (CoinGecko, ao vivo)</b>`:qtdReais>0?`<b style="color:var(--verde2)">${qtdReais}/${lista.length} reais (brapi.dev, ao vivo)</b> — os outros ${lista.length-qtdReais} continuam ilustrativos`:'ilustrativo (carregando preços reais…)'}.</div>
       ${carteira.length>0?`
       <section class="painel" style="margin-bottom:1rem">
         <div class="painel-head"><span class="painel-titulo">Minha Carteira — ${_fmtR(carteiraValor)}</span></div>
@@ -312,7 +349,7 @@ window._invRenderTab = function(tab) {
         <div style="padding:.4rem 1.1rem 1rem">
           ${lista.map(a => `
           <div class="perf-row">
-            <span>${a.ticker} <em style="color:var(--txt4);font-style:normal">${a.nome}</em></span>
+            <span>${a.ticker} <em style="color:var(--txt4);font-style:normal">${a.nome}</em>${a.real?' <b style="color:var(--verde2);font-size:.6rem">● real</b>':''}</span>
             <span style="display:flex;align-items:center;gap:.6rem">
               <b>${_fmtR(a.preco)}</b>
               <b style="color:${a.variacao>=0?'var(--verde2)':'var(--verm2)'};min-width:52px;text-align:right">${a.variacao>=0?'+':''}${a.variacao}%</b>
