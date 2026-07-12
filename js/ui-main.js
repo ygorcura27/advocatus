@@ -7,8 +7,6 @@
 import { collection, query, where, orderBy, limit,
          getDocs, doc, updateDoc, addDoc }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-import { httpsCallable }
-  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
 import { db } from './firebase-init.js';
 import { icon } from './icons.js';
 import { renderAvatarJogador } from './avatar_svg.js';
@@ -749,37 +747,10 @@ async function renderBalancete(j, el) {
     </div>
 
     ${data.escId && data.caixa > 0 ? `
-    <div class="card blcte-card" style="margin-top:.7rem">
-      <div class="secao-titulo" style="font-size:.85rem;margin-bottom:.5rem">💰 Distribuir Lucros</div>
-      <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.6rem">
-        Caixa disponível: <b style="color:var(--txt)">${fmt(data.caixa)}</b> — divide na hora entre os sócios, proporcional à participação de cada um.
-      </div>
-      <div style="display:flex;gap:.5rem;align-items:center">
-        <div class="campo" style="margin-bottom:0;flex:1">
-          <input type="number" id="blcte-dist-valor" placeholder="Valor" max="${data.caixa}" value="${Math.min(data.caixa, Math.max(0, Math.round(data.lucroMes)))}">
-        </div>
-        <button class="btn btn-prim btn-sm" onclick="window._distribuirLucrosBalancete()">Distribuir</button>
-      </div>
-      <div id="blcte-dist-preview" style="margin-top:.5rem"></div>
-    </div>` : ''}`;
+    <button class="btn btn-prim btn-block" style="margin-top:.7rem" onclick="window.abrirModalDistribuirLucros('${data.escId}')">
+      💰 Distribuir Lucros (caixa: ${fmt(data.caixa)})
+    </button>` : ''}`;
 }
-
-window._distribuirLucrosBalancete = async function(){
-  const data = window._escBalanceteData;
-  const input = document.getElementById('blcte-dist-valor');
-  const valor = parseFloat(input?.value);
-  const preview = document.getElementById('blcte-dist-preview');
-  if (!valor || valor <= 0) { if (preview) preview.innerHTML = `<div style="font-size:.72rem;color:var(--verm2)">Valor deve ser positivo.</div>`; return; }
-  if (!data?.escId) return;
-  try {
-    const fn = httpsCallable(window.FB_FUNCTIONS, 'distribuirLucros');
-    const r  = await fn({ escritorio_id: data.escId, valor });
-    toast(`✅ ${r.data.msg}`, 'ok', 6000);
-    setTimeout(() => window.navTo?.('balancete', null), 500);
-  } catch (e) {
-    if (preview) preview.innerHTML = `<div style="font-size:.72rem;color:var(--verm2)">${e.message || 'Erro ao distribuir lucros.'}</div>`;
-  }
-};
 
 // ════════════════════════════════════════════════════════
 // ESPAÇO DE TRABALHO — seção no painel do escritório
@@ -1215,7 +1186,6 @@ async function _escKpis(esc, j) {
     rendaMes, honorariosMes, receitaRecorrente, custoFixo, salariosTotais, workspaceCm,
     workspaceLabel: wLabel, despMes, lucroMes, minhaCota,
     tier, funcionarios: listaFuncionarios, escId: esc?.id, caixa,
-    socios: esc ? socios : null,
   };
 
   const deltaIcon = v => v > 0 ? 'up' : v < 0 ? 'down' : 'flat';
