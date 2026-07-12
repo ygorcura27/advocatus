@@ -36,8 +36,8 @@ exports.confeccionarObra = onCall({ region: 'southamerica-east1' }, async (reque
   const db  = getFirestore();
   const { categoria, practice_area, titulo, tese_central } = request.data || {};
 
-  if (!['artigo', 'livro'].includes(categoria)) {
-    throw new HttpsError('invalid-argument', 'categoria deve ser "artigo" ou "livro".');
+  if (!['artigo', 'livro', 'dissertacao', 'tese'].includes(categoria)) {
+    throw new HttpsError('invalid-argument', 'categoria deve ser "artigo", "livro", "dissertacao" ou "tese".');
   }
   if (!practice_area) throw new HttpsError('invalid-argument', 'practice_area obrigatório.');
 
@@ -45,21 +45,35 @@ exports.confeccionarObra = onCall({ region: 'southamerica-east1' }, async (reque
   if (!snap.exists) throw new HttpsError('not-found', 'Jogador não encontrado.');
 
   const j = snap.data();
-
-  // Requisitos mínimos
   const grau = j.posgrad_concluido;
-  if (!grau) {
-    throw new HttpsError('failed-precondition', 'Você precisa ter pelo menos Mestrado para publicar obras acadêmicas.');
-  }
-  if (categoria === 'livro' && !['doutorado', 'catedral'].includes(grau)) {
-    throw new HttpsError('failed-precondition', 'Apenas Doutores e Catedráticos podem publicar livros.');
+
+  // Dissertação/tese são a peça que se submete PRA CONCLUIR o próprio grau
+  // (posgraduacao.js:submeterDissertacao) — não exigem grau anterior, exigem
+  // estar cursando o programa correspondente.
+  if (categoria === 'dissertacao') {
+    if (j.posgrad_status !== 'cursando' || j.posgrad_programa !== 'mestrado') {
+      throw new HttpsError('failed-precondition', 'Você precisa estar cursando o Mestrado para escrever a dissertação.');
+    }
+  } else if (categoria === 'tese') {
+    if (j.posgrad_status !== 'cursando' || j.posgrad_programa !== 'doutorado') {
+      throw new HttpsError('failed-precondition', 'Você precisa estar cursando o Doutorado para escrever a tese.');
+    }
+  } else {
+    if (!grau) {
+      throw new HttpsError('failed-precondition', 'Você precisa ter pelo menos Mestrado para publicar obras acadêmicas.');
+    }
+    if (categoria === 'livro' && !['doutorado', 'catedral'].includes(grau)) {
+      throw new HttpsError('failed-precondition', 'Apenas Doutores e Catedráticos podem publicar livros.');
+    }
   }
 
   const mesGlobal   = j.mes_global_pessoal || 0;
-  const duracao     = categoria === 'livro' ? 3 : 2;
+  const DURACAO = { livro: 3, artigo: 2, dissertacao: 6, tese: 10 };
+  const duracao     = DURACAO[categoria] || 2;
   const mesConclusao = mesGlobal + duracao;
 
-  const nomeAuto = titulo || `${categoria === 'livro' ? '📗 Livro' : '📄 Artigo'} — ${practice_area}`;
+  const LABEL = { livro: '📗 Livro', artigo: '📄 Artigo', dissertacao: '🎓 Dissertação', tese: '🎓 Tese' };
+  const nomeAuto = titulo || `${LABEL[categoria]} — ${practice_area}`;
 
   const novaObra = {
     jogador_uid:      uid,

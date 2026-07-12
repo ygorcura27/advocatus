@@ -76,7 +76,8 @@ function _navLateralPadrao(painel) {
       <div class="nav-grupo-titulo">Desenvolvimento</div>
       <div class="nav-item${ativo('peticoes')}" onclick="navTo('peticoes',this)"><span class="ni-icon">${icon('peticoes')}</span> Petições</div>
       <div class="nav-item${ativo('habilidades')}" onclick="navTo('habilidades',this)"><span class="ni-icon">${icon('habilidades')}</span> Habilidades</div>
-      <div class="nav-item${ativo('cursos')}" onclick="navTo('cursos',this)"><span class="ni-icon">${icon('cursos')}</span> Cursos & Pós</div>
+      <div class="nav-item${ativo('cursos')}" onclick="navTo('cursos',this)"><span class="ni-icon">${icon('cursos')}</span> Cursos</div>
+      <div class="nav-item${ativo('posgraduacao')}" onclick="navTo('posgraduacao',this)"><span class="ni-icon">${icon('posgraduacao')||'🎓'}</span> Pós-Graduação</div>
       <div class="nav-item${ativo('concurso')}" onclick="navTo('concurso',this)"><span class="ni-icon">${icon('concurso')}</span> Concurso Público</div>
     </div>
     <div class="nav-grupo">
@@ -176,6 +177,7 @@ function _renderizar() {
     case 'redes':         renderRedes(j, main);         break;
     case 'assembleia':    window.renderAssembleiaSocios(j, main); break;
     case 'marketing':     renderMarketing(j, main);     break;
+    case 'posgraduacao':  window.renderPosGraduacao(j, main); break;
     case 'progressao':   renderProgressao(j, main);    break;
     case 'habilidades':  renderHabilidades(j, main);   break;
     case 'cursos':       renderCursos(j, main);        break;
