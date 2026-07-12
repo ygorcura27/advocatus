@@ -825,6 +825,15 @@ function renderBeta(main) {
         <button class="btn btn-sec btn-block" onclick="acaoAdmin('julgadores_seed',{})">Rodar Seed</button>
       </div>
       <div class="ctrl-card">
+        <div class="ctrl-card-titulo">⚠️ Resetar Casos em Andamento</div>
+        <p style="font-size:.72rem;color:var(--ardosia2);margin-bottom:.6rem">
+          Apaga TODOS os processos "em_andamento" assumidos por este UID no pool do escritório
+          (mesmo conjunto que "⚙️ Seus casos em andamento" conta). Irreversível.
+        </p>
+        <div class="ctrl-campo"><label>UID</label><input type="text" id="reset-proc-uid" placeholder="UID do jogador"></div>
+        <button class="btn btn-danger btn-block" onclick="acaoAdmin('processos_resetar_jogador',{uid:$id('reset-proc-uid').value.trim()},'Apagar TODOS os processos em andamento deste UID? Não dá pra desfazer.')">Resetar Processos</button>
+      </div>
+      <div class="ctrl-card">
         <div class="ctrl-card-titulo">Simular próximo tick</div>
         <p style="font-size:.72rem;color:var(--ardosia2);margin-bottom:.6rem">
           Simula o que aconteceria no próximo tick para um jogador (sem salvar).
