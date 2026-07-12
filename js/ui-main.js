@@ -1611,6 +1611,8 @@ function renderFoco(j, el) {
     { k:'peticoes',  icone:'📄', label:'Escrever Petição',   tag:'real', tela:'peticoes' },
     { k:'cursos',    icone:'🎓', label:'Curso / Pós',         tag:'real', tela:'cursos' },
     { k:'concurso',  icone:'🏛️', label:'Concurso Público',    tag:'real, travado', tela:'concurso' },
+    { k:'redes',     icone:'📣', label:'Postar em Redes Sociais', tag:'real', tela:'redes' },
+    { k:'audiencia', icone:'🔨', label:'Preparar Audiência',  tag:'real (via Investigação)', tela:'investigacao' },
   ];
   const focoLockedHtml = focoAtual
     ? `<div class="card" style="margin-bottom:1rem;border-color:var(--navy3);background:rgba(22,214,168,.06)">
@@ -1633,9 +1635,7 @@ function renderFoco(j, el) {
   const propostaHtml = `
     <div class="esc-acao-btn" style="opacity:.5;cursor:not-allowed" title="Só aparece no recesso mensal, não é ação avulsa"><span class="esc-acao-icone">🍷</span><span>Networking<br><small style="opacity:.7">real (recesso)</small></span></div>
     <div class="esc-acao-btn" style="opacity:.5;cursor:not-allowed" title="Só aparece no recesso mensal, não é ação avulsa"><span class="esc-acao-icone">🛋️</span><span>Descansar<br><small style="opacity:.7">real (recesso)</small></span></div>
-    <div class="esc-acao-btn" style="opacity:.5;cursor:not-allowed" title="Não existe no jogo — proposta"><span class="esc-acao-icone">📣</span><span>Redes Sociais<br><small style="opacity:.7">📌 proposta</small></span></div>
-    <div class="esc-acao-btn" style="opacity:.5;cursor:not-allowed" title="Jogador não tem stat de produtividade — proposta"><span class="esc-acao-icone">💼</span><span>Trabalhar Intensamente<br><small style="opacity:.7">📌 proposta</small></span></div>
-    <div class="esc-acao-btn" style="opacity:.5;cursor:not-allowed" title="Não existe como ação isolada — proposta"><span class="esc-acao-icone">🔨</span><span>Preparar Audiência<br><small style="opacity:.7">📌 proposta</small></span></div>`;
+    <div class="esc-acao-btn" style="opacity:.5;cursor:not-allowed" title="Jogador não tem stat de produtividade — proposta"><span class="esc-acao-icone">💼</span><span>Trabalhar Intensamente<br><small style="opacity:.7">📌 proposta</small></span></div>`;
 
   el.innerHTML = `
     ${_capaHeader(`CARREIRA · ${(j.escritorio_nome||'ADVOCACIA SOLO').toUpperCase()}`, '🎯 Foco do Personagem', '')}

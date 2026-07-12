@@ -842,7 +842,6 @@ window.renderTreinamento = async function(j, el) {
 
   const ativas = funcs.filter(f => f.mentor_id);
   const mentores = funcs.filter(f => f.tipo === 'npc' && _CARGO_MENTOR_EQ.has(f.cargo_id) && !f.burnout_npc && !f.em_ferias && (f.aprendizes_ids||[]).length < 2);
-  const aprendizesElegiveis = funcs.filter(f => f.tipo === 'npc' && _CARGO_APRENDIZ_EQ.has(f.cargo_id) && !f.mentor_id && !f.burnout_npc && !f.em_ferias);
 
   const ativasHtml = ativas.length ? ativas.map(f => {
     const dur = f.meses_mentoria_restantes || 0;
@@ -862,17 +861,25 @@ window.renderTreinamento = async function(j, el) {
       <button class="btn btn-sm btn-prim" onclick="window.abrirModalMentoria('${f.id}','${escId}')">Iniciar mentoria</button>
     </div>`).join('') : `<div style="font-size:.75rem;color:var(--txt4)">Nenhum mentor disponível agora (precisa ser Pleno+, sem burnout/férias, com menos de 2 aprendizes).</div>`;
 
+  const estudando = funcs.filter(f => f.tipo === 'npc' && !f.mentor_id && !f.burnout_npc && !f.em_ferias);
+  const estudoHtml = estudando.length ? estudando.map(f => {
+    const skFoco = f.skill_em_estudo;
+    const lbl = skFoco ? (_SKILL_JUR_TODAS_LBL[skFoco] || _SKILL_FULL_LBL[skFoco] || skFoco) : 'Auto (skill mais fraca)';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem 0;border-bottom:1px solid var(--bg2)">
+      <span style="font-size:.78rem;color:var(--txt)">${f.nome} <span style="color:var(--txt4)">(${(CARGO_INFO[f.cargo_id]||{}).l||f.cargo_id})</span></span>
+      <span style="font-size:.72rem;color:var(--navy3)">${lbl}</span>
+      <button class="btn btn-sm btn-ghost" onclick="window.designarEstudo('${f.id}','${escId}')">Mudar</button>
+    </div>`;
+  }).join('') : `<div style="font-size:.75rem;color:var(--txt4)">Nenhum NPC elegível agora (precisa não estar em mentoria, burnout ou férias).</div>`;
+
   el.innerHTML = `
     <div style="margin-bottom:.8rem"><button class="btn btn-ghost btn-sm" onclick="window.navTo('escritorio',null)">← Escritório</button></div>
     ${window._capaHeader(`RECURSOS HUMANOS · ${(esc.nome||'—').toUpperCase()}`, 'Mentoria & Treinamento', '')}
-    <div class="card" style="font-size:.7rem;color:var(--txt3);margin-bottom:1rem">
-      📌 Não existe catálogo de cursos, instrutor ou certificação pra NPC — só mentoria 1-a-1 é real.
-    </div>
     <div class="stat-row">
       <div class="stat"><div class="stat-label">Mentorias ativas</div><div class="stat-value">${ativas.length}</div></div>
       <div class="stat"><div class="stat-label">Energia investida/mês</div><div class="stat-value">${ativas.length*30}⚡</div></div>
       <div class="stat"><div class="stat-label">Mentores disponíveis</div><div class="stat-value up">${mentores.length}</div></div>
-      <div class="stat"><div class="stat-label">Aprendizes elegíveis</div><div class="stat-value up">${aprendizesElegiveis.length}</div></div>
+      <div class="stat"><div class="stat-label">Estudando agora</div><div class="stat-value up">${estudando.length}</div></div>
     </div>
     <div class="esc-card-bloco" style="margin-bottom:1rem">
       <div class="secao-header" style="margin-bottom:.6rem"><div class="secao-titulo">Mentorias Ativas</div></div>
@@ -882,53 +889,16 @@ window.renderTreinamento = async function(j, el) {
       <div class="secao-header" style="margin-bottom:.6rem"><div class="secao-titulo">Iniciar Nova Mentoria</div></div>
       ${mentoresHtml}
     </div>
-    <div class="esc-card-bloco" style="border-color:var(--bronze-bg,var(--borda2))">
+    <div class="esc-card-bloco">
       <div class="secao-header" style="margin-bottom:.4rem">
-        <div class="secao-titulo">📌 Cursos Corporativos</div>
+        <div class="secao-titulo">📖 Estudo Autônomo</div>
       </div>
       <div style="font-size:.68rem;color:var(--txt4);line-height:1.6;margin-bottom:.6rem">
-        Proposta — não existe no jogo ainda, alternativa em grupo à mentoria 1-a-1. Cobre os mesmos blocos de skill real
-        (skills_jur do funcionário + habilidades gerais).
+        Todo NPC ativo estuda 1 skill por mês sozinho (-20⚡ NPC), cobrindo qualquer skill real — geral, jurídica,
+        tipo de documento ou área do direito. Escolha a prioridade de cada um ou deixe em automático (skill mais fraca).
       </div>
-      <div class="equipe-tabs" id="curso-tabs">
-        <div class="equipe-tab ativo" data-cursotab="todos" onclick="window._cursoTab(this,'todos')">Todos</div>
-        <div class="equipe-tab" data-cursotab="base" onclick="window._cursoTab(this,'base')">Skills Jurídicas</div>
-        <div class="equipe-tab" data-cursotab="doc" onclick="window._cursoTab(this,'doc')">Peças &amp; Documentos</div>
-        <div class="equipe-tab" data-cursotab="area" onclick="window._cursoTab(this,'area')">Áreas do Direito</div>
-        <div class="equipe-tab" data-cursotab="geral" onclick="window._cursoTab(this,'geral')">Habilidades Gerais</div>
-      </div>
-      <div id="curso-grid" class="peca-grid"></div>
+      ${estudoHtml}
     </div>`;
-
-  window._cursoTab(document.querySelector('#curso-tabs [data-cursotab="todos"]'), 'todos');
-};
-
-const _CURSO_CATS = {
-  base:  { l: 'Skills Jurídicas',       map: _SKILL_JUR_BASE_LBL },
-  doc:   { l: 'Peças & Documentos',     map: _DOC_JUR_LBL },
-  area:  { l: 'Áreas do Direito',       map: _AREA_JUR_LBL },
-  geral: { l: 'Habilidades Gerais',     map: _SKILL_FULL_LBL },
-};
-
-window._cursoTab = function(btn, tab) {
-  if (btn) btn.parentElement.querySelectorAll('.equipe-tab').forEach(t => t.classList.toggle('ativo', t === btn));
-  const grid = document.getElementById('curso-grid');
-  if (!grid) return;
-  const cats = tab === 'todos' ? Object.keys(_CURSO_CATS) : [tab];
-  const cards = [];
-  for (const catKey of cats) {
-    const cat = _CURSO_CATS[catKey];
-    for (const [k, l] of Object.entries(cat.map)) {
-      cards.push(`
-        <div class="peca-card">
-          <div class="peca-topo"><div class="peca-kicker">${cat.l}</div></div>
-          <div class="peca-titulo">${l}</div>
-          <div style="font-size:.68rem;color:var(--txt4);margin:.4rem 0">1-18 meses · +1 skill/mês</div>
-          <button class="btn btn-sm btn-ghost" style="width:100%" onclick="window.toast&&window.toast('📌 Proposta — não afeta o jogo real ainda.','neutro')">Contratar</button>
-        </div>`);
-    }
-  }
-  grid.innerHTML = cards.join('');
 };
 
 // ════════════════════════════════════════════════════════
