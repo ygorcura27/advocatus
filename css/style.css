@@ -191,19 +191,6 @@ a:hover { color: var(--txt); }
 .logo em { font-style: italic; color: var(--ouro); }
 
 .topbar-spacer { flex: 1; }
-.nav-top { display: flex; gap: .15rem; flex: 1; }
-.nav-top a {
-  font-size: .7rem;
-  padding: .3rem .7rem;
-  color: rgba(255,255,255,.65);
-  border-radius: var(--r);
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  transition: all .15s;
-  white-space: nowrap;
-}
-.nav-top a:hover  { color: #fff; background: rgba(255,255,255,.1); }
-.nav-top a.ativo  { color: var(--ouro); background: rgba(217,181,115,.15); }
 
 .server-clock {
   display: flex;
@@ -938,7 +925,6 @@ a:hover { color: var(--txt); }
 @media (max-width: 900px) {
   .layout { grid-template-columns: var(--sidebar-l) 1fr; }
   .sidebar-right { display: none; }
-  .nav-top { display: none; }
 }
 
 /* Mobile */
@@ -978,7 +964,6 @@ a:hover { color: var(--txt); }
 
   .main-content { padding: .85rem .75rem; }
   .sidebar-right { display: none; }
-  .nav-top { display: none; }
 
   /* Topbar mobile */
   .topbar {
