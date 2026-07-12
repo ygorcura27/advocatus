@@ -121,7 +121,10 @@ window.renderPeticoes = async function(j, el) {
               <span style="font-size:.72rem;color:var(--ouro2);font-weight:600">⏳ Finaliza no mês ${p.mes_conclusao}</span>
             </div>`).join('')
           : ''}
-        <button class="btn btn-prim btn-sm" style="margin-top:.8rem" onclick="window.abrirModalCompor()">+ Confeccionar Nova Petição</button>
+        <div style="display:flex;gap:.5rem;margin-top:.8rem;flex-wrap:wrap">
+          <button class="btn btn-prim btn-sm" onclick="window.abrirModalCompor()">+ Confeccionar Nova Petição</button>
+          <button class="btn btn-ghost btn-sm" onclick="window._abrirModalParecerista()">👔 Contratar Parecerista (pronta na hora)</button>
+        </div>
       </div>
 
       <div class="secao-header">
@@ -565,9 +568,15 @@ function _modalComporHTML() {
         </select>
 
         <label style="font-size:.78rem;color:var(--ardosia2)">Ramo do Direito <span style="color:var(--ardosia3)">— trava</span></label>
-        <select id="compor-area" class="input-select" style="margin-bottom:.8rem;width:100%">
+        <select id="compor-area" class="input-select" style="margin-bottom:.8rem;width:100%" onchange="window._atualizarTesesCompor()">
           ${Object.entries(AREA_LABELS).map(([k,v]) => `<option value="${k}">${v}</option>`).join('')}
         </select>
+
+        <label style="font-size:.78rem;color:var(--ardosia2)">Tese Central <span style="color:var(--ardosia3)">— opcional, trava</span></label>
+        <select id="compor-tese" class="input-select" style="margin-bottom:.3rem;width:100%">
+          <option value="">— nenhuma —</option>
+        </select>
+        <div style="font-size:.65rem;color:var(--ardosia3);margin-bottom:.8rem">Tese original (não usada por outro jogador nos últimos 2 meses) dá +10% na nota teto; repetida dá −15%.</div>
 
         <label style="font-size:.78rem;color:var(--ardosia2)">Estilo de Escrita <span style="color:var(--ardosia3)">— trava</span></label>
         <select id="compor-estilo" class="input-select" style="margin-bottom:.3rem;width:100%" onchange="window._atualizarDescEstilo()">
@@ -594,7 +603,20 @@ window.abrirModalCompor = function() {
     m.style.display = 'flex';
     window._atualizarDescEstilo();
     window._atualizarNomeAuto();
+    window._atualizarTesesCompor();
   }
+};
+
+window._atualizarTesesCompor = async function() {
+  const area = document.getElementById('compor-area')?.value;
+  const sel  = document.getElementById('compor-tese');
+  if (!area || !sel) return;
+  try {
+    const fn = httpsCallable(functions, 'listarTeses');
+    const r  = await fn({ practice_area: area });
+    sel.innerHTML = `<option value="">— nenhuma —</option>` +
+      (r.data.teses || []).map(t => `<option value="${t.replace(/"/g,'&quot;')}">${t}</option>`).join('');
+  } catch (e) { /* segue sem lista de teses */ }
 };
 
 window._atualizarDescEstilo = function() {
@@ -620,16 +642,51 @@ window._atualizarNomeAuto = function() {
   }
 };
 
+const _PARECERISTA_TIERS = {
+  1: { label: 'Iniciante', custo: 2000, nota_teto: 8 },
+  2: { label: 'Especialista', custo: 5000, nota_teto: 14 },
+  3: { label: 'Renomado', custo: 12000, nota_teto: 20 },
+  4: { label: 'Luminária', custo: 30000, nota_teto: 26 },
+};
+
+window._abrirModalParecerista = function() {
+  window.abrirModal('👔 Contratar Parecerista',
+    `<div style="font-size:.72rem;color:var(--txt3);margin-bottom:.8rem">Parecer pronto na hora, sem esperar mês de composição. Não pode ser vendido nem emprestado.</div>
+    <div class="campo"><label>Área</label>
+      <select id="par-area">${Object.entries(AREA_LABELS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select>
+    </div>
+    <div class="campo"><label>Tier</label>
+      <select id="par-tier">${Object.entries(_PARECERISTA_TIERS).map(([k,c])=>`<option value="${k}">${c.label} — nota ${c.nota_teto}/26 — R$ ${c.custo.toLocaleString('pt-BR')}</option>`).join('')}</select>
+    </div>
+    <div style="display:flex;gap:.5rem;margin-top:.6rem">
+      <button class="btn btn-ghost" style="flex:1" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-prim" style="flex:1" onclick="window._confirmarParecerista()">Contratar →</button>
+    </div>`);
+};
+
+window._confirmarParecerista = async function() {
+  const practice_area = document.getElementById('par-area')?.value;
+  const tier = document.getElementById('par-tier')?.value;
+  try {
+    const fn = httpsCallable(functions, 'contratarParecerista');
+    const r = await fn({ tier, practice_area });
+    window.fecharModal();
+    toast(`✅ Parecer contratado — nota ${r.data.nota_teto}/26.`, 'ok', 3000);
+    if (window.JOGADOR) window.renderPeticoes(window.JOGADOR, document.getElementById('main-content'));
+  } catch (e) { toast(e.message || 'Erro ao contratar.', 'ko'); }
+};
+
 window.confirmarCompor = async function() {
   const tipo   = document.getElementById('compor-tipo')?.value;
   const area   = document.getElementById('compor-area')?.value;
   const estilo = document.getElementById('compor-estilo')?.value;
   const titulo = document.getElementById('compor-nome')?.value?.trim() || '';
+  const tese_central = document.getElementById('compor-tese')?.value || null;
   if (!tipo || !area) return;
 
   try {
     const fn  = httpsCallable(functions, 'componerPeticao');
-    const res = await fn({ document_type: tipo, practice_area: area, estilo_escrita: estilo, titulo });
+    const res = await fn({ document_type: tipo, practice_area: area, estilo_escrita: estilo, titulo, tese_central });
     const d   = res.data;
     document.getElementById('modal-compor').style.display = 'none';
     toast(`📝 Confecção iniciada — petição pronta no mês ${d.mes_conclusao}. A nota teto será calculada com suas skills daquele momento.`, 'ok', 6000);
