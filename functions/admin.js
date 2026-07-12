@@ -616,6 +616,20 @@ exports.adminAction = onCall({ region: 'southamerica-east1' }, async (request) =
       };
     }
 
+    // ════════════════════════════════════════════════════
+    // JULGADORES (§30 — Alumni Network, GDD addendum)
+    // ════════════════════════════════════════════════════
+
+    case 'julgadores_seed': {
+      const { seedJulgadores } = require('./julgadores_seed');
+      const resumo = await seedJulgadores(db);
+      return {
+        ok: true,
+        msg: `Seed de julgadores: ${resumo.criados} criado(s), ${resumo.jaExistentes} já existente(s) de ${resumo.total} total.`,
+        resumo,
+      };
+    }
+
     default:
       throw new HttpsError('invalid-argument', `Ação desconhecida: ${acao}`);
   }

@@ -2,10 +2,12 @@
  * SISTEMAS SOCIAIS — Advocatus Online (GDD v5.1 §25-30)
  * functions/sistemas_sociais.js tinha 6 callables reais, zero UI.
  * Construída aqui: Moot Court, Intercâmbio, Podcast, Seguro Malpractice,
- * Pro Bono. Alumni Network (registrarAlumni) fica de fora — depende de
- * j.faculdade, campo que não existe em NENHUM jogador (só filhos NPC
- * têm faculdade), e de uma tela de busca de julgadores que não existe.
- * Botão fake não ajuda ninguém; melhor documentar o gap que fingir.
+ * Pro Bono, Alumni Network. Alumni precisou de 2 peças novas de backend
+ * antes de dar pra construir a UI (functions/julgadores_seed.js — persiste
+ * os mesmos 57 julgadores fictícios já usados no recursal colegiado,
+ * js/processos.js:JULGADORES_TJ/STJ/STF — e listarJulgadores, que também
+ * atribui faculdade ao jogador na primeira visita, já que não existe
+ * passo de escolha de faculdade na criação de personagem).
  */
 
 import { httpsCallable }
@@ -105,12 +107,68 @@ window.renderSistemasSociais = function(j, el) {
       : `<div style="font-size:.65rem;color:var(--txt4)">Requer OAB.</div>`}
   </div>`;
 
+  // ── Alumni Network — carregada à parte (async), preenche #ss-alumni-area ──
+  const alumniHtml = `<div class="card" id="ss-alumni-card" style="margin-bottom:.7rem">
+    <div style="font-weight:700;font-size:.82rem;color:var(--txt)">🎓 Alumni Network</div>
+    <div id="ss-alumni-area" style="font-size:.7rem;color:var(--txt4);margin-top:.4rem">Carregando julgadores…</div>
+  </div>`;
+
   el.innerHTML = `
     ${window._capaHeader('VIDA SOCIAL & CARREIRA · ADVOCATUS ONLINE', '🌐 Sistemas Sociais', '')}
-    <div class="card" style="font-size:.7rem;color:var(--txt3);margin-bottom:1rem">
-      📌 Alumni Network não está aqui — depende de campos que não existem no jogo ainda (faculdade do jogador, busca de julgadores).
-    </div>
-    ${mootHtml}${intercambioHtml}${podcastHtml}${malpracticeHtml}${probonoHtml}`;
+    ${mootHtml}${intercambioHtml}${podcastHtml}${malpracticeHtml}${probonoHtml}${alumniHtml}`;
+
+  window._ssCarregarAlumni();
+};
+
+let _ssAlumniSoMinha = false;
+window._ssCarregarAlumni = async function() {
+  const areaEl = document.getElementById('ss-alumni-area');
+  if (!areaEl) return;
+  try {
+    const fn = httpsCallable(window.FB_FUNCTIONS, 'listarJulgadores');
+    const r  = await fn({});
+    const { faculdade, julgadores, seed_pendente } = r.data;
+    if (seed_pendente) {
+      areaEl.innerHTML = `<div style="color:var(--txt4)">Roster de julgadores ainda não foi gerado neste servidor (admin precisa rodar o seed).</div>`;
+      return;
+    }
+    const lista = _ssAlumniSoMinha ? julgadores.filter(jl => jl.mesma_faculdade) : julgadores;
+    areaEl.innerHTML = `
+      <div style="margin-bottom:.5rem">Sua faculdade: <b style="color:var(--txt)">${faculdade}</b> — registrar como colega de curso de um julgador dá <b>+2 Networking</b> (uma vez por julgador).</div>
+      <label style="display:flex;align-items:center;gap:.4rem;margin-bottom:.5rem;cursor:pointer">
+        <input type="checkbox" ${_ssAlumniSoMinha?'checked':''} onchange="window._ssAlumniToggleFiltro(this.checked)"> só da minha faculdade
+      </label>
+      <div style="max-height:280px;overflow-y:auto">
+        ${lista.map(jl => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:.3rem 0;border-bottom:1px solid var(--bg2)">
+            <div>
+              <div style="font-size:.75rem;color:var(--txt)">${jl.nome} <span style="color:var(--txt4);font-size:.62rem">· ${jl.instancia}</span></div>
+              <div style="font-size:.62rem;color:${jl.mesma_faculdade?'var(--verde2)':'var(--txt4)'}">${jl.faculdade}</div>
+            </div>
+            ${jl.ja_alumni
+              ? `<span style="font-size:.65rem;color:var(--verde2)">✅ colega</span>`
+              : jl.mesma_faculdade
+                ? `<button class="btn btn-ghost btn-sm" onclick="window._ssRegistrarAlumni('${jl.id}')">Registrar</button>`
+                : `<button class="btn btn-ghost btn-sm" disabled title="Faculdade diferente">Registrar</button>`}
+          </div>`).join('')}
+      </div>`;
+  } catch (e) {
+    areaEl.innerHTML = `<div style="color:var(--verm2)">Erro ao carregar: ${e.message||e}</div>`;
+  }
+};
+
+window._ssAlumniToggleFiltro = function(checked) {
+  _ssAlumniSoMinha = checked;
+  window._ssCarregarAlumni();
+};
+
+window._ssRegistrarAlumni = async function(julgadorId) {
+  try {
+    const fn = httpsCallable(window.FB_FUNCTIONS, 'registrarAlumni');
+    const r  = await fn({ julgador_id: julgadorId });
+    window.toast(r.data.ja_registrado ? 'Já era colega.' : `✅ Colega de curso registrado! +${r.data.bonus_networking||2} Networking.`, 'ok', 3000);
+    window._ssCarregarAlumni();
+  } catch (e) { window.toast(e.message || 'Erro.', 'ko'); }
 };
 
 window._ssMoot = async function() {

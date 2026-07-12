@@ -48,6 +48,7 @@ const {
   contratarSeguroMalpractice,
   abrirCasoProBono,
   registrarAlumni,
+  listarJulgadores,
 } = require('./sistemas_sociais');
 // GDD v5.1 — Artigos e Livros §31-34
 const {
@@ -117,6 +118,7 @@ exports.gravarPodcast            = gravarPodcast;
 exports.contratarSeguroMalpractice = contratarSeguroMalpractice;
 exports.abrirCasoProBono         = abrirCasoProBono;
 exports.registrarAlumni          = registrarAlumni;
+exports.listarJulgadores         = listarJulgadores;
 exports.confeccionarObra         = confeccionarObra;
 exports.publicarLivro            = publicarLivro;
 exports.citarObra                = citarObra;

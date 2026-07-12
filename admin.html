@@ -817,6 +817,14 @@ function renderBeta(main) {
         <button class="btn btn-sec btn-block" onclick="acaoAdmin('beta_dar_starter_pack',{uid:$id('beta-uid').value.trim()})">Conceder Starter Pack</button>
       </div>
       <div class="ctrl-card">
+        <div class="ctrl-card-titulo">Seed de Julgadores (Alumni Network)</div>
+        <p style="font-size:.72rem;color:var(--ardosia2);margin-bottom:.6rem">
+          Persiste os 57 julgadores fictícios (TJ/STJ/STF, mesmos nomes do recursal) com faculdade —
+          idempotente, roda 1x. Necessário antes da tela de Alumni Network funcionar.
+        </p>
+        <button class="btn btn-sec btn-block" onclick="acaoAdmin('julgadores_seed',{})">Rodar Seed</button>
+      </div>
+      <div class="ctrl-card">
         <div class="ctrl-card-titulo">Simular próximo tick</div>
         <p style="font-size:.72rem;color:var(--ardosia2);margin-bottom:.6rem">
           Simula o que aconteceria no próximo tick para um jogador (sem salvar).

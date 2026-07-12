@@ -293,6 +293,53 @@ exports.abrirCasoProBono = onCall({ region: 'southamerica-east1' }, async (reque
 // §30 — ALUMNI NETWORK
 // ════════════════════════════════════════════════════════
 
+// Jogador nunca escolhe faculdade na criação de personagem (não existe esse
+// passo) — atribuída uma vez, na primeira vez que toca em Alumni Network,
+// por sorteio fixo entre as mesmas 10 faculdades usadas no seed de
+// julgadores (functions/julgadores_seed.js), e persistida pra sempre.
+async function _garantirFaculdadeJogador(db, jogRef, j) {
+  if (j.faculdade) return j.faculdade;
+  const { FACULDADES_DIREITO } = require('./julgadores_seed');
+  const faculdade = FACULDADES_DIREITO[Math.floor(Math.random() * FACULDADES_DIREITO.length)];
+  await jogRef.update({ faculdade });
+  return faculdade;
+}
+
+// Lista o roster de julgadores (seed de functions/julgadores_seed.js) pra
+// tela de Alumni Network. Atribui faculdade ao jogador na primeira chamada,
+// se ainda não tiver.
+exports.listarJulgadores = onCall({ region: 'southamerica-east1' }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
+  const uid = request.auth.uid;
+  const db  = getFirestore();
+
+  const jogRef  = db.collection('jogadores').doc(uid);
+  const jogSnap = await jogRef.get();
+  if (!jogSnap.exists) throw new HttpsError('not-found', 'Jogador não encontrado.');
+  const j = jogSnap.data();
+
+  const faculdade = await _garantirFaculdadeJogador(db, jogRef, j);
+
+  const julgSnap = await db.collection('julgadores').get();
+  if (julgSnap.empty) {
+    return { ok: true, faculdade, julgadores: [], seed_pendente: true };
+  }
+
+  const julgadores = julgSnap.docs.map(d => {
+    const jl = d.data();
+    return {
+      id: d.id,
+      nome: jl.nome,
+      instancia: jl.instancia,
+      faculdade: jl.faculdade,
+      mesma_faculdade: jl.faculdade === faculdade,
+      ja_alumni: (jl.colegas_curso || []).includes(uid),
+    };
+  });
+
+  return { ok: true, faculdade, julgadores };
+});
+
 exports.registrarAlumni = onCall({ region: 'southamerica-east1' }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
 
@@ -302,8 +349,9 @@ exports.registrarAlumni = onCall({ region: 'southamerica-east1' }, async (reques
 
   if (!julgador_id) throw new HttpsError('invalid-argument', 'julgador_id obrigatório.');
 
+  const jogRef = db.collection('jogadores').doc(uid);
   const [jogSnap, julgSnap] = await Promise.all([
-    db.collection('jogadores').doc(uid).get(),
+    jogRef.get(),
     db.collection('julgadores').doc(julgador_id).get(),
   ]);
   if (!jogSnap.exists) throw new HttpsError('not-found', 'Jogador não encontrado.');
@@ -312,11 +360,13 @@ exports.registrarAlumni = onCall({ region: 'southamerica-east1' }, async (reques
   const j    = jogSnap.data();
   const julg = julgSnap.data();
 
-  // Verifica que o jogador tem a mesma faculdade que o julgador
-  const facJogador  = j.faculdade || null;
+  // Verifica que o jogador tem a mesma faculdade que o julgador (atribui
+  // faculdade ao jogador agora, se essa for a primeira vez que ele mexe
+  // com Alumni Network sem ter passado por listarJulgadores antes).
+  const facJogador  = await _garantirFaculdadeJogador(db, jogRef, j);
   const facJulgador = julg.faculdade || null;
-  if (!facJogador || facJogador !== facJulgador) {
-    throw new HttpsError('failed-precondition', 'O julgador e você precisam ter cursado a mesma faculdade.');
+  if (facJogador !== facJulgador) {
+    throw new HttpsError('failed-precondition', `Vocês precisam ter cursado a mesma faculdade (você: ${facJogador}, julgador: ${facJulgador}).`);
   }
 
   // Adiciona o jogador ao colegas_curso do julgador (sem duplicar)
@@ -330,7 +380,7 @@ exports.registrarAlumni = onCall({ region: 'southamerica-east1' }, async (reques
   });
 
   // Bônus de Networking para o jogador
-  await db.collection('jogadores').doc(uid).update({
+  await jogRef.update({
     networking: FieldValue.increment(2),
     alumni_registrados: FieldValue.increment(1),
   });
