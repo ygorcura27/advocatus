@@ -874,6 +874,7 @@ async function _verificarPrazosRecursaisPoolCF(db, escId, uid, updates, novoMes,
       prazo_expirado: true,
     }));
     proms.push(db.collection('escritorios').doc(escId).update({
+      total_casos: require('firebase-admin/firestore').FieldValue.increment(1),
       casos_perdidos: require('firebase-admin/firestore').FieldValue.increment(1),
     }));
 

@@ -300,9 +300,10 @@ if (escritorioDoCaso) {
     const escritorioDoCasoContagem = p.pool_escritorio_id || j.escritorio_proprio_id;
     if (escritorioDoCasoContagem) {
       try {
-        await db.collection('escritorios').doc(escritorioDoCasoContagem).update(
-          jogadorGanhouEsteJulgamento ? { casos_ganhos: FieldValue.increment(1) } : { casos_perdidos: FieldValue.increment(1) }
-        );
+        await db.collection('escritorios').doc(escritorioDoCasoContagem).update({
+          total_casos: FieldValue.increment(1),
+          ...(jogadorGanhouEsteJulgamento ? { casos_ganhos: FieldValue.increment(1) } : { casos_perdidos: FieldValue.increment(1) }),
+        });
       } catch (e) { logger.warn('Contagem casos_ganhos/perdidos (acórdão):', e.message); }
     }
     await _atualizarSatisfacaoClienteAcordao(db, p, jogadorGanhouEsteJulgamento ? 'procedente' : 'improcedente');
@@ -337,6 +338,7 @@ if (escritorioDoCaso) {
             caixa: (escSnap.data().caixa||0) + honAcordao,
             faturamento_mes_atual: (escSnap.data().faturamento_mes_atual||0) + honAcordao,
             faturamento_honorarios_mes: (escSnap.data().faturamento_honorarios_mes||0) + honAcordao,
+            faturamento_total: FieldValue.increment(honAcordao),
           });
           resposta.honNoCaixa = true;
         }
@@ -389,7 +391,10 @@ exports.decidirProximaInstancia = onCall({ region: 'southamerica-east1' }, async
     const escritorioDoCasoContagem = p.pool_escritorio_id || j.escritorio_proprio_id;
     if (escritorioDoCasoContagem) {
       try {
-        await db.collection('escritorios').doc(escritorioDoCasoContagem).update({ casos_perdidos: FieldValue.increment(1) });
+        await db.collection('escritorios').doc(escritorioDoCasoContagem).update({
+          total_casos: FieldValue.increment(1),
+          casos_perdidos: FieldValue.increment(1),
+        });
       } catch (e) { logger.warn('Contagem casos_perdidos (decidir instância):', e.message); }
     }
     if (p.pool_proc_subcol_id && p.pool_proc_esc_id) {

@@ -308,9 +308,11 @@ async function _finalizarProcessoDefinitivo(db, processoRef, jogadorRef, p, j, s
   });
   if (escritorioDoCaso) {
     try {
-      await db.collection('escritorios').doc(escritorioDoCaso).update(
-        favoravelAoJogador ? { casos_ganhos: FieldValue.increment(1) } : { casos_perdidos: FieldValue.increment(1) }
-      );
+      await db.collection('escritorios').doc(escritorioDoCaso).update({
+        total_casos: FieldValue.increment(1),
+        faturamento_total: FieldValue.increment(favoravelAoJogador ? honPotencial : 0),
+        ...(favoravelAoJogador ? { casos_ganhos: FieldValue.increment(1) } : { casos_perdidos: FieldValue.increment(1) }),
+      });
     } catch (e) { logger.warn('Contagem casos_ganhos/perdidos (sentença):', e.message); }
   }
   if (escritorioDoCaso && !favoravelAoJogador) {
@@ -683,9 +685,11 @@ exports.decidirRecursoSentenca = onCall({ region: 'southamerica-east1' }, async 
       });
       if (escritorioDoCaso) {
         try {
-          await db.collection('escritorios').doc(escritorioDoCaso).update(
-            ganhou ? { casos_ganhos: FieldValue.increment(1) } : { casos_perdidos: FieldValue.increment(1) }
-          );
+          await db.collection('escritorios').doc(escritorioDoCaso).update({
+            total_casos: FieldValue.increment(1),
+            faturamento_total: FieldValue.increment(ganhou ? hon : 0),
+            ...(ganhou ? { casos_ganhos: FieldValue.increment(1) } : { casos_perdidos: FieldValue.increment(1) }),
+          });
         } catch (e) { logger.warn('Contagem casos_ganhos/perdidos (recurso):', e.message); }
       }
       if (p.pool_proc_subcol_id && p.pool_proc_esc_id) {
