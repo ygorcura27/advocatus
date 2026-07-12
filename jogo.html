@@ -115,12 +115,9 @@
       <div class="pa-pct" id="pa-pct">0% concluído</div>
     </div>
 
-    <!-- Botão Avançar Mês (injetado por avancar_mes.js) -->
-    <div class="energia-bloco" id="bloco-energia">
-      <button id="btn-avancar" class="btn btn-prim btn-block" onclick="window.avancarMes()">
-        ▶ Avançar mês
-      </button>
-    </div>
+    <!-- Botão Avançar Mês vive só no topbar (btn-avancar-topo) — igual mockup,
+         uma ação primária só, não duplicada aqui na sidebar. -->
+    <div class="energia-bloco" id="bloco-energia" style="display:none"></div>
 
     <!-- Evento global -->
     <div class="evento-bloco" id="sr-evento" style="display:none">
