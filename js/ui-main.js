@@ -67,6 +67,7 @@ function _navLateralPadrao(painel) {
     <div class="nav-grupo">
       <div class="nav-grupo-titulo">Carreira</div>
       <div class="nav-item${ativo('perfil')}" onclick="navTo('perfil',this)"><span class="ni-icon">${icon('perfil')}</span> Meu Perfil</div>
+      <div class="nav-item${ativo('foco')}" onclick="navTo('foco',this)"><span class="ni-icon">${icon('oportunidades')}</span> Foco</div>
       <div class="nav-item${ativo('escritorio')}" onclick="navTo('escritorio',this)"><span class="ni-icon">${icon('escritorio')}</span> Escritório</div>
       <div class="nav-item${ativo('investigacao')}" onclick="navTo('investigacao',this)"><span class="ni-icon">${icon('investigacao')}</span> Investigação</div>
       <div class="nav-item${ativo('progressao')}" onclick="navTo('progressao',this)"><span class="ni-icon">${icon('progressao')}</span> Progressão</div>
@@ -168,6 +169,7 @@ function _renderizar() {
       if (window.renderInvestigacao) window.renderInvestigacao(j, main);
       else main.innerHTML = '<div class="card" style="color:var(--txt3)">Carregando investigação...</div>';
       break;
+    case 'foco':          renderFoco(j, main);          break;
     case 'progressao':   renderProgressao(j, main);    break;
     case 'habilidades':  renderHabilidades(j, main);   break;
     case 'cursos':       renderCursos(j, main);        break;
@@ -1372,6 +1374,80 @@ function renderEquipe(j, el) {
           <button class="btn btn-sm btn-danger" onclick="window.dispensarEstagiario && window.dispensarEstagiario(${i})">Dispensar</button>
         </div>
       </div>`).join('')}`;
+}
+
+// ════════════════════════════════════════════════════════
+// FOCO DO PERSONAGEM — reúne ações reais espalhadas (study_queue,
+// Petições, Cursos, Concurso, recesso mensal) num só painel. Não é um
+// mecanismo novo — é uma vitrine pras 30 skills reais + os atalhos que
+// já existem em telas separadas. Cards marcados 📌 são propostos, sem
+// mecânica real por trás (ver notas em cada um).
+// ════════════════════════════════════════════════════════
+const _FOCO_BASE_SKILLS = [
+  { k:'legal_drafting', l:'Redação Jurídica' }, { k:'legal_research', l:'Pesquisa Jurídica' },
+  { k:'argumentation', l:'Argumentação' }, { k:'oral_advocacy', l:'Sustentação Oral' },
+  { k:'negotiation', l:'Negociação' }, { k:'procedure', l:'Litigância' }, { k:'gestao', l:'Gestão' },
+];
+const _FOCO_DOC_SKILLS = [
+  { k:'doc_initial_filing', l:'Petição Inicial' }, { k:'doc_responsive_pleading', l:'Contestação' },
+  { k:'doc_motion', l:'Requerimento' }, { k:'doc_appellate_brief', l:'Razões de Apelação' },
+  { k:'doc_supreme_brief', l:'Razões de Rec. Especial' }, { k:'doc_trial_brief', l:'Memoriais' },
+  { k:'doc_evidence', l:'Prova Documental' }, { k:'doc_deposition', l:'Depoimento' },
+];
+const _FOCO_AREA_SKILLS = [
+  { k:'area_employment', l:'Trabalhista' }, { k:'area_tax', l:'Tributário' }, { k:'area_civil', l:'Cível' },
+  { k:'area_criminal', l:'Criminal' }, { k:'area_corporate', l:'Empresarial' },
+  { k:'area_immigration', l:'Imigração' }, { k:'area_bankruptcy', l:'Rec. Judicial' },
+];
+function renderFoco(j, el) {
+  const queue = j.study_queue || [];
+  const skJur = j.skills_jur || {};
+  const skGer = j.skills || {};
+  const geraisDef = _getSkills();
+
+  const gruposHtml = [
+    ['⚖️ Skills Jurídicas', _FOCO_BASE_SKILLS, skJur, 'skJur'],
+    ['📄 Peças & Documentos', _FOCO_DOC_SKILLS, skJur, 'skJur'],
+    ['🏛️ Áreas do Direito', _FOCO_AREA_SKILLS, skJur, 'skJur'],
+    ['🎯 Habilidades Gerais', geraisDef.map(g=>({k:g.k,l:g.l})), skGer, 'skGer'],
+  ].map(([titulo, lista, valores, fonte]) => `
+    <details style="margin-bottom:.5rem">
+      <summary style="font-size:.76rem;font-weight:600;color:var(--txt);cursor:pointer;padding:.3rem 0">${titulo}</summary>
+      ${lista.map(sk => {
+        const emEst = queue.some(q => q.skill === sk.k);
+        const val = valores[sk.k] || 0;
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:.25rem 0;font-size:.75rem">
+          <span style="color:var(--txt3)">${sk.l} <span style="color:var(--txt4)">(${val})</span></span>
+          ${emEst
+            ? `<span style="color:var(--amber);font-size:.68rem">⏳ em estudo</span>`
+            : `<button class="sk-btn" onclick="window.${fonte==='skJur'?'estudarSkillJur':'estudarSkill'}('${sk.k}','${sk.l}')">📖 +3 (R$500)</button>`}
+        </div>`;
+      }).join('')}
+    </details>`).join('');
+
+  el.innerHTML = `
+    <div class="secao-header"><div class="secao-titulo">🎯 Foco do Personagem</div></div>
+    <div class="card" style="font-size:.74rem;color:var(--txt3);margin-bottom:1rem;line-height:1.6">
+      Reúne ações reais que já existem em telas separadas — não é mecânica nova. "Estudar habilidade" é o
+      <code>study_queue</code> real (R$500, +3 fixo, resultado em 1 mês). O resto são atalhos ou está marcado 📌 quando não existe de verdade.
+    </div>
+
+    <div class="card" style="margin-bottom:1rem">
+      <div style="font-size:.78rem;font-weight:600;margin-bottom:.4rem;color:var(--txt)">📖 Estudar Habilidade <span style="font-size:.65rem;color:var(--verde2);font-weight:400">real</span></div>
+      ${queue.length ? `<div style="font-size:.72rem;color:var(--txt3);margin-bottom:.5rem">Fila atual: ${queue.map(q=>q.skill_label||q.skill).join(', ')}</div>` : ''}
+      ${gruposHtml}
+    </div>
+
+    <div class="esc-acoes-grid">
+      <button class="esc-acao-btn" onclick="window.navTo('peticoes',null)"><span class="esc-acao-icone">📄</span><span>Escrever Petição<br><small style="opacity:.7">real</small></span></button>
+      <button class="esc-acao-btn" onclick="window.navTo('cursos',null)"><span class="esc-acao-icone">🎓</span><span>Curso / Pós<br><small style="opacity:.7">real</small></span></button>
+      <button class="esc-acao-btn" onclick="window.navTo('concurso',null)"><span class="esc-acao-icone">🏛️</span><span>Concurso Público<br><small style="opacity:.7">real, travado</small></span></button>
+      <button class="esc-acao-btn" disabled title="Só aparece no recesso mensal, não é ação avulsa"><span class="esc-acao-icone">🍷</span><span>Networking<br><small style="opacity:.7">real (recesso)</small></span></button>
+      <button class="esc-acao-btn" disabled title="Só aparece no recesso mensal, não é ação avulsa"><span class="esc-acao-icone">🛋️</span><span>Descansar<br><small style="opacity:.7">real (recesso)</small></span></button>
+      <button class="esc-acao-btn" disabled title="Não existe no jogo — proposta"><span class="esc-acao-icone">📣</span><span>Redes Sociais<br><small style="opacity:.7">📌 proposta</small></span></button>
+      <button class="esc-acao-btn" disabled title="Jogador não tem stat de produtividade — proposta"><span class="esc-acao-icone">💼</span><span>Trabalhar Intensamente<br><small style="opacity:.7">📌 proposta</small></span></button>
+      <button class="esc-acao-btn" disabled title="Não existe como ação isolada — proposta"><span class="esc-acao-icone">🔨</span><span>Preparar Audiência<br><small style="opacity:.7">📌 proposta</small></span></button>
+    </div>`;
 }
 
 // ════════════════════════════════════════════════════════
