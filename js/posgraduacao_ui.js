@@ -71,7 +71,7 @@ window.renderPosGraduacao = async function(j, el) {
     } catch (e) { pecasHtml = `<div class="card" style="color:var(--txt4)">Erro ao carregar peças.</div>`; }
 
     el.innerHTML = `
-      <div class="secao-header"><div class="secao-titulo">🎓 Pós-Graduação — ${cfg.label}</div></div>
+      ${window._capaHeader('CURSOS & PÓS-GRADUAÇÃO · ADVOCATUS ONLINE', `🎓 ${cfg.label}`, `<span class="pill pill-oab">${freq}/12 meses</span>`)}
       <div class="card" style="margin-bottom:1rem">
         <div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--txt3);margin-bottom:.3rem">
           <span>Frequência</span><span>${freq}/12 meses</span>
@@ -95,7 +95,7 @@ window.renderPosGraduacao = async function(j, el) {
     const proximoPrograma = j.posgrad_concluido === 'mestrado' ? 'doutorado' : (j.posgrad_concluido === 'doutorado' ? 'catedral' : null);
 
     el.innerHTML = `
-      <div class="secao-header"><div class="secao-titulo">🎓 Pós-Graduação</div></div>
+      ${window._capaHeader('CURSOS & PÓS-GRADUAÇÃO · ADVOCATUS ONLINE', '🎓 Pós-Graduação', `<span class="pill pill-oab">${grauCfg.label} concluído</span>`)}
       <div class="card" style="margin-bottom:1rem;text-align:center">
         <div style="font-size:1.4rem;font-weight:700;color:var(--navy3)">${grauCfg.label} concluído</div>
         <div style="font-size:.72rem;color:var(--txt3);margin-top:.3rem">Nota final: ${j.posgrad_nota_final || '—'}/26 · Didática Acadêmica: ${j.didatica_academica || 0}</div>
@@ -112,7 +112,7 @@ window.renderPosGraduacao = async function(j, el) {
 
   // ── NÃO MATRICULADO ─────────────────────────────────────────────────
   el.innerHTML = `
-    <div class="secao-header"><div class="secao-titulo">🎓 Pós-Graduação</div></div>
+    ${window._capaHeader('CURSOS & PÓS-GRADUAÇÃO · ADVOCATUS ONLINE', '🎓 Pós-Graduação', '')}
     <div class="card" style="font-size:.72rem;color:var(--txt3);margin-bottom:1rem;line-height:1.6">
       Árvore real: Mestrado/LLM → Doutorado/JSD → Cátedra. Cada etapa exige skills, cargo e (às vezes) o grau anterior.
     </div>

@@ -106,7 +106,7 @@ window.renderSistemasSociais = function(j, el) {
   </div>`;
 
   el.innerHTML = `
-    <div class="secao-header"><div class="secao-titulo">🌐 Sistemas Sociais</div></div>
+    ${window._capaHeader('VIDA SOCIAL & CARREIRA · ADVOCATUS ONLINE', '🌐 Sistemas Sociais', '')}
     <div class="card" style="font-size:.7rem;color:var(--txt3);margin-bottom:1rem">
       📌 Alumni Network não está aqui — depende de campos que não existem no jogo ainda (faculdade do jogador, busca de julgadores).
     </div>

@@ -50,7 +50,7 @@ window.renderArtigosLivros = async function(j, el) {
   }).join('') : `<div class="card" style="color:var(--txt4);text-align:center">Nenhuma obra ainda.</div>`;
 
   el.innerHTML = `
-    <div class="secao-header"><div class="secao-titulo">📚 Artigos & Livros</div></div>
+    ${window._capaHeader('PRODUÇÃO ACADÊMICA · ADVOCATUS ONLINE', '📚 Artigos & Livros', `<span class="pill pill-oab">${obras.length} obra${obras.length===1?'':'s'}</span>`)}
     <div class="card" style="font-size:.72rem;color:var(--txt3);margin-bottom:1rem;line-height:1.6">
       Artigos exigem Mestrado+; livros exigem Doutorado/Cátedra. Citações de outros jogadores rendem
       Prestígio Acadêmico e Didática; livros publicados no mercado rendem royalties mensais por cópia vendida.

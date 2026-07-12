@@ -47,7 +47,7 @@ window.renderImprensa = async function(j, el) {
   }).join('') : `<div class="card" style="color:var(--txt4);text-align:center">Nenhuma notícia publicada ainda. A imprensa cobre vitórias em instância superior, petições muito famosas e reputação alta.</div>`;
 
   el.innerHTML = `
-    <div class="secao-header"><div class="secao-titulo">📰 Imprensa Jurídica</div></div>
+    ${window._capaHeader('IMPRENSA JURÍDICA · ADVOCATUS ONLINE', '📰 Imprensa Jurídica', `<span class="pill pill-oab">${noticias.length} matéria${noticias.length===1?'':'s'}</span>`)}
     <div class="card" style="font-size:.7rem;color:var(--txt3);margin-bottom:1rem">
       Gerada automaticamente: vitórias em 2ª instância+, petições com fama ≥ 80, ou reputação ≥ 80. Sem ação do jogador.
     </div>
