@@ -591,24 +591,28 @@ a:hover { color: var(--txt); }
 /* ═══════════════════════════════════════════════════════════
    ÁREA CENTRAL — COMPONENTES
    ═══════════════════════════════════════════════════════════ */
+/* .secao-header vira uma tira "painel-head" sempre — moldurada por
+   padrão (fundo+borda+cantos arredondados nos 4 lados), igual o
+   mockup faz em .painel-head. Quando o próximo elemento é um .card
+   (padrão mais comum, ~40% das ocorrências reais), a regra :has()
+   abaixo funde as duas peças numa moldura contínua sem costura;
+   quando não é (tabela, grid, div solta com conteúdo assíncrono
+   heterogêneo — texto de carregamento, parágrafo simples etc.), o
+   header ainda assim fica com aparência de painel por conta própria,
+   só sem se colar ao que vem depois. Cobre 100% das ocorrências reais
+   de .secao-header no jogo, não só o padrão .card. */
 .secao-header {
   display: flex; align-items: center; gap: .7rem;
-  margin-bottom: 1rem; padding-bottom: .6rem;
-  border-bottom: var(--borda2);
+  margin-bottom: 1rem; padding: .8rem 1.1rem;
+  background: var(--surface); border: var(--borda); border-radius: 3px;
+  box-shadow: var(--sombra);
 }
 .secao-titulo { font-family: var(--font-serif); font-size: 1rem; color: var(--txt); font-weight: 700; }
 
-/* Funde .secao-header + o .card que vem logo depois numa moldura só,
-   igual .painel/.painel-head do mockup — sem reescrever a marcação de
-   cada tela (o par solto .secao-header + .card é o padrão mais comum,
-   ~40% das ocorrências reais). Telas com .secao-header seguido de
-   algo diferente (tabela, grid, div solta) continuam com o visual
-   separado até serem portadas manualmente pra .painel de verdade. */
 .secao-header:has(+ .card) {
-  background: var(--surface); border: var(--borda);
   border-bottom: var(--borda2);
   border-radius: 3px 3px 0 0;
-  margin-bottom: 0; padding: .9rem 1.1rem .7rem;
+  margin-bottom: 0; box-shadow: none;
 }
 .secao-header:has(+ .card) + .card {
   border-top: none; border-radius: 0 0 3px 3px;
@@ -1967,6 +1971,7 @@ a:hover { color: var(--txt); }
 }
 .esc-card-bloco .secao-header {
   margin: 0 0 .8rem; padding: 0 0 .6rem;
+  background: none; border: none; border-radius: 0; box-shadow: none;
   border-bottom: 1px solid var(--borda);
 }
 .esc-card-bloco .secao-titulo { font-size: .8rem; font-weight: 700; color: var(--txt); text-transform: uppercase; letter-spacing: .04em; }
