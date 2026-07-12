@@ -1683,17 +1683,34 @@ window._focoSelecionar = async function(key) {
 // visual do mockup dossiê, não implementado aqui de propósito (não dá
 // pra fingir um feed que não existe).
 // ════════════════════════════════════════════════════════
+// Seguidores por plataforma: NÃO é um contador armazenado (evita virar um
+// segundo "sistema de seguidores" fake e desalinhado) — é derivado ao vivo
+// dos 2 campos reais que já governam autoridade de mídia (skills_jur.
+// comunicacao_midiatica e podcast_views_acumul), com split fixo por
+// plataforma. Determinístico: dois jogadores com os mesmos 2 campos reais
+// sempre veem o mesmo número, nada sorteado.
+const _REDES_PLATAFORMAS = [
+  { k:'instagram', l:'Instagram', icone:'📸', peso:0.35 },
+  { k:'youtube',   l:'YouTube',   icone:'▶️', peso:0.30 },
+  { k:'linkedin',  l:'LinkedIn',  icone:'💼', peso:0.20 },
+  { k:'x',         l:'X',         icone:'✖️', peso:0.15 },
+];
+function _redesSeguidoresTotal(com, viewsAcumul) {
+  return Math.round(viewsAcumul / 8) + com * 15;
+}
+
 function renderRedes(j, el) {
   const com = (j.skills_jur || {}).comunicacao_midiatica || 0;
   const viewsMes = j.podcast_views_mes || 0;
   const viewsAcumul = j.podcast_views_acumul || 0;
   const autoridade = Math.min(100, Math.round(com * 2));
+  const seguidoresTotal = _redesSeguidoresTotal(com, viewsAcumul);
 
   el.innerHTML = `
     ${_capaHeader(`MARCA PESSOAL · ${(j.nome_personagem||'—').toUpperCase()}`, '📱 Redes Sociais', '')}
     <div class="card" style="font-size:.72rem;color:var(--txt3);margin-bottom:1rem;line-height:1.6">
-      📌 Sem seguidores por plataforma ou DMs — isso continua fora do jogo real.
-      O feed abaixo é real e persistido (Firestore); Comunicação Midiática/views vêm do sistema de mídia/podcast.
+      Seguidores por plataforma são derivados ao vivo de Comunicação Midiática + views acumulados (não é um contador
+      fake separado). DMs usam a Caixa de Entrada real do jogo. O feed abaixo é real e persistido (Firestore).
     </div>
     <div class="card" style="display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap;text-align:center;justify-content:center">
       <div>
@@ -1713,9 +1730,27 @@ function renderRedes(j, el) {
         <div style="font-size:.62rem;color:var(--txt3);text-transform:uppercase;letter-spacing:.08em">Views acumulados</div>
       </div>
     </div>
-    <button class="btn btn-ghost btn-block" style="margin-top:.7rem" onclick="window.navTo('midia_convites',null)">
-      🎙️ Ver Convites de Mídia e Podcasts →
-    </button>
+    <div class="card" style="margin-top:.7rem">
+      <div class="secao-header" style="margin-bottom:.4rem">
+        <div class="secao-titulo">Seguidores — ${seguidoresTotal.toLocaleString('pt-BR')} total</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.8rem">
+        ${_REDES_PLATAFORMAS.map(p => `
+          <div style="text-align:center">
+            <div style="font-size:1.1rem">${p.icone}</div>
+            <div style="font-size:1rem;font-weight:700;color:var(--txt)">${Math.round(seguidoresTotal*p.peso).toLocaleString('pt-BR')}</div>
+            <div style="font-size:.62rem;color:var(--txt4)">${p.l}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div style="display:flex;gap:.6rem;margin-top:.7rem;flex-wrap:wrap">
+      <button class="btn btn-ghost" style="flex:1;min-width:180px" onclick="window.navTo('midia_convites',null)">
+        🎙️ Ver Convites de Mídia e Podcasts →
+      </button>
+      <button class="btn btn-ghost" style="flex:1;min-width:180px" onclick="window.navTo('inbox',null)">
+        💬 Ver DMs (Caixa de Entrada) →
+      </button>
+    </div>
     <div id="redes-feed-area" style="margin-top:1rem"></div>`;
 
   if (window.renderFeedPosts) window.renderFeedPosts(document.getElementById('redes-feed-area'));
@@ -1867,8 +1902,9 @@ window._mktRenderTab = async function(tab, escCached) {
 
   if (tab === 'redes') {
     el.innerHTML = `
-      <div class="card" style="font-size:.7rem;color:var(--txt4);margin-bottom:.7rem">
-        📌 Mecânica proposta — o jogo só rastreia comunicação_midiatica e views de podcast por jogador, sem perfis de rede social dedicados.
+      <div class="card" style="font-size:.7rem;color:var(--txt3);margin-bottom:.7rem">
+        Perfil de marca pessoal do jogador — Comunicação Midiática, Autoridade, seguidores por plataforma (derivados,
+        não é sistema separado) e DMs reais via Caixa de Entrada.
       </div>
       <button class="btn btn-prim btn-block" onclick="window.navTo('redes',null)">📱 Ver Redes Sociais →</button>`;
     return;
