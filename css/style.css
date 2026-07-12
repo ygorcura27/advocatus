@@ -386,18 +386,19 @@ a:hover { color: var(--txt); }
 .nav-lateral { padding: .6rem .5rem .5rem; }
 .nav-grupo { margin-bottom: .4rem; }
 .nav-grupo-titulo {
+  font-family: var(--font-mono);
   font-size: .58rem; color: var(--txt4);
   text-transform: uppercase; letter-spacing: .12em;
   padding: .4rem .6rem .2rem;
 }
 .nav-item {
   display: flex; align-items: center; gap: .5rem;
-  padding: .42rem .65rem; border-radius: var(--r);
-  cursor: pointer; transition: all .15s;
-  font-size: .78rem; color: var(--txt2);
+  padding: .42rem .65rem; border-radius: 2px;
+  cursor: pointer; transition: background .15s, color .15s;
+  font-size: .78rem; color: var(--txt3);
 }
-.nav-item:hover { background: var(--navy-light); color: var(--txt); }
-.nav-item.ativo { background: var(--navy); color: #fff; }
+.nav-item:hover { background: var(--surface2); color: var(--txt); }
+.nav-item.ativo { background: var(--navy3); color: #fff; font-weight: 500; }
 .nav-item .ni-icon { font-size: .9rem; flex-shrink: 0; display: inline-flex; color: var(--txt2); }
 .nav-item.ativo .ni-icon { color: #fff; }
 .nav-item .ni-icon svg { width: 16px; height: 16px; }
@@ -822,13 +823,68 @@ a:hover { color: var(--txt); }
 @keyframes fadeOut { to { opacity: 0; transform: translateX(10px); } }
 
 /* ═══════════════════════════════════════════════════════════
+   CAPA DO PROCESSO — file-cover header (Perfil), igual ao mockup
+   .impeccable/preview/dossie-v1.html
+   ═══════════════════════════════════════════════════════════ */
+.capa {
+  position: relative;
+  background: linear-gradient(155deg, var(--surface) 0%, var(--surface2) 100%);
+  border: var(--borda2); border-radius: 3px;
+  padding: 1.6rem 1.8rem; box-shadow: var(--sombra);
+  overflow: hidden; margin-bottom: 1.2rem;
+}
+.capa::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(180deg, transparent 0 27px, rgba(232,237,244,.025) 27px 28px);
+}
+.capa-kicker {
+  font-family: var(--font-mono); font-size: .66rem; letter-spacing: .04em;
+  color: var(--txt4); margin-bottom: .9rem; position: relative;
+}
+.capa-body { display: flex; align-items: flex-end; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; position: relative; }
+.capa-nome { font-family: var(--font-serif); font-size: 1.9rem; font-weight: 600; letter-spacing: -.01em; color: var(--txt); text-wrap: balance; margin: 0; }
+.capa-meta { display: flex; align-items: center; gap: .6rem; margin-top: .5rem; flex-wrap: wrap; }
+.pill { display: inline-flex; align-items: center; gap: .35rem; font-size: .72rem; font-weight: 600; padding: .28rem .65rem; border-radius: 2px; letter-spacing: .02em; }
+.pill-cargo { background: rgba(217,181,115,.12); color: var(--ouro); border: 1px solid rgba(176,138,78,.35); }
+.pill-oab { font-family: var(--font-mono); background: transparent; color: var(--txt3); border: var(--borda2); font-weight: 400; }
+
+.selo-stamp {
+  position: absolute; top: 1.1rem; right: 1.6rem;
+  width: 82px; height: 82px; border-radius: 50%;
+  border: 1.5px solid var(--navy3);
+  display: flex; align-items: center; justify-content: center;
+  transform: rotate(-11deg); opacity: .9;
+}
+.selo-stamp::before { content: ""; position: absolute; inset: 5px; border-radius: 50%; border: 1px solid var(--navy3); opacity: .55; }
+.selo-stamp-text {
+  font-family: var(--font-mono); font-size: .5rem; font-weight: 600; letter-spacing: .05em;
+  color: var(--navy4); text-align: center; line-height: 1.5; text-transform: uppercase;
+}
+
+/* Stat row — grade dividida (Perfil) */
+.stat-row {
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 1px;
+  background: var(--borda2); border: var(--borda2); border-radius: 3px;
+  overflow: hidden; margin-bottom: 1.2rem;
+}
+.stat-row .stat { background: var(--surface); padding: .8rem .9rem; }
+.stat-row .stat-label { font-size: .62rem; color: var(--txt3); text-transform: uppercase; letter-spacing: .04em; margin-bottom: .3rem; }
+.stat-row .stat-value { font-family: var(--font-mono); font-size: 1.05rem; font-weight: 600; color: var(--txt); }
+.stat-row .stat-value small { font-size: .6rem; font-weight: 400; color: var(--txt4); }
+.stat-row .stat-value.up { color: var(--verde2); }
+.stat-row .stat-bar { height: 4px; background: var(--bg2); border-radius: 2px; overflow: hidden; margin-top: .45rem; }
+.stat-row .stat-bar-fill { height: 100%; border-radius: 2px; }
+@media (max-width: 720px) { .stat-row { grid-template-columns: repeat(3, 1fr); } .stat-row .stat:nth-child(n+4) { border-top: 1px solid var(--borda2); } }
+@media (max-width: 460px) { .stat-row { grid-template-columns: repeat(2, 1fr); } }
+
+/* ═══════════════════════════════════════════════════════════
    PROFILE HERO
    ═══════════════════════════════════════════════════════════ */
 .profile-hero {
   border: var(--borda); border-radius: var(--r2);
   padding: 1.2rem; background: var(--surface);
   margin-bottom: 1.2rem; display: grid;
-  grid-template-columns: 72px 1fr minmax(170px, 25%) auto; gap: 1rem;
+  grid-template-columns: 72px 1fr; gap: 1rem;
   align-items: start; box-shadow: var(--sombra);
 }
 .profile-photo {

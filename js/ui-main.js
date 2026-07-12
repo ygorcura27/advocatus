@@ -241,40 +241,73 @@ function renderPerfil(j, el) {
 
   el.innerHTML = `
       <div class="perfil-container">
+        <section class="capa">
+          <div class="capa-kicker">CAPA DO PROCESSO · ADVOCATUS ONLINE</div>
+          <div class="capa-body">
+            <div>
+              <h1 class="capa-nome">${j.nome_personagem || '—'}</h1>
+              <div class="capa-meta">
+                <span class="pill pill-cargo">${label}</span>
+                ${j.oab ? `<span class="pill pill-oab">OAB ✓</span>` : ''}
+                <span class="pill" style="background:var(--bg2);color:var(--txt3);border:var(--borda-sub)">${esp} · ${j.escritorio_bairro || 'Rio de Janeiro'}</span>
+                ${j.no_serasa ? '<span class="pill" style="background:rgba(122,32,32,.25);color:var(--verm3);border:1px solid rgba(200,80,80,.35)">🚨 Serasa</span>' : ''}
+              </div>
+            </div>
+          </div>
+          ${j.oab ? `<div class="selo-stamp"><div class="selo-stamp-text">Registro<br>Ativo<br>OAB</div></div>` : ''}
+        </section>
+
         <div class="profile-hero">
           ${fotoHtml}
           <div>
-            <div class="profile-hero-nome">${j.nome_personagem || '—'}</div>
-            <div class="profile-hero-titulo">${label} · ${esp} · ${j.escritorio_bairro || 'Rio de Janeiro'}</div>
             <div class="profile-hero-desc">${j.descricao_personagem || `${label} atuando em ${esp}, ${escNome}.`}
               <span style="cursor:pointer;color:var(--navy3);font-size:.68rem;margin-left:.4rem" onclick="window._perfilEditarDescricao()">✏️ editar</span>
             </div>
             <div class="profile-hero-meta">
               <span class="meta-tag">📅 ${j.anos_carreira || 0} anos de carreira</span>
-              <span class="meta-tag">⚖️ ${total} casos no total</span>
               <span class="meta-tag">✅ ${aprov}% de aproveitamento</span>
               <span class="meta-tag">🏢 ${escNome}</span>
               <span class="meta-tag">👤 ${j.idade || 22} anos · Geração ${j.geracao || 1}</span>
             </div>
           </div>
-          <div class="barra-status-bloco profile-hero-status">
-            ${_barraStatus('⚡', energiaDisp, { label: 'Energia' }, true)}
-            ${_barraStatus('img/simbolos/saude_mental.png', j.saude_mental||80, { label: 'Saúde Mental' })}
-            ${_barraStatus('img/simbolos/disposicao.png', j.disposicao||80, { label: 'Disposição' })}
-            ${_barraStatus('img/simbolos/reputacao.png', repPct, { semVermelho: true, label: 'Reputação' })}
-            <div class="barra-status-saldo"><img class="barra-status-icone-saldo" src="img/simbolos/dinheiro.png" alt=""> ${_fmtExt(j.dinheiro||0)}</div>
+        </div>
+
+        <div class="stat-row">
+          <div class="stat">
+            <div class="stat-label">Reputação</div>
+            <div class="stat-value">${j.reputacao||0} <small>/ ${cap} cap.</small></div>
+            <div class="stat-bar"><div class="stat-bar-fill" style="width:${repPct}%;background:var(--ouro)"></div></div>
           </div>
-          <div class="hero-badges">
-            <span class="badge-pill badge-cargo">${label}</span>
-            <span class="badge-pill badge-esp">${esp}</span>
-            ${j.oab ? '<span class="badge-pill badge-oab">OAB ✓</span>' : ''}
-            ${j.no_serasa ? '<span class="badge-pill" style="background:rgba(122,32,32,.25);color:var(--verm3);border:1px solid rgba(200,80,80,.35)">🚨 Serasa</span>' : ''}
+          <div class="stat">
+            <div class="stat-label">Meu saldo</div>
+            <div class="stat-value up">${_fmtExt(j.dinheiro||0)}</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Energia do mês</div>
+            <div class="stat-value">${energiaDisp} <small>/ 100</small></div>
+            <div class="stat-bar"><div class="stat-bar-fill" style="width:${energiaDisp}%;background:var(--amber)"></div></div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">😌 Saúde Mental</div>
+            <div class="stat-value" style="color:var(--verde2)">${j.saude_mental||80} <small>/ 100</small></div>
+            <div class="stat-bar"><div class="stat-bar-fill" style="width:${j.saude_mental||80}%;background:var(--verde2)"></div></div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">🔋 Disposição</div>
+            <div class="stat-value" style="color:var(--amber)">${j.disposicao||80} <small>/ 100</small></div>
+            <div class="stat-bar"><div class="stat-bar-fill" style="width:${j.disposicao||80}%;background:var(--amber)"></div></div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Casos no total</div>
+            <div class="stat-value">${total} <small>${aprov}% aprov.</small></div>
           </div>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:1.2rem">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:.5rem;margin-bottom:1.2rem">
           ${_miniStatCard('📈','Renda/mês', _fmtExt(j.renda_calculada||0),'money')}
           ${_miniStatCard('💸','Despesas', _fmtExt(j.despesas_calculadas||0),'danger')}
+          ${_miniStatCard('🌐','Networking', j.networking||10, '')}
+          ${_miniStatCard('🎓','Prestígio Acad.', j.prestigio_academico||0, '')}
         </div>
 
         <!-- Energia do mês — detalhamento de custos -->
@@ -283,15 +316,6 @@ function renderPerfil(j, el) {
           <div style="font-size:.62rem;color:var(--txt4)">
             Pesquisa -5⚡ · Petição -10⚡ · Diligência -15⚡ · Audiência -20⚡
           </div>
-        </div>
-
-        <!-- Atributos -->
-        <div class="secao-header" id="perfil-atributos-secao">
-          <div class="secao-titulo">📊 Atributos</div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-bottom:1.2rem">
-          ${_attrRow('🌐','Networking', j.networking||10, 'verde')}
-          ${_attrRow('🎓','Prestígio Acadêmico', j.prestigio_academico||0, 'roxo')}
         </div>
 
         <!-- Feed de atividade recente -->
@@ -1257,7 +1281,7 @@ async function _escKpis(esc, j) {
     </div>
     <div class="esc-kpi-card">
       <div class="esc-kpi-label">Caixa disponível</div>
-      <div class="esc-kpi-valor" style="color:${caixa>=0?'var(--navy)':'var(--verm2)'}">${_fmtExt(caixa)}</div>
+      <div class="esc-kpi-valor" style="color:${caixa>=0?'var(--txt)':'var(--verm2)'}">${_fmtExt(caixa)}</div>
       <div class="esc-kpi-delta flat">sua cota: ${minhaCota}%</div>
     </div>
   </div>`;
@@ -2035,7 +2059,7 @@ function _barraStatus(icon, valor, opts = {}, ehEmoji = false) {
 }
 
 function _miniStatCard(icon, label, val, tipo) {
-  const cor = tipo==='money'?'var(--verde2)':tipo==='gold'?'var(--ouro2)':tipo==='danger'?'var(--verm2)':'var(--navy)';
+  const cor = tipo==='money'?'var(--verde2)':tipo==='gold'?'var(--ouro2)':tipo==='danger'?'var(--verm2)':'var(--txt)';
   return `<div class="stat-mini">
     <div class="v" style="color:${cor}">${val}</div>
     <div class="l">${icon} ${label}</div>
