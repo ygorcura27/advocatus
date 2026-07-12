@@ -1434,7 +1434,7 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
 
   // ── SEGURO MALPRACTICE — cobrança mensal (GDD v5.1 §28) ──
   if (j.malpractice_tier && j.malpractice_custo_mensal > 0) {
-    updates.caixa = (updates.caixa || (j.caixa || 0)) - j.malpractice_custo_mensal;
+    updates.dinheiro = (updates.dinheiro || (j.dinheiro || 0)) - j.malpractice_custo_mensal;
   }
 
   // ── INTERCÂMBIO — verificar conclusão (GDD v5.1 §26) ──

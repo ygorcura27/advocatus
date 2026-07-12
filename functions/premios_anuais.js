@@ -193,7 +193,7 @@ async function _concederPremio(db, uid, categoria, cfg, anoJogo, detalhes) {
   await Promise.all([
     jogRef.update({
       reputacao: FieldValue.increment(cfg.rep),
-      caixa:     FieldValue.increment(cfg.dinheiro),
+      dinheiro:  FieldValue.increment(cfg.dinheiro),
       [`premios.${categoria}_${anoJogo}`]: true,
     }),
     jogRef.collection('inbox').add({

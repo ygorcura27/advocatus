@@ -416,7 +416,7 @@ async function _processarSentencaSetlist(db, processoRef, jogadorRef, p, j, uid,
     processos_concluidos: (j.processos_concluidos || 0) + 1,
     derrotas_consecutivas: favoravelAoJogador ? 0 : (j.derrotas_consecutivas || 0) + 1,
   };
-  if (malpracticeIndenizacao > 0) updJog.caixa = (j.caixa || 0) + malpracticeIndenizacao;
+  if (malpracticeIndenizacao > 0) updJog.dinheiro = (j.dinheiro || 0) + malpracticeIndenizacao;
   if (favoravelAoJogador) { updJog.wins = (j.wins||0)+1; updJog.wins_ano = (j.wins_ano||0)+1; }
   else { updJog.losses = (j.losses||0)+1; updJog.losses_ano = (j.losses_ano||0)+1; }
 

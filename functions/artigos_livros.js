@@ -294,7 +294,7 @@ async function processarRoyaltiesLivros(db, uid, mesGlobal) {
 
   if (totalRoyalties > 0) {
     await db.collection('jogadores').doc(uid).update({
-      caixa: FieldValue.increment(totalRoyalties),
+      dinheiro: FieldValue.increment(totalRoyalties),
     });
     logger.info(`[ROYALTIES] ${uid} recebeu R$${totalRoyalties} em royalties`);
   }

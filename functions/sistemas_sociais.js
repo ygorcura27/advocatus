@@ -65,7 +65,7 @@ exports.participarMootCourt = onCall({ region: 'southamerica-east1' }, async (re
     energia_usada_mes: FieldValue.increment(ENERGIA_MOOT),
     xp:                FieldValue.increment(xpGanho),
     reputacao:         FieldValue.increment(reputacao),
-    caixa:             FieldValue.increment(premioDinheiro),
+    dinheiro:          FieldValue.increment(premioDinheiro),
     moot_ultimo_mes:   mesGlobal,
     moot_vitorias:     vitoria ? FieldValue.increment(1) : FieldValue.increment(0),
     moot_partidas:     FieldValue.increment(1),
@@ -109,7 +109,7 @@ exports.iniciarIntercambio = onCall({ region: 'southamerica-east1' }, async (req
   if (j.intercambio_ativo) {
     throw new HttpsError('failed-precondition', 'Você já está em intercâmbio.');
   }
-  if ((j.caixa || 0) < opt.custo) {
+  if ((j.dinheiro || 0) < opt.custo) {
     throw new HttpsError('failed-precondition', `Saldo insuficiente. Custo: R$${opt.custo.toLocaleString('pt-BR')}.`);
   }
 
@@ -117,7 +117,7 @@ exports.iniciarIntercambio = onCall({ region: 'southamerica-east1' }, async (req
   const mesConclusao = mesGlobal + opt.duracao;
 
   await db.collection('jogadores').doc(uid).update({
-    caixa:              FieldValue.increment(-opt.custo),
+    dinheiro:           FieldValue.increment(-opt.custo),
     intercambio_ativo:  true,
     intercambio_destino: destino,
     intercambio_mes_inicio: mesGlobal,

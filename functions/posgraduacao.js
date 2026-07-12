@@ -140,7 +140,7 @@ exports.matricularPosGraduacao = onCall({ region: 'southamerica-east1' }, async 
   }
 
   // Verificar saldo
-  if (cfg.custo_matricula > 0 && (j.caixa || 0) < cfg.custo_matricula) {
+  if (cfg.custo_matricula > 0 && (j.dinheiro || 0) < cfg.custo_matricula) {
     throw new HttpsError('failed-precondition', `Saldo insuficiente. Matrícula: R$${cfg.custo_matricula.toLocaleString('pt-BR')}.`);
   }
 
@@ -158,7 +158,7 @@ exports.matricularPosGraduacao = onCall({ region: 'southamerica-east1' }, async 
   };
 
   if (cfg.custo_matricula > 0) {
-    upd.caixa = FieldValue.increment(-cfg.custo_matricula);
+    upd.dinheiro = FieldValue.increment(-cfg.custo_matricula);
   }
 
   // Cátedra é concluída imediatamente (aprovação direta)
@@ -258,7 +258,7 @@ exports.darAula = onCall({ region: 'southamerica-east1' }, async (request) => {
 
   await db.collection('jogadores').doc(uid).update({
     energia:                   FieldValue.increment(ENERGIA_AULA),  // Bônus — docência energiza
-    caixa:                     FieldValue.increment(salario),
+    dinheiro:                  FieldValue.increment(salario),
     didatica_academica:        novaDid,
     posgrad_ultima_aula_dada:  mesGlobal,
   });

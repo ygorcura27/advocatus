@@ -629,9 +629,9 @@ exports.contratarParecerista = onCall({ region: 'southamerica-east1' }, async (r
   if (!snap.exists) throw new HttpsError('not-found', 'Jogador não encontrado.');
 
   const j = snap.data();
-  if ((j.caixa || 0) < config.custo) {
+  if ((j.dinheiro || 0) < config.custo) {
     throw new HttpsError('failed-precondition',
-      `Saldo insuficiente. Custo: R$${config.custo.toLocaleString('pt-BR')}. Saldo: R$${(j.caixa||0).toLocaleString('pt-BR')}.`);
+      `Saldo insuficiente. Custo: R$${config.custo.toLocaleString('pt-BR')}. Saldo: R$${(j.dinheiro||0).toLocaleString('pt-BR')}.`);
   }
 
   const notaBase = Math.round(config.nota_teto * 0.75);
@@ -672,7 +672,7 @@ exports.contratarParecerista = onCall({ region: 'southamerica-east1' }, async (r
 
   const ref = await db.collection('peticoes').add(novaPeticao);
   await db.collection('jogadores').doc(uid).update({
-    caixa: FieldValue.increment(-config.custo),
+    dinheiro: FieldValue.increment(-config.custo),
   });
 
   logger.info(`[PARECERISTA] ${uid} contratou tier ${tierNum} (${practice_area}) por R$${config.custo}`);
