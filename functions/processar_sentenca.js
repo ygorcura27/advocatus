@@ -591,6 +591,97 @@ exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (requ
 });
 
 // ════════════════════════════════════════════════════════
+// ACEITAR DECISÃO DA SENTENÇA (não recorrer) — extraído de
+// decidirRecursoSentenca pra ser reutilizável também pelo gestor NPC
+// (functions/gestor_decisoes.js, permissão "Tomar decisões estratégicas"),
+// que só AUTO-ACEITA sentenças no tick mensal — nunca auto-recorre, porque
+// recorrer abre uma fase de sustentação recursal interativa que não dá
+// pra automatizar sem construir um "auto-play" de rodadas, fora de escopo.
+// ════════════════════════════════════════════════════════
+async function _aceitarDecisaoSentenca(db, processoRef, jogadorRef, p, j, isSetlistFlow) {
+  if (isSetlistFlow) {
+    // Aceitar: encerrar com base no resultado já calculado
+    const ganhou = p.resultado_setlist !== 'improcedente';
+    // Descontar valor já antecipado (GDD Seção 31 — fatoração de recebíveis)
+    const honBruto      = ganhou ? (p.hon_pendente || 0) : 0;
+    const honAntecipado = p.hon_antecipado || 0;
+    const hon           = Math.max(0, honBruto - honAntecipado);
+    const repDt  = p.repDelta || 0;
+    const escritorioDoCaso = p.pool_escritorio_id || j.escritorio_proprio_id;
+    if (ganhou && hon > 0) {
+      if (escritorioDoCaso) {
+        const escRef  = db.collection('escritorios').doc(escritorioDoCaso);
+        const escSnap = await escRef.get();
+        if (escSnap.exists) {
+          await escRef.update({
+            caixa: (escSnap.data().caixa||0) + hon,
+            faturamento_mes_atual: (escSnap.data().faturamento_mes_atual||0) + hon,
+            faturamento_honorarios_mes: (escSnap.data().faturamento_honorarios_mes||0) + hon,
+          });
+        }
+      } else {
+        await jogadorRef.update({
+          dinheiro:       (j.dinheiro||0) + hon,
+          honorarios_mes: (j.honorarios_mes||0) + hon,
+        });
+      }
+    }
+    if (!ganhou && repDt < 0 && escritorioDoCaso) {
+      try {
+        const escRef  = db.collection('escritorios').doc(escritorioDoCaso);
+        const escSnap = await escRef.get();
+        if (escSnap.exists)
+          await escRef.update({ prestigio: Math.max(0, (escSnap.data().prestigio||10) - Math.ceil(Math.abs(repDt)*0.5)) });
+      } catch(e) { logger.warn('Rep escritório setlist:', e); }
+    }
+    // Reputação do ESCRITÓRIO (tier-upgrade — distinta de prestigio acima).
+    // Faltava se mover em vitória ou derrota via veredito/setlist.
+    if (escritorioDoCaso && repDt) {
+      try {
+        const escRef  = db.collection('escritorios').doc(escritorioDoCaso);
+        const escSnap = await escRef.get();
+        if (escSnap.exists) {
+          const escCap = repCapDoCargo('escritorio');
+          const escRep = escSnap.data().reputacao || 0;
+          await escRef.update({ reputacao: Math.max(0, Math.min(escCap, escRep + repDt)) });
+        }
+      } catch (e) { logger.warn('Reputação do escritório (setlist):', e.message); }
+    }
+    await processoRef.update({
+      status:               ganhou ? 'ganho' : 'perdido',
+      encerrado_mes:        mesTotalPessoal(j),
+      hon_total_acumulado:  hon,
+      hon_pendente:         0,
+    });
+    if (escritorioDoCaso) {
+      try {
+        await db.collection('escritorios').doc(escritorioDoCaso).update({
+          total_casos: FieldValue.increment(1),
+          faturamento_total: FieldValue.increment(ganhou ? hon : 0),
+          ...(ganhou ? { casos_ganhos: FieldValue.increment(1) } : { casos_perdidos: FieldValue.increment(1) }),
+        });
+      } catch (e) { logger.warn('Contagem casos_ganhos/perdidos (recurso):', e.message); }
+    }
+    if (p.pool_proc_subcol_id && p.pool_proc_esc_id) {
+      try {
+        await db.collection('escritorios').doc(p.pool_proc_esc_id)
+          .collection('processos_pool').doc(p.pool_proc_subcol_id)
+          .update({ status:'concluido', resultado: p.resultado_setlist, valor_recebido: hon, concluido_em: new Date().toISOString() });
+      } catch(e) { logger.warn('Pool subcol encerrar setlist:', e); }
+    }
+    await _atualizarSatisfacaoCliente(db, p, ganhou ? p.resultado_setlist : 'improcedente');
+    return { msg: ganhou ? `Vitória confirmada — R$${hon.toLocaleString('pt-BR')} em honorários recebidos.` : 'Derrota aceita. Processo encerrado.' };
+  }
+
+  // Fluxo legado: aceita a derrota
+  const score = p.score_anterior;
+  await _finalizarProcessoDefinitivo(db, processoRef, jogadorRef, p, j, score, false, 0, mesTotalPessoal(j), 0, logger);
+  await _atualizarSatisfacaoCliente(db, p, 'improcedente');
+  return { msg: 'Decisão aceita. Processo encerrado — trânsito em julgado.' };
+}
+exports._aceitarDecisaoSentenca = _aceitarDecisaoSentenca;
+
+// ════════════════════════════════════════════════════════
 // DECIDIR RECURSO DA SENTENÇA — callable chamada pelo client
 // (window.decidirRecursoSentencaProducao) quando o JOGADOR decide se
 // recorre de uma sentença desfavorável (processo em
@@ -629,85 +720,7 @@ exports.decidirRecursoSentenca = onCall({ region: 'southamerica-east1' }, async 
   // ── Fluxo setlist (GDD v4.1): resultado já determinado, hon em espera ───────
   const isSetlistFlow = !!(p.setlist && p.resultado_setlist);
   if (!recorrer) {
-    if (isSetlistFlow) {
-      // Aceitar: encerrar com base no resultado já calculado
-      const ganhou = p.resultado_setlist !== 'improcedente';
-      // Descontar valor já antecipado (GDD Seção 31 — fatoração de recebíveis)
-      const honBruto      = ganhou ? (p.hon_pendente || 0) : 0;
-      const honAntecipado = p.hon_antecipado || 0;
-      const hon           = Math.max(0, honBruto - honAntecipado);
-      const repDt  = p.repDelta || 0;
-      const escritorioDoCaso = p.pool_escritorio_id || j.escritorio_proprio_id;
-      if (ganhou && hon > 0) {
-        if (escritorioDoCaso) {
-          const escRef  = db.collection('escritorios').doc(escritorioDoCaso);
-          const escSnap = await escRef.get();
-          if (escSnap.exists) {
-            await escRef.update({
-              caixa: (escSnap.data().caixa||0) + hon,
-              faturamento_mes_atual: (escSnap.data().faturamento_mes_atual||0) + hon,
-              faturamento_honorarios_mes: (escSnap.data().faturamento_honorarios_mes||0) + hon,
-            });
-          }
-        } else {
-          await jogadorRef.update({
-            dinheiro:       (j.dinheiro||0) + hon,
-            honorarios_mes: (j.honorarios_mes||0) + hon,
-          });
-        }
-      }
-      if (!ganhou && repDt < 0 && escritorioDoCaso) {
-        try {
-          const escRef  = db.collection('escritorios').doc(escritorioDoCaso);
-          const escSnap = await escRef.get();
-          if (escSnap.exists)
-            await escRef.update({ prestigio: Math.max(0, (escSnap.data().prestigio||10) - Math.ceil(Math.abs(repDt)*0.5)) });
-        } catch(e) { logger.warn('Rep escritório setlist:', e); }
-      }
-      // Reputação do ESCRITÓRIO (tier-upgrade — distinta de prestigio acima).
-      // Faltava se mover em vitória ou derrota via veredito/setlist.
-      if (escritorioDoCaso && repDt) {
-        try {
-          const escRef  = db.collection('escritorios').doc(escritorioDoCaso);
-          const escSnap = await escRef.get();
-          if (escSnap.exists) {
-            const escCap = repCapDoCargo('escritorio');
-            const escRep = escSnap.data().reputacao || 0;
-            await escRef.update({ reputacao: Math.max(0, Math.min(escCap, escRep + repDt)) });
-          }
-        } catch (e) { logger.warn('Reputação do escritório (setlist):', e.message); }
-      }
-      await processoRef.update({
-        status:               ganhou ? 'ganho' : 'perdido',
-        encerrado_mes:        mesTotalPessoal(j),
-        hon_total_acumulado:  hon,
-        hon_pendente:         0,
-      });
-      if (escritorioDoCaso) {
-        try {
-          await db.collection('escritorios').doc(escritorioDoCaso).update({
-            total_casos: FieldValue.increment(1),
-            faturamento_total: FieldValue.increment(ganhou ? hon : 0),
-            ...(ganhou ? { casos_ganhos: FieldValue.increment(1) } : { casos_perdidos: FieldValue.increment(1) }),
-          });
-        } catch (e) { logger.warn('Contagem casos_ganhos/perdidos (recurso):', e.message); }
-      }
-      if (p.pool_proc_subcol_id && p.pool_proc_esc_id) {
-        try {
-          await db.collection('escritorios').doc(p.pool_proc_esc_id)
-            .collection('processos_pool').doc(p.pool_proc_subcol_id)
-            .update({ status:'concluido', resultado: p.resultado_setlist, valor_recebido: hon, concluido_em: new Date().toISOString() });
-        } catch(e) { logger.warn('Pool subcol encerrar setlist:', e); }
-      }
-      await _atualizarSatisfacaoCliente(db, p, ganhou ? p.resultado_setlist : 'improcedente');
-      return { msg: ganhou ? `Vitória confirmada — R$${hon.toLocaleString('pt-BR')} em honorários recebidos.` : 'Derrota aceita. Processo encerrado.' };
-    }
-
-    // Fluxo legado: aceita a derrota
-    const score = p.score_anterior;
-    await _finalizarProcessoDefinitivo(db, processoRef, jogadorRef, p, j, score, false, 0, mesTotalPessoal(j), 0, logger);
-    await _atualizarSatisfacaoCliente(db, p, 'improcedente');
-    return { msg: 'Decisão aceita. Processo encerrado — trânsito em julgado.' };
+    return await _aceitarDecisaoSentenca(db, processoRef, jogadorRef, p, j, isSetlistFlow);
   }
 
   if (isSetlistFlow && p.resultado_setlist !== 'improcedente') {

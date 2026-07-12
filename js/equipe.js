@@ -1441,6 +1441,8 @@ function _renderCardGestao(j, esc, funcs, escId) {
       ${_renderToggleGestor('📋 Delegar processos ao gestor', 'processos', esc.gestor_delega_processos !== false, escId)}
       ${_renderToggleGestor('🎓 Delegar mentoria ao gestor', 'mentoria', !!esc.gestor_delega_mentoria, escId)}
       ${_renderToggleGestor('⚖️ Delegar conflitos leves ao gestor', 'conflitos', !!esc.gestor_delega_conflitos, escId)}
+      ${_renderToggleGestor('📑 Auto-aceitar sentenças pendentes', 'recursos', !!esc.gestor_delega_recursos, escId)}
+      ${_renderToggleGestor('🤝 Auto-tentar acordo', 'acordos', !!esc.gestor_delega_acordos, escId)}
       <div style="font-size:.6rem;color:var(--txt4);margin-top:.4rem">⚠️ Conflitos estruturais sempre escalam ao dono, independente das delegações.</div>
       ${_renderPickerGestor(escId)}
     </div>`;
@@ -1591,7 +1593,7 @@ window.toggleGestorDelegacao = async function(escId, tipo) {
   const novoVal = !escSnap.data()[campo];
   const { updateDoc } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
   await updateDoc(doc(db, 'escritorios', escId), { [campo]: novoVal });
-  const labels = { processos:'processos', mentoria:'mentoria', conflitos:'conflitos leves' };
+  const labels = { processos:'processos', mentoria:'mentoria', conflitos:'conflitos leves', recursos:'auto-aceitar sentenças', acordos:'auto-tentar acordo' };
   toast(`${novoVal ? '✅' : '❌'} Delegação de ${labels[tipo]||tipo} ${novoVal ? 'ativada' : 'desativada'}.`, 'ok');
   setTimeout(() => window.navTo && window.navTo('equipe', null), 400);
 };

@@ -2190,6 +2190,15 @@ async function _processarServicosMensalCF(db, uid, j) {
       if (esc.gestor_delega_conflitos) {
         await _gestorAutoMediacaoLeveCF(db, escRef, fSnapFresh, uid);
       }
+      // Permissões reais "Tomar decisões estratégicas" / "Firmar acordos"
+      // (js/processos_escritorio.js:_dgSalvarGeral) — functions/gestor_decisoes.js
+      const { processarDecisoesGestorCF, processarAcordosGestorCF } = require('./gestor_decisoes');
+      if (esc.gestor_delega_recursos) {
+        await processarDecisoesGestorCF(db, escId, db.collection('jogadores').doc(uid), j);
+      }
+      if (esc.gestor_delega_acordos) {
+        await processarAcordosGestorCF(db, escId, j);
+      }
     }
   } catch (e) {
     const logger = require('firebase-functions/logger');

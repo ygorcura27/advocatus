@@ -1169,12 +1169,15 @@ window.gerarProcessosMensais = async function(escId, tierEscritorio) {
 // ─── Delegar Gestão ───────────────────────────────────────────────────────────
 // Layout/interação seguem a prévia de direção aprovada (.impeccable/preview/
 // dossie-v1.html — Escopo / Responsável+domínio / Nível+Prazo / Permissões+
-// Resumo). Real por baixo: Nível de Gestão escreve nos 3 flags reais que
-// avancar_mes.js já consome (gestor_delega_processos/_mentoria/_conflitos) e
-// Prazo agenda uma revogação automática real (checada no tick mensal, ver
-// avancar_mes.js). As 8 permissões individuais são derivadas do Nível e
-// salvas pra referência, mas só as 3 alavancas acima têm efeito real hoje —
-// não inventar enforcement por permissão sem reforçar o backend primeiro.
+// Resumo), mas o design original tinha 8 permissões e só 3 tinham gancho
+// real (avancar_mes.js: gestor_delega_processos/_mentoria/_conflitos) — as
+// outras 5 foram cortadas ou viraram mecânica nova: "Tomar decisões
+// estratégicas" e "Firmar acordos" agora processam de verdade no tick
+// mensal (functions/gestor_decisoes.js — auto-aceita sentença pendente e
+// auto-tenta acordo, mesma fórmula de window.tentarAcordo). Prazo da
+// Delegação também expira de verdade (gestor_prazo_meses_restantes,
+// decrementado no tick, mesmo padrão das Campanhas de Marketing).
+// Resultado: as 5 permissões que sobraram são TODAS reais, nenhuma decorativa.
 
 // Departamentos reais (agrupam as 11 áreas de processo — mesmo agrupamento
 // de functions/avancar_mes.js::DEPTO_AREA_AGRUPADA, precisa ficar em sincronia).
@@ -1188,32 +1191,28 @@ const _DG_DEPARTAMENTOS = [
 const _DG_CARGO_L = { est:'Estagiário', ass:'Assistente', jnr:'Júnior', pln:'Pleno', snr:'Sênior', asc:'Associado', soc:'Sócio' };
 const _DG_LIMIAR_FRACO = 25;
 
+// 5 permissões, todas com efeito real (avancar_mes.js + functions/
+// gestor_decisoes.js) — as outras 3 do design original (visualizar autos,
+// protocolar petições, encerrar/arquivar, receber citações) não tinham
+// gancho real nenhum pra gatilhar e foram cortadas em vez de ficarem de
+// enfeite.
 const _DG_PERMISSOES_DEF = [
-  { k:'visualizar', l:'Visualizar autos e documentos' },
-  { k:'protocolar', l:'Protocolar petições' },
-  { k:'movimentar', l:'Movimentar o processo' },
-  { k:'decisoes',   l:'Tomar decisões estratégicas' },
-  { k:'acordos',    l:'Firmar acordos' },
-  { k:'encerrar',   l:'Encerrar / Arquivar processo' },
-  { k:'citacoes',   l:'Receber citações e intimações' },
-  { k:'atribuir',   l:'Atribuir tarefas para terceiros' },
+  { k:'processos', l:'Movimentar o processo' },
+  { k:'mentoria',  l:'Atribuir tarefas para terceiros' },
+  { k:'conflitos', l:'Mediar conflitos leves' },
+  { k:'recursos',  l:'Tomar decisões estratégicas (aceitar sentença)' },
+  { k:'acordos',   l:'Firmar acordos' },
 ];
 const _DG_NIVEIS = [
   { k:'acompanhamento', l:'Acompanhamento', desc:'Só acompanha — não decide nada, não firma acordo, não movimenta.' },
-  { k:'parcial',        l:'Gestão Parcial',  desc:'Protocola e movimenta o processo, mas decisões estratégicas e acordos ainda passam por você.' },
+  { k:'parcial',        l:'Gestão Parcial',  desc:'Movimenta o processo, mas decisões estratégicas e acordos ainda passam por você.' },
   { k:'total',          l:'Gestão Total',    desc:'Pode tomar decisões estratégicas, firmar acordos e concluir o processo.' },
 ];
-// Nível → as 3 alavancas reais que avancar_mes.js lê de verdade.
+// Nível → as 5 permissões reais que avancar_mes.js/gestor_decisoes.js consomem.
 const _DG_NIVEL_FLAGS = {
-  acompanhamento: { processos:false, mentoria:false, conflitos:false },
-  parcial:        { processos:true,  mentoria:false, conflitos:false },
-  total:          { processos:true,  mentoria:true,  conflitos:true  },
-};
-// Nível → preset das 8 permissões (visual/informativo, ver nota acima).
-const _DG_NIVEL_PERMISSOES = {
-  acompanhamento: { visualizar:true,  protocolar:false, movimentar:false, decisoes:false, acordos:false, encerrar:false, citacoes:true,  atribuir:false },
-  parcial:        { visualizar:true,  protocolar:true,  movimentar:true,  decisoes:false, acordos:false, encerrar:false, citacoes:true,  atribuir:false },
-  total:          { visualizar:true,  protocolar:true,  movimentar:true,  decisoes:true,  acordos:true,  encerrar:true,  citacoes:true,  atribuir:true  },
+  acompanhamento: { processos:false, mentoria:false, conflitos:false, recursos:false, acordos:false },
+  parcial:        { processos:true,  mentoria:false, conflitos:false, recursos:false, acordos:false },
+  total:          { processos:true,  mentoria:true,  conflitos:true,  recursos:true,  acordos:true  },
 };
 const _DG_PRAZO_OPCOES = [
   { v:'revogacao', l:'Até revogação' },
@@ -1229,7 +1228,7 @@ let _dgDeptosSel = {};
 let _dgResponsavelId = null;
 let _dgNivel  = 'parcial';
 let _dgPrazo  = 'revogacao';
-let _dgPermissoes = { ..._DG_NIVEL_PERMISSOES.parcial };
+let _dgPermissoes = { ..._DG_NIVEL_FLAGS.parcial };
 
 window.abrirDelegacaoGestao = async function(escId) {
   const fSnap = await getDocs(query(
@@ -1249,7 +1248,7 @@ window.abrirDelegacaoGestao = async function(escId) {
   _dgResponsavelId = esc.gestor_id || null;
   _dgNivel     = esc.gestor_nivel || 'parcial';
   _dgPrazo     = esc.gestor_prazo_meses ? String(esc.gestor_prazo_meses) : 'revogacao';
-  _dgPermissoes = { ...(esc.gestor_permissoes || _DG_NIVEL_PERMISSOES[_dgNivel]) };
+  _dgPermissoes = { ...(esc.gestor_permissoes || _DG_NIVEL_FLAGS[_dgNivel]) };
 
   abrirModal('👤 Delegar Gestão do Escritório', _dgRenderModal(esc));
 };
@@ -1265,9 +1264,9 @@ function _dgRenderModal(esc) {
 
   return `
     <div style="font-size:.7rem;color:var(--txt4);margin-bottom:.6rem">
-      Processos disponíveis são atribuídos automaticamente à equipe no início de cada mês. Nível de Gestão e Prazo
-      escrevem nos flags reais que o avanço de mês já usa; as 8 permissões abaixo refletem o nível escolhido
-      (informativas — só as 3 alavancas de processos/mentoria/conflitos têm efeito real hoje).
+      Processos disponíveis são atribuídos automaticamente à equipe no início de cada mês. Nível de Gestão, Prazo e as
+      5 permissões abaixo escrevem nos flags reais que o avanço de mês usa — inclusive decidir sentenças pendentes e
+      tentar acordo sozinho.
     </div>
     <div style="font-size:.78rem;font-weight:700;color:var(--txt);margin-bottom:.4rem">Escopo da Gestão</div>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem">
@@ -1390,7 +1389,7 @@ window._dgSetEscopo = function(v) { _dgEscopo = v; _dgReabrirModal(); };
 window._dgSetResponsavel = function(id) { _dgResponsavelId = id; _dgReabrirModal(); };
 window._dgSetNivel = function(nivel) {
   _dgNivel = nivel;
-  _dgPermissoes = { ..._DG_NIVEL_PERMISSOES[nivel] };
+  _dgPermissoes = { ..._DG_NIVEL_FLAGS[nivel] };
   _dgReabrirModal();
 };
 window._dgSetPrazo = function(v) { _dgPrazo = v; };
@@ -1425,7 +1424,6 @@ window._dgSalvarDepartamentos = async function() {
 window._dgSalvarGeral = async function() {
   const f = _dgNpcs.find(x => x.id === _dgResponsavelId);
   if (!f) return;
-  const flags = _DG_NIVEL_FLAGS[_dgNivel];
   const prazoMeses = _dgPrazo === 'revogacao' ? null : parseInt(_dgPrazo, 10);
   try {
     await updateDoc(doc(db, 'escritorios', _dgEscId), {
@@ -1437,9 +1435,11 @@ window._dgSalvarGeral = async function() {
       gestor_permissoes: _dgPermissoes,
       gestor_prazo_meses: prazoMeses,
       gestor_prazo_meses_restantes: prazoMeses,
-      gestor_delega_processos: flags.processos,
-      gestor_delega_mentoria: flags.mentoria,
-      gestor_delega_conflitos: flags.conflitos,
+      gestor_delega_processos: _dgPermissoes.processos,
+      gestor_delega_mentoria: _dgPermissoes.mentoria,
+      gestor_delega_conflitos: _dgPermissoes.conflitos,
+      gestor_delega_recursos: _dgPermissoes.recursos,
+      gestor_delega_acordos: _dgPermissoes.acordos,
       gestores_departamento: null,
     });
     fecharModal();
@@ -1457,6 +1457,7 @@ window._dgConfirmarJogador = async function() {
       gestor_escopo: null, gestor_nivel: null, gestor_permissoes: null,
       gestor_prazo_meses: null, gestor_prazo_meses_restantes: null,
       gestor_delega_processos: null, gestor_delega_mentoria: null, gestor_delega_conflitos: null,
+      gestor_delega_recursos: null, gestor_delega_acordos: null,
       gestores_departamento: null,
     });
     fecharModal();
