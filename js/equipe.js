@@ -880,10 +880,57 @@ window.renderTreinamento = async function(j, el) {
       <div class="secao-header" style="margin-bottom:.6rem"><div class="secao-titulo">Mentorias Ativas</div></div>
       ${ativasHtml}
     </div>
-    <div class="esc-card-bloco">
+    <div class="esc-card-bloco" style="margin-bottom:1.1rem">
       <div class="secao-header" style="margin-bottom:.6rem"><div class="secao-titulo">Iniciar Nova Mentoria</div></div>
       ${mentoresHtml}
+    </div>
+    <div class="esc-card-bloco" style="border-color:var(--bronze-bg,var(--borda2))">
+      <div class="secao-header" style="margin-bottom:.4rem">
+        <div class="secao-titulo">📌 Cursos Corporativos</div>
+      </div>
+      <div style="font-size:.68rem;color:var(--txt4);line-height:1.6;margin-bottom:.6rem">
+        Proposta — não existe no jogo ainda, alternativa em grupo à mentoria 1-a-1. Cobre os mesmos blocos de skill real
+        (skills_jur do funcionário + habilidades gerais).
+      </div>
+      <div class="equipe-tabs" id="curso-tabs">
+        <div class="equipe-tab ativo" data-cursotab="todos" onclick="window._cursoTab(this,'todos')">Todos</div>
+        <div class="equipe-tab" data-cursotab="base" onclick="window._cursoTab(this,'base')">Skills Jurídicas</div>
+        <div class="equipe-tab" data-cursotab="doc" onclick="window._cursoTab(this,'doc')">Peças &amp; Documentos</div>
+        <div class="equipe-tab" data-cursotab="area" onclick="window._cursoTab(this,'area')">Áreas do Direito</div>
+        <div class="equipe-tab" data-cursotab="geral" onclick="window._cursoTab(this,'geral')">Habilidades Gerais</div>
+      </div>
+      <div id="curso-grid" class="peca-grid"></div>
     </div>`;
+
+  window._cursoTab(document.querySelector('#curso-tabs [data-cursotab="todos"]'), 'todos');
+};
+
+const _CURSO_CATS = {
+  base:  { l: 'Skills Jurídicas',       map: _SKILL_JUR_BASE_LBL },
+  doc:   { l: 'Peças & Documentos',     map: _DOC_JUR_LBL },
+  area:  { l: 'Áreas do Direito',       map: _AREA_JUR_LBL },
+  geral: { l: 'Habilidades Gerais',     map: _SKILL_FULL_LBL },
+};
+
+window._cursoTab = function(btn, tab) {
+  if (btn) btn.parentElement.querySelectorAll('.equipe-tab').forEach(t => t.classList.toggle('ativo', t === btn));
+  const grid = document.getElementById('curso-grid');
+  if (!grid) return;
+  const cats = tab === 'todos' ? Object.keys(_CURSO_CATS) : [tab];
+  const cards = [];
+  for (const catKey of cats) {
+    const cat = _CURSO_CATS[catKey];
+    for (const [k, l] of Object.entries(cat.map)) {
+      cards.push(`
+        <div class="peca-card">
+          <div class="peca-topo"><div class="peca-kicker">${cat.l}</div></div>
+          <div class="peca-titulo">${l}</div>
+          <div style="font-size:.68rem;color:var(--txt4);margin:.4rem 0">1-18 meses · +1 skill/mês</div>
+          <button class="btn btn-sm btn-ghost" style="width:100%" onclick="window.toast&&window.toast('📌 Proposta — não afeta o jogo real ainda.','neutro')">Contratar</button>
+        </div>`);
+    }
+  }
+  grid.innerHTML = cards.join('');
 };
 
 // ════════════════════════════════════════════════════════

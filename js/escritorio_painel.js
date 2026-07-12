@@ -9,13 +9,13 @@ import { collection, query, where, orderBy, limit, getDocs, doc, deleteDoc,
 import { db } from './firebase-init.js';
 
 const CARGO_INFO = {
-  soc: { l: 'Sócio',               ordem: 6 },
-  asc: { l: 'Associado',           ordem: 5 },
-  snr: { l: 'Advogado Sênior',     ordem: 4 },
-  pln: { l: 'Advogado Pleno',      ordem: 3 },
-  jnr: { l: 'Advogado Júnior',     ordem: 2 },
-  ass: { l: 'Assistente Jurídico', ordem: 1 },
-  est: { l: 'Estagiário',          ordem: 0 },
+  soc: { l: 'Sócio',               ordem: 6, sal: 65000 },
+  asc: { l: 'Associado',           ordem: 5, sal: 35000 },
+  snr: { l: 'Advogado Sênior',     ordem: 4, sal: 9000  },
+  pln: { l: 'Advogado Pleno',      ordem: 3, sal: 5500  },
+  jnr: { l: 'Advogado Júnior',     ordem: 2, sal: 3500  },
+  ass: { l: 'Assistente Jurídico', ordem: 1, sal: 2500  },
+  est: { l: 'Estagiário',          ordem: 0, sal: 1700  },
 };
 
 const ESP_LABEL = {
@@ -611,18 +611,17 @@ const _SKILL_TRAD_LABEL = {
   gestao:'Gestão', networking:'Networking',
 };
 
-function _skBarPerfil(val, max) {
+function _skRowPerfil(label, val, max) {
   const pct = Math.round(Math.min(100, (val / max) * 100));
-  return `<div style="flex:1;height:4px;background:var(--bg2);border-radius:2px">
-    <div style="width:${pct}%;height:100%;background:var(--navy3);border-radius:2px"></div>
+  return `<div class="equipe-skrow">
+    <span class="equipe-skrow-l">${label}</span>
+    <div class="membro-prod-bar" style="flex:1"><div class="membro-prod-fill" style="width:${pct}%;background:var(--navy3)"></div></div>
+    <span class="equipe-skrow-v">${val}/${max}</span>
   </div>`;
 }
-function _skRowPerfil(label, val, max) {
-  return `<div style="display:flex;align-items:center;gap:.5rem;padding:.2rem 0">
-    <span style="flex:0 0 140px;font-size:.73rem;color:var(--txt3)">${label}</span>
-    ${_skBarPerfil(val, max)}
-    <span style="font-size:.72rem;font-weight:600;min-width:36px;text-align:right;color:var(--txt)">${val}/${max}</span>
-  </div>`;
+function _estrelasPerfil(v, max) {
+  const n = Math.round((v||0) / max * 5);
+  return `<span class="equipe-estrelas">${'★'.repeat(n)}${'☆'.repeat(5-n)}</span>`;
 }
 
 window._abrirPerfilFuncionario = async function(escId, funcId) {
@@ -662,61 +661,132 @@ window._abrirPerfilFuncionario = async function(escId, funcId) {
   }
   const temSkJur  = Object.keys(skJur).length > 0;
   const temSkTrad = false;
+  const skillsHtml = `
+    ${temSkJur ? `
+    <div class="equipe-skrow-grupo">Skills principais</div>
+    ${Object.entries(_SKILL_JUR_LABEL).map(([k,l]) => _skRowPerfil(l, skJur[k]||0, 50)).join('')}
+    <details class="equipe-skills-todas">
+      <summary>Ver todas as skills →</summary>
+      <div class="equipe-skrow-grupo">Tipos de documento</div>
+      ${Object.entries(_DOC_LABEL).map(([k,l]) => _skRowPerfil(l, skJur[k]||0, 50)).join('')}
+      <div class="equipe-skrow-grupo">Áreas do direito</div>
+      ${Object.entries(_AREA_JUR_LABEL).map(([k,l]) => _skRowPerfil(l, skJur[k]||0, 50)).join('')}
+    </details>` : ''}
+    ${temSkTrad ? `
+    <div class="equipe-skrow-grupo">Habilidades</div>
+    ${Object.entries(_SKILL_TRAD_LABEL).filter(([k]) => skTrad[k] != null)
+        .map(([k,l]) => _skRowPerfil(l, skTrad[k]||0, cargoCapTrad)).join('')}` : ''}
+    ${!temSkJur && !temSkTrad ? `<div style="text-align:center;padding:.6rem 0;font-size:.76rem;color:var(--txt4)">Nenhuma skill registrada.</div>` : ''}`;
+
+  const isNpc  = f.tipo === 'npc';
+  const prod   = calcProdutividade(f);
+  const _SKILLS_REL_P = ['escrita_juridica','pesquisa','oratoria','persuasao','argumentacao'];
+  const _CARGO_CAP_P  = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
+  const efic = isNpc ? Math.round(Math.min(100, ((_SKILLS_REL_P.map(s => (f.skills||{})[s]||0).reduce((a,b)=>a+b,0) / _SKILLS_REL_P.length) / (_CARGO_CAP_P[f.cargo_id]||35)) * 100)) : null;
+  const repInterna = f.reputacao_interna ?? 50;
+  const bemEstar   = 100 - (f.estresse || 0);
+  const aneis = [
+    { l:'Produtividade', v:prod, cor:'var(--verde2)' },
+    efic != null ? { l:'Eficiência', v:efic, cor:'var(--amber)' } : null,
+    { l:'Reputação interna', v:repInterna, cor:'var(--ouro2)' },
+    { l:'Bem-estar', v:bemEstar, cor: bemEstar>=60?'var(--verde2)':'var(--verm2)' },
+  ].filter(Boolean);
+
+  const salario = CARGO_INFO[f.cargo_id]?.sal || 0;
+  const mesGlobal = window.SERVER?.mes_global ?? 0;
+  const feriasInfo = f.em_ferias
+    ? 'Em férias este mês'
+    : f.ultimas_ferias_mes_total == null
+      ? 'Nunca tirou férias'
+      : `Última: ${mesGlobal - f.ultimas_ferias_mes_total} mês(es) atrás`;
 
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem';
   overlay.innerHTML = `
-    <div style="background:var(--surface);border:1px solid var(--borda-navy);border-radius:var(--r2);width:100%;max-width:440px;max-height:88vh;overflow-y:auto;box-shadow:var(--sombra2);color:var(--txt)">
-      <!-- Header -->
-      <div style="display:flex;align-items:center;gap:.9rem;padding:1.2rem 1.2rem .8rem;border-bottom:1px solid var(--bg2)">
+    <div style="background:var(--surface);border:1px solid var(--borda-navy);border-radius:var(--r2);width:100%;max-width:440px;max-height:88vh;overflow-y:auto;box-shadow:var(--sombra2);color:var(--txt);position:relative">
+      <button onclick="this.closest('[style*=fixed]').remove()"
+        style="position:absolute;top:1rem;right:1rem;background:transparent;border:none;font-size:1.1rem;cursor:pointer;color:var(--txt3)">✕</button>
+
+      <div class="equipe-detalhe-head" style="padding:1.2rem 1.2rem .6rem">
         <img src="${avatarSrc}" alt="${nome}"
           onerror="window._svgNpcFallback(this,'${nome.replace(/'/g,"\\'")}');"
-          style="width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0">
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:700;font-size:.95rem;color:var(--txt)">${nome}</div>
-          <div style="font-size:.75rem;color:var(--txt3)">${cargo} · ${esp}</div>
-          <div style="display:flex;gap:.4rem;margin-top:.3rem;flex-wrap:wrap">
-            ${emBurnout
-              ? `<span style="font-size:.65rem;background:var(--verm2);color:#fff;padding:.15rem .5rem;border-radius:2px">Burnout</span>`
-              : `<span style="font-size:.65rem;background:var(--bg2);color:var(--txt3);padding:.15rem .5rem;border-radius:2px">⚡ ${npcDisp}/100</span>`}
-          </div>
+          style="width:46px;height:46px;border-radius:50%;object-fit:cover;flex-shrink:0">
+        <div>
+          <div class="equipe-detalhe-nome">${nome} ${isNpc?'<span class="tag-npc">NPC</span>':'<span class="tag-voce">você</span>'}</div>
+          <div class="membro-cargo">${cargo} · ${esp}</div>
+          <span class="equipe-status-pill" style="margin-top:.3rem;${emBurnout?'color:var(--verm3);border-color:var(--verm3)':'color:var(--verde2);border-color:var(--verde2)'}">
+            ${emBurnout ? 'Burnout' : `⚡ ${npcDisp}/100`}
+          </span>
         </div>
-        <button onclick="this.closest('[style*=fixed]').remove()"
-          style="background:transparent;border:none;font-size:1.2rem;cursor:pointer;color:var(--txt3);align-self:flex-start">✕</button>
       </div>
 
-      <div style="padding:.9rem 1.2rem">
+      <div style="padding:0 1.2rem 1.1rem">
+        <div class="equipe-tabs">
+          <div class="equipe-tab ativo" data-pftab="geral" onclick="window._perfilFuncTab(this,'geral')">Visão Geral</div>
+          <div class="equipe-tab" data-pftab="desemp" onclick="window._perfilFuncTab(this,'desemp')">Desempenho</div>
+          <div class="equipe-tab" data-pftab="hist" onclick="window._perfilFuncTab(this,'hist')">Histórico</div>
+        </div>
 
-        ${temSkJur ? `
-        <div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem">Skills Jurídicas</div>
-        ${Object.entries(_SKILL_JUR_LABEL).map(([k,l]) => _skRowPerfil(l, skJur[k]||0, 50)).join('')}
+        <div data-pfpane="geral">
+          <div class="ficha-item" style="padding:.5rem 0"><span class="ficha-label">Salário</span><span class="ficha-valor">R$ ${salario.toLocaleString('pt-BR')}/mês</span></div>
+          <div class="ficha-item" style="padding:.5rem 0"><span class="ficha-label">Tempo no cargo</span><span class="ficha-valor">${f.meses_no_cargo||0} meses</span></div>
+          <div class="ficha-item" style="padding:.5rem 0"><span class="ficha-label">🏖️ Férias</span><span class="ficha-valor">${feriasInfo}</span></div>
+        </div>
 
-        <details style="margin-top:.6rem">
-          <summary style="font-size:.72rem;color:var(--txt3);cursor:pointer;margin-bottom:.3rem">Tipos de Documento</summary>
-          ${Object.entries(_DOC_LABEL).map(([k,l]) => _skRowPerfil(l, skJur[k]||0, 50)).join('')}
-        </details>
+        <div data-pfpane="desemp" hidden>
+          <div class="equipe-anel-row">
+            ${aneis.map(a => `
+            <div class="equipe-anel">
+              <div class="donut" style="background:conic-gradient(${a.cor} 0% ${a.v}%, var(--bg2) ${a.v}% 100%)">
+                <div class="donut-hole"><div class="donut-pct" style="font-size:.8rem">${a.v}%</div></div>
+              </div>
+              <div class="equipe-anel-label">${a.l}</div>
+            </div>`).join('')}
+          </div>
+          <div class="perf-row"><span>Casos resolvidos</span><b>${f.casos_resolvidos_total||0}</b></div>
+          <div class="perf-row"><span>Satisfação do cliente</span><b>${_estrelasPerfil(f.feedback_media_estrelas??3, 5)} ${(f.feedback_media_estrelas??3).toFixed(1)}</b></div>
+          ${skillsHtml}
+        </div>
 
-        <details style="margin-top:.4rem">
-          <summary style="font-size:.72rem;color:var(--txt3);cursor:pointer;margin-bottom:.3rem">Áreas do Direito</summary>
-          ${Object.entries(_AREA_JUR_LABEL).map(([k,l]) => _skRowPerfil(l, skJur[k]||0, 50)).join('')}
-        </details>
-        ` : ''}
-
-        ${temSkTrad ? `
-        <div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-top:${temSkJur?'1rem':0};margin-bottom:.4rem">Habilidades</div>
-        ${Object.entries(_SKILL_TRAD_LABEL)
-            .filter(([k]) => skTrad[k] != null)
-            .map(([k,l]) => _skRowPerfil(l, skTrad[k]||0, cargoCapTrad)).join('')}
-        ` : ''}
-
-        ${!temSkJur && !temSkTrad ? `
-        <div style="text-align:center;padding:1rem 0;font-size:.78rem;color:var(--txt4)">Nenhuma skill registrada.</div>
-        ` : ''}
+        <div data-pfpane="hist" hidden id="perfil-func-hist">
+          <div style="font-size:.76rem;color:var(--txt4);padding:.5rem 0">Carregando histórico...</div>
+        </div>
       </div>
     </div>`;
 
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
   document.body.appendChild(overlay);
+
+  // Histórico — best-effort: log_equipe do escritório mencionando o nome
+  // do funcionário (não existe um índice por funcionário, filtra client-side).
+  try {
+    const logSnap = await getDocs(query(
+      collection(db, 'escritorios', escId, 'log_equipe'),
+      orderBy('criado_em', 'desc'), limit(60)
+    ));
+    const relevantes = logSnap.docs.map(d => d.data())
+      .filter(l => (l.texto||'').includes(nome)).slice(0, 8);
+    const histEl = document.getElementById('perfil-func-hist');
+    if (histEl) {
+      histEl.innerHTML = relevantes.length
+        ? relevantes.map(l => `
+          <div class="equipe-hist-item">
+            <span class="equipe-hist-icone">📋</span>
+            <span class="equipe-hist-texto">${l.texto}</span>
+            <span class="equipe-hist-data">${l.criado_em ? new Date(l.criado_em).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}) : ''}</span>
+          </div>`).join('')
+        : `<div style="font-size:.76rem;color:var(--txt4);padding:.5rem 0">Nenhum evento registrado ainda.</div>`;
+    }
+  } catch (e) {
+    const histEl = document.getElementById('perfil-func-hist');
+    if (histEl) histEl.innerHTML = `<div style="font-size:.76rem;color:var(--txt4)">Erro ao carregar histórico.</div>`;
+  }
+};
+
+window._perfilFuncTab = function(btn, tab) {
+  btn.parentElement.querySelectorAll('.equipe-tab').forEach(t => t.classList.toggle('ativo', t === btn));
+  const overlay = btn.closest('[style*=fixed]');
+  overlay.querySelectorAll('[data-pfpane]').forEach(p => { p.hidden = p.dataset.pfpane !== tab; });
 };
 
 // ════════════════════════════════════════════════════════
