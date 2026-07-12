@@ -30,15 +30,14 @@ const _FIRMAS_NPC = [
   { id: 'ribeiro_trabalhista', nome: 'Ribeiro Trabalhista', setor: 'Trabalhista', min_inv: 20000, pct_base: 0.007, vol: 0.10, desc: 'Demanda estável, retorno conservador e previsível.' },
 ];
 
-// ── Ações (B3) e Criptomoedas — 📌 PROPOSTA (compra/venda/carteira não
-// persistem, sem backing real no jogo). Preço/variação partem de um sorteio
-// mas são substituídos por dados reais de API gratuita quando disponível
-// (_invCarregarPrecosReais, abaixo) — cripto 100% real via CoinGecko,
-// ações 3 de 20 reais via brapi.dev (sandbox sem token só cobre PETR4/
-// VALE3/ITUB4/MGLU3; as outras 17 continuam ilustrativas até virar plano pago).
-const _INV_ACOES_TICKERS = ['PETR4','VALE3','ITUB4','BBDC4','ABEV3','WEGE3','BBAS3','RENT3','SUZB3','JBSS3','PRIO3','RADL3','RAIL3','VIVT3','ELET3','GGBR4','CSAN3','EQTL3','SBSP3','LREN3'];
-const _INV_ACOES_NOMES = { PETR4:'Petrobras', VALE3:'Vale', ITUB4:'Itaú Unibanco', BBDC4:'Bradesco', ABEV3:'Ambev', WEGE3:'WEG', BBAS3:'Banco do Brasil', RENT3:'Localiza', SUZB3:'Suzano', JBSS3:'JBS', PRIO3:'PRIO', RADL3:'Raia Drogasil', RAIL3:'Rumo', VIVT3:'Telefônica Brasil', ELET3:'Eletrobras', GGBR4:'Gerdau', CSAN3:'Cosan', EQTL3:'Equatorial', SBSP3:'Sabesp', LREN3:'Lojas Renner' };
-const _INV_ACOES_BRAPI = ['PETR4','VALE3','ITUB4']; // únicos cobertos pelo sandbox grátis da brapi.dev
+// ── Ações (B3) e Criptomoedas — 📌 compra/venda/carteira ainda são proposta
+// (não persistem, sem backing real no jogo), mas preço/variação agora são
+// 100% reais (_invCarregarPrecosReais, abaixo): cripto via CoinGecko (10/10),
+// ações via brapi.dev (só 3 tickers — PETR4/VALE3/ITUB4/MGLU3 são os únicos
+// cobertos pelo sandbox grátis sem token; lista fica só nesses 3 em vez de
+// misturar com ilustrativo).
+const _INV_ACOES_TICKERS = ['PETR4','VALE3','ITUB4'];
+const _INV_ACOES_NOMES = { PETR4:'Petrobras', VALE3:'Vale', ITUB4:'Itaú Unibanco' };
 const _INV_ACOES = _INV_ACOES_TICKERS.map(t => ({ ticker:t, nome:_INV_ACOES_NOMES[t], preco:+(8+Math.random()*72).toFixed(2), variacao:+((Math.random()*10)-5).toFixed(2), real:false }));
 const _INV_CRIPTOS_LISTA = [
   { ticker:'BTC', nome:'Bitcoin',    coingeckoId:'bitcoin',                 preco: 340000+Math.random()*40000 },
@@ -66,7 +65,7 @@ async function _invCarregarPrecosReais() {
   _invPrecosReaisCarregados = true;
 
   try {
-    const r = await fetch(`https://brapi.dev/api/quote/${_INV_ACOES_BRAPI.join(',')}`);
+    const r = await fetch(`https://brapi.dev/api/quote/${_INV_ACOES_TICKERS.join(',')}`);
     const d = await r.json();
     for (const res of (d.results || [])) {
       const alvo = _INV_ACOES.find(a => a.ticker === res.symbol);
@@ -135,8 +134,8 @@ window.renderFinanceiroAvancado = async function(j, el) {
     <div class="card" style="font-size:.7rem;color:var(--txt3);margin-bottom:1rem;line-height:1.6">
       4 categorias reais (functions/financeiro.js, GDD Seção 32, rodam todo mês em avancar_mes.js): Renda Fixa, Fundos,
       Imóvel para Renda, Firmas NPC. Ações (B3) e Criptomoedas são <b style="color:var(--ouro)">📌 proposta</b> — não
-      existem no jogo real e a carteira não é salva, mas os preços já vêm de API pública grátis (CoinGecko pra cripto,
-      brapi.dev pra 3 das 20 ações) em vez de sorteio.
+      existem no jogo real e a carteira não é salva, mas os preços são 100% reais via API pública grátis (CoinGecko
+      pra cripto, brapi.dev pra ações — 3 tickers, único plano sem custo dessa API).
     </div>
 
     <div class="stat-row">
@@ -329,10 +328,10 @@ window._invRenderTab = function(tab) {
       const atual = lista.find(x=>x.ticker===h.ticker);
       return s + (atual ? atual.preco*h.qtd : 0);
     },0);
-    const qtdReais = lista.filter(a=>a.real).length;
+    const carregado = lista.every(a=>a.real);
     el.innerHTML = `
       <div style="font-size:.7rem;color:var(--ouro);margin-bottom:.8rem">📌 Compra/venda/carteira são proposta (não persistem, não existem no jogo real).
-        Preço: ${qtdReais===lista.length?`<b style="color:var(--verde2)">${qtdReais}/${lista.length} reais (CoinGecko, ao vivo)</b>`:qtdReais>0?`<b style="color:var(--verde2)">${qtdReais}/${lista.length} reais (brapi.dev, ao vivo)</b> — os outros ${lista.length-qtdReais} continuam ilustrativos`:'ilustrativo (carregando preços reais…)'}.</div>
+        Preço: ${carregado?`<b style="color:var(--verde2)">100% real, ao vivo (${tab==='acoes'?'brapi.dev':'CoinGecko'})</b>`:'carregando preços reais…'}.</div>
       ${carteira.length>0?`
       <section class="painel" style="margin-bottom:1rem">
         <div class="painel-head"><span class="painel-titulo">Minha Carteira — ${_fmtR(carteiraValor)}</span></div>
@@ -345,7 +344,7 @@ window._invRenderTab = function(tab) {
         </div>
       </section>`:''}
       <section class="painel">
-        <div class="painel-head"><span class="painel-titulo">${tab==='acoes'?'Top 20 Ações — B3':'Top 10 Criptomoedas'}</span></div>
+        <div class="painel-head"><span class="painel-titulo">${tab==='acoes'?'Ações — B3':'Top 10 Criptomoedas'}</span></div>
         <div style="padding:.4rem 1.1rem 1rem">
           ${lista.map(a => `
           <div class="perf-row">
