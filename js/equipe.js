@@ -219,8 +219,6 @@ window.renderEquipe = async function(j, el) {
             📓 Diário
           </button>
         </div>
-        ${_renderCardGestao(j, esc, funcs, escId)}
-
         <!-- Pane: Equipe -->
         <div class="equipe-tab-pane" data-tab="equipe" ${_activeEquipeTab==='diario'?'style="display:none"':''}>
           ${_renderEquipePane(estagiarios, assistentes, advogados, escId, energiaDisp, procCountEquipe, esc.mes_global || 0, cap)}
@@ -1457,6 +1455,7 @@ function _renderPickerGestor(escId) {
     </div>`;
 }
 
+window._renderCardGestao = _renderCardGestao;
 function _renderCardGestao(j, esc, funcs, escId) {
   if (esc.gestor_id) {
     const meuUid = window.JOGADOR?.uid || window.JOGADOR_UID;

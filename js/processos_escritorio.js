@@ -142,6 +142,37 @@ function _npcEnergiaBadge(func) {
 // Exportar para uso no escritorio_painel.js
 window._npcEnergiaBadge = _npcEnergiaBadge;
 
+// ─── PÁGINA DEDICADA — igual mockup (esc-sub-processos): capa própria +
+// Delegar Gestão no cabeçalho + o mesmo pool de 3 colunas de sempre.
+// window._renderCardGestao vem de js/equipe.js (exposto lá).
+window.renderGestaoProcessos = async function(j, el) {
+  const escId = j.escritorio_proprio_id || j.escritorio_empregado_id;
+  if (!escId) {
+    el.innerHTML = `<div class="card" style="color:var(--txt3)">Você precisa de um escritório.</div>`;
+    return;
+  }
+
+  el.innerHTML = `<div class="secao-header"><div class="secao-titulo">⚖️ Gestão de Processos</div></div><div class="card">Carregando...</div>`;
+
+  const escSnap = await getDoc(doc(db, 'escritorios', escId));
+  const esc = escSnap.exists() ? escSnap.data() : {};
+  const fSnap = await getDocs(collection(db, 'escritorios', escId, 'funcionarios'));
+  const funcs = fSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+  const uid = j.uid || window.JOGADOR_UID;
+  const socios = esc.socios || [];
+  const podeGerenciar = esc.dono_uid === uid || esc.fundador_uid === uid || socios.some(s => s.uid === uid);
+
+  el.innerHTML = `
+    <div style="margin-bottom:.8rem"><button class="btn btn-ghost btn-sm" onclick="window.navTo('escritorio',null)">← Escritório</button></div>
+    ${window._capaHeader(`GESTÃO · ${(esc.nome||'—').toUpperCase()}`, '⚖️ Gestão de Processos', '')}
+    ${podeGerenciar && window._renderCardGestao ? window._renderCardGestao(j, esc, funcs, escId) : ''}
+    <div id="gestao-processos-pool"></div>`;
+
+  const elPool = document.getElementById('gestao-processos-pool');
+  if (elPool) window.renderProcessosPool(j, escId, elPool);
+};
+
 // ─── RENDER principal — 3 colunas ────────────────────────────────────────────
 
 window.renderProcessosPool = async function(j, escId, el) {

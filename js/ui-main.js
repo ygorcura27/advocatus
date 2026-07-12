@@ -131,7 +131,7 @@ function _renderizar() {
 
   switch (_painelAtivo) {
     case 'perfil':       renderPerfil(j, main);       break;
-    case 'processos':    renderEscritorio(j, main);     break;
+    case 'processos':    window.renderGestaoProcessos(j, main); break;
     case 'escritorio':   renderEscritorio(j, main);    break;
     case 'equipe':
       if (window.renderEquipe) {
@@ -699,7 +699,6 @@ async function _carregarEscritorioProprio(escId, j) {
         ${_escEquipeCard(esc.id)}
         ${_escBeneficiosPreviewCard(esc.id)}
         ${_escClientesCard()}
-        <div id="esc-processos-bloco"></div>
         <div id="esc-oportunidades-bloco"></div>
         ${_escSocietarioCard(esc, j)}
         ${_escAtividadeCard()}
@@ -729,8 +728,6 @@ async function _carregarEscritorioProprio(escId, j) {
       if (elOportunidades && window.renderOportunidadesPainel) window.renderOportunidadesPainel(j, escId, elOportunidades);
       const elWorkspace = document.getElementById('esc-workspace-bloco');
       if (elWorkspace) _renderWorkspacePainel(j, elWorkspace);
-      const elProcessos = document.getElementById('esc-processos-bloco');
-      if (elProcessos && window.renderProcessosPool) window.renderProcessosPool(j, escId, elProcessos);
       const elEspec = document.getElementById('esc-especializacoes-bloco');
       if (elEspec && window.renderEspecializacoesEsc) window.renderEspecializacoesEsc(escId, elEspec);
     }
@@ -1145,7 +1142,7 @@ function _escProcessosPreviewCard(escId) {
   <div class="esc-card-bloco" style="margin-bottom:1.1rem">
     <div class="secao-header" style="margin-bottom:.4rem">
       <div class="secao-titulo">⚖️ Gestão de Processos</div>
-      <button class="painel-btn" onclick="document.getElementById('esc-processos-bloco')?.scrollIntoView({behavior:'smooth'})">gerenciar processos →</button>
+      <button class="painel-btn" onclick="window.navTo('processos',null)">gerenciar processos →</button>
     </div>
     <div id="esc-processos-preview" style="font-size:.78rem;color:var(--txt3);padding:.5rem 0">Carregando...</div>
   </div>`;
@@ -1163,7 +1160,7 @@ async function _carregarProcessosPreview(escId) {
     const emAndamento = todos.filter(p => p.status === 'em_andamento');
     const ativos   = disponiveis.length + emAndamento.length;
     const recursal = todos.filter(p => _PROC_STATUSES_RECURSAL.includes(p.status));
-    const irVerTodos = `document.getElementById('esc-processos-bloco')?.scrollIntoView({behavior:'smooth'})`;
+    const irVerTodos = `window.navTo('processos',null)`;
 
     const novo = disponiveis[0];
     const rec  = recursal[0];
