@@ -294,19 +294,6 @@ body { background: var(--couro); overflow: hidden; }
 .carreira-card .nm { font-size: .76rem; font-weight: 600; color: var(--perg); }
 .carreira-card .ds { font-size: .63rem; color: var(--ardosia2); margin-top: .2rem; line-height: 1.4; }
 
-/* Info de carreira */
-#carreira-info {
-  display: none;
-  background: rgba(22,214,168,.06);
-  border: 1px solid rgba(22,214,168,.2);
-  border-radius: 2px;
-  padding: .75rem;
-  margin-bottom: 1.1rem;
-  font-size: .75rem;
-  color: var(--ardosia2);
-  line-height: 1.6;
-}
-
 /* Botão primário */
 .btn-prim {
   width: 100%;
@@ -478,10 +465,10 @@ body { background: var(--couro); overflow: hidden; }
       <p class="sub">Você só faz isso uma vez. Escolha com cuidado.</p>
 
       <div class="criacao-progresso">
-        <span class="criacao-progresso-txt">Passo <b id="criacao-passo-num">1</b> de 3 —
+        <span class="criacao-progresso-txt">Passo <b id="criacao-passo-num">1</b> de 2 —
           <span id="criacao-passo-nome">Identidade</span></span>
         <div class="criacao-progresso-bar">
-          <div class="criacao-progresso-fill" id="criacao-progresso-fill" style="width:33.33%"></div>
+          <div class="criacao-progresso-fill" id="criacao-progresso-fill" style="width:50%"></div>
         </div>
       </div>
 
@@ -509,75 +496,60 @@ body { background: var(--couro); overflow: hidden; }
         </div>
       </div>
 
-      <!-- Etapa 2 — Trilha de carreira -->
+      <!-- Etapa 2 — Faculdade de Direito -->
       <div class="criacao-etapa" data-etapa="2">
         <div class="campo">
-          <label>Trilha de carreira</label>
-          <div class="carreira-grid">
-            <div class="carreira-card" data-carreira="adv_privado" onclick="selecionarCarreira(this)">
-              <span class="ic">⚖️</span>
-              <div class="nm">Advogado Privado</div>
-              <div class="ds">Escritório autônomo. Honorários de sucesso.</div>
-            </div>
-            <div class="carreira-card" data-carreira="inhouse" onclick="selecionarCarreira(this)">
-              <span class="ic">🏢</span>
-              <div class="nm">In-House</div>
-              <div class="ds">Jurídico corporativo. Salário fixo.</div>
-            </div>
-            <div class="carreira-card" data-carreira="juiz" onclick="selecionarCarreira(this)">
-              <span class="ic">🔨</span>
-              <div class="nm">Magistratura</div>
-              <div class="ds">Carreira pública. Exige concurso após 3 anos.</div>
-            </div>
-            <div class="carreira-card" data-carreira="promotor" onclick="selecionarCarreira(this)">
-              <span class="ic">🛡️</span>
-              <div class="nm">Ministério Público</div>
-              <div class="ds">MP. Concurso público exigente.</div>
-            </div>
-            <div class="carreira-card" data-carreira="defensor" onclick="selecionarCarreira(this)">
-              <span class="ic">🤝</span>
-              <div class="nm">Defensoria Pública</div>
-              <div class="ds">DPE/DPU. Foco em direitos fundamentais.</div>
-            </div>
-          </div>
-          <div id="carreira-info"></div>
-        </div>
-      </div>
-
-      <!-- Etapa 3 — Perfil inicial -->
-      <div class="criacao-etapa" data-etapa="3">
-        <div class="campo">
-          <label>Perfil inicial — distribui 10 pontos extras de skill</label>
-          <div class="carreira-grid" id="perfil-grid">
-            <div class="carreira-card" data-perfil="pesquisador" onclick="selecionarPerfil(this)">
-              <span class="ic">🔬</span>
-              <div class="nm">Pesquisador</div>
+          <label>Faculdade de Direito — distribui 10 pontos extras de skill conforme o perfil da instituição</label>
+          <div class="carreira-grid" id="faculdade-grid">
+            <div class="carreira-card" data-faculdade="USP" onclick="selecionarFaculdade(this)">
+              <span class="ic">📚</span>
+              <div class="nm">USP</div>
               <div class="ds">+6 Pesquisa · +4 Escrita</div>
             </div>
-            <div class="carreira-card" data-perfil="contencioso" onclick="selecionarPerfil(this)">
-              <span class="ic">⚔️</span>
-              <div class="nm">Contencioso</div>
+            <div class="carreira-card" data-faculdade="PUC-SP" onclick="selecionarFaculdade(this)">
+              <span class="ic">🗣️</span>
+              <div class="nm">PUC-SP</div>
               <div class="ds">+6 Argumentação · +4 Oratória</div>
             </div>
-            <div class="carreira-card" data-perfil="consultivo" onclick="selecionarPerfil(this)">
-              <span class="ic">📋</span>
-              <div class="nm">Consultivo</div>
-              <div class="ds">+6 Escrita · +4 Pesquisa</div>
-            </div>
-            <div class="carreira-card" data-perfil="comercial" onclick="selecionarPerfil(this)">
+            <div class="carreira-card" data-faculdade="Mackenzie" onclick="selecionarFaculdade(this)">
               <span class="ic">🤝</span>
-              <div class="nm">Comercial</div>
+              <div class="nm">Mackenzie</div>
               <div class="ds">+6 Negociação · +4 Networking</div>
             </div>
-            <div class="carreira-card" data-perfil="peticionante" onclick="selecionarPerfil(this)">
+            <div class="carreira-card" data-faculdade="FGV Direito SP" onclick="selecionarFaculdade(this)">
+              <span class="ic">📊</span>
+              <div class="nm">FGV Direito SP</div>
+              <div class="ds">+6 Gestão · +4 Negociação</div>
+            </div>
+            <div class="carreira-card" data-faculdade="UFRJ" onclick="selecionarFaculdade(this)">
               <span class="ic">✍️</span>
-              <div class="nm">Peticionante</div>
+              <div class="nm">UFRJ</div>
               <div class="ds">+6 Escrita · +4 Argumentação</div>
             </div>
-            <div class="carreira-card" data-perfil="audiencista" onclick="selecionarPerfil(this)">
+            <div class="carreira-card" data-faculdade="PUC-Rio" onclick="selecionarFaculdade(this)">
               <span class="ic">🎤</span>
-              <div class="nm">Audiencista</div>
+              <div class="nm">PUC-Rio</div>
               <div class="ds">+6 Oratória · +4 Persuasão</div>
+            </div>
+            <div class="carreira-card" data-faculdade="UERJ" onclick="selecionarFaculdade(this)">
+              <span class="ic">💬</span>
+              <div class="nm">UERJ</div>
+              <div class="ds">+6 Persuasão · +4 Escrita</div>
+            </div>
+            <div class="carreira-card" data-faculdade="UFMG" onclick="selecionarFaculdade(this)">
+              <span class="ic">🔬</span>
+              <div class="nm">UFMG</div>
+              <div class="ds">+6 Pesquisa · +4 Argumentação</div>
+            </div>
+            <div class="carreira-card" data-faculdade="UnB" onclick="selecionarFaculdade(this)">
+              <span class="ic">🏛️</span>
+              <div class="nm">UnB</div>
+              <div class="ds">+6 Argumentação · +4 Networking</div>
+            </div>
+            <div class="carreira-card" data-faculdade="UFRGS" onclick="selecionarFaculdade(this)">
+              <span class="ic">⚖️</span>
+              <div class="nm">UFRGS</div>
+              <div class="ds">+6 Negociação · +4 Persuasão</div>
             </div>
           </div>
         </div>
@@ -712,42 +684,26 @@ window.fazerLogin = async () => {
   }
 };
 
-// ── Seleção de carreira ──
-const CARREIRA_INFO = {
-  adv_privado: 'Começa como Estagiário e passa pela OAB antes de advogar. Sem salário fixo — seus ganhos vêm de honorários de sucesso (30% + sucumbência). Total autonomia.',
-  inhouse:     'Contratado em empresa. Salário fixo desde o início (pós-OAB). Progressão interna mais rápida, porém menos autonomia na escolha de casos.',
-  juiz:        'Carreira pública: Estagiário → OAB → Advogado Sênior → 3 anos de experiência → Concurso da Magistratura (muito difícil). Salário alto, estabilidade máxima.',
-  promotor:    'Carreira pública: mesmo percurso até o concurso do MP. Exige processo penal e constitucional aprofundados. Prestígio enorme.',
-  defensor:    'Carreira pública: concurso da DPE/DPU. Foco em direitos fundamentais e assistência a populações vulneráveis. Muito respeitado.',
-};
-
-window.selecionarCarreira = (el) => {
-  document.querySelectorAll('.carreira-card[data-carreira]').forEach(c => c.classList.remove('selecionado'));
-  el.classList.add('selecionado');
-  const info = document.getElementById('carreira-info');
-  info.textContent = CARREIRA_INFO[el.dataset.carreira] || '';
-  info.style.display = 'block';
-  validarCriacao();
-};
-
-window.selecionarPerfil = (el) => {
-  document.querySelectorAll('.carreira-card[data-perfil]').forEach(c => c.classList.remove('selecionado'));
+window.selecionarFaculdade = (el) => {
+  document.querySelectorAll('.carreira-card[data-faculdade]').forEach(c => c.classList.remove('selecionado'));
   el.classList.add('selecionado');
   validarCriacao();
 };
 
-// ── Criação de personagem em 3 etapas (identidade → carreira → perfil) ──
-const CRIACAO_NOMES_ETAPA = { 1: 'Identidade', 2: 'Trilha de carreira', 3: 'Perfil inicial' };
+// ── Criação de personagem em 2 etapas (identidade → faculdade) ──
+// Carreira era escolhível antes (Advogado Privado/In-House/Magistratura/MP/
+// Defensoria) — cortada: só Estagiário → OAB → escritório existe de fato
+// hoje (concurso público trava em "Em breve" nas 4 carreiras públicas, ver
+// tela Concurso Público). Manter a escolha era oferecer opção sem efeito.
+const CRIACAO_NOMES_ETAPA = { 1: 'Identidade', 2: 'Faculdade' };
 let _criacaoEtapa = 1;
 
 function criacaoEtapaValida(n) {
   const nome = document.getElementById('inp-nome').value.trim();
   const esp  = document.getElementById('inp-esp').value;
-  const carr = document.querySelector('.carreira-card[data-carreira].selecionado');
-  const perf = document.querySelector('.carreira-card[data-perfil].selecionado');
+  const fac  = document.querySelector('.carreira-card[data-faculdade].selecionado');
   if (n === 1) return nome.length >= 3 && !!esp;
-  if (n === 2) return !!carr;
-  if (n === 3) return !!perf;
+  if (n === 2) return !!fac;
   return false;
 }
 
@@ -757,16 +713,16 @@ function criacaoAtualizarUI() {
   });
   document.getElementById('criacao-passo-num').textContent = String(_criacaoEtapa);
   document.getElementById('criacao-passo-nome').textContent = CRIACAO_NOMES_ETAPA[_criacaoEtapa];
-  document.getElementById('criacao-progresso-fill').style.width = (_criacaoEtapa / 3 * 100) + '%';
+  document.getElementById('criacao-progresso-fill').style.width = (_criacaoEtapa / 2 * 100) + '%';
   document.getElementById('btn-voltar').style.display = _criacaoEtapa > 1 ? '' : 'none';
-  document.getElementById('btn-continuar').style.display = _criacaoEtapa < 3 ? '' : 'none';
-  document.getElementById('btn-criar').style.display = _criacaoEtapa === 3 ? '' : 'none';
+  document.getElementById('btn-continuar').style.display = _criacaoEtapa < 2 ? '' : 'none';
+  document.getElementById('btn-criar').style.display = _criacaoEtapa === 2 ? '' : 'none';
   validarCriacao();
 }
 
 window.criacaoContinuar = () => {
   if (!criacaoEtapaValida(_criacaoEtapa)) return;
-  _criacaoEtapa = Math.min(3, _criacaoEtapa + 1);
+  _criacaoEtapa = Math.min(2, _criacaoEtapa + 1);
   criacaoAtualizarUI();
 };
 
@@ -778,10 +734,9 @@ window.criacaoVoltar = () => {
 window.validarCriacao = () => {
   const nome  = document.getElementById('inp-nome').value.trim();
   const esp   = document.getElementById('inp-esp').value;
-  const carr  = document.querySelector('.carreira-card[data-carreira].selecionado');
-  const perf  = document.querySelector('.carreira-card[data-perfil].selecionado');
+  const fac   = document.querySelector('.carreira-card[data-faculdade].selecionado');
   document.getElementById('btn-continuar').disabled = !criacaoEtapaValida(_criacaoEtapa);
-  document.getElementById('btn-criar').disabled = !(nome.length >= 3 && esp && carr && perf);
+  document.getElementById('btn-criar').disabled = !(nome.length >= 3 && esp && fac);
 };
 
 // ── Criar personagem ──
@@ -789,14 +744,13 @@ window.criarPersonagem = async () => {
   const user = auth.currentUser;
   if (!user) return;
 
-  const nome     = document.getElementById('inp-nome').value.trim();
-  const esp      = document.getElementById('inp-esp').value;
-  const carreira = document.querySelector('.carreira-card[data-carreira].selecionado')?.dataset.carreira;
-  const perfil   = document.querySelector('.carreira-card[data-perfil].selecionado')?.dataset.perfil;
-  const errEl    = document.getElementById('msg-erro-criacao');
+  const nome      = document.getElementById('inp-nome').value.trim();
+  const esp       = document.getElementById('inp-esp').value;
+  const faculdade = document.querySelector('.carreira-card[data-faculdade].selecionado')?.dataset.faculdade;
+  const errEl     = document.getElementById('msg-erro-criacao');
 
-  if (!nome || !esp || !carreira || !perfil) {
-    errEl.textContent = 'Preencha todos os campos, incluindo o perfil inicial.';
+  if (!nome || !esp || !faculdade) {
+    errEl.textContent = 'Preencha todos os campos, incluindo a faculdade.';
     return;
   }
   if (nome.length < 3 || nome.length > 50) {
@@ -821,16 +775,24 @@ window.criarPersonagem = async () => {
       gestao:5,   networking:5,
     };
 
-    // 10 pontos extras distribuídos conforme o PERFIL escolhido (6+4)
-    const PERFIL_BOOST = {
-      pesquisador:  { pesquisa:6,     escrita:4      },
-      contencioso:  { argumentacao:6, oratoria:4     },
-      consultivo:   { escrita:6,      pesquisa:4     },
-      comercial:    { negociacao:6,   networking:4   },
-      peticionante: { escrita:6,      argumentacao:4 },
-      audiencista:  { oratoria:6,     persuasao:4    },
+    // 10 pontos extras distribuídos conforme o PERFIL DA FACULDADE (6+4) —
+    // mesmas 10 faculdades reais usadas no seed de julgadores (Alumni
+    // Network, functions/julgadores_seed.js:FACULDADES_DIREITO), pra que
+    // "faculdade" seja o mesmo campo/valores em todo o jogo desde o início
+    // (antes só era sorteado na primeira visita a Sistemas Sociais).
+    const FACULDADE_BOOST = {
+      'USP':            { pesquisa:6,     escrita:4      },
+      'PUC-SP':         { argumentacao:6, oratoria:4     },
+      'Mackenzie':      { negociacao:6,   networking:4   },
+      'FGV Direito SP': { gestao:6,       negociacao:4   },
+      'UFRJ':           { escrita:6,      argumentacao:4 },
+      'PUC-Rio':        { oratoria:6,     persuasao:4    },
+      'UERJ':           { persuasao:6,    escrita:4      },
+      'UFMG':           { pesquisa:6,     argumentacao:4 },
+      'UnB':            { argumentacao:6, networking:4   },
+      'UFRGS':          { negociacao:6,   persuasao:4    },
     };
-    const boost = PERFIL_BOOST[perfil] || {};
+    const boost = FACULDADE_BOOST[faculdade] || {};
     for (const [sk, val] of Object.entries(boost)) {
       skills[sk] = (skills[sk]||0) + val;
     }
@@ -841,8 +803,8 @@ window.criarPersonagem = async () => {
       email:            user.email || '',
       nome_personagem:  nome,
       especialidade:    esp,
-      carreira,
-      perfil_inicial:   perfil,
+      carreira:         'adv_privado',
+      faculdade,
       criado_em:        new Date().toISOString(),
       ultimo_login:     new Date().toISOString(),
 
