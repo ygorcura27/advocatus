@@ -1832,19 +1832,18 @@ a:hover { color: var(--txt); }
 
 .esc-card-bloco {
   background: var(--surface);
-  border: 1px solid var(--navy-light);
+  border: var(--borda);
   border-radius: var(--r2);
   padding: 1rem;
-  box-shadow: var(--sombra2);
+  box-shadow: var(--sombra);
   overflow: hidden;
 }
 .esc-card-bloco .secao-header {
-  margin: -1rem -1rem .8rem; padding: .55rem 1rem;
-  background: linear-gradient(180deg, var(--navy2), var(--navy));
-  border-bottom: 2px solid var(--ouro2);
+  margin: 0 0 .8rem; padding: 0 0 .6rem;
+  border-bottom: 1px solid var(--borda);
 }
-.esc-card-bloco .secao-titulo { font-size: .8rem; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: .04em; }
-.esc-card-bloco .secao-header .esc-ver-todos { color: var(--ouro); }
+.esc-card-bloco .secao-titulo { font-size: .8rem; font-weight: 700; color: var(--txt); text-transform: uppercase; letter-spacing: .04em; }
+.esc-card-bloco .secao-header .esc-ver-todos { color: var(--navy4); }
 
 /* Linha de oportunidade/vaga (Contratação, Clientes) — do mockup */
 .oport-row { display: grid; grid-template-columns: 1fr 128px 108px; gap: 1rem; align-items: center; padding: .9rem 1.1rem; border-bottom: 1px solid var(--borda); }

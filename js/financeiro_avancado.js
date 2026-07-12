@@ -78,7 +78,7 @@ window.renderFinanceiroAvancado = async function(j, el) {
       .inv-tipo-card:hover{border-color:var(--azul-accent,#4A90E2);background:rgba(74,144,226,.06)}
     </style>
 
-    ${window._capaHeader(`FINANCEIRO · ${(j.nome_personagem||'—').toUpperCase()}`, '💳 Financeiro Avançado', '')}
+    ${window._capaHeader(`FINANCEIRO · ${(j.nome_personagem||'—').toUpperCase()}`, '📊 Investimentos & Financeiro', '')}
 
     ${_htmlPortfolio(inv)}
     ${_htmlSocioInvestidor(esc, escTier, escId)}

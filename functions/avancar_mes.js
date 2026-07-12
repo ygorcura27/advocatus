@@ -30,6 +30,20 @@ const { processarRoyaltiesLivros } = require('./artigos_livros');
 
 const ENERGIA_TOTAL        = 100;
 
+// Benefícios dos Funcionários (GDD proposta → real nesta sessão). Custo é
+// por funcionário coberto (todos os ativos do escritório, cobertura em
+// bloco — não dá pra escolher quem recebe). Efeitos aplicados direto em
+// estresse/reputacao_interna no processamento mensal de NPCs, mesmos
+// campos que já regem burnout/saída por estresse (functions/avancar_mes.js
+// mais abaixo: estresse>=85 → aviso_saida, streak de 3 meses → demissão).
+const BENEFICIOS_CATALOGO = {
+  plano_saude:    { label: 'Plano de Saúde',        custo_por_func: 300, efeito_estresse: -8,  efeito_rep_interna: 3 },
+  vale_refeicao:  { label: 'Vale-Refeição',         custo_por_func: 150, efeito_estresse: -3,  efeito_rep_interna: 2 },
+  plano_odonto:   { label: 'Plano Odontológico',    custo_por_func: 80,  efeito_estresse: -2,  efeito_rep_interna: 1 },
+  gympass:        { label: 'Gympass',               custo_por_func: 120, efeito_estresse: -5,  efeito_rep_interna: 2 },
+  bonus_perform:  { label: 'Bônus por Performance',  custo_por_func: 400, efeito_estresse: -5,  efeito_rep_interna: 5 },
+};
+
 const REP_CAP = {
   est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100, snm:100,
   jsub:55, jtit:70, dsb:85, mstj:100,
@@ -142,7 +156,18 @@ function _sentencaOutcomeNPC(efic) {
   return                   _rollSentenca([.01,.12,.87]);
 }
 
-async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid) {
+async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid, esc) {
+  // Benefícios ativos: soma dos efeitos, cobertura em bloco pra todos os NPCs
+  const beneficiosAtivos = (esc && esc.beneficios_ativos) || [];
+  let benefEstresse = 0, benefRepInterna = 0, benefCustoPorFunc = 0;
+  for (const bid of beneficiosAtivos) {
+    const cfg = BENEFICIOS_CATALOGO[bid];
+    if (!cfg) continue;
+    benefEstresse += cfg.efeito_estresse;
+    benefRepInterna += cfg.efeito_rep_interna;
+    benefCustoPorFunc += cfg.custo_por_func;
+  }
+
   // Buscar todos os processos em andamento por NPCs (exclui processos assumidos pelo jogador)
   const poolSnap = await escRef.collection('processos_pool')
     .where('status', '==', 'em_andamento').get();
@@ -338,6 +363,29 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid) {
   }
   if (fProms.length) await Promise.all(fProms);
   if (logsBurn.length) await Promise.all(logsBurn);
+
+  // ── Benefícios dos Funcionários — efeito mensal em TODOS os NPCs ativos
+  // (não só os que tiveram processo este mês) + custo total descontado do
+  // caixa do escritório. Real desde esta sessão (functions/index.js não
+  // precisa mudar — roda dentro do avançar mês já existente).
+  const npcsAtivosBenef = Object.values(npcMap).filter(f => f.tipo === 'npc' && f.ativo !== false);
+  if (beneficiosAtivos.length > 0 && npcsAtivosBenef.length > 0) {
+    const FVb = require('firebase-admin/firestore').FieldValue;
+    // increment (não leitura+escrita) de propósito: NPCs com processo este mês
+    // já tiveram estresse/reputacao_interna recalculados e commitados acima
+    // (fProms) — ler do npcMap aqui pegaria o valor ANTES daquele recálculo
+    // e sobrescreveria o resultado certo. Increment aplica por cima do que
+    // já está salvo, não importa a ordem.
+    const benefProms = npcsAtivosBenef.map(f => f.ref.update({
+      estresse:          FVb.increment(benefEstresse),
+      reputacao_interna: FVb.increment(benefRepInterna),
+    }));
+    const custoTotal = benefCustoPorFunc * npcsAtivosBenef.length;
+    if (custoTotal > 0) {
+      benefProms.push(escRef.update({ caixa: FVb.increment(-custoTotal) }));
+    }
+    await Promise.all(benefProms);
+  }
 
   // ── Competição Mensal — Ranking entre NPCs ──────────────────────────────────
   if (rankingData.length >= 2) {
@@ -2076,7 +2124,7 @@ async function _processarServicosMensalCF(db, uid, j) {
   const esc  = escSnap.data();
   const tier = esc.tier || 1;
 
-  await _processarProgressoNPCsCF(db, escRef, esc.mes_global || 0, uid);
+  await _processarProgressoNPCsCF(db, escRef, esc.mes_global || 0, uid, esc);
 
   try {
     const fSnapFresh = await escRef.collection('funcionarios').get();

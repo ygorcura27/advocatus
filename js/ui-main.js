@@ -86,9 +86,7 @@ function _navLateralPadrao(painel) {
     <div class="nav-grupo">
       <div class="nav-grupo-titulo">Vida</div>
       <div class="nav-item${ativo('patrimonio')}" onclick="navTo('patrimonio',this)"><span class="ni-icon">${icon('patrimonio')}</span> Patrimônio</div>
-      <div class="nav-item${ativo('financeiro')}" onclick="navTo('financeiro',this)"><span class="ni-icon">${icon('financeiro')}</span> Finanças Avançadas</div>
-      <div class="nav-item${ativo('assembleia')}" onclick="navTo('assembleia',this)"><span class="ni-icon">${icon('assembleia')||'🏛️'}</span> Assembleia de Sócios</div>
-      <div class="nav-item${ativo('marketing')}" onclick="navTo('marketing',this)"><span class="ni-icon">${icon('marketing')||'📣'}</span> Marketing</div>
+      <div class="nav-item${ativo('financeiro')}" onclick="navTo('financeiro',this)"><span class="ni-icon">${icon('financeiro')}</span> Investimentos & Financeiro</div>
       <div class="nav-item${ativo('loja')}" onclick="navTo('loja',this)"><span class="ni-icon">${icon('loja')}</span> Loja</div>
       <div class="nav-item${ativo('vida_pessoal')}" onclick="navTo('vida_pessoal',this)"><span class="ni-icon">${icon('vida_pessoal')}</span> Vida Pessoal</div>
     </div>
@@ -110,13 +108,17 @@ function _navLateralPadrao(painel) {
 // Painéis que pertencem à "seção" Escritório — o menu lateral é fixo entre
 // eles (igual Popmundo: só o item ativo muda, nunca vira submenu diferente).
 const ESC_PAINEIS = {
-  escritorio: 'visao-geral',
-  processos:  'visao-geral',
-  balancete:  'balancete',
-  equipe:     'equipe',
-  clientes:   'clientes',
-  repertorio: 'repertorio',
+  escritorio:   'visao-geral',
+  processos:    'visao-geral',
+  balancete:    'balancete',
+  equipe:       'equipe',
+  clientes:     'clientes',
+  repertorio:   'repertorio',
   midia_convites: 'midia',
+  marketing:    'marketing',
+  assembleia:   'assembleia',
+  contratacao:  'contratacao',
+  treinamento:  'treinamento',
 };
 
 function _renderSidebarLateral(painel) {
@@ -1060,11 +1062,14 @@ function _escSideMenu(ativo, semWrapper) {
       { id: 'assistentes',  iconKey:'assistentes', label: 'Assistentes',  fn: "window._pendingScrollId='equipe-grupo-assistentes';window.switchEquipeTab&&window.switchEquipeTab('equipe');window.navTo('equipe',null)" },
       { id: 'advogados',    iconKey:'advogados',   label: 'Advogados',    fn: "window._pendingScrollId='equipe-grupo-advogados';window.switchEquipeTab&&window.switchEquipeTab('equipe');window.navTo('equipe',null)" },
       { id: 'diario',       iconKey:'diario',      label: 'Diário',       fn: "window.switchEquipeTab&&window.switchEquipeTab('diario');window.navTo('equipe',null)" },
+      { id: 'contratacao',  iconKey:'oportunidades', label: 'Contratação', fn: "window.navTo('contratacao',null)" },
+      { id: 'treinamento',  iconKey:'cursos',      label: 'Mentoria & Treinamento', fn: "window.navTo('treinamento',null)" },
     ]},
     { titulo: 'Negócios', links: [
       { id: 'clientes',       iconKey:'clientes',       label: 'Clientes',       fn: "window.navTo('clientes',null)" },
       { id: 'oportunidades',  iconKey:'oportunidades',  label: 'Oportunidades',  fn: "document.getElementById('esc-oportunidades-bloco')?.scrollIntoView({behavior:'smooth'})" },
       { id: 'processos',      iconKey:'documento',      label: 'Processos',      fn: "document.getElementById('esc-processos-bloco')?.scrollIntoView({behavior:'smooth'})" },
+      { id: 'marketing',      iconKey:'marketing',      label: 'Marketing',      fn: "window.navTo('marketing',null)" },
     ]},
     { titulo: 'Petições', links: [
       { id: 'minhas-peticoes', iconKey:'peticoes',   label: 'Minhas Petições',           fn: "window.navTo('peticoes',null)" },
@@ -1074,7 +1079,8 @@ function _escSideMenu(ativo, semWrapper) {
       { id: 'midia', iconKey:'midia', label: 'Aparições na Internet', fn: "window.navTo('midia_convites',null)" },
     ]},
     { titulo: 'Sócios', links: [
-      { id: 'societario', iconKey:'societario', label: 'Estrutura Societária', fn: "document.querySelector('.esc-donut-wrap')?.scrollIntoView({behavior:'smooth'})" },
+      { id: 'societario',  iconKey:'societario',  label: 'Estrutura Societária', fn: "document.querySelector('.esc-donut-wrap')?.scrollIntoView({behavior:'smooth'})" },
+      { id: 'assembleia',  iconKey:'assembleia',  label: 'Assembleia de Sócios', fn: "window.navTo('assembleia',null)" },
     ]},
   ];
   const grupos = GRUPOS.map(g => `
