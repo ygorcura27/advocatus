@@ -1545,30 +1545,72 @@ function renderFoco(j, el) {
       }).join('')}
     </details>`).join('');
 
+  const focoAtual = j.foco_atual || null;
+  const FOCO_OPCOES = [
+    { k:'estudar',   icone:'📖', label:'Estudar Habilidade', tag:'real', tela:null },
+    { k:'peticoes',  icone:'📄', label:'Escrever Petição',   tag:'real', tela:'peticoes' },
+    { k:'cursos',    icone:'🎓', label:'Curso / Pós',         tag:'real', tela:'cursos' },
+    { k:'concurso',  icone:'🏛️', label:'Concurso Público',    tag:'real, travado', tela:'concurso' },
+  ];
+  const focoLockedHtml = focoAtual
+    ? `<div class="card" style="margin-bottom:1rem;border-color:var(--navy3);background:rgba(22,214,168,.06)">
+        <div style="font-size:.72rem;color:var(--navy4)">🔒 Foco travado neste mês</div>
+        <div style="font-size:.9rem;font-weight:700;color:var(--txt);margin-top:.2rem">${FOCO_OPCOES.find(o=>o.k===focoAtual)?.label || focoAtual}</div>
+        <button class="btn btn-ghost btn-sm" style="margin-top:.5rem" onclick="window._focoSelecionar(null)">Destravar</button>
+      </div>`
+    : `<div class="card" style="margin-bottom:1rem;color:var(--txt4);font-size:.72rem">Nenhum foco travado ainda — clique num card abaixo pra travar (fica valendo até você trocar).</div>`;
+
+  const cardsHtml = FOCO_OPCOES.map(o => {
+    const selecionado = focoAtual === o.k;
+    return `<div class="esc-acao-btn" style="cursor:pointer;position:relative;${selecionado?'border-color:var(--navy3);background:rgba(22,214,168,.08)':''}" onclick="window._focoSelecionar('${o.k}')">
+      ${selecionado ? `<span style="position:absolute;top:.3rem;right:.4rem;font-size:.7rem">🔒</span>` : ''}
+      <span class="esc-acao-icone">${o.icone}</span>
+      <span>${o.label}<br><small style="opacity:.7">${o.tag}</small></span>
+      ${o.tela ? `<a href="#" style="display:block;margin-top:.3rem;font-size:.62rem;color:var(--navy4)" onclick="event.stopPropagation();window.navTo('${o.tela}',null)">abrir tela →</a>` : ''}
+    </div>`;
+  }).join('');
+
+  const propostaHtml = `
+    <div class="esc-acao-btn" style="opacity:.5;cursor:not-allowed" title="Só aparece no recesso mensal, não é ação avulsa"><span class="esc-acao-icone">🍷</span><span>Networking<br><small style="opacity:.7">real (recesso)</small></span></div>
+    <div class="esc-acao-btn" style="opacity:.5;cursor:not-allowed" title="Só aparece no recesso mensal, não é ação avulsa"><span class="esc-acao-icone">🛋️</span><span>Descansar<br><small style="opacity:.7">real (recesso)</small></span></div>
+    <div class="esc-acao-btn" style="opacity:.5;cursor:not-allowed" title="Não existe no jogo — proposta"><span class="esc-acao-icone">📣</span><span>Redes Sociais<br><small style="opacity:.7">📌 proposta</small></span></div>
+    <div class="esc-acao-btn" style="opacity:.5;cursor:not-allowed" title="Jogador não tem stat de produtividade — proposta"><span class="esc-acao-icone">💼</span><span>Trabalhar Intensamente<br><small style="opacity:.7">📌 proposta</small></span></div>
+    <div class="esc-acao-btn" style="opacity:.5;cursor:not-allowed" title="Não existe como ação isolada — proposta"><span class="esc-acao-icone">🔨</span><span>Preparar Audiência<br><small style="opacity:.7">📌 proposta</small></span></div>`;
+
   el.innerHTML = `
     ${_capaHeader(`CARREIRA · ${(j.escritorio_nome||'ADVOCACIA SOLO').toUpperCase()}`, '🎯 Foco do Personagem', '')}
     <div class="card" style="font-size:.74rem;color:var(--txt3);margin-bottom:1rem;line-height:1.6">
-      Reúne ações reais que já existem em telas separadas — não é mecânica nova. "Estudar habilidade" é o
-      <code>study_queue</code> real (R$500, +3 fixo, resultado em 1 mês). O resto são atalhos ou está marcado 📌 quando não existe de verdade.
+      Clique num card pra travar como seu foco do mês — fica marcado até você trocar, não navega pra outra tela.
+      Pra executar a ação de verdade (escrever a petição, etc), use "abrir tela →" dentro do card. "Estudar habilidade" é o
+      <code>study_queue</code> real (R$500, +3 fixo, resultado em 1 mês). O resto marcado 📌 é proposta, sem efeito real.
     </div>
 
-    <div class="card" style="margin-bottom:1rem">
-      <div style="font-size:.78rem;font-weight:600;margin-bottom:.4rem;color:var(--txt)">📖 Estudar Habilidade <span style="font-size:.65rem;color:var(--verde2);font-weight:400">real</span></div>
+    ${focoLockedHtml}
+
+    <div class="esc-acoes-grid" style="margin-bottom:1rem">
+      ${cardsHtml}
+      ${propostaHtml}
+    </div>
+
+    <div class="card">
+      <div style="font-size:.78rem;font-weight:600;margin-bottom:.4rem;color:var(--txt)">📖 Estudar Habilidade <span style="font-size:.65rem;color:var(--verde2);font-weight:400">real, independe do foco travado acima</span></div>
       ${queue.length ? `<div style="font-size:.72rem;color:var(--txt3);margin-bottom:.5rem">Fila atual: ${queue.map(q=>q.skill_label||q.skill).join(', ')}</div>` : ''}
       ${gruposHtml}
-    </div>
-
-    <div class="esc-acoes-grid">
-      <button class="esc-acao-btn" onclick="window.navTo('peticoes',null)"><span class="esc-acao-icone">📄</span><span>Escrever Petição<br><small style="opacity:.7">real</small></span></button>
-      <button class="esc-acao-btn" onclick="window.navTo('cursos',null)"><span class="esc-acao-icone">🎓</span><span>Curso / Pós<br><small style="opacity:.7">real</small></span></button>
-      <button class="esc-acao-btn" onclick="window.navTo('concurso',null)"><span class="esc-acao-icone">🏛️</span><span>Concurso Público<br><small style="opacity:.7">real, travado</small></span></button>
-      <button class="esc-acao-btn" disabled title="Só aparece no recesso mensal, não é ação avulsa"><span class="esc-acao-icone">🍷</span><span>Networking<br><small style="opacity:.7">real (recesso)</small></span></button>
-      <button class="esc-acao-btn" disabled title="Só aparece no recesso mensal, não é ação avulsa"><span class="esc-acao-icone">🛋️</span><span>Descansar<br><small style="opacity:.7">real (recesso)</small></span></button>
-      <button class="esc-acao-btn" disabled title="Não existe no jogo — proposta"><span class="esc-acao-icone">📣</span><span>Redes Sociais<br><small style="opacity:.7">📌 proposta</small></span></button>
-      <button class="esc-acao-btn" disabled title="Jogador não tem stat de produtividade — proposta"><span class="esc-acao-icone">💼</span><span>Trabalhar Intensamente<br><small style="opacity:.7">📌 proposta</small></span></button>
-      <button class="esc-acao-btn" disabled title="Não existe como ação isolada — proposta"><span class="esc-acao-icone">🔨</span><span>Preparar Audiência<br><small style="opacity:.7">📌 proposta</small></span></button>
     </div>`;
 }
+
+window._focoSelecionar = async function(key) {
+  const j = window.JOGADOR;
+  const uid = j?.uid || window.JOGADOR_UID;
+  try {
+    await updateDoc(doc(db, 'jogadores', uid), { foco_atual: key });
+    if (window.JOGADOR) window.JOGADOR.foco_atual = key;
+    window.toast(key ? '🔒 Foco travado.' : 'Foco destravado.', 'ok', 1800);
+    renderFoco(window.JOGADOR, document.getElementById('main-content'));
+  } catch (e) {
+    window.toast(e.message || 'Erro ao travar foco.', 'ko');
+  }
+};
 
 // ════════════════════════════════════════════════════════
 // REDES SOCIAIS — perfil de mídia do jogador. Real: skill
