@@ -116,9 +116,12 @@ window.renderPeticoes = async function(j, el) {
             <div style="display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-top:1px solid var(--borda-sub);margin-top:.6rem">
               <div>
                 <div style="font-weight:600;font-size:.82rem;color:var(--txt)">${p.titulo || p.nome}</div>
-                <div style="font-size:.7rem;color:var(--txt3)">${DOC_LABELS[p.document_type]||p.document_type} · ${AREA_LABELS[p.practice_area]||p.practice_area}</div>
+                <div style="font-size:.7rem;color:var(--txt3)">${DOC_LABELS[p.document_type]||p.document_type} · ${AREA_LABELS[p.practice_area]||p.practice_area}${(p.autores||[]).length>1?` · ${p.autores.length} autores`:''}</div>
               </div>
-              <span style="font-size:.72rem;color:var(--ouro2);font-weight:600">⏳ Finaliza no mês ${p.mes_conclusao}</span>
+              <div style="display:flex;align-items:center;gap:.6rem">
+                ${temEscritorio && (p.autores||[]).length < 2 ? `<button class="btn btn-ghost btn-sm" style="font-size:.65rem" onclick="window._abrirModalCoautor('${p.id}')">+ Colega</button>` : ''}
+                <span style="font-size:.72rem;color:var(--ouro2);font-weight:600">⏳ Finaliza no mês ${p.mes_conclusao}</span>
+              </div>
             </div>`).join('')
           : ''}
         <div style="display:flex;gap:.5rem;margin-top:.8rem;flex-wrap:wrap">
@@ -647,6 +650,50 @@ const _PARECERISTA_TIERS = {
   2: { label: 'Especialista', custo: 5000, nota_teto: 14 },
   3: { label: 'Renomado', custo: 12000, nota_teto: 20 },
   4: { label: 'Luminária', custo: 30000, nota_teto: 26 },
+};
+
+window._abrirModalCoautor = async function(peticaoId) {
+  const j = window.JOGADOR;
+  const escId = j.escritorio_proprio_id || j.escritorio_empregado_id;
+  if (!escId) return;
+
+  window.abrirModal('👥 Adicionar Colega Co-autor', `<div style="font-size:.75rem;color:var(--txt3)">Carregando colegas...</div>`);
+
+  try {
+    const snap = await getDocs(query(collection(db, 'escritorios', escId, 'funcionarios'), where('tipo', '==', 'jogador')));
+    const colegas = snap.docs.map(d => d.data()).filter(f => f.jogador_uid && f.jogador_uid !== j.uid);
+
+    if (!colegas.length) {
+      window.abrirModal('👥 Adicionar Colega Co-autor',
+        `<div style="font-size:.78rem;color:var(--txt4)">Nenhum colega jogador real neste escritório (funcionários NPC não contam como co-autor).</div>
+        <button class="btn btn-ghost btn-block" style="margin-top:.6rem" onclick="fecharModal()">Fechar</button>`);
+      return;
+    }
+
+    window.abrirModal('👥 Adicionar Colega Co-autor',
+      `<div class="campo"><label>Colega</label>
+        <select id="coautor-uid">${colegas.map(c=>`<option value="${c.jogador_uid}">${c.nome}</option>`).join('')}</select>
+      </div>
+      <div class="campo"><label>% de contribuição (5-49)</label><input type="number" id="coautor-pct" min="5" max="49" value="20"></div>
+      <div style="display:flex;gap:.5rem;margin-top:.6rem">
+        <button class="btn btn-ghost" style="flex:1" onclick="fecharModal()">Cancelar</button>
+        <button class="btn btn-prim" style="flex:1" onclick="window._confirmarCoautor('${peticaoId}')">Adicionar →</button>
+      </div>`);
+  } catch (e) {
+    window.toast('Erro ao buscar colegas.', 'ko');
+  }
+};
+
+window._confirmarCoautor = async function(peticaoId) {
+  const coautor_uid = document.getElementById('coautor-uid')?.value;
+  const contribuicao_pct = parseInt(document.getElementById('coautor-pct')?.value || 0, 10);
+  try {
+    const fn = httpsCallable(functions, 'adicionarCoAutor');
+    await fn({ peticao_id: peticaoId, coautor_uid, contribuicao_pct });
+    window.fecharModal();
+    toast('✅ Co-autor adicionado.', 'ok', 2500);
+    if (window.JOGADOR) window.renderPeticoes(window.JOGADOR, document.getElementById('main-content'));
+  } catch (e) { toast(e.message || 'Erro ao adicionar co-autor.', 'ko'); }
 };
 
 window._abrirModalParecerista = function() {

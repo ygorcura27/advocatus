@@ -80,6 +80,7 @@ function _navLateralPadrao(painel) {
       <div class="nav-item${ativo('posgraduacao')}" onclick="navTo('posgraduacao',this)"><span class="ni-icon">${icon('posgraduacao')||'🎓'}</span> Pós-Graduação</div>
       <div class="nav-item${ativo('artigos_livros')}" onclick="navTo('artigos_livros',this)"><span class="ni-icon">${icon('artigos_livros')||'📚'}</span> Artigos & Livros</div>
       <div class="nav-item${ativo('sistemas_sociais')}" onclick="navTo('sistemas_sociais',this)"><span class="ni-icon">${icon('sistemas_sociais')||'🌐'}</span> Sistemas Sociais</div>
+      <div class="nav-item${ativo('imprensa')}" onclick="navTo('imprensa',this)"><span class="ni-icon">${icon('imprensa')||'📰'}</span> Imprensa</div>
       <div class="nav-item${ativo('concurso')}" onclick="navTo('concurso',this)"><span class="ni-icon">${icon('concurso')}</span> Concurso Público</div>
     </div>
     <div class="nav-grupo">
@@ -182,6 +183,7 @@ function _renderizar() {
     case 'posgraduacao':  window.renderPosGraduacao(j, main); break;
     case 'artigos_livros': window.renderArtigosLivros(j, main); break;
     case 'sistemas_sociais': window.renderSistemasSociais(j, main); break;
+    case 'imprensa':      window.renderImprensa(j, main); break;
     case 'progressao':   renderProgressao(j, main);    break;
     case 'habilidades':  renderHabilidades(j, main);   break;
     case 'cursos':       renderCursos(j, main);        break;
