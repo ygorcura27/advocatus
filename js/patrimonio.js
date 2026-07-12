@@ -204,10 +204,8 @@ window.renderPatrimonio = function(j, el) {
   const saldoLiq   = (j.renda_calculada||0) - despTotal - custoVida;
 
   el.innerHTML = `
-        <div class="secao-header">
-          <div class="secao-titulo">🏠 Patrimônio</div>
-          <span class="secao-badge">Rep de patrimônio: +${_calcRepPat(j)}</span>
-        </div>
+        ${window._capaHeader(`PATRIMÔNIO · ${(j.nome_personagem||'—').toUpperCase()}`, '🏛️ Patrimônio Pessoal',
+          `<span class="pill pill-oab">Rep de patrimônio: +${_calcRepPat(j)}</span>`)}
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-bottom:1.2rem">
           ${_card4('💰','Saldo',fmt(j.dinheiro||0),'money')}
           ${_card4('📈','Renda',fmt(j.renda_calculada||0),'money')}
@@ -455,10 +453,8 @@ function _renderLojaTela(el, catSel, itemSel) {
   const item = itemSel ? itensDaCategoria.find(it => it.id === itemSel) : itensDaCategoria[0];
 
   el.innerHTML = `
-    <div class="secao-header">
-      <div class="secao-titulo">🛍️ Loja</div>
-      <span class="secao-badge">Saldo: ${fmt(j.dinheiro||0)}</span>
-    </div>
+    ${window._capaHeader('LOJA · ADVOCATUS ONLINE', 'Fazer Compras',
+      `<span class="pill pill-oab" style="color:var(--verde2);border-color:rgba(107,151,96,.4)">Saldo ${fmt(j.dinheiro||0)}</span>`)}
 
     <div class="esc-card-bloco" style="margin-bottom:1rem">
       <div class="secao-header" style="margin-bottom:.6rem"><div class="secao-titulo" style="font-size:.85rem">Fazer Compras</div></div>

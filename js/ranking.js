@@ -12,10 +12,8 @@ import { db } from './firebase-init.js';
 // ════════════════════════════════════════════════════════
 window.renderRanking = async function(j, el) {
   el.innerHTML = `
-    <div class="secao-header">
-      <div class="secao-titulo">🏆 Rankings Globais</div>
-      <span class="secao-badge" id="rank-atualizacao">Carregando...</span>
-    </div>
+    ${window._capaHeader('RANKINGS GLOBAIS · ADVOCATUS ONLINE', 'Tabelas de Líderes',
+      `<span class="pill pill-oab" id="rank-atualizacao">Carregando...</span>`)}
 
     <!-- Abas de categoria -->
     <div style="display:flex;gap:.3rem;margin-bottom:1.2rem;flex-wrap:wrap">

@@ -94,12 +94,11 @@ window.renderPeticoes = async function(j, el) {
     const temEscritorio = !!(j.escritorio_proprio_id || j.escritorio_empregado_id);
 
     el.innerHTML = `
-      <div class="secao-header">
-        <div class="secao-titulo">📜 Minhas Petições</div>
-        <div style="display:flex;gap:.5rem">
-          ${temEscritorio ? `<button class="btn btn-ghost btn-sm" onclick="window.navTo('repertorio',null)">📚 Repertório do Escritório</button>` : ''}
-          <button class="btn btn-ghost btn-sm" onclick="window.renderMercadoPeticoes(window.JOGADOR, document.getElementById('main-content'))">🏪 Mercado</button>
-        </div>
+      ${window._capaHeader('REPERTÓRIO PESSOAL · ADVOCATUS ONLINE', 'Minhas Petições',
+        `<span class="pill pill-oab">${peticoes.length} peça${peticoes.length===1?'':'s'} no acervo</span>`)}
+      <div style="display:flex;justify-content:flex-end;gap:.5rem;margin-bottom:.8rem">
+        ${temEscritorio ? `<button class="btn btn-ghost btn-sm" onclick="window.navTo('repertorio',null)">📚 Repertório do Escritório</button>` : ''}
+        <button class="btn btn-ghost btn-sm" onclick="window.renderMercadoPeticoes(window.JOGADOR, document.getElementById('main-content'))">🏪 Mercado</button>
       </div>
 
       ${!j.oab ? _bannerBarExam(j) : ''}

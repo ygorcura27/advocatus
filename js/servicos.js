@@ -143,10 +143,8 @@ window.renderClientes = async function(j, el) {
  
   el.innerHTML = `
     <div style="margin-bottom:.8rem"><button class="btn btn-ghost btn-sm" onclick="window.navTo('escritorio',null)">← Escritório</button></div>
-    <div class="secao-header">
-      <div class="secao-titulo">📁 Clientes — ${esc.nome}</div>
-      <span class="secao-badge">Tier ${tier}</span>
-    </div>
+    ${window._capaHeader(`CARTEIRA DE CLIENTES · ${(esc.nome||'—').toUpperCase()}`, 'Clientes',
+      `<span class="pill pill-oab">${clientes.length} na carteira</span><span class="pill pill-cargo">Tier ${tier}</span>`)}
  
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-bottom:1.2rem">
       <div class="stat-mini">

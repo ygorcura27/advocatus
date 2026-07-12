@@ -97,7 +97,7 @@ window.renderAssembleiaSocios = async function(j, el) {
   }).join('') : `<div class="card" style="color:var(--txt4)">Nenhuma votação ainda.</div>`;
 
   el.innerHTML = `
-    <div class="secao-header"><div class="secao-titulo">🏛️ Assembleia de Sócios</div></div>
+    ${window._capaHeader(`GOVERNANÇA · ${(esc.nome||'—').toUpperCase()}`, '🏛️ Assembleia de Sócios', '')}
     <div class="card" style="font-size:.74rem;color:var(--txt3);margin-bottom:1rem;line-height:1.6">
       Cada sócio vota conforme sua % de participação. Aprovada se % sim > % não entre quem votou.
       A votação só registra a decisão — executar (aportar, contratar, mudar de tier etc) continua sendo uma ação manual à parte.

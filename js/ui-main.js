@@ -1113,6 +1113,7 @@ function _capaHeader(kicker, nome, pillsHtml, seloHtml) {
     ${seloHtml || ''}
   </section>`;
 }
+window._capaHeader = _capaHeader;
 
 function _escHero(j, esc) {
   const escNome = (esc && esc.nome) || j.escritorio_nome || 'Advocacia Solo';

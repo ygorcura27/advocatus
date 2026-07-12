@@ -144,10 +144,8 @@ window.renderVidaPessoal = async function(j, el) {
                  felicidade >= 40 ? 'var(--amber)' : 'var(--verm2)';
 
   el.innerHTML = `
-    <div class="secao-header">
-      <div class="secao-titulo">💞 Vida Pessoal</div>
-      <span class="secao-badge" style="background:${corFel}20;color:${corFel}">😊 Felicidade: ${felicidade}/100</span>
-    </div>
+    ${window._capaHeader('VIDA PESSOAL · ADVOCATUS ONLINE', 'Vida Fora do Escritório',
+      `<span class="pill pill-cargo" style="background:${corFel}20;color:${corFel};border-color:${corFel}55">😊 Felicidade ${felicidade}/100</span>`)}
 
     <!-- Academia -->
     ${_renderAcademia(j)}

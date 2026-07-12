@@ -390,7 +390,7 @@ let _concursoState = null;
 // abaixo, só não está mais acessível pela UI até serem finalizados).
 window.renderConcursoPanel = function(j, el) {
   el.innerHTML = `
-    <div class="secao-header"><div class="secao-titulo">🔨 Concurso Público</div></div>
+    ${window._capaHeader('CARREIRA PÚBLICA · ADVOCATUS ONLINE', 'Concurso Público', '<span class="pill pill-oab">Requer OAB + 3 anos de carreira</span>')}
     <div style="display:flex;flex-direction:column;gap:.6rem">
       <div class="card" onclick="window.navTo('habilidades',null)" style="cursor:pointer">
         <div style="display:flex;align-items:center;gap:.7rem">
@@ -511,7 +511,8 @@ window.renderCursosPanel = function(j, el) {
   const cap         = window.REP_CAP[j.cargo_id] || 55;
 
   el.innerHTML = `
-    <div class="secao-header"><div class="secao-titulo">🎓 Cursos & Pós-Graduação</div></div>
+    ${window._capaHeader('CURSOS & PÓS-GRADUAÇÃO · ADVOCATUS ONLINE', 'Formação Continuada',
+      `<span class="pill pill-oab">${feitos.length} concluído${feitos.length===1?'':'s'}</span><span class="pill pill-oab">${Object.keys(matriculas).length} em andamento</span>`)}
     <div style="font-size:.75rem;color:var(--ardosia2);margin-bottom:1rem">
       Cursos levam meses para concluir. Frequente a aula todo mês — abaixo de 75% de presença, você é reprovado.
     </div>

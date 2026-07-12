@@ -62,6 +62,9 @@ window.renderVagas = async function(j, el) {
   };
 
   el.innerHTML = `
+    ${window._capaHeader('MERCADO DE TRABALHO · ADVOCATUS ONLINE', 'Vagas',
+      `<span class="pill pill-oab">Prestígio no nível atual: ${presPerc}%</span>${j.escritorio_proprio_id ? `<span class="pill pill-oab" style="color:var(--ouro)">Você já é dono(a) do próprio escritório</span>` : ''}`)}
+
     ${convites.length > 0 ? `
     <div class="secao-header">
       <div class="secao-titulo">📬 Convites Recebidos</div>
