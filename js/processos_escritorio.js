@@ -1140,6 +1140,21 @@ window.gerarProcessosMensais = async function(escId, tierEscritorio) {
 
 // ─── Delegar Gestão ───────────────────────────────────────────────────────────
 
+// Departamentos reais (agrupam as 11 áreas de processo — mesmo agrupamento
+// de functions/avancar_mes.js::DEPTO_AREA_AGRUPADA, precisa ficar em sincronia).
+const _DG_DEPARTAMENTOS = [
+  { k: 'civil',        l: '⚖️ Cível',       skill: 'area_civil'      },
+  { k: 'trabalhista',  l: '👔 Trabalhista', skill: 'area_employment' },
+  { k: 'tributario',   l: '💰 Tributário',  skill: 'area_tax'        },
+  { k: 'empresarial',  l: '🏢 Empresarial', skill: 'area_corporate'  },
+  { k: 'criminal',     l: '🚨 Criminal',    skill: 'area_criminal'   },
+];
+const _DG_CARGO_L = { est:'Estagiário', ass:'Assistente', jnr:'Júnior', pln:'Pleno', snr:'Sênior', asc:'Associado', soc:'Sócio' };
+let _dgEscId = null;
+let _dgNpcs  = [];
+let _dgEscopo = 'geral';
+let _dgDeptosSel = {};
+
 window.abrirDelegacaoGestao = async function(escId) {
   const fSnap = await getDocs(query(
     collection(db, 'escritorios', escId, 'funcionarios'),
@@ -1153,26 +1168,103 @@ window.abrirDelegacaoGestao = async function(escId) {
     return;
   }
 
-  const CARGO_L = { est:'Estagiario', ass:'Assistente', jnr:'Junior', pln:'Pleno', snr:'Senior', asc:'Associado', soc:'Socio' };
+  const escSnap = await getDoc(doc(db, 'escritorios', escId));
+  const esc = escSnap.exists() ? escSnap.data() : {};
 
-  abrirModal('👤 Delegar Gestao do Escritorio',
-    `<div style="font-size:.78rem;color:var(--txt2);margin-bottom:1rem">
-      O gestor designado atribuira automaticamente processos disponiveis a equipe no inicio de cada mes.
-      O dono ainda controla recursos e execucao de sentencas.
+  _dgEscId     = escId;
+  _dgNpcs      = npcs;
+  _dgEscopo    = esc.gestor_escopo === 'departamento' ? 'departamento' : 'geral';
+  _dgDeptosSel = { ...(esc.gestores_departamento || {}) };
+
+  abrirModal('👤 Delegar Gestão do Escritório', _dgRenderModal(esc));
+};
+
+function _dgRenderModal(esc) {
+  const escopoBtn = (v, label, desc) => `
+    <div class="card" style="flex:1;min-width:180px;cursor:pointer;padding:.7rem .8rem;border-color:${_dgEscopo===v?'var(--navy3)':'var(--borda2)'};background:${_dgEscopo===v?'var(--verde-bg)':'var(--surface)'}"
+      onclick="window._dgSetEscopo('${v}')">
+      <div style="font-weight:600;font-size:.8rem;color:var(--txt)">${label}</div>
+      <div style="font-size:.66rem;color:var(--txt3);margin-top:.2rem">${desc}</div>
+    </div>`;
+
+  return `
+    <div style="font-size:.78rem;color:var(--txt2);margin-bottom:.8rem">
+      Processos disponíveis são atribuídos automaticamente à equipe no início de cada mês.
+      O dono ainda controla recursos e execução de sentenças.
     </div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem">
+      ${escopoBtn('geral', '🏢 Escritório Todo', 'Um gestor único distribui tudo, priorizando o NPC mais eficiente disponível.')}
+      ${escopoBtn('departamento', '🗂️ Por Departamento', 'Um gestor por área — processos vão direto pro especialista daquele departamento.')}
+    </div>
+    <div id="dg-conteudo">${_dgEscopo === 'departamento' ? _dgRenderDepartamentos(esc) : _dgRenderGeral(esc)}</div>`;
+}
+
+function _dgRenderGeral(esc) {
+  return `
     <div style="display:flex;flex-direction:column;gap:.4rem">
+      ${esc.gestor_id ? `
       <button class="btn btn-ghost btn-block" style="text-align:left;padding:.6rem .8rem;color:var(--verm2)"
-        onclick="window.removerGestor('${escId}')">
-        ❌ Remover gestor atual
-      </button>
-      ${npcs.map(f => `
+        onclick="window.removerGestor('${_dgEscId}')">
+        ❌ Remover gestor atual (${esc.gestor_nome||'—'})
+      </button>` : ''}
+      ${_dgNpcs.map(f => `
         <button class="btn btn-ghost btn-block" style="text-align:left;padding:.6rem .8rem"
-          onclick="window.salvarGestor('${escId}','${f.id}','${(f.nome||'').replace(/'/g,"\\'")}')">
-          <div style="font-weight:600;font-size:.82rem">${f.nome}</div>
-          <div style="font-size:.65rem;color:var(--txt3)">${CARGO_L[f.cargo_id]||f.cargo_id}</div>
+          onclick="window.salvarGestor('${_dgEscId}','${f.id}','${(f.nome||'').replace(/'/g,"\\'")}')">
+          <div style="font-weight:600;font-size:.82rem">${f.nome} ${esc.gestor_id===f.id?'✓':''}</div>
+          <div style="font-size:.65rem;color:var(--txt3)">${_DG_CARGO_L[f.cargo_id]||f.cargo_id}</div>
         </button>`).join('')}
-    </div>`
-  );
+    </div>`;
+}
+
+function _dgRenderDepartamentos() {
+  const rows = _DG_DEPARTAMENTOS.map(dep => {
+    const atualId = _dgDeptosSel[dep.k] || '';
+    const opts = _dgNpcs.map(f => {
+      const nivel = (f.skills_jur||{})[dep.skill] || 0;
+      const fraco = nivel < 25 ? ' ⚠️ fraco' : '';
+      return `<option value="${f.id}" ${atualId===f.id?'selected':''}>${f.nome} — ${_DG_CARGO_L[f.cargo_id]||f.cargo_id} (${nivel}/50${fraco})</option>`;
+    }).join('');
+    return `
+      <div style="display:flex;align-items:center;gap:.6rem;padding:.5rem 0;border-bottom:1px solid var(--bg2)">
+        <div style="width:110px;font-size:.76rem;color:var(--txt)">${dep.l}</div>
+        <select style="flex:1;font-size:.74rem;padding:.35rem .5rem;background:var(--surface2);color:var(--txt);border:var(--borda-sub);border-radius:var(--r)"
+          onchange="window._dgSetDepto('${dep.k}', this.value)">
+          <option value="">— ninguém —</option>
+          ${opts}
+        </select>
+      </div>`;
+  }).join('');
+  return `
+    <div style="font-size:.66rem;color:var(--txt4);margin-bottom:.4rem">Domínio de área é real (skills_jur do NPC) — abaixo de 25/50 marca ⚠️ fraco, esse gestor ainda recebe o processo mas o resultado não é reforçado por especialização.</div>
+    ${rows}
+    <button class="btn btn-prim btn-block" style="margin-top:.8rem" onclick="window._dgSalvarDepartamentos()">✓ Salvar Delegação por Departamento</button>`;
+}
+
+window._dgSetEscopo = function(v) {
+  _dgEscopo = v;
+  // Reabre o modal inteiro (não só #dg-conteudo) pra recolorir os cards
+  // de escopo selecionado, que vivem fora desse container.
+  abrirModal('👤 Delegar Gestão do Escritório', _dgRenderModal({ gestores_departamento: _dgDeptosSel }));
+};
+
+window._dgSetDepto = function(area, funcId) {
+  if (funcId) _dgDeptosSel[area] = funcId;
+  else delete _dgDeptosSel[area];
+};
+
+window._dgSalvarDepartamentos = async function() {
+  try {
+    await updateDoc(doc(db, 'escritorios', _dgEscId), {
+      gestor_escopo: 'departamento',
+      gestores_departamento: _dgDeptosSel,
+    });
+    fecharModal();
+    toast('✅ Delegação por departamento salva.', 'ok', 4000);
+    const elProc = document.getElementById('esc-processos-bloco');
+    if (elProc && window.JOGADOR) window.renderProcessosPool(window.JOGADOR, _dgEscId, elProc);
+  } catch(e) {
+    toast('Erro ao salvar: ' + e.message, 'ko');
+  }
 };
 
 window.salvarGestor = async function(escId, funcId, nome) {
@@ -1180,6 +1272,7 @@ window.salvarGestor = async function(escId, funcId, nome) {
     await updateDoc(doc(db, 'escritorios', escId), {
       gestor_id: funcId,
       gestor_nome: nome,
+      gestor_escopo: 'geral',
     });
     fecharModal();
     toast(`✅ ${nome} e o novo gestor do escritorio.`, 'ok', 4000);

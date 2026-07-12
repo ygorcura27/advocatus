@@ -2170,7 +2170,8 @@ async function _processarServicosMensalCF(db, uid, j) {
 
   await _processarAutogestaoOportunidadesCF(db, escRef, esc);
 
-  if (esc.gestor_id && (esc.gestor_delega_processos !== false)) {
+  if ((esc.gestor_escopo === 'departamento' && esc.gestores_departamento) ||
+      (esc.gestor_id && (esc.gestor_delega_processos !== false))) {
     await _autoAtribuirProcessosMensalCF(db, escRef, esc);
   }
 
@@ -2328,6 +2329,25 @@ function _npcPodeManejar(cargo_id, tier) {
   return (_TIER_ORDER_CF[tier] || 0) <= (_TIER_ORDER_CF[maxTier] || 0);
 }
 
+// Delegar Gestão por departamento — agrupa as 11 áreas reais de processo
+// (js/processos_escritorio.js::AREA_DEFAULT) nos 5 departamentos que a UI
+// oferece, e cada departamento aponta pra uma skill_jur.area_* real
+// (seedada em js/equipe.js::_gerarCandidatoNPC) — usada só pra medir
+// "domínio fraco", não existe simulação de resultado por enquanto.
+const DEPTO_AREA_AGRUPADA = {
+  civil:'civil', consumidor:'civil', ambiental:'civil', administrativo:'civil',
+  familia:'civil', imobiliario:'civil',
+  trabalhista:'trabalhista',
+  tributario:'tributario',
+  empresarial:'empresarial', societario:'empresarial',
+  criminal:'criminal',
+};
+const DEPTO_SKILL_AREA = {
+  civil:'area_civil', trabalhista:'area_employment', tributario:'area_tax',
+  empresarial:'area_corporate', criminal:'area_criminal',
+};
+const DEPTO_AREA_FRACA_LIMIAR = 25;
+
 async function _autoAtribuirProcessosMensalCF(db, escRef, esc) {
   const poolSnap = await escRef.collection('processos_pool')
     .where('status', '==', 'disponivel').get();
@@ -2349,30 +2369,53 @@ async function _autoAtribuirProcessosMensalCF(db, escRef, esc) {
     if (fid) procCount[fid] = (procCount[fid] || 0) + 1;
   }
 
-  const gestorNome = esc.gestor_nome || 'O gestor';
+  const gestorNome  = esc.gestor_nome || 'O gestor';
+  const npcMap      = Object.fromEntries(npcsDisponiveis.map(f => [f.id, f]));
+  const escopoDepto = esc.gestor_escopo === 'departamento' && esc.gestores_departamento;
 
-  // Pré-calcular eficiência de cada NPC (usada para priorização)
+  // Pré-calcular eficiência de cada NPC (usada para priorização no fallback)
   const eficMap = {};
   for (const f of npcsDisponiveis) eficMap[f.id] = _eficienciaNPC(f);
 
   // Limite de energia: (procCount+1)*20 <= 80 → máx 4 processos ativos por NPC
   const ENERGIA_LIMITE_PROC = Math.floor((NPC_ENERGIA_MES - NPC_OVERLOAD_TH) / NPC_ENERGIA_POR_PROC); // = 4
 
+  const npcElegivel = (f, proc) => {
+    const atual = procCount[f.id] || 0;
+    const cabeNoMax  = atual < (NPC_MAX_PROC[f.cargo_id] || 1);
+    const naoPerdeEnergia = (atual + 1) <= ENERGIA_LIMITE_PROC;
+    return cabeNoMax && naoPerdeEnergia && _npcPodeManejar(f.cargo_id, proc.tier || 'D');
+  };
+
   for (const procDoc of poolSnap.docs) {
     const proc = procDoc.data();
-    const npc = npcsDisponiveis
-      .filter(f => {
-        const atual = procCount[f.id] || 0;
-        const cabeNoMax  = atual < (NPC_MAX_PROC[f.cargo_id] || 1);
-        const naoPerdeEnergia = (atual + 1) <= ENERGIA_LIMITE_PROC; // não cai abaixo de 20%
-        return cabeNoMax && naoPerdeEnergia && _npcPodeManejar(f.cargo_id, proc.tier || 'D');
-      })
-      // Mais eficiente primeiro; em empate, menos processos ativos
-      .sort((a, b) => {
-        const de = (eficMap[b.id] || 0) - (eficMap[a.id] || 0);
-        if (Math.abs(de) > 0.01) return de;
-        return (procCount[a.id]||0) - (procCount[b.id]||0);
-      })[0];
+    let npc = null;
+    let viaDepartamento = false;
+    let areaFraca = false;
+
+    if (escopoDepto) {
+      const depto = DEPTO_AREA_AGRUPADA[proc.area] || 'civil';
+      const gestorDeptoId = esc.gestores_departamento[depto];
+      const gestorDepto = gestorDeptoId ? npcMap[gestorDeptoId] : null;
+      if (gestorDepto && npcElegivel(gestorDepto, proc)) {
+        npc = gestorDepto;
+        viaDepartamento = true;
+        const skillArea = DEPTO_SKILL_AREA[depto];
+        const nivelArea  = (gestorDepto.skills_jur || {})[skillArea] || 0;
+        areaFraca = nivelArea < DEPTO_AREA_FRACA_LIMIAR;
+      }
+    }
+
+    if (!npc) {
+      npc = npcsDisponiveis
+        .filter(f => npcElegivel(f, proc))
+        // Mais eficiente primeiro; em empate, menos processos ativos
+        .sort((a, b) => {
+          const de = (eficMap[b.id] || 0) - (eficMap[a.id] || 0);
+          if (Math.abs(de) > 0.01) return de;
+          return (procCount[a.id]||0) - (procCount[b.id]||0);
+        })[0];
+    }
     if (!npc) continue; // nenhum NPC elegível — processo fica para dono/sócio
 
     // Incrementar contador local antes de continuar o loop
@@ -2385,8 +2428,15 @@ async function _autoAtribuirProcessosMensalCF(db, escRef, esc) {
       func_cargo: npc.cargo_id,
       designado_por_gestor: true,
       designado_em: new Date().toISOString(),
+      designado_area_fraca: areaFraca,
       progresso: 0,
     });
+
+    if (viaDepartamento && areaFraca) {
+      await _logGestaoCF(escRef,
+        `⚠️ ${npc.nome} recebeu "${proc.titulo}" (${proc.cliente_nome||'cliente'}) fora do domínio forte da área.`);
+      continue;
+    }
 
     await _logGestaoCF(escRef,
       `👤 ${gestorNome} designou "${proc.titulo}" (${proc.cliente_nome||'cliente'}) para ${npc.nome}.`);
