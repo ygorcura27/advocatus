@@ -1044,6 +1044,17 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
 
   updates.idade = 22 + Math.floor(mesGlobal / 12);
 
+  // Falta na Pós-Graduação: todo mês que o jogador não comparece à aula
+  // (compararecerAula, functions/posgraduacao.js) enquanto cursando conta
+  // como falta — antes nada registrava isso, então dava pra concluir
+  // Mestrado/Doutorado (peça aprovada) sem nunca ter frequentado 1 aula
+  // sequer. j.mes_global_pessoal é o mês que está TERMINANDO agora (mesGlobal
+  // já é o mês novo); posgrad_ultima_aula grava esse mesmo valor quando
+  // compareceu.
+  if (j.posgrad_status === 'cursando' && j.posgrad_ultima_aula !== (j.mes_global_pessoal || 0)) {
+    updates.posgrad_faltas = (j.posgrad_faltas || 0) + 1;
+  }
+
   if (updates.idade >= 75 && !j.aposentado) {
     updates.aposentado = true;
     mensagens.push({ assunto:'🎓 Aposentadoria', corpo:'Você atingiu 75 anos. Escolha um herdeiro para continuar sua dinastia.', tipo:'sistema' });

@@ -20,7 +20,7 @@ const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { logger } = require('firebase-functions');
 const { normalizarSkillsJur } = require('./skills');
-const { PROGRAMAS, concluirProgramaAoAprovar } = require('./posgraduacao');
+const { PROGRAMAS, concluirProgramaAoAprovar, elegibilidadeFrequencia } = require('./posgraduacao');
 
 const ENERGIA_DEFESA = 8;
 const N_PERGUNTAS = { mestrado: 3, doutorado: 4 };
@@ -70,8 +70,12 @@ exports.iniciarDefesaTCC = onCall({ region: 'southamerica-east1' }, async (reque
     throw new HttpsError('failed-precondition', `O programa exige uma peça do tipo ${cfg.categoria_peca}.`);
   }
   if (p.status !== 'pronta') throw new HttpsError('failed-precondition', 'A peça deve estar finalizada (pronta).');
-  if ((j.posgrad_frequencia || 0) < 12) {
-    throw new HttpsError('failed-precondition', 'Frequência ainda não completa (12/12) — a defesa só libera depois das aulas.');
+  const freq = elegibilidadeFrequencia(j, cfg);
+  if (!freq.elegivel) {
+    const motivo = !freq.tempoOk
+      ? `aulas ainda não concluídas (${freq.decorridos}/${freq.duracao} meses)`
+      : `frequência abaixo de 70% (atual: ${Math.round(freq.pctFreq*100)}%)`;
+    throw new HttpsError('failed-precondition', `A defesa só libera com as aulas concluídas: ${motivo}.`);
   }
   if (p.defesa_banca && !p.defesa_banca.veredito) {
     throw new HttpsError('failed-precondition', 'Defesa já em andamento.');

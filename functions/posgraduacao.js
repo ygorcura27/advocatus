@@ -81,7 +81,29 @@ const PROGRAMAS = {
 exports.PROGRAMAS = PROGRAMAS;
 
 const ENERGIA_AULA = 5;
-const CAP_FREQUENCIA = 12;  // meses de aula por programa
+const CAP_FREQUENCIA = 12;  // fallback quando não há programa (não deveria acontecer)
+const FREQUENCIA_MINIMA_PCT = 0.70; // mínimo de frequência pra concluir (GDD — "reprova sem 75%" no texto da UI é a mesma regra, só o número mudou pra 70%)
+
+// "Conclusão das aulas" = 2 condições, as duas juntas (functions/avancar_mes.js
+// incrementa posgrad_faltas todo mês que o jogador não comparece, enquanto
+// cursando): (1) já se passaram os meses nominais do programa
+// (frequencia+faltas >= duracao_meses) — não dá pra formar antes da hora
+// mesmo comparecendo sempre; (2) taxa de frequência (frequencia/(frequencia+
+// faltas)) >= 70% — comparecer pouco reprova mesmo com o tempo todo passado.
+// Antes só existia frequencia (comparecimentos) sem nenhum controle de
+// falta nem de tempo mínimo — dava pra concluir Doutorado (peça aprovada)
+// sem nunca ter frequentado 1 aula sequer.
+exports.elegibilidadeFrequencia = _elegibilidadeFrequencia; // reaproveitado por functions/defesa_tcc.js
+function _elegibilidadeFrequencia(j, cfg) {
+  const frequencia = j.posgrad_frequencia || 0;
+  const faltas     = j.posgrad_faltas || 0;
+  const decorridos = frequencia + faltas;
+  const duracao    = cfg.duracao_meses || CAP_FREQUENCIA;
+  const tempoOk    = decorridos >= duracao;
+  const pctFreq    = decorridos > 0 ? frequencia / decorridos : 0;
+  const pctOk      = pctFreq >= FREQUENCIA_MINIMA_PCT;
+  return { elegivel: tempoOk && pctOk, tempoOk, pctOk, pctFreq, decorridos, duracao };
+}
 
 // ─── Callable: matricularPosGraduacao ────────────────────────────────────────
 
@@ -180,7 +202,7 @@ exports.matricularPosGraduacao = onCall({ region: 'southamerica-east1' }, async 
     assunto:    `🎓 Matrícula confirmada — ${cfg.label}`,
     corpo:      programa === 'catedral'
       ? `Parabéns! Você atingiu todos os requisitos da Cátedra. Sua mentoria agora tem peso ${cfg.bonus_mentoria_mult}x.`
-      : `Matrícula no ${cfg.label} confirmada. Duração: ${cfg.duracao_meses} meses. Compare à aula mensalmente (mín. 75% frequência).`,
+      : `Matrícula no ${cfg.label} confirmada. Duração: ${cfg.duracao_meses} meses. Compare à aula mensalmente (mín. ${Math.round(FREQUENCIA_MINIMA_PCT*100)}% frequência).`,
     tipo:       'sistema',
     tipo_noticia: 'positivo',
     lida:       false,
@@ -206,12 +228,19 @@ exports.compararecerAula = onCall({ region: 'southamerica-east1' }, async (reque
   if (j.posgrad_status !== 'cursando') {
     throw new HttpsError('failed-precondition', 'Você não está cursando nenhum programa no momento.');
   }
+  const cfgFreq = PROGRAMAS[j.posgrad_programa];
   if ((j.energia || 0) < ENERGIA_AULA) {
     throw new HttpsError('failed-precondition', `Energia insuficiente. Comparecer à aula custa ${ENERGIA_AULA}⚡.`);
   }
 
-  if ((j.posgrad_frequencia || 0) >= CAP_FREQUENCIA) {
-    throw new HttpsError('failed-precondition', `Frequência máxima já atingida (${CAP_FREQUENCIA}/${CAP_FREQUENCIA}) — falta só concluir o curso.`);
+  // Trava só quando JÁ elegível pra concluir (tempo mínimo decorrido + 70%
+  // de frequência) — nunca um teto de comparecimentos cru. Um teto cru
+  // (frequencia>=duracao, sem olhar faltas) travava o botão mesmo com taxa
+  // abaixo de 70%, e como falta continua sendo registrada todo mês
+  // (functions/avancar_mes.js) mesmo sem poder comparecer, a taxa só piorava
+  // pra sempre — soft-lock que nunca deixava o jogador se recuperar.
+  if (cfgFreq && _elegibilidadeFrequencia(j, cfgFreq).elegivel) {
+    throw new HttpsError('failed-precondition', 'Frequência já suficiente pra concluir o curso — falta só apresentar a defesa.');
   }
 
   const mesGlobal = j.mes_global_pessoal || 0;
@@ -345,20 +374,28 @@ exports.submeterDissertacao = onCall({ region: 'southamerica-east1' }, async (re
     throw new HttpsError('failed-precondition', 'A peça deve estar finalizada (pronta).');
   }
 
-  const notaEfetiva = pet.nota_teto || 0;
-  const aprovado    = notaEfetiva >= cfg.nota_min_peca;
+  const notaEfetiva  = pet.nota_teto || 0;
+  const notaOk       = notaEfetiva >= cfg.nota_min_peca;
+  const freq         = _elegibilidadeFrequencia(j, cfg);
 
-  if (!aprovado) {
+  // Precisa dos DOIS requisitos juntos — nota aprovada na peça E aulas
+  // concluídas (tempo mínimo decorrido + frequência ≥70%). Bug relatado:
+  // dava pra concluir Doutorado só com a tese aprovada, sem nunca ter
+  // comparecido a uma aula sequer.
+  if (!notaOk || !freq.elegivel) {
+    const motivos = [];
+    if (!notaOk) motivos.push(`nota insuficiente (${notaEfetiva}/${cfg.nota_min_peca})`);
+    if (!freq.tempoOk) motivos.push(`aulas ainda não concluídas (${freq.decorridos}/${freq.duracao} meses)`);
+    if (freq.tempoOk && !freq.pctOk) motivos.push(`frequência abaixo de ${Math.round(FREQUENCIA_MINIMA_PCT*100)}% (atual: ${Math.round(freq.pctFreq*100)}%)`);
     return {
-      ok:      false,
-      aprovado: false,
-      nota:    notaEfetiva,
-      nota_min: cfg.nota_min_peca,
-      msg:     `Nota insuficiente (${notaEfetiva}/${cfg.nota_min_peca}). Melhore a peça antes de submeter.`,
+      ok: false, aprovado: false,
+      nota: notaEfetiva, nota_min: cfg.nota_min_peca,
+      frequencia_ok: freq.elegivel, frequencia_pct: Math.round(freq.pctFreq*100),
+      msg: `Ainda não pode concluir: ${motivos.join(' · ')}.`,
     };
   }
 
-  // Aprovado — concluir o programa
+  // Aprovado nos dois requisitos — concluir o programa
   await concluirProgramaAoAprovar(db, uid, j, j.posgrad_programa, cfg, peticao_id, notaEfetiva);
 
   logger.info(`[POSGRAD] ${uid} concluiu ${j.posgrad_programa} — nota ${notaEfetiva}`);

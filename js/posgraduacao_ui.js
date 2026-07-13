@@ -60,9 +60,20 @@ window.renderPosGraduacao = async function(j, el) {
   // ── CURSANDO ──────────────────────────────────────────────────────
   if (status === 'cursando') {
     const cfg = _PG_PROGRAMAS[j.posgrad_programa];
+    const duracao = cfg.duracao_meses || 12;
     const freq = j.posgrad_frequencia || 0;
-    const freqMaxima = freq >= 12;
-    const pct = Math.min(100, Math.round(freq / 12 * 100));
+    const faltas = j.posgrad_faltas || 0;
+    const decorridos = freq + faltas;
+    // "Elegível pra concluir" = tempo mínimo do programa já decorrido E
+    // frequência ≥70% entre o que decorreu — espelho de functions/
+    // posgraduacao.js::_elegibilidadeFrequencia. Só nesse ponto a Defesa de
+    // TCC libera e o botão de Comparecer trava (nunca por um teto cru de
+    // comparecimentos, senão falta continuando a acumular sem poder
+    // comparecer mais derrubava a taxa pra sempre, sem chance de recuperar).
+    const pctFreq = decorridos > 0 ? freq / decorridos : 1;
+    const tempoOk = decorridos >= duracao;
+    const elegivel = tempoOk && pctFreq >= 0.70;
+    const pct = Math.min(100, Math.round(pctFreq * 100));
     const jaCompareceuMes = j.posgrad_ultima_aula === (j.mes_global_pessoal || 0);
 
     let pecasHtml = '';
@@ -82,9 +93,9 @@ window.renderPosGraduacao = async function(j, el) {
       // aulas. Antes de bater 12/12, Submeter continua valendo como está.
       const pecasCards = pecas.map(p => {
         let acaoBtn = '';
-        if (p.status === 'pronta' && !freqMaxima) {
+        if (p.status === 'pronta' && !elegivel) {
           acaoBtn = `<button class="btn btn-prim btn-sm" style="margin-top:.4rem" onclick="window._pgSubmeter('${p.id}')">Submeter</button>`;
-        } else if (p.status === 'pronta' && freqMaxima) {
+        } else if (p.status === 'pronta' && elegivel) {
           const emDefesa = p.defesa_banca && !p.defesa_banca.veredito;
           acaoBtn = `<button class="btn btn-prim btn-sm" style="margin-top:.4rem" onclick="window._pgAbrirDefesa('${p.id}')">🎓 ${emDefesa ? 'Continuar Defesa' : 'Apresentar Defesa'}</button>`;
         }
@@ -102,15 +113,15 @@ window.renderPosGraduacao = async function(j, el) {
     } catch (e) { pecasHtml = `<div class="card" style="color:var(--txt4)">Erro ao carregar peças.</div>`; }
 
     el.innerHTML = `
-      ${window._capaHeader('CURSOS & PÓS-GRADUAÇÃO · ADVOCATUS ONLINE', `🎓 ${cfg.label}`, `<span class="pill pill-oab">${freq}/12 meses</span>`)}
+      ${window._capaHeader('CURSOS & PÓS-GRADUAÇÃO · ADVOCATUS ONLINE', `🎓 ${cfg.label}`, `<span class="pill pill-oab">${decorridos}/${duracao} meses</span>`)}
       <div class="card" style="margin-bottom:1rem">
         <div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--txt3);margin-bottom:.3rem">
-          <span>Frequência</span><span>${freq}/12 meses</span>
+          <span>Frequência</span><span>${freq} presenças / ${decorridos} meses (${pct}%)</span>
         </div>
         <div class="skill-bar"><div class="skill-fill" style="width:${pct}%"></div></div>
-        <div style="font-size:.65rem;color:var(--txt4);margin-top:.3rem">Faltas: ${j.posgrad_faltas || 0} · mínimo 75% de frequência pra não reprovar</div>
-        <button class="btn btn-prim btn-block" style="margin-top:.7rem" ${(jaCompareceuMes||freqMaxima)?'disabled':''} onclick="window._pgComparecer()">
-          ${freqMaxima ? '✅ Frequência máxima (12/12)' : jaCompareceuMes ? '✅ Já compareceu este mês' : '📖 Comparecer à Aula (5⚡)'}
+        <div style="font-size:.65rem;color:var(--txt4);margin-top:.3rem">Faltas: ${faltas} · mínimo 70% de frequência E ${duracao} meses decorridos pra concluir</div>
+        <button class="btn btn-prim btn-block" style="margin-top:.7rem" ${(jaCompareceuMes||elegivel)?'disabled':''} onclick="window._pgComparecer()">
+          ${elegivel ? '✅ Frequência suficiente pra concluir' : jaCompareceuMes ? '✅ Já compareceu este mês' : '📖 Comparecer à Aula (5⚡)'}
         </button>
       </div>
       <div style="font-size:.78rem;font-weight:600;margin-bottom:.5rem;color:var(--txt)">${cfg.categoria_peca === 'tese' ? 'Tese' : 'Dissertação'}</div>
