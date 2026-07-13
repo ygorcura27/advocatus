@@ -37,6 +37,11 @@ const AREA_PARA_TAG_VADEMECUM = {
   criminal:'criminal',
 };
 
+// Evento "caso de grande repercussão" — espelho de functions/
+// processar_sentenca.js::CASO_GRANDE_VALOR_MIN/CASO_GRANDE_POP_BONUS.
+const CASO_GRANDE_VALOR_MIN = 100000;
+const CASO_GRANDE_POP_BONUS = 300;
+
 // ─── Config (Parte II/III/VI do GDD — "pendências de calibração" Parte VIII) ──
 
 const TURNOS_TOTAIS_PADRAO = 9;         // calibrar
@@ -750,6 +755,9 @@ exports.finalizarJulgamento = onCall({ region: 'southamerica-east1' }, async (re
     derrotas_consecutivas: favoravelAoJogador ? 0 : (j.derrotas_consecutivas || 0) + 1,
     ...(favoravelAoJogador ? { wins: (j.wins||0)+1, wins_ano: (j.wins_ano||0)+1 }
                            : { losses: (j.losses||0)+1, losses_ano: (j.losses_ano||0)+1 }),
+    ...(favoravelAoJogador && valorBase >= CASO_GRANDE_VALOR_MIN
+      ? { popularidade_pessoal: (j.popularidade_pessoal || 0) + CASO_GRANDE_POP_BONUS }
+      : {}),
   });
 
   const areaBrutaJulg = p.area || p.tipo || 'civil';

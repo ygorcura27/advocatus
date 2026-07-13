@@ -12,6 +12,12 @@ import { httpsCallable }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
 import { db } from './firebase-init.js';
 
+function _formatarMesGlobal(mesTotal) {
+  const ano = Math.floor((mesTotal || 0) / 12);
+  const mes = (mesTotal || 0) % 12 + 1;
+  return `mês ${mes} do ano ${ano}`;
+}
+
 const _AL_AREAS = [
   { k: 'area_employment', l: 'Trabalhista' }, { k: 'area_tax', l: 'Tributário' },
   { k: 'area_civil', l: 'Cível' }, { k: 'area_criminal', l: 'Criminal' },
@@ -83,7 +89,7 @@ window._alConfirmarEscrever = async function(categoria) {
   try {
     const fn = httpsCallable(window.FB_FUNCTIONS, 'confeccionarObra');
     const r = await fn({ categoria, practice_area, titulo });
-    window.toast(`✅ ${categoria === 'livro' ? 'Livro' : 'Artigo'} iniciado — pronto no mês ${r.data.mes_conclusao}.`, 'ok', 3500);
+    window.toast(`✅ ${categoria === 'livro' ? 'Livro' : 'Artigo'} iniciado — pronto ${_formatarMesGlobal(r.data.mes_conclusao)}.`, 'ok', 3500);
     window.fecharModal();
     setTimeout(() => window.navTo?.('artigos_livros', null), 500);
   } catch (e) { window.toast(e.message || 'Erro.', 'ko'); }

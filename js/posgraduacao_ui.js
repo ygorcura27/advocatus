@@ -11,6 +11,16 @@ import { httpsCallable }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
 import { db } from './firebase-init.js';
 
+// mes_conclusao é um total contínuo (ano_pessoal*12+mes_pessoal, mesmo
+// formato de mesTotalPessoal em functions/*.js) — exibir cru ("mês 330")
+// não diz nada pro jogador. Converte pro par (mês 1-12, ano) que ele já
+// reconhece do resto da UI.
+function _formatarMesGlobal(mesTotal) {
+  const ano = Math.floor((mesTotal || 0) / 12);
+  const mes = (mesTotal || 0) % 12 + 1;
+  return `mês ${mes} do ano ${ano}`;
+}
+
 const _PG_PROGRAMAS = {
   mestrado: {
     label: 'Mestrado / LLM', duracao_meses: 12,
@@ -51,6 +61,7 @@ window.renderPosGraduacao = async function(j, el) {
   if (status === 'cursando') {
     const cfg = _PG_PROGRAMAS[j.posgrad_programa];
     const freq = j.posgrad_frequencia || 0;
+    const freqMaxima = freq >= 12;
     const pct = Math.min(100, Math.round(freq / 12 * 100));
     const jaCompareceuMes = j.posgrad_ultima_aula === (j.mes_global_pessoal || 0);
 
@@ -69,7 +80,7 @@ window.renderPosGraduacao = async function(j, el) {
         <div class="card" style="margin-bottom:.4rem">
           <div style="font-weight:600;font-size:.78rem;color:var(--txt)">${p.titulo}</div>
           <div style="font-size:.68rem;color:var(--txt3)">
-            ${p.status === 'em_composicao' ? `⏳ em composição (pronta mês ${p.mes_conclusao})` : `nota ${p.nota_teto}/26 (mín. ${cfg.nota_min_peca})${p.nota_teto < cfg.nota_min_peca ? ' · nota insuficiente' : ''}`}
+            ${p.status === 'em_composicao' ? `⏳ em composição (pronta ${_formatarMesGlobal(p.mes_conclusao)})` : `nota ${p.nota_teto}/26 (mín. ${cfg.nota_min_peca})${p.nota_teto < cfg.nota_min_peca ? ' · nota insuficiente' : ''}`}
           </div>
           ${p.status === 'pronta' ? `<button class="btn btn-prim btn-sm" style="margin-top:.4rem" onclick="window._pgSubmeter('${p.id}')">Submeter</button>` : ''}
         </div>`).join('');
@@ -85,8 +96,8 @@ window.renderPosGraduacao = async function(j, el) {
         </div>
         <div class="skill-bar"><div class="skill-fill" style="width:${pct}%"></div></div>
         <div style="font-size:.65rem;color:var(--txt4);margin-top:.3rem">Faltas: ${j.posgrad_faltas || 0} · mínimo 75% de frequência pra não reprovar</div>
-        <button class="btn btn-prim btn-block" style="margin-top:.7rem" ${jaCompareceuMes?'disabled':''} onclick="window._pgComparecer()">
-          ${jaCompareceuMes ? '✅ Já compareceu este mês' : '📖 Comparecer à Aula (5⚡)'}
+        <button class="btn btn-prim btn-block" style="margin-top:.7rem" ${(jaCompareceuMes||freqMaxima)?'disabled':''} onclick="window._pgComparecer()">
+          ${freqMaxima ? '✅ Frequência máxima (12/12)' : jaCompareceuMes ? '✅ Já compareceu este mês' : '📖 Comparecer à Aula (5⚡)'}
         </button>
       </div>
       <div style="font-size:.78rem;font-weight:600;margin-bottom:.5rem;color:var(--txt)">${cfg.categoria_peca === 'tese' ? 'Tese' : 'Dissertação'}</div>
@@ -200,7 +211,7 @@ window._pgEscrever = async function(categoria) {
   try {
     const fn = httpsCallable(window.FB_FUNCTIONS, 'confeccionarObra');
     const r = await fn({ categoria, practice_area, titulo: null });
-    window.toast(`✅ ${categoria === 'tese' ? 'Tese' : 'Dissertação'} iniciada — pronta no mês ${r.data.mes_conclusao}.`, 'ok', 3500);
+    window.toast(`✅ ${categoria === 'tese' ? 'Tese' : 'Dissertação'} iniciada — pronta ${_formatarMesGlobal(r.data.mes_conclusao)}.`, 'ok', 3500);
     setTimeout(() => window.navTo?.('posgraduacao', null), 500);
   } catch (e) { window.toast(e.message || 'Erro.', 'ko'); }
 };

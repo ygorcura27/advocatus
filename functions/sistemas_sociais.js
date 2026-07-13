@@ -22,7 +22,7 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { logger } = require('firebase-functions');
-const { clampReputacao } = require('./shared/repCap');
+const { clampReputacao, repCapDoCargo } = require('./shared/repCap');
 const { aplicarXpPracticeArea } = require('./skills');
 
 // Áreas reais de processo são em português; Practice Area Mastery (area_*
@@ -162,6 +162,23 @@ const VIRAL_CHANCE    = 0.12;  // 12% de chance de viralizar
 const DIDATICA_CAP_CONTEUDO = 20;
 const XP_AREA_CONTEUDO = 1;
 
+// Ganho de Popularidade Pessoal por conteúdo escalado por perfil (Comunicação
+// Midiática + Reputação), não mais fixo — um criador com 0 skill/reputação
+// ganha só o piso (20, mesmo "efeito" de antes); um com skill/reputação no
+// talo ganha o teto (2000) — só nesse ponto a curva de seguidores (js/
+// ui-main.js:_redesSeguidoresTotal, pop×3) deixa de travar em "sempre uns
+// +20" e passa a acompanhar perfis grandes (1M+ seguidores exige épocas de
+// +200/+2000, não +20). Viral multiplica por 3 em cima do valor escalado.
+const POP_GANHO_MIN = 20;
+const POP_GANHO_MAX = 2000;
+const POP_GANHO_MULT_VIRAL = 3;
+function _calcPopGanhoEscalado(comunicacaoMidiatica, reputacao, cargoId) {
+  const fatorSkill = Math.min(1, (comunicacaoMidiatica || 0) / 50);
+  const fatorRep   = Math.min(1, (reputacao || 0) / repCapDoCargo(cargoId));
+  const fator      = fatorSkill * 0.5 + fatorRep * 0.5;
+  return Math.round(POP_GANHO_MIN + (POP_GANHO_MAX - POP_GANHO_MIN) * fator);
+}
+
 exports.gravarConteudoEducativo = onCall({ region: 'southamerica-east1' }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
 
@@ -185,7 +202,9 @@ exports.gravarConteudoEducativo = onCall({ region: 'southamerica-east1' }, async
   const oralAdvocacy = j.oral_advocacy || 0;
   const viral  = Math.random() < VIRAL_CHANCE + (oralAdvocacy / 500);
   const baseRep = viral ? 3 : 1;
-  const basePop = viral ? 15 : 5;
+  const comunicacaoMidiatica = (j.skills_jur || {}).comunicacao_midiatica || 0;
+  const popGanhoBase = _calcPopGanhoEscalado(comunicacaoMidiatica, j.reputacao, j.cargo_id);
+  const basePop = viral ? popGanhoBase * POP_GANHO_MULT_VIRAL : popGanhoBase;
 
   const didaticaAtual = j.didatica_academica || 0;
   const abaixoDoCap = didaticaAtual < DIDATICA_CAP_CONTEUDO;

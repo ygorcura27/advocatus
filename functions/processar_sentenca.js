@@ -23,6 +23,15 @@ const banco = require('./shared/banco_juridico.js');
 const { aplicarXpPracticeArea } = require('./skills');
 const { atualizarFama }         = require('./peticoes');
 
+// Evento "caso de grande repercussão" — vitória (procedente/parcial) num
+// caso de valor alto (mesmo piso do tier S de honorários, functions/
+// avancar_mes.js::TIER_CHANCE_PROC) dá um bônus de Popularidade Pessoal de
+// uma vez só (mídia noticiou o caso), igual ao bônus de petição viral em
+// functions/peticoes.js::atualizarFama. Não escala com skill — é sorte/
+// repercussão do caso, não desempenho de conteúdo.
+const CASO_GRANDE_VALOR_MIN  = 100000;
+const CASO_GRANDE_POP_BONUS  = 300;
+
 // Áreas reais de processo são em português (js/escritorio_painel.js::
 // TODAS_AREAS); os consumidores de tipoCaso abaixo (ranges de
 // sortearValorParcial, perfil do julgador em determinarSentencaSetlist,
@@ -299,6 +308,9 @@ async function _finalizarProcessoDefinitivo(db, processoRef, jogadorRef, p, j, s
       });
     }
   }
+  if (favoravelAoJogador && (p.valor || 0) >= CASO_GRANDE_VALOR_MIN) {
+    await jogadorRef.update({ popularidade_pessoal: FieldValue.increment(CASO_GRANDE_POP_BONUS) });
+  }
 
   // Reputação do ESCRITÓRIO — mesmo padrão de processar_acordao.js. Faltava
   // aqui: sentença só atualizava a reputação do jogador (updJog acima), o
@@ -433,6 +445,9 @@ async function _processarSentencaSetlist(db, processoRef, jogadorRef, p, j, uid,
     derrotas_consecutivas: favoravelAoJogador ? 0 : (j.derrotas_consecutivas || 0) + 1,
   };
   if (malpracticeIndenizacao > 0) updJog.dinheiro = (j.dinheiro || 0) + malpracticeIndenizacao;
+  if (favoravelAoJogador && valorBase >= CASO_GRANDE_VALOR_MIN) {
+    updJog.popularidade_pessoal = (j.popularidade_pessoal || 0) + CASO_GRANDE_POP_BONUS;
+  }
   if (favoravelAoJogador) { updJog.wins = (j.wins||0)+1; updJog.wins_ano = (j.wins_ano||0)+1; }
   else { updJog.losses = (j.losses||0)+1; updJog.losses_ano = (j.losses_ano||0)+1; }
 

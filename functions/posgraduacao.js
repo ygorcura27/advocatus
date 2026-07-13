@@ -207,6 +207,10 @@ exports.compararecerAula = onCall({ region: 'southamerica-east1' }, async (reque
     throw new HttpsError('failed-precondition', `Energia insuficiente. Comparecer à aula custa ${ENERGIA_AULA}⚡.`);
   }
 
+  if ((j.posgrad_frequencia || 0) >= CAP_FREQUENCIA) {
+    throw new HttpsError('failed-precondition', `Frequência máxima já atingida (${CAP_FREQUENCIA}/${CAP_FREQUENCIA}) — falta só concluir o curso.`);
+  }
+
   const mesGlobal = j.mes_global_pessoal || 0;
   if (j.posgrad_ultima_aula === mesGlobal) {
     throw new HttpsError('failed-precondition', 'Você já compareceu à aula este mês.');

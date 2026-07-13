@@ -10,6 +10,14 @@ import { httpsCallable }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
 import { db, functions } from './firebase-init.js';
 
+// mes_conclusao é total contínuo (ano_pessoal*12+mes_pessoal) — cru
+// ("mês 330") não diz nada; converte pro par mês/ano que o resto da UI usa.
+function _formatarMesGlobal(mesTotal) {
+  const ano = Math.floor((mesTotal || 0) / 12);
+  const mes = (mesTotal || 0) % 12 + 1;
+  return `mês ${mes} do ano ${ano}`;
+}
+
 // ─── Labels ──────────────────────────────────────────────────────────────────
 
 const DOC_LABELS = {
@@ -119,7 +127,7 @@ window.renderPeticoes = async function(j, el) {
               </div>
               <div style="display:flex;align-items:center;gap:.6rem">
                 ${temEscritorio && (p.autores||[]).length < 2 ? `<button class="btn btn-ghost btn-sm" style="font-size:.65rem" onclick="window._abrirModalCoautor('${p.id}')">+ Colega</button>` : ''}
-                <span style="font-size:.72rem;color:var(--ouro2);font-weight:600">⏳ Finaliza no mês ${p.mes_conclusao}</span>
+                <span style="font-size:.72rem;color:var(--ouro2);font-weight:600">⏳ Finaliza ${_formatarMesGlobal(p.mes_conclusao)}</span>
               </div>
             </div>`).join('')
           : ''}
@@ -423,7 +431,7 @@ function _cardPeticao(p) {
 
       <div style="font-size:.72rem;color:var(--ardosia2);margin-bottom:.4rem">
         ${p.status === 'em_composicao' && p.mes_conclusao
-          ? `<span style="color:var(--ouro2)">⏳ Finaliza no mês ${p.mes_conclusao}</span>`
+          ? `<span style="color:var(--ouro2)">⏳ Finaliza ${_formatarMesGlobal(p.mes_conclusao)}</span>`
           : temNotaTeto
           ? `Efetiva: <b>${notaEfetiva}/26</b> · Teto: ${notaTeto}/26`
           : `Nota base: <b>${p.nota_base}/26</b> · Teto: ${p.teto_nota}/26`}
@@ -751,7 +759,7 @@ window.confirmarCompor = async function() {
     const res = await fn({ document_type: tipo, practice_area: area, estilo_escrita: estilo, titulo, tese_central });
     const d   = res.data;
     document.getElementById('modal-compor').style.display = 'none';
-    toast(`📝 Confecção iniciada — petição pronta no mês ${d.mes_conclusao}. A nota teto será calculada com suas skills daquele momento.`, 'ok', 6000);
+    toast(`📝 Confecção iniciada — petição pronta ${_formatarMesGlobal(d.mes_conclusao)}. A nota teto será calculada com suas skills daquele momento.`, 'ok', 6000);
     if (window.JOGADOR) window.renderPeticoes(window.JOGADOR, document.getElementById('main-content'));
   } catch(e) {
     toast('Erro ao iniciar confecção: ' + (e.message || e), 'erro');
@@ -964,7 +972,7 @@ window.matricularPrep = async function() {
   if (!confirm('Matricular no Bar Prep Course? (R$3.000 · 2 meses · +10 XP nas 4 skills principais)')) return;
   try {
     const res = await httpsCallable(functions, 'matricularBarPrep')({});
-    toast(`✅ Matriculado! +10 XP nas skills chegam no mês ${res.data.mes_conclusao}.`, 'ok', 4000);
+    toast(`✅ Matriculado! +10 XP nas skills chegam ${_formatarMesGlobal(res.data.mes_conclusao)}.`, 'ok', 4000);
   } catch(e) { toast('Erro: ' + (e.message || e), 'erro'); }
 };
 

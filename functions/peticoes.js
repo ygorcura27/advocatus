@@ -320,8 +320,14 @@ async function atualizarFama(db, peticaoId, resultado, instancia, opts = {}) {
   const deltaPop = calcularDeltaPopularidade(pop, resultado);
   const novaPop  = Math.max(0, Math.min(100, pop + deltaPop));
 
-  // Ativa flag de decaimento mensal quando pop ≥ 60 E fama ≥ 50
+  // Ativa flag de decaimento mensal quando pop ≥ 60 E fama ≥ 50 — esse é o
+  // momento em que a peça "virou hit" (repercussão real, não só um uso a
+  // mais). Evento de Popularidade Pessoal (js/ui-main.js:renderRedes,
+  // _redesSeguidoresTotal) pros autores só na TRANSIÇÃO pra esse estado
+  // (nunca repete no mesmo boom).
+  const jaEraViral = p.decaimento_ativo === true;
   const decaimentoAtivo = novaPop >= 60 && novaFama >= 50;
+  const virouAgora = decaimentoAtivo && !jaEraViral;
 
   // Vitórias por instância (para desbloqueio progressivo do teto)
   const vitAtual = p.vitorias_por_instancia || {};
@@ -340,6 +346,27 @@ async function atualizarFama(db, peticaoId, resultado, instancia, opts = {}) {
     usos_total:              FieldValue.increment(1),
     ultimo_uso:              new Date().toISOString(),
   });
+
+  // ── Evento: petição viralizou — bônus de Popularidade Pessoal a todos os
+  // autores, proporcional à contribuição (mesmo padrão de rateio da
+  // co-autoria abaixo). Flat, não escala com skill — é um bônus de sorte/
+  // repercussão, diferente do ganho por Conteúdo Educativo (esse sim
+  // escalado por skill/reputação em sistemas_sociais.js).
+  const PETICAO_VIRAL_POP_BONUS = 500;
+  if (virouAgora && Array.isArray(p.autores) && p.autores.length > 0) {
+    await Promise.all(p.autores.map(async (a) => {
+      if (!a.uid) return;
+      const bonus = Math.round(PETICAO_VIRAL_POP_BONUS * ((a.contribuicao_pct || 100) / 100));
+      if (bonus <= 0) return;
+      try {
+        await db.collection('jogadores').doc(a.uid).update({
+          popularidade_pessoal: FieldValue.increment(bonus),
+        });
+      } catch (e) {
+        logger.warn(`[PETICAO VIRAL] Erro ao creditar popularidade a ${a.uid}:`, e.message);
+      }
+    }));
+  }
 
   // ── Co-autoria: distribui repDelta proporcional aos co-autores (GDD v5.1 §11) ──
   const { repDelta, primaryUid } = opts;
