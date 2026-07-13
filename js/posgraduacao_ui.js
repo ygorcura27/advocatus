@@ -191,7 +191,12 @@ window._pgDarAula = async function() {
 
 window._pgEscrever = async function(categoria) {
   const j = window.JOGADOR;
-  const practice_area = j.posgrad_area || 'area_civil';
+  // j.posgrad_area vem no formato 'area_tax' (mesma chave usada pro check de
+  // requisito em matricularPosGraduacao, skJur[practice_area]) — mas
+  // calcularNotaTeto (functions/peticoes.js) espera a chave NUA ('tax') e
+  // prefixa 'area_' sozinho. Sem o replace, a nota_teto da obra nunca batia
+  // com nenhuma skill de Practice Area Mastery e caía sempre no piso (0.55x).
+  const practice_area = (j.posgrad_area || 'area_civil').replace(/^area_/, '');
   try {
     const fn = httpsCallable(window.FB_FUNCTIONS, 'confeccionarObra');
     const r = await fn({ categoria, practice_area, titulo: null });

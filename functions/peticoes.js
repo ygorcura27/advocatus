@@ -107,11 +107,20 @@ function modPopularidade(pop) {
 
 // ─── Nota Teto: calculada na finalização (GDD v5.1 §6) ──────────────────────
 
+// Obras acadêmicas (dissertação/tese/artigo/livro, functions/artigos_livros.js)
+// usam document_type 'academic_article'/'book', que nunca bate com nenhuma
+// das 8 chaves doc_* de Document Type Mastery — modDT sempre caía no piso
+// (0.70), capando a nota_teto tão baixo que Mestrado (mín. 18) e Doutorado
+// (mín. 22) eram estruturalmente inalcançáveis mesmo com skills máximas.
+// Document Type Mastery é sobre tipos de peça PROCESSUAL — não deveria nem
+// entrar na conta de uma obra acadêmica.
+const CATEGORIAS_ACADEMICAS_NOTA = ['dissertacao', 'tese', 'artigo', 'livro'];
+
 /**
  * Calcula nota_teto, nota_argumentacao e nota_redacao usando as skills do
  * jogador NO MOMENTO DA FINALIZAÇÃO. Estes valores travam permanentemente.
  */
-function calcularNotaTeto(skJur, docType, practiceArea, jogador) {
+function calcularNotaTeto(skJur, docType, practiceArea, jogador, categoria) {
   const s = normalizarSkillsJur(skJur);
 
   // Argumentação: Legal Drafting como dimensão dominante
@@ -125,7 +134,7 @@ function calcularNotaTeto(skJur, docType, practiceArea, jogador) {
   const nota_redacao = Math.max(1, Math.min(tetoLR, Math.round(tetoLR * fatorLR)));
 
   // Combinação com Document Type, Practice Area e estado mental na finalização
-  const modDT  = calcModDocumentType(s[`doc_${docType}`] || 0);
+  const modDT  = CATEGORIAS_ACADEMICAS_NOTA.includes(categoria) ? 1.0 : calcModDocumentType(s[`doc_${docType}`] || 0);
   const modPA  = calcModPracticeArea(s[`area_${practiceArea}`] || 0);
   const modEst = modEstadoJogador(jogador || {});
 
@@ -998,7 +1007,7 @@ async function finalizarPeticoesPendentes(db, uid, jogador, mesAtual) {
     // Petições do novo sistema têm nota_teto null — calcular agora
     if (p.nota_teto === null || p.nota_teto === undefined) {
       const { nota_argumentacao, nota_redacao, nota_teto: tetoBase } = calcularNotaTeto(
-        skJur, p.document_type, p.practice_area, jogador
+        skJur, p.document_type, p.practice_area, jogador, p.categoria
       );
 
       // Modificador de Tese Central (GDD v5.1 §16) — aplicado na finalização
