@@ -57,10 +57,26 @@ export const BANCO_VADEMECUM = [
     holding:'A tomadora de serviços responde subsidiariamente por verbas trabalhistas inadimplidas quando comprovada culpa in vigilando na fiscalização do contrato.', tags:['employment','corporate'] },
 ];
 
+// As áreas reais de processo (js/escritorio_painel.js:TODAS_AREAS) são em
+// português (civil, tributario, trabalhista...), mas as tags acima são em
+// inglês (herdadas de COMPAT_AREAS/functions/skills.js). Sem esta tradução,
+// `p.tags.includes(areaCaso)` nunca batia pra quase nenhuma área do jogo —
+// bug que fazia o Vade Mecum "sempre dar errado". Espelho de
+// functions/investigacao.js::AREA_PARA_TAG_VADEMECUM.
+const AREA_PARA_TAG_VADEMECUM = {
+  civil:'civil', consumidor:'civil', familia:'civil', imobiliario:'civil',
+  contencioso:'civil', ambiental:'civil',
+  tributario:'tax',
+  trabalhista:'employment',
+  empresarial:'corporate', societario:'corporate', administrativo:'corporate',
+  criminal:'criminal',
+};
+
 /** Retorna uma amostra de precedentes candidatos para o Vade Mecum de um caso — mistura da área do caso com ruído de outras áreas, para não entregar a resposta pela simples filtragem. */
 export function sortearCandidatosVademecum(areaCaso, n = 6) {
-  const doTema = BANCO_VADEMECUM.filter(p => p.tags.includes(areaCaso));
-  const outros = BANCO_VADEMECUM.filter(p => !p.tags.includes(areaCaso));
+  const tag = AREA_PARA_TAG_VADEMECUM[areaCaso] || areaCaso;
+  const doTema = BANCO_VADEMECUM.filter(p => p.tags.includes(tag));
+  const outros = BANCO_VADEMECUM.filter(p => !p.tags.includes(tag));
   const embaralhar = arr => arr.map(v => [Math.random(), v]).sort((a,b) => a[0]-b[0]).map(([,v]) => v);
   const qtdCertos = Math.max(1, Math.min(doTema.length, Math.ceil(n / 2)));
   const candidatos = [...embaralhar(doTema).slice(0, qtdCertos), ...embaralhar(outros).slice(0, n - qtdCertos)];

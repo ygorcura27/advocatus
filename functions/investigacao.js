@@ -581,7 +581,18 @@ exports.aplicarTeseVademecum = onCall({ region: 'southamerica-east1' }, async (r
   // Validação de encaixe é feita aqui, server-side: as tags do precedente
   // (enviadas junto por já serem públicas no banco estático) precisam bater
   // com a área/tipo do processo — nunca confiamos em um bool do cliente.
-  const tagsCaso = [p.area, p.tipo].filter(Boolean);
+  // p.area/p.tipo são em português (TODAS_AREAS); as tags do banco são em
+  // inglês (COMPAT_AREAS) — sem tradução, nunca batiam. Espelho de
+  // js/banco_vademecum.js::AREA_PARA_TAG_VADEMECUM.
+  const AREA_PARA_TAG_VADEMECUM = {
+    civil:'civil', consumidor:'civil', familia:'civil', imobiliario:'civil',
+    contencioso:'civil', ambiental:'civil',
+    tributario:'tax',
+    trabalhista:'employment',
+    empresarial:'corporate', societario:'corporate', administrativo:'corporate',
+    criminal:'criminal',
+  };
+  const tagsCaso = [p.area, p.tipo].filter(Boolean).map(a => AREA_PARA_TAG_VADEMECUM[a] || a);
   const encaixa = Array.isArray(tags_precedente) && tags_precedente.some(t => tagsCaso.includes(t));
 
   const skJur = normalizarSkillsJur(j.skills_jur);

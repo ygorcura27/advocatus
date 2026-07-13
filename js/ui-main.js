@@ -1078,9 +1078,16 @@ function _espLabel2(esp) {
     tributario:'Tributário',trabalhista:'Trabalhista',civil:'Civil',
     criminal:'Criminal',empresarial:'Empresarial',constitucional:'Constitucional',
     ambiental:'Ambiental',previdenciario:'Previdenciário',
+    societario:'Societário',consumidor:'Consumidor',familia:'Família',
+    imobiliario:'Imobiliário',contencioso:'Contencioso',administrativo:'Administrativo',
   };
   return MAP[esp]||esp||'—';
 }
+
+// Espelho de js/escritorio_painel.js::TODAS_AREAS (só as chaves) — usado pra
+// saber se o escritório cobre TODAS as especializações do jogo (Full Service
+// de verdade), em vez de inferir isso só pelo tier.
+const _TODAS_AREAS_KEYS = ['civil','tributario','trabalhista','criminal','empresarial','societario','consumidor','familia','imobiliario','contencioso','ambiental','administrativo'];
 
 // ════════════════════════════════════════════════════════
 // ESCRITÓRIO — COMPONENTES DO REDESIGN (Hero / KPIs / Equipe /
@@ -1249,9 +1256,15 @@ window._capaHeader = _capaHeader;
 
 function _escHero(j, esc) {
   const escNome = (esc && esc.nome) || j.escritorio_nome || 'Advocacia Solo';
-  const esp     = _espLabel2((esc && (esc.especialidade_principal||esc.especialidade)) || j.escritorio_esp || j.especialidade);
   const tier    = (esc && esc.tier) || j.escritorio_tier || 1;
   const TIER_TAG = {1:'Boutique',2:'Boutique',3:'Regional',4:'Full Service',5:'Big Law'};
+  const areasAtuacao = (esc && esc.areas_atuacao) || [];
+  const fullService = areasAtuacao.length > 0 && _TODAS_AREAS_KEYS.every(k => areasAtuacao.includes(k));
+  const tagEspecializacao = fullService
+    ? 'Full Service'
+    : areasAtuacao.length
+      ? `${TIER_TAG[tier]||'Boutique'} · ${areasAtuacao.map(_espLabel2).join(', ')}`
+      : `${TIER_TAG[tier]||'Boutique'} · ${_espLabel2((esc && (esc.especialidade_principal||esc.especialidade)) || j.escritorio_esp || j.especialidade)}`;
   const numSocios = esc ? _normalizarSociosUI(esc).length : 1;
   const totalCasos = (esc && (esc.total_casos || j._processos_count)) || j._processos_count || 0;
   const rep = j.reputacao || 0;
@@ -1266,7 +1279,7 @@ function _escHero(j, esc) {
       <div>
         <h1 class="capa-nome">${escNome}</h1>
         <div class="capa-meta">
-          <span class="pill pill-cargo">${TIER_TAG[tier]||'Boutique'} · ${esp}</span>
+          <span class="pill pill-cargo">${tagEspecializacao}</span>
           <span class="pill pill-oab">📍 ${local}</span>
           <span class="pill pill-oab">👥 ${numSocios} sócio${numSocios>1?'s':''}</span>
           <span class="pill pill-oab">⚖️ ${totalCasos} processo${totalCasos===1?'':'s'} ativo${totalCasos===1?'':'s'}</span>
