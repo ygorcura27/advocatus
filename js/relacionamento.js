@@ -57,29 +57,12 @@ async function _travarNpcParaJogador(npcId, uid, relacionamentoId, nome) {
   }
 }
 
-/**
- * Marca o NPC como "em tempo" — só o mesmo uid pode reatar ou terminar.
- *
- * ⚠️ TODO/PENDÊNCIA CONHECIDA: esta função existe aqui no frontend mas
- * "dar um tempo" é hoje um evento ALEATÓRIO MENSAL que só acontece dentro
- * da Cloud Function avancarMes (functions/avancar_mes.js,
- * _processarRelacionamentosMensalCF), não por nenhuma ação manual do
- * jogador neste arquivo. Ou seja: ESTA função aqui (frontend) ainda não
- * tem nenhum caller real — é a versão equivalente em CommonJS/Admin SDK,
- * dentro da Cloud Function, que precisa chamar a MESMA regra de negócio
- * quando sortear "upd.afinidade = ...*0.7" (tempo). Repetir aqui o padrão
- * de bug já documentado no projeto ("função existe mas nunca é chamada")
- * seria grave justamente no sistema de exclusividade — sem o hook do lado
- * da Cloud Function, o NPC nunca entra em status 'tempo' de verdade.
- */
-async function _marcarNpcEmTempo(npcId, uid, relacionamentoId) {
-  try {
-    await updateDoc(_npcLockRef(npcId), {
-      status: 'tempo', jogador_uid: uid, relacionamento_id: relacionamentoId,
-      atualizado_em: new Date().toISOString(),
-    });
-  } catch (e) { console.warn('[NPC LOCK] Erro ao marcar tempo:', e); }
-}
+// "Dar um tempo" é um evento ALEATÓRIO MENSAL sorteado dentro da Cloud
+// Function avancarMes (functions/avancar_mes.js,
+// _processarRelacionamentosMensalCF) — nunca por ação manual do jogador
+// aqui no frontend. O lock do NPC (status 'tempo'/'namorando') e o campo
+// em_tempo/tempo_termina_mes_total do relacionamento são geridos lá
+// (_marcarNpcEmTempoCF/_reconciliarNpcCF), não neste arquivo.
 
 /** Libera o NPC de volta para o mundo (término definitivo). */
 async function _liberarNpc(npcId) {
@@ -245,8 +228,15 @@ function _cardRelacionamento(r, j) {
   const tracosLabel = (r.tracos||[]).map(t => TRACOS[t]?.icone + ' ' + TRACOS[t]?.l).join(' · ');
   const meses = _mesesNoRelacionamento(r, j);
 
+  // "Dando um tempo": relacionamento pausado (sorteado mensalmente pela
+  // Cloud Function) — sem interação possível até ela decidir reatar ou
+  // terminar de vez. A afinidade continua caindo mês a mês nesse período.
+  const emTempo = !!r.em_tempo;
+  const mesAtualTotal = (j.ano_pessoal||1)*12 + (j.mes_pessoal||0);
+  const mesesRestantesTempo = emTempo ? Math.max(1, (r.tempo_termina_mes_total||0) - mesAtualTotal) : 0;
+
   return `
-    <div class="card" style="margin-bottom:.6rem;border-left:3px solid ${r.estagio==='affair'?'var(--verm3)':'var(--navy3)'}">
+    <div class="card" style="margin-bottom:.6rem;border-left:3px solid ${emTempo ? 'var(--amber)' : r.estagio==='affair'?'var(--verm3)':'var(--navy3)'}">
       <div style="display:flex;align-items:start;justify-content:space-between;gap:.8rem">
         <div style="display:flex;gap:.6rem;flex:1;cursor:pointer" onclick="window.abrirPerfilNpc('${r.id}')">
           <img src="${_avatarUrlNpc(r)}" alt="${r.nome}" class="rel-avatar-mini"
@@ -264,6 +254,18 @@ function _cardRelacionamento(r, j) {
           </div>
         </div>
       </div>
+      ${emTempo ? `
+      <div style="margin-top:.6rem;padding:.55rem .7rem;background:var(--surface2);border-radius:6px;border:1px solid var(--amber)">
+        <div style="font-size:.75rem;font-weight:700;color:var(--amber)">😔 Dando um tempo</div>
+        <div style="font-size:.68rem;color:var(--txt3);margin-top:.15rem">
+          Sem contato possível agora. ${r.nome} decide em até ${mesesRestantesTempo} mês${mesesRestantesTempo===1?'':'es'} se volta ou termina de vez.
+        </div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.6rem">
+        <button class="btn btn-sm btn-danger" onclick="window.terminarRelacionamento('${r.id}','${r.nome}')">
+          Terminar de vez
+        </button>
+      </div>` : `
       <div style="display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.6rem">
         ${Object.entries(INTERACOES).map(([k,v]) =>
           `<button class="btn btn-sm btn-ghost" onclick="window.interagirRelacionamento('${r.id}','${k}')" title="${v.l}">
@@ -276,7 +278,7 @@ function _cardRelacionamento(r, j) {
         <button class="btn btn-sm btn-danger" onclick="window.terminarRelacionamento('${r.id}','${r.nome}')">
           Terminar
         </button>
-      </div>
+      </div>`}
     </div>`;
 }
 
@@ -598,6 +600,8 @@ window.interagirRelacionamento = async function(relId, interacaoKey) {
   if (!relSnap.exists()) return;
   const r = relSnap.data();
 
+  if (r.em_tempo) { toast(`😔 ${r.nome} pediu um tempo — sem contato possível agora.`, 'ko'); return; }
+
   // Limite mensal de ganho
   const ganhoMesAtual = r._ganho_mes_atual || 0;
   if (ganhoMesAtual >= GANHO_MAX_MENSAL) {
@@ -719,6 +723,8 @@ window.darPresente = async function(relId, presenteKey) {
   if (!relSnap.exists()) return;
   const r = relSnap.data();
 
+  if (r.em_tempo) { toast(`😔 ${r.nome} pediu um tempo — sem contato possível agora.`, 'ko'); return; }
+
   const ehMaterialista = (r.tracos||[]).includes('materialista');
   let ganho = presente.afinidade;
   if (ehMaterialista) ganho += EFEITO_TRACO.materialista.afinidade_presente;
@@ -757,6 +763,8 @@ window.progredirRelacionamento = async function(relId, progKey) {
   const relSnap = await getDoc(relRef);
   if (!relSnap.exists()) return;
   const r = relSnap.data();
+
+  if (r.em_tempo) { toast(`😔 ${r.nome} pediu um tempo — sem contato possível agora.`, 'ko'); return; }
 
   // Chance de aceitação
   const chanceBase  = 50 + (r.afinidade / 2);
@@ -913,6 +921,7 @@ window.abrirPerfilNpc = async function(relId) {
             <div class="fb-info-linha">💑 <b>Relacionamento:</b> ${label}</div>
             <div class="fb-info-linha">📊 <b>Compatibilidade:</b> ${r.compatibilidade||50}%</div>
             <div class="fb-info-linha">💗 <b>Afinidade:</b> ${r.afinidade}/${estagio.cap}</div>
+            ${r.em_tempo ? `<div class="fb-info-linha">😔 <b>Status:</b> Dando um tempo — sem contato possível</div>` : ''}
           </div>
           <div class="fb-box">
             <div class="fb-box-titulo">Características</div>

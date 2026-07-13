@@ -1909,6 +1909,9 @@ const IMPACTO_SM_REL = {
   tempo:   { affair:5,  namorado:10, noivo:15, esposo:20 },
   termino: { affair:10, namorado:20, noivo:35, esposo:50 },
 };
+const TEMPO_DURACAO_MIN_MESES = 3;
+const TEMPO_DURACAO_MAX_MESES = 6;
+const CHANCE_TERMINO_APOS_TEMPO = 0.20;
 const CHANCE_GRAVIDEZ_REL = { namorado: 0.02, noivo: 0.04, esposo: 0.08 };
 const DURACAO_GESTACAO_REL = 9;
 const SEXO_CONFIG_REL = {
@@ -1980,6 +1983,35 @@ async function _marcarNpcEmTempoCF(db, npcId, uid, relId) {
     });
   } catch (e) {
     // idem
+  }
+}
+/** Reconciliação após "dar um tempo": volta o lock pra 'namorando'. */
+async function _reconciliarNpcCF(db, npcId, uid, relId) {
+  if (!npcId) return;
+  try {
+    await db.collection('npcs_locks').doc(npcId).update({
+      status: 'namorando', jogador_uid: uid, relacionamento_id: relId,
+      atualizado_em: new Date().toISOString(),
+    });
+  } catch (e) {
+    // idem
+  }
+}
+
+/**
+ * Grava evento na timeline do relacionamento
+ * (jogadores/{uid}/relacionamentos/{relId}/eventos) — equivalente Admin SDK
+ * de _registrarEvento em js/relacionamento.js. Eventos disparados pela
+ * Cloud Function (ciúmes, flagra, tempo, término) só iam pro inbox — o
+ * jogador recebia a notificação, mas o perfil da NPC (tela estilo Facebook
+ * 2010) não sabia de nada, mostrando só as interações manuais.
+ */
+async function _registrarEventoCF(db, uid, relId, evento) {
+  try {
+    await db.collection('jogadores').doc(uid).collection('relacionamentos').doc(relId)
+      .collection('eventos').add({ ...evento, criado_em: new Date().toISOString() });
+  } catch (e) {
+    // timeline é cosmética — não pode derrubar o tick mensal por causa dela
   }
 }
 
@@ -3071,6 +3103,49 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
       }
     }
 
+    // ── "Dando um tempo" ativo: relacionamento pausado. Sem novos eventos
+    // mensais de ciúmes/flagra/término/novo-tempo enquanto durar (o casal
+    // não está se falando) — só o decaimento de afinidade do topo do loop
+    // continua rodando, contabilizando a queda do período inteiro. Ao
+    // chegar no mês sorteado de fim do tempo, resolve: reconcilia (80%,
+    // mantendo a afinidade já decaída) ou termina de vez (20%).
+    if (r.em_tempo) {
+      if (mesTotalAtual >= (r.tempo_termina_mes_total || 0)) {
+        upd.em_tempo = false;
+        upd.tempo_termina_mes_total = null;
+        if (Math.random() < CHANCE_TERMINO_APOS_TEMPO) {
+          upd.ativo = false;
+          if (r.estagio === 'esposo') { upd.separado_em = new Date().toISOString(); upd.motivo_separacao = 'tempo'; }
+          const danoTermDef = IMPACTO_SM_REL.termino[r.estagio] || 10;
+          smDelta -= danoTermDef;
+          const assuntoFimTempo = r.estagio === 'esposo' ? '💔 Separação após o tempo' : `💔 ${r.nome} decidiu terminar`;
+          const corpoFimTempo = `Depois do tempo que pediu, ${r.nome} decidiu que é melhor encerrar de vez. -${danoTermDef} saúde mental.`;
+          await db.collection('jogadores').doc(uid).collection('inbox').add({
+            de:'sistema', para_uid:uid, assunto:assuntoFimTempo, corpo:corpoFimTempo,
+            tipo:'sistema', tipo_noticia:'negativo', lida:false, criado_em:new Date().toISOString(),
+          });
+          await _registrarEventoCF(db, uid, r.id, {
+            tipo:'termino_apos_tempo', label:`${r.nome} decidiu terminar depois do tempo`,
+            mes_pessoal: novoCalendario.mes_pessoal, ano_pessoal: novoCalendario.ano_pessoal,
+          });
+          if (r.npc_id) await _liberarNpcCF(db, r.npc_id);
+        } else {
+          const assuntoVolta = r.estagio === 'esposo' ? '💞 Reatando o casamento' : `💞 ${r.nome} quer reatar`;
+          const corpoVolta = `${r.nome} decidiu continuar com você depois do tempo. A afinidade não voltou ao normal — retomem aos poucos.`;
+          await db.collection('jogadores').doc(uid).collection('inbox').add({
+            de:'sistema', para_uid:uid, assunto:assuntoVolta, corpo:corpoVolta,
+            tipo:'sistema', tipo_noticia:'positivo', lida:false, criado_em:new Date().toISOString(),
+          });
+          await _registrarEventoCF(db, uid, r.id, {
+            tipo:'reatou_apos_tempo', label:`Você e ${r.nome} voltaram depois do tempo`,
+            mes_pessoal: novoCalendario.mes_pessoal, ano_pessoal: novoCalendario.ano_pessoal,
+          });
+          if (r.npc_id) await _reconciliarNpcCF(db, r.npc_id, uid, r.id);
+        }
+      }
+      // enquanto em tempo (ou recém-resolvido este mês), pula ciúmes/flagra/
+      // término-natural/novo-tempo abaixo — ver bloco else.
+    } else {
     // ── Ciumenta: evento mensal de conflito, com chance de virar término ──
     // (independente do fluxo de tempo/término "natural" abaixo — checado
     // primeiro porque é mais específico ao traço).
@@ -3087,6 +3162,10 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
             corpo:`${r.nome} terminou com você após uma crise de ciúmes.`,
             tipo:'sistema', tipo_noticia:'negativo', lida:false, criado_em:new Date().toISOString(),
           });
+          await _registrarEventoCF(db, uid, r.id, {
+            tipo:'termino_ciumes', label:`${r.nome} terminou com você após uma crise de ciúmes`,
+            mes_pessoal: novoCalendario.mes_pessoal, ano_pessoal: novoCalendario.ano_pessoal,
+          });
         } else {
           upd.afinidade = Math.max(0, (upd.afinidade ?? r.afinidade) - 5);
           await db.collection('jogadores').doc(uid).collection('inbox').add({
@@ -3094,6 +3173,10 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
             assunto:'😒 Crise de ciúmes',
             corpo:`${r.nome} teve uma crise de ciúmes este mês. -5 afinidade.`,
             tipo:'sistema', tipo_noticia:'negativo', lida:false, criado_em:new Date().toISOString(),
+          });
+          await _registrarEventoCF(db, uid, r.id, {
+            tipo:'crise_ciumes', label:`${r.nome} teve uma crise de ciúmes`,
+            mes_pessoal: novoCalendario.mes_pessoal, ano_pessoal: novoCalendario.ano_pessoal,
           });
         }
       }
@@ -3114,6 +3197,10 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
           assunto: r.estagio === 'esposo' ? '💔 Separação — traição descoberta' : '💔 Flagrado(a) traindo!',
           corpo:`${r.nome} descobriu seu affair e ${r.estagio === 'esposo' ? 'pediu a separação' : 'terminou o relacionamento'}. -${FLAGRA_REL.penalidade_sm} saúde mental.`,
           tipo:'sistema', tipo_noticia:'negativo', lida:false, criado_em:new Date().toISOString(),
+        });
+        await _registrarEventoCF(db, uid, r.id, {
+          tipo:'flagra', label:`${r.nome} descobriu o affair e ${r.estagio === 'esposo' ? 'pediu a separação' : 'terminou o relacionamento'}`,
+          mes_pessoal: novoCalendario.mes_pessoal, ano_pessoal: novoCalendario.ano_pessoal,
         });
       }
     } else if (r.estagio === 'affair' && numAffairs > 1) {
@@ -3136,10 +3223,17 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
         de:'sistema', para_uid:uid, assunto:assuntoTerm, corpo:corpoTerm,
         tipo:'sistema', tipo_noticia:'negativo', lida:false, criado_em:new Date().toISOString(),
       });
+      await _registrarEventoCF(db, uid, r.id, {
+        tipo:'termino_natural', label: r.estagio === 'esposo' ? `${r.nome} pediu a separação` : `${r.nome} encerrou o relacionamento`,
+        mes_pessoal: novoCalendario.mes_pessoal, ano_pessoal: novoCalendario.ano_pessoal,
+      });
     } else if (Math.random() < estagio.tempo_chance) {
       upd.afinidade = Math.max(0, Math.floor((upd.afinidade ?? r.afinidade) * 0.7));
       const smTempoDano = IMPACTO_SM_REL.tempo[r.estagio] || 5;
       smDelta -= smTempoDano;
+      const duracaoTempo = TEMPO_DURACAO_MIN_MESES + Math.floor(Math.random() * (TEMPO_DURACAO_MAX_MESES - TEMPO_DURACAO_MIN_MESES + 1));
+      upd.em_tempo = true;
+      upd.tempo_termina_mes_total = mesTotalAtual + duracaoTempo;
       const assuntoTempo = r.estagio === 'esposo' ? '😔 Dando um tempo no casamento' : `😔 ${r.nome} quer dar um tempo`;
       const corpoTempo = r.estagio === 'esposo'
         ? `${r.nome} pediu um tempo no casamento. A afinidade caiu 30%. -${smTempoDano} saúde mental. Cuide do relacionamento para que não evolua para separação.`
@@ -3148,9 +3242,14 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
         de:'sistema', para_uid:uid, assunto:assuntoTempo, corpo:corpoTempo,
         tipo:'sistema', tipo_noticia:'negativo', lida:false, criado_em:new Date().toISOString(),
       });
+      await _registrarEventoCF(db, uid, r.id, {
+        tipo:'pediu_tempo', label: r.estagio === 'esposo' ? `${r.nome} pediu um tempo no casamento` : `${r.nome} pediu um tempo`,
+        mes_pessoal: novoCalendario.mes_pessoal, ano_pessoal: novoCalendario.ano_pessoal,
+      });
       // "Dar um tempo": trava o NPC globalmente para o MESMO jogador —
       // outros não podem conhecê-la enquanto isso, só ele pode reatar.
       if (r.npc_id) await _marcarNpcEmTempoCF(db, r.npc_id, uid, r.id);
+    }
     }
 
     // Se o relacionamento foi encerrado (qualquer um dos ramos acima:
@@ -3267,5 +3366,7 @@ exports._processarCursosMensalCF = _processarCursosMensalCF;
 exports._processarServicosMensalCF = _processarServicosMensalCF;
 exports._liberarNpcCF = _liberarNpcCF;
 exports._marcarNpcEmTempoCF = _marcarNpcEmTempoCF;
+exports._reconciliarNpcCF = _reconciliarNpcCF;
+exports._registrarEventoCF = _registrarEventoCF;
 exports.EFEITO_TRACO_REL = EFEITO_TRACO_REL;
 
