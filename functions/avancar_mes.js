@@ -247,7 +247,7 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid, esc) {
         const hon        = p.honorarios || 0;
         const valorRecebido = resultado === 'procedente' ? hon
           : resultado === 'parcial' ? Math.round(hon * 0.55)
-          : Math.round(hon * 0.10);
+          : 0; // improcedente nunca gera honorários (mesma regra do setlist/investigação)
 
         // Rastrear feedback para estresse e ranking
         if (resultado === 'procedente') {
@@ -306,6 +306,7 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid, esc) {
   const fProms     = [];
   const logsBurn   = [];
   const rankingData = []; // coleta para ordenar depois
+  const estadoNpcPosTick = {}; // funcId → {estresse, reputacao_interna} recém-calculados, pro bloco de benefícios usar como base (em vez de FieldValue.increment cego, que nunca respeitava o teto de 0-100)
   for (const fd of fSnap.docs) {
     const f = fd.data();
     if (f.tipo !== 'npc') continue;
@@ -372,6 +373,8 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid, esc) {
     const rankScore    = (casosRanking * 10) + (novaMediaAcum * 15) + (taxaS * 5);
     rankingData.push({ id: fd.id, ref: fd.ref, f, rankScore, casosRanking });
 
+    estadoNpcPosTick[fd.id] = { estresse: novoEstresse, reputacao_interna: novaRepInterna };
+
     fProms.push(fd.ref.update({
       energia_npc_usada_mes:    npcUsado,
       mes_energia:              proximoMes,
@@ -397,16 +400,19 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid, esc) {
   // precisa mudar — roda dentro do avançar mês já existente).
   const npcsAtivosBenef = Object.values(npcMap).filter(f => f.tipo === 'npc' && f.ativo !== false);
   if (beneficiosAtivos.length > 0 && npcsAtivosBenef.length > 0) {
-    const FVb = require('firebase-admin/firestore').FieldValue;
-    // increment (não leitura+escrita) de propósito: NPCs com processo este mês
-    // já tiveram estresse/reputacao_interna recalculados e commitados acima
-    // (fProms) — ler do npcMap aqui pegaria o valor ANTES daquele recálculo
-    // e sobrescreveria o resultado certo. Increment aplica por cima do que
-    // já está salvo, não importa a ordem.
-    const benefProms = npcsAtivosBenef.map(f => f.ref.update({
-      estresse:          FVb.increment(benefEstresse),
-      reputacao_interna: FVb.increment(benefRepInterna),
-    }));
+    // Base = valor JÁ recalculado no loop acima (estadoNpcPosTick), nunca o
+    // npcMap (que é a leitura ANTES do tick) — evita a corrida de escrita
+    // sem reler o doc. Antes usava FieldValue.increment cego, que nunca
+    // respeitava o teto 0-100 (estresse podia ir negativo → bem-estar
+    // "100 - estresse" passava de 100; reputação interna passava de 100
+    // direto, sem nenhum clamp).
+    const benefProms = npcsAtivosBenef.map(f => {
+      const base = estadoNpcPosTick[f.id] || { estresse: f.estresse || 0, reputacao_interna: f.reputacao_interna || 50 };
+      return f.ref.update({
+        estresse:          Math.max(0, Math.min(100, base.estresse + benefEstresse)),
+        reputacao_interna: Math.max(0, Math.min(100, base.reputacao_interna + benefRepInterna)),
+      });
+    });
     let custoTotal = benefCustoPorFunc * npcsAtivosBenef.length;
     // Bônus por Performance: % do salário do cargo, escalado pela eficiência
     // real do NPC (5% no piso de eficiência, 15% no teto) — variável de
@@ -1969,7 +1975,7 @@ async function _marcarNpcEmTempoCF(db, npcId, uid, relId) {
 function custoFilhoPorIdadeCF(idade) {
   if (idade <= 5)  return CUSTO_FILHO_REL.bebe;
   if (idade <= 17) return CUSTO_FILHO_REL.crianca;
-  if (idade <= 22) return CUSTO_FILHO_REL.jovem;
+  if (idade < 22)  return CUSTO_FILHO_REL.jovem; // custo termina ao completar 22 (não durante o ano de 22)
   return 0;
 }
 function efeitoFelicidadeCompatibilidadeCF(compat) {
@@ -3176,7 +3182,10 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
     const novaIdadeMeses = idadeMesesAtual + 1;
     const idadeAnosCompletos = Math.floor(novaIdadeMeses/12);
 
-    custoFilhos += custoFilhoPorIdadeCF(Math.floor(idadeMesesAtual/12));
+    // Custo usa a idade JÁ atualizada deste mês (idadeAnosCompletos), não a
+    // idade anterior — senão o filho seguia custando por mais um mês inteiro
+    // depois de completar 22 (bug relatado: custo não parava nos 22 anos).
+    custoFilhos += custoFilhoPorIdadeCF(idadeAnosCompletos);
     const upd = { idade_meses: novaIdadeMeses, idade: idadeAnosCompletos };
 
     if (idadeAnosCompletos >= 18 && !f.faculdade) {

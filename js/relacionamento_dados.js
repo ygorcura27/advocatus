@@ -451,8 +451,8 @@ export function efeitoFelicidadeChance(felicidade) {
 export function custoFilhoPorIdade(idade) {
   if (idade <= 5)  return CUSTO_FILHO.bebe.custo;
   if (idade <= 17) return CUSTO_FILHO.crianca.custo;
-  if (idade <= 22) return CUSTO_FILHO.jovem.custo;
-  return 0; // independente após 22
+  if (idade < 22)  return CUSTO_FILHO.jovem.custo; // custo termina ao completar 22 (não durante o ano de 22)
+  return 0; // independente a partir de 22
 }
 
 /**

@@ -1115,7 +1115,7 @@ export async function processarRelacionamentosMensal(j) {
     const novaIdadeMeses  = idadeMesesAtual + 1;
     const idadeAnosCompletos = Math.floor(novaIdadeMeses/12);
 
-    custoFilhos += custoFilhoPorIdade(Math.floor(idadeMesesAtual/12));
+    custoFilhos += custoFilhoPorIdade(idadeAnosCompletos);
     const upd = { idade_meses: novaIdadeMeses, idade: idadeAnosCompletos }; // idade = anos completos, inteiro, sem float
 
     if (idadeAnosCompletos >= 18 && !f.faculdade) {

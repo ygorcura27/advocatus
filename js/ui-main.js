@@ -1095,10 +1095,25 @@ const _TODAS_AREAS_KEYS = ['civil','tributario','trabalhista','criminal','empres
 // ════════════════════════════════════════════════════════
 
 
+// "Investido no mês" = custo cheio de TODA campanha ainda ativa (meses_
+// restantes>0), somado — não só o gasto do mês em que a campanha foi
+// lançada. Antes usava esc.despesa_marketing_mes_atual, que só soma o
+// custo à vista de campanhas lançadas NESTE mês (financeiro.js:
+// lancarCampanha) e zera no tick seguinte — então uma Campanha Nacional
+// (R$40.000, 4 meses) aparecia como "investido" só no mês do lançamento,
+// sumindo do indicador nos meses 2-4 mesmo ainda ativa rendendo prestígio.
+// Isso é só pro indicador de intensidade de marketing; o Balancete
+// (despesaMarketing em _escKpis) continua usando o gasto de caixa real do
+// mês, sem repetir — dinheiro não sai de novo depois do lançamento.
+function _investidoMarketingAtivo(esc) {
+  const campanhas = (esc && esc.campanhas_ativas) || [];
+  return campanhas
+    .filter(c => (c.meses_restantes || 0) > 0)
+    .reduce((s, c) => s + (c.custo || 0), 0);
+}
+
 // Prévia de Marketing no dashboard — igual mockup, mas com dados reais
 // (reputação/prestígio do escritório, convites de mídia pendentes).
-// "Investido no mês" = esc.despesa_marketing_mes_atual, incrementado real
-// por functions/financeiro.js:lancarCampanha, resetado a cada tick mensal.
 function _escMarketingPreviewCard(escId) {
   return `
   <div class="esc-card-bloco" style="margin-bottom:1.1rem">
@@ -1126,7 +1141,7 @@ async function _carregarMarketingPreview(escId) {
       where('status', '==', 'pendente')
     ));
     el.innerHTML = `
-      <div class="stat"><div class="stat-label">Investido no mês</div><div class="stat-value" style="font-size:1.1rem">${_fmtExt(esc.despesa_marketing_mes_atual||0)}</div></div>
+      <div class="stat"><div class="stat-label">Investido no mês</div><div class="stat-value" style="font-size:1.1rem">${_fmtExt(_investidoMarketingAtivo(esc))}</div></div>
       <div class="stat"><div class="stat-label">Reputação</div><div class="stat-value up" style="font-size:1.1rem">${esc.reputacao||0}</div></div>
       <div class="stat"><div class="stat-label">Prestígio</div><div class="stat-value" style="font-size:1.1rem">${esc.prestigio||0}</div></div>
       <div class="stat"><div class="stat-label">Convites pendentes</div><div class="stat-value" style="font-size:1.1rem;color:${conviteSnap.size?'var(--amber)':'var(--txt)'}">${conviteSnap.size}</div></div>`;
@@ -1254,6 +1269,25 @@ function _capaHeader(kicker, nome, pillsHtml, seloHtml) {
 }
 window._capaHeader = _capaHeader;
 
+// Conta processos ativos de verdade (disponivel+em_andamento no pool),
+// igual à Gestão de Processos — antes o pill do hero usava esc.total_casos
+// (contador VITALÍCIO de casos concluídos, incrementado em processar_
+// sentenca.js/processar_acordao.js) ou j._processos_count (campo que nunca
+// é escrito em lugar nenhum, sempre 0/undefined), então nunca batia com o
+// número real de casos ativos mostrado na tela de Gestão de Processos.
+async function _atualizarHeroAtivos(escId) {
+  const el = document.getElementById('esc-hero-ativos');
+  if (!el || !escId) return;
+  try {
+    const poolSnap = await getDocs(collection(db, 'escritorios', escId, 'processos_pool'));
+    const ativos = poolSnap.docs.filter(d => {
+      const st = d.data().status;
+      return st === 'disponivel' || st === 'em_andamento';
+    }).length;
+    el.textContent = `⚖️ ${ativos} processo${ativos===1?'':'s'} ativo${ativos===1?'':'s'}`;
+  } catch (e) { /* mantém placeholder */ }
+}
+
 function _escHero(j, esc) {
   const escNome = (esc && esc.nome) || j.escritorio_nome || 'Advocacia Solo';
   const tier    = (esc && esc.tier) || j.escritorio_tier || 1;
@@ -1266,11 +1300,12 @@ function _escHero(j, esc) {
       ? `${TIER_TAG[tier]||'Boutique'} · ${areasAtuacao.map(_espLabel2).join(', ')}`
       : `${TIER_TAG[tier]||'Boutique'} · ${_espLabel2((esc && (esc.especialidade_principal||esc.especialidade)) || j.escritorio_esp || j.especialidade)}`;
   const numSocios = esc ? _normalizarSociosUI(esc).length : 1;
-  const totalCasos = (esc && (esc.total_casos || j._processos_count)) || j._processos_count || 0;
   const rep = j.reputacao || 0;
   const cap = (window.REP_CAP||{})[j.cargo_id] || 35;
   const prestigio = esc ? (esc.prestigio||0) : Math.min(100, Math.round(rep/cap*100));
   const local = (esc && esc.bairro_sede) || j.escritorio_bairro || 'Rio de Janeiro';
+  const escIdHero = (esc && esc.id) || j.escritorio_proprio_id || j.escritorio_empregado_id || null;
+  if (escIdHero) setTimeout(() => _atualizarHeroAtivos(escIdHero), 0);
 
   return `
   <section class="capa">
@@ -1282,7 +1317,7 @@ function _escHero(j, esc) {
           <span class="pill pill-cargo">${tagEspecializacao}</span>
           <span class="pill pill-oab">📍 ${local}</span>
           <span class="pill pill-oab">👥 ${numSocios} sócio${numSocios>1?'s':''}</span>
-          <span class="pill pill-oab">⚖️ ${totalCasos} processo${totalCasos===1?'':'s'} ativo${totalCasos===1?'':'s'}</span>
+          <span class="pill pill-oab" id="esc-hero-ativos">⚖️ …</span>
           ${esc && esc.gestor_id ? `<span class="pill pill-oab" style="background:var(--ouro,#D9B573);color:#1E293C;border-color:transparent">👑 Gestor: ${esc.gestor_nome||'—'}</span>` : ''}
         </div>
       </div>
@@ -1892,7 +1927,7 @@ async function renderMarketing(j, el) {
   el.innerHTML = `
     ${_capaHeader(`GESTÃO DE MARKETING · ${(esc.nome||'—').toUpperCase()}`, '📣 Marketing & Reputação', '')}
     <div class="stat-row stat-row-4">
-      <div class="stat"><div class="stat-label">Investido no mês</div><div class="stat-value">${_fmtExt(esc.despesa_marketing_mes_atual||0)}</div></div>
+      <div class="stat"><div class="stat-label">Investido no mês</div><div class="stat-value">${_fmtExt(_investidoMarketingAtivo(esc))}</div></div>
       <div class="stat"><div class="stat-label">Reputação</div><div class="stat-value up">${rep}<small>/${repCap}</small></div></div>
       <div class="stat"><div class="stat-label">Prestígio</div><div class="stat-value">${prestigio}<small>/100</small></div></div>
       <div class="stat"><div class="stat-label">Convites pendentes</div><div class="stat-value" style="color:${convitesPendentes?'var(--amber)':'var(--txt)'}">${convitesPendentes}</div></div>
