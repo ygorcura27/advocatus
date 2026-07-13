@@ -67,13 +67,10 @@ window.renderSistemasSociais = function(j, el) {
     </div>`;
   }
 
-  // ── Podcast ──
-  const jaGravouMes = j.podcast_ultimo_mes === mesGlobal;
-  const podcastHtml = `<div class="card" style="margin-bottom:.7rem">
-    <div style="font-weight:700;font-size:.82rem;color:var(--txt)">🎙️ Podcast / Talk Show</div>
-    <div style="font-size:.68rem;color:var(--txt3);margin:.3rem 0">Chance de viralizar cresce com Oral Advocacy (atual: ${j.oral_advocacy||0}/50). Total gravado: ${j.podcast_total||0}.</div>
-    <button class="btn btn-prim btn-block" ${jaGravouMes?'disabled':''} onclick="window._ssPodcast()">${jaGravouMes ? '✅ Já gravou este mês' : '🎙️ Gravar Episódio (6⚡)'}</button>
-  </div>`;
+  // Podcast/Talk Show foi pra Redes Sociais (js/ui-main.js:renderRedes) —
+  // faz mais sentido junto de Comunicação Midiática/Autoridade/views do que
+  // aqui. window._ssPodcast continua definida embaixo neste arquivo, só a
+  // renderização do card que mudou de tela.
 
   // ── Seguro Malpractice ──
   let malpracticeHtml;
@@ -115,7 +112,7 @@ window.renderSistemasSociais = function(j, el) {
 
   el.innerHTML = `
     ${window._capaHeader('VIDA SOCIAL & CARREIRA · ADVOCATUS ONLINE', '🌐 Sistemas Sociais', '')}
-    ${mootHtml}${intercambioHtml}${podcastHtml}${malpracticeHtml}${probonoHtml}${alumniHtml}`;
+    ${mootHtml}${intercambioHtml}${malpracticeHtml}${probonoHtml}${alumniHtml}`;
 
   window._ssCarregarAlumni();
 };
@@ -196,7 +193,7 @@ window._ssPodcast = async function() {
     const fn = httpsCallable(window.FB_FUNCTIONS, 'gravarPodcast');
     const r = await fn({});
     window.toast(r.data.viral ? '🔥 Viralizou!' : 'Episódio publicado.', 'ok', 3000);
-    setTimeout(() => window.navTo?.('sistemas_sociais', null), 500);
+    setTimeout(() => window.navTo?.('redes', null), 500);
   } catch (e) { window.toast(e.message || 'Erro.', 'ko'); }
 };
 

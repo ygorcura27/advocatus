@@ -1706,6 +1706,18 @@ function renderRedes(j, el) {
   const autoridade = Math.min(100, Math.round(com * 2));
   const seguidoresTotal = _redesSeguidoresTotal(com, viewsAcumul);
 
+  // Podcast/Talk Show — movido de Sistemas Sociais pra cá (mesma ação real,
+  // window._ssPodcast em js/sistemas_sociais_ui.js, chamada de fora do
+  // arquivo onde foi definida — window.* é global entre módulos). Faz mais
+  // sentido junto do resto da marca pessoal do que solto em Sistemas Sociais.
+  const mesGlobalPodcast = j.mes_global_pessoal || 0;
+  const jaGravouMes = j.podcast_ultimo_mes === mesGlobalPodcast;
+  const podcastHtml = `<div class="card" style="margin-bottom:1rem">
+    <div style="font-weight:700;font-size:.82rem;color:var(--txt)">🎙️ Podcast / Talk Show</div>
+    <div style="font-size:.68rem;color:var(--txt3);margin:.3rem 0">Chance de viralizar cresce com Oral Advocacy (atual: ${j.oral_advocacy||0}/50). Cada episódio dá +1 Didática Acadêmica. Total gravado: ${j.podcast_total||0}.</div>
+    <button class="btn btn-prim btn-block" ${jaGravouMes?'disabled':''} onclick="window._ssPodcast && window._ssPodcast()">${jaGravouMes ? '✅ Já gravou este mês' : '🎙️ Gravar Episódio (6⚡)'}</button>
+  </div>`;
+
   el.innerHTML = `
     ${_capaHeader(`MARCA PESSOAL · ${(j.nome_personagem||'—').toUpperCase()}`, '📱 Redes Sociais', '')}
     <div class="card" style="font-size:.72rem;color:var(--txt3);margin-bottom:1rem;line-height:1.6">
@@ -1730,7 +1742,8 @@ function renderRedes(j, el) {
         <div style="font-size:.62rem;color:var(--txt3);text-transform:uppercase;letter-spacing:.08em">Views acumulados</div>
       </div>
     </div>
-    <div class="card" style="margin-top:.7rem">
+    ${podcastHtml}
+    <div class="card">
       <div class="secao-header" style="margin-bottom:.4rem">
         <div class="secao-titulo">Seguidores — ${seguidoresTotal.toLocaleString('pt-BR')} total</div>
       </div>
