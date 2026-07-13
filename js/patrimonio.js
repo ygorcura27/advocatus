@@ -564,6 +564,8 @@ window.venderItem = async function(id) {
 window.estudarSkill = async function(sk, skLabel) {
   const j   = window.JOGADOR;
   const uid = j.uid || window.JOGADOR_UID;
+  const cap = (window.REP_CAP||{})[j.cargo_id] || 55;
+  if ((j.skills?.[sk]||0) >= cap) { toast(`${skLabel} já está no máximo (${cap}).`, 'ko'); return; }
   if ((j.dinheiro||0) < 500) { toast('Saldo insuficiente. Estudar custa R$500.','ko'); return; }
   if ((j.study_queue||[]).some(s => s.skill === sk)) { toast('Já há um estudo desta skill em andamento.','ko'); return; }
   const novaFila = [...(j.study_queue||[]), { skill:sk, skill_label:skLabel, ganho:3, mes_conclusao:(window.SERVER?.mes_global||1)+1 }];
@@ -574,6 +576,8 @@ window.estudarSkill = async function(sk, skLabel) {
 window.estudarSkillJur = async function(sk, skLabel) {
   const j   = window.JOGADOR;
   const uid = j.uid || window.JOGADOR_UID;
+  const capJur = Math.round(50 * (1 + (j.posgrad_bonus_skill || 0)));
+  if ((j.skills_jur?.[sk]||0) >= capJur) { toast(`${skLabel} já está no máximo (${capJur}).`, 'ko'); return; }
   if ((j.dinheiro||0) < 500) { toast('Saldo insuficiente. Estudar custa R$500.','ko'); return; }
   if ((j.study_queue||[]).some(s => s.skill === sk)) { toast('Já há um estudo desta skill em andamento.','ko'); return; }
   const novaFila = [...(j.study_queue||[]), {

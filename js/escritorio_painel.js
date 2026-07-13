@@ -157,6 +157,9 @@ window.renderAtividadeEscritorioPainel = async function(escId, el) {
 // ════════════════════════════════════════════════════════
 window.renderEquipePainel = async function(j, escId, el) {
   try {
+    const escSnap = await getDoc(doc(db, 'escritorios', escId));
+    const gestorId = escSnap.exists() ? (escSnap.data().gestor_id || null) : null;
+
     const fSnap = await getDocs(
       query(collection(db, 'escritorios', escId, 'funcionarios'), orderBy('criado_em', 'asc'))
     );
@@ -208,7 +211,7 @@ window.renderEquipePainel = async function(j, escId, el) {
           <img class="membro-avatar${isNpc?' npc':''}" src="${_avatarSrc(func)}" alt="${nome}"
                onerror="window._svgNpcFallback(this,'${nome.replace(/'/g,"\\'")}')">
           <div>
-            <div class="membro-nome">${nome} ${isNpc?'<span class="tag-npc">NPC</span>':''} ${energiaBadge}</div>
+            <div class="membro-nome">${nome} ${isNpc?'<span class="tag-npc">NPC</span>':''} ${func.id===gestorId?'<span style="font-size:.6rem;background:var(--ouro,#D9B573);color:#1E293C;padding:.05rem .4rem;border-radius:99px;font-weight:700;margin-left:.2rem">👑 Gestor</span>':''} ${energiaBadge}</div>
             <div class="membro-cargo">${cargo} · ${esp}</div>
             ${emBurnout
               ? `<div class="membro-gestor-tag" style="color:var(--verm3)">Burnout — ${func.burnout_npc_restante||0} mês(es) afastado</div>`

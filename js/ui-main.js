@@ -2083,6 +2083,7 @@ function renderHabilidades(j, el) {
     const val     = skills[sk.k] || 0;
     const isPrior = prioridades.includes(sk.k);
     const emEst   = queue.some(q => q.skill === sk.k);
+    const isCap   = val >= cap;
     return `<tr class="sk-row">
       <td class="sk-nome">${isPrior ? '<span class="sk-prior">⭐</span>' : ''} ${sk.l}</td>
       <td class="sk-nivel">
@@ -2090,9 +2091,11 @@ function renderHabilidades(j, el) {
         ${skBar(val, cap)}
       </td>
       <td class="sk-acao">
-        ${emEst
-          ? `<span class="sk-pendente">⏳</span>`
-          : `<button class="sk-btn" onclick="window.estudarSkill && window.estudarSkill('${sk.k}','${sk.l}')">📖 +3</button>`}
+        ${isCap
+          ? `<span class="sk-max">MAX</span>`
+          : emEst
+            ? `<span class="sk-pendente">⏳</span>`
+            : `<button class="sk-btn" onclick="window.estudarSkill && window.estudarSkill('${sk.k}','${sk.l}')">📖 +3</button>`}
       </td>
     </tr>`;
   }

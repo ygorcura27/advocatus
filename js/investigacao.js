@@ -547,7 +547,12 @@ function _renderJulgamento(j, main, p) {
 
   const ordenadas = [...pecas].sort((a, b) => _prioridadeAtaqueClient(b) - _prioridadeAtaqueClient(a));
   const alvo = ordenadas[0];
-  const chanceDefender = Math.min(90, Math.round(30 + alvo.forca * 0.7));
+  // Espelha o cálculo real do servidor (functions/investigacao.js:
+  // executarRodadaJulgamento) — faltava o bônus de Sustentação Oral aqui,
+  // fazendo o % exibido ficar sempre abaixo da chance real usada no roll.
+  const oralAdv = (j.skills_jur || {}).oral_advocacy || 0;
+  const bonusOratoriaClient = 12 * Math.sqrt(Math.min(50, Math.max(0, oralAdv)) / 50);
+  const chanceDefender = Math.min(90, Math.round(30 + alvo.forca * 0.7 + bonusOratoriaClient));
   const favoresDisp = (p.investigacao.favores_reservados || []).length;
 
   main.innerHTML = `
@@ -586,7 +591,7 @@ window._invReagir = async function(reacao, favorId) {
     _procCache = snap.data();
     const resultado = reacao === 'deixar_cair'
       ? 'Peça descartada — 0 força.'
-      : `${r.forca_obtida > 0 ? '✅ Defesa bem-sucedida' : '⚠️ Defesa falhou'} — força obtida: ${r.forca_obtida}.`;
+      : `${r.sucesso ? '✅ Defesa bem-sucedida' : '⚠️ Defesa falhou (força parcial)'} — força obtida: ${r.forca_obtida}.`;
     window.toast && window.toast(
       `${resultado}${r.exposta ? ' ⚠️ Peça exposta!' : ''}`, r.exposta ? 'ko' : (r.forca_obtida > 0 ? 'ok' : 'neutro'), 3500,
     );

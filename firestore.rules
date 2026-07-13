@@ -146,6 +146,28 @@ service cloud.firestore {
         allow delete: if isOwner(uid);
       }
 
+      // ── Subcoleção: amigos (amizades/trabalho, js/amigos.js) ──
+      // Faltava essa regra desde que a feature foi criada — sem match
+      // nenhum aqui, toda leitura/escrita caía em "Missing or insufficient
+      // permissions" (deny-by-default), reportado como bug em
+      // relacionamento.js:189 (renderVidaPessoal, que chama renderAmigosSecao).
+      match /amigos/{amigoId} {
+        allow read:   if isOwner(uid);
+        allow create: if isOwner(uid);
+        allow update: if isOwner(uid);
+        allow delete: if isOwner(uid);
+      }
+
+      // ── Subcoleção: confiancas_npc (favores de Investigação, js/investigacao.js) ──
+      // Mesma lacuna — leitura do cliente (_confiancasDosNosBloqueados) falhava
+      // silenciosamente (try/catch com fallback pra 50), nunca foi notado.
+      match /confiancas_npc/{npcId} {
+        allow read:   if isOwner(uid);
+        allow create: if isOwner(uid);
+        allow update: if isOwner(uid);
+        allow delete: if isOwner(uid);
+      }
+
       // Convites de mídia direcionados (Podcasts/Aparições na Internet) —
       // gerados e respondidos via Cloud Function (Admin SDK); dono só lê.
       match /convites_midia/{conviteId} {

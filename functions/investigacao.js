@@ -628,11 +628,11 @@ exports.executarRodadaJulgamento = onCall({ region: 'southamerica-east1' }, asyn
   julg.pecas_restantes.sort((a, b) => prioridadeAtaque(b) - prioridadeAtaque(a));
   const alvo = julg.pecas_restantes[0];
 
-  let forcaFinal = 0, exposta = false, favorConsumido = null;
+  let forcaFinal = 0, exposta = false, favorConsumido = null, sucesso = null;
   if (reacao === 'defender') {
     const chanceBase = 30 + alvo.forca * 0.7;
     const chance = Math.min(90, chanceBase + sk.bonusOratoria(skJur.oral_advocacy));
-    const sucesso = Math.random() * 100 < chance;
+    sucesso = Math.random() * 100 < chance;
     forcaFinal = sucesso ? alvo.forca : Math.round(alvo.forca * 0.4);
     if (!sucesso && alvo.suja) {
       const riscoExposicao = Math.max(5, 45 - sk.reducaoRiscoExposicao(skJur.discricao));
@@ -643,6 +643,7 @@ exports.executarRodadaJulgamento = onCall({ region: 'southamerica-east1' }, asyn
       throw new HttpsError('invalid-argument', 'Favor inválido ou não reservado para este caso.');
     }
     forcaFinal = alvo.forca; // sucesso garantido
+    sucesso = true;
     investigacao.favores_reservados = investigacao.favores_reservados.filter(id => id !== favor_id);
     favorConsumido = favor_id;
     await db.collection('favores').doc(favor_id).update({ status: 'consumido' });
@@ -659,11 +660,16 @@ exports.executarRodadaJulgamento = onCall({ region: 'southamerica-east1' }, asyn
   julg.forca_total += forcaFinal;
   julg.pecas_restantes = julg.pecas_restantes.filter(pc => pc !== alvo);
   julg.rodada_atual += 1;
-  julg.log.push({ no_id: alvo.no_id, reacao, forca_obtida: forcaFinal, exposta, favor_id: favorConsumido });
+  julg.log.push({ no_id: alvo.no_id, reacao, forca_obtida: forcaFinal, exposta, favor_id: favorConsumido, sucesso });
 
   await processoRef.update({ investigacao });
   return {
-    rodada: julg.rodada_atual, alvo_no_id: alvo.no_id, forca_obtida: forcaFinal, exposta,
+    // `sucesso` é o resultado real do roll de defesa — o client não pode mais
+    // inferir êxito a partir de forca_obtida > 0, porque uma defesa que
+    // FALHA ainda rende 40% de força (não zero), o que fazia o toast mostrar
+    // "✅ Defesa bem-sucedida" toda vez, mesmo perdendo o roll — bug relatado
+    // como "nunca perco, mesmo com 38%/41% de chance".
+    rodada: julg.rodada_atual, alvo_no_id: alvo.no_id, forca_obtida: forcaFinal, exposta, sucesso,
     pecas_restantes: julg.pecas_restantes.length, forca_total: julg.forca_total,
   };
 });

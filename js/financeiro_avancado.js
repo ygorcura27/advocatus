@@ -83,7 +83,7 @@ async function _invCarregarPrecosReais() {
     }
   } catch (e) { /* silencioso — mantém preço ilustrativo */ }
 
-  if (_invTabAtiva === 'acoes' || _invTabAtiva === 'cripto') window._invRenderTab(_invTabAtiva);
+  if (_invTabAtiva === 'acoes' || _invTabAtiva === 'cripto' || _invTabAtiva === 'visao') window._invRenderTab(_invTabAtiva);
 }
 
 // ════════════════════════════════════════════════════════
@@ -197,25 +197,45 @@ window._invRenderTab = function(tab) {
   const { rf, fd, im, fn, total } = _invTotais(inv);
 
   if (tab === 'visao') {
+    // Ações/Cripto (investimentos.carteira_mercado) são reais desde que
+    // comprarAtivo/venderAtivo passaram a persistir (antes eram proposta
+    // pura e ficavam de fora do círculo de propósito — hoje isso omitia
+    // dinheiro de verdade da Alocação da Carteira). Preço vem de _INV_ACOES/
+    // _INV_CRIPTOS (mesmo cache ao vivo usado nas abas Ações/Cripto);
+    // antes de _invCarregarPrecosReais resolver, usa o preço ilustrativo
+    // seed — mesma transição que as outras abas já têm.
+    const carteiraMercado = j.investimentos?.carteira_mercado || {};
+    const mercadoValor = ['acoes','cripto'].reduce((soma, tipo) => {
+      const lista = tipo === 'acoes' ? _INV_ACOES : _INV_CRIPTOS;
+      return soma + (carteiraMercado[tipo] || []).reduce((s, h) => {
+        const atual = lista.find(x => x.ticker === h.ticker);
+        return s + (atual ? atual.preco : h.preco_medio) * h.qtd;
+      }, 0);
+    }, 0);
+    const totalComMercado = total + mercadoValor;
+
     const linhas = [
       ['📈 Renda Fixa', rf, 'var(--verde2)'],
       ['💹 Fundos', fd, 'var(--ouro)'],
       ['🏠 Imóvel p/ Renda', im, 'var(--amber)'],
       ['🏢 Firmas (Ações)', fn, 'var(--navy3)'],
+      ['🪙 Ações & Cripto', mercadoValor, 'var(--verm2)'],
     ].filter(l => l[1] > 0);
     let acumulado = 0;
     const gradientParts = linhas.map(([,valor,cor]) => {
-      const pctStart = acumulado / total * 100;
+      const pctStart = acumulado / totalComMercado * 100;
       acumulado += valor;
-      const pctEnd = acumulado / total * 100;
+      const pctEnd = acumulado / totalComMercado * 100;
       return `${cor} ${pctStart}% ${pctEnd}%`;
     });
-    const donutBg = total > 0 ? `conic-gradient(${gradientParts.join(',')})` : 'var(--surface2)';
+    const donutBg = totalComMercado > 0 ? `conic-gradient(${gradientParts.join(',')})` : 'var(--surface2)';
     const todasPosicoes = [
       ...(inv.renda_fixa||[]).map(i=>({ nome:'Tesouro/CDB', tipo:'Renda Fixa', valor:i.valor_aplicado, rend:`+${((i.taxa_mensal||0.008)*100).toFixed(1)}%/mês` })),
       ...(inv.fundos||[]).map(i=>({ nome:'Fundo '+(i.subtipo?i.subtipo[0].toUpperCase()+i.subtipo.slice(1):'—'), tipo:'Fundos', valor:i.valor_aplicado, rend:`${((i.min||0)*100).toFixed(1)}% a ${((i.max||0)*100).toFixed(1)}%/mês` })),
       ...(inv.imovel_renda ? [{ nome:'Imóvel p/ Renda', tipo:'Imóvel', valor:inv.imovel_renda.valor_aplicado, rend:`+${_fmtR(inv.imovel_renda.aluguel_mensal)}/mês` }] : []),
       ...(inv.firma_npc||[]).map(i=>({ nome:i.nome, tipo:'Firma (Ação)', valor:i.valor_investido, rend:`±${((i.volatilidade||0.2)*100).toFixed(0)}% sobre ${((i.pct_base||0.009)*100).toFixed(1)}%/mês` })),
+      ...(carteiraMercado.acoes||[]).map(h=>{ const atual=_INV_ACOES.find(x=>x.ticker===h.ticker); const p=atual?atual.preco:h.preco_medio; return { nome:`${h.ticker} · ${h.qtd} ações`, tipo:'Ações (B3)', valor:p*h.qtd, rend:`PM ${_fmtR(h.preco_medio)}` }; }),
+      ...(carteiraMercado.cripto||[]).map(h=>{ const atual=_INV_CRIPTOS.find(x=>x.ticker===h.ticker); const p=atual?atual.preco:h.preco_medio; return { nome:`${h.ticker} · ${h.qtd} unid.`, tipo:'Criptomoeda', valor:p*h.qtd, rend:`PM ${_fmtR(h.preco_medio)}` }; }),
     ];
     el.innerHTML = `
       <div class="equipe-layout" style="grid-template-columns:1fr 1fr">
@@ -225,12 +245,12 @@ window._invRenderTab = function(tab) {
             <div style="width:120px;height:120px;border-radius:50%;background:${donutBg};display:flex;align-items:center;justify-content:center;flex-shrink:0">
               <div style="width:76px;height:76px;border-radius:50%;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center">
                 <div style="font-size:.58rem;color:var(--txt4)">Total</div>
-                <div style="font-size:.74rem;color:var(--txt);font-weight:600">${_fmtR(total)}</div>
+                <div style="font-size:.74rem;color:var(--txt);font-weight:600">${_fmtR(totalComMercado)}</div>
               </div>
             </div>
             <div style="flex:1;min-width:160px">
-              ${total===0?`<div style="font-size:.78rem;color:var(--txt4)">Nenhum investimento ativo.</div>`:
-                linhas.map(([nome,valor,cor]) => `<div class="perf-row"><span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${cor};margin-right:.4rem"></span>${nome}</span><b>${Math.round(valor/total*100)}%</b></div>`).join('')}
+              ${totalComMercado===0?`<div style="font-size:.78rem;color:var(--txt4)">Nenhum investimento ativo.</div>`:
+                linhas.map(([nome,valor,cor]) => `<div class="perf-row"><span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${cor};margin-right:.4rem"></span>${nome}</span><b>${Math.round(valor/totalComMercado*100)}%</b></div>`).join('')}
             </div>
           </div>
         </section>
