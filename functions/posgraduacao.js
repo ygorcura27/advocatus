@@ -77,6 +77,9 @@ const PROGRAMAS = {
   },
 };
 
+// Reaproveitados por functions/defesa_tcc.js (banca de defesa) sem duplicar.
+exports.PROGRAMAS = PROGRAMAS;
+
 const ENERGIA_AULA = 5;
 const CAP_FREQUENCIA = 12;  // meses de aula por programa
 
@@ -272,6 +275,39 @@ exports.darAula = onCall({ region: 'southamerica-east1' }, async (request) => {
   return { ok: true, salario, didatica: novaDid, energia_bonus: ENERGIA_AULA };
 });
 
+// ─── Conclusão do programa (compartilhado com functions/defesa_tcc.js) ───────
+// Efeitos de aprovação — extraído de submeterDissertacao pra ser reaproveitado
+// pela Defesa de TCC (banca em rodadas, mesmo esquema de turnos/força/limiar
+// do Julgamento), que agora é o caminho real de conclusão depois que a
+// frequência bate 12/12 (submeterDissertacao — checagem instantânea de nota,
+// sem banca — continua valendo antes disso).
+exports.concluirProgramaAoAprovar = concluirProgramaAoAprovar;
+async function concluirProgramaAoAprovar(db, uid, j, programa, cfg, peticao_id, notaEfetiva) {
+  const bonus = cfg.bonus_teto_skill_pct
+    ? `Bônus de teto de skill: +${Math.round(cfg.bonus_teto_skill_pct * 100)}%`
+    : '';
+
+  await db.collection('jogadores').doc(uid).update({
+    posgrad_status:       'concluido',
+    posgrad_concluido:    programa,
+    posgrad_peca_final:   peticao_id,
+    posgrad_nota_final:   notaEfetiva,
+    posgrad_bonus_skill:  cfg.bonus_teto_skill_pct || 0,
+    reputacao:            clampReputacao(j.reputacao, j.cargo_id, 10),
+    prestigio_academico:  FieldValue.increment(programa === 'doutorado' ? 30 : 15),
+  });
+
+  await db.collection('jogadores').doc(uid).collection('inbox').add({
+    de:         'sistema',
+    assunto:    `🎓 ${cfg.label} concluído!`,
+    corpo:      `Parabéns! Sua ${cfg.categoria_peca} obteve nota ${notaEfetiva}/26 — aprovado!\n${bonus}\n+10 reputação pelo grau obtido.`,
+    tipo:       'sistema',
+    tipo_noticia: 'positivo',
+    lida:       false,
+    criado_em:  new Date().toISOString(),
+  });
+}
+
 // ─── Callable: submeterDissertacao ────────────────────────────────────────────
 
 exports.submeterDissertacao = onCall({ region: 'southamerica-east1' }, async (request) => {
@@ -323,29 +359,7 @@ exports.submeterDissertacao = onCall({ region: 'southamerica-east1' }, async (re
   }
 
   // Aprovado — concluir o programa
-  const bonus = cfg.bonus_teto_skill_pct
-    ? `Bônus de teto de skill: +${Math.round(cfg.bonus_teto_skill_pct * 100)}%`
-    : '';
-
-  await db.collection('jogadores').doc(uid).update({
-    posgrad_status:       'concluido',
-    posgrad_concluido:    j.posgrad_programa,
-    posgrad_peca_final:   peticao_id,
-    posgrad_nota_final:   notaEfetiva,
-    posgrad_bonus_skill:  cfg.bonus_teto_skill_pct || 0,
-    reputacao:            clampReputacao(j.reputacao, j.cargo_id, 10),
-    prestigio_academico:  FieldValue.increment(j.posgrad_programa === 'doutorado' ? 30 : 15),
-  });
-
-  await db.collection('jogadores').doc(uid).collection('inbox').add({
-    de:         'sistema',
-    assunto:    `🎓 ${cfg.label} concluído!`,
-    corpo:      `Parabéns! Sua ${cfg.categoria_peca} obteve nota ${notaEfetiva}/26 — aprovado!\n${bonus}\n+10 reputação pelo grau obtido.`,
-    tipo:       'sistema',
-    tipo_noticia: 'positivo',
-    lida:       false,
-    criado_em:  new Date().toISOString(),
-  });
+  await concluirProgramaAoAprovar(db, uid, j, j.posgrad_programa, cfg, peticao_id, notaEfetiva);
 
   logger.info(`[POSGRAD] ${uid} concluiu ${j.posgrad_programa} — nota ${notaEfetiva}`);
   return { ok: true, aprovado: true, nota: notaEfetiva, programa: j.posgrad_programa };

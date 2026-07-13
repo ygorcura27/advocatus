@@ -5,7 +5,7 @@
  * que nunca teve tela nenhuma. Mestrado/LLM → Doutorado/JSD → Cátedra.
  */
 
-import { collection, query, where, getDocs }
+import { collection, query, where, getDocs, doc, getDoc }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { httpsCallable }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
@@ -76,14 +76,27 @@ window.renderPosGraduacao = async function(j, el) {
       // trava enquanto uma peça está em composição (evita duplicar em
       // paralelo); rejeitada ou com nota baixa sempre pode escrever outra.
       const emComposicao = pecas.some(p => p.status === 'em_composicao');
-      const pecasCards = pecas.map(p => `
+      // Depois de 12/12 de frequência, conclusão vira a Defesa de TCC (banca
+      // em rodadas) em vez do "Submeter" instantâneo — mesma exigência real
+      // de defender o trabalho perante uma banca só depois de terminar as
+      // aulas. Antes de bater 12/12, Submeter continua valendo como está.
+      const pecasCards = pecas.map(p => {
+        let acaoBtn = '';
+        if (p.status === 'pronta' && !freqMaxima) {
+          acaoBtn = `<button class="btn btn-prim btn-sm" style="margin-top:.4rem" onclick="window._pgSubmeter('${p.id}')">Submeter</button>`;
+        } else if (p.status === 'pronta' && freqMaxima) {
+          const emDefesa = p.defesa_banca && !p.defesa_banca.veredito;
+          acaoBtn = `<button class="btn btn-prim btn-sm" style="margin-top:.4rem" onclick="window._pgAbrirDefesa('${p.id}')">🎓 ${emDefesa ? 'Continuar Defesa' : 'Apresentar Defesa'}</button>`;
+        }
+        return `
         <div class="card" style="margin-bottom:.4rem">
           <div style="font-weight:600;font-size:.78rem;color:var(--txt)">${p.titulo}</div>
           <div style="font-size:.68rem;color:var(--txt3)">
             ${p.status === 'em_composicao' ? `⏳ em composição (pronta ${_formatarMesGlobal(p.mes_conclusao)})` : `nota ${p.nota_teto}/26 (mín. ${cfg.nota_min_peca})${p.nota_teto < cfg.nota_min_peca ? ' · nota insuficiente' : ''}`}
           </div>
-          ${p.status === 'pronta' ? `<button class="btn btn-prim btn-sm" style="margin-top:.4rem" onclick="window._pgSubmeter('${p.id}')">Submeter</button>` : ''}
-        </div>`).join('');
+          ${acaoBtn}
+        </div>`;
+      }).join('');
       const escreverBtn = emComposicao ? '' : `<button class="btn btn-prim btn-block" style="margin-top:.4rem" onclick="window._pgEscrever('${cfg.categoria_peca}')">✍️ ${pecas.length ? 'Escrever nova versão' : `Escrever ${cfg.categoria_peca === 'tese' ? 'Tese' : 'Dissertação'}`}</button>`;
       pecasHtml = pecasCards + escreverBtn;
     } catch (e) { pecasHtml = `<div class="card" style="color:var(--txt4)">Erro ao carregar peças.</div>`; }
@@ -226,5 +239,104 @@ window._pgSubmeter = async function(peticao_id) {
       window.toast(r.data.msg || 'Nota insuficiente.', 'ko', 4000);
     }
     setTimeout(() => window.navTo?.('posgraduacao', null), 600);
+  } catch (e) { window.toast(e.message || 'Erro.', 'ko'); }
+};
+
+// ════════════════════════════════════════════════════════
+// DEFESA DE TCC — banca em rodadas (functions/defesa_tcc.js), mesmo esquema
+// de turnos/força/limiar do Julgamento (js/investigacao.js:_renderJulgamento),
+// adaptado: pergunta da banca no lugar da peça de processo, sem favores.
+// Reaproveita as classes .inv-* já existentes no CSS pra manter a mesma cara.
+// ════════════════════════════════════════════════════════
+
+window._pgAbrirDefesa = async function(peticao_id) {
+  const pSnap = await getDoc(doc(db, 'peticoes', peticao_id));
+  if (!pSnap.exists()) { window.toast('Peça não encontrada.', 'ko'); return; }
+  const p = pSnap.data();
+
+  if (p.defesa_banca && !p.defesa_banca.veredito) {
+    _pgRenderDefesa(peticao_id, p);
+    return;
+  }
+
+  try {
+    const fn = httpsCallable(window.FB_FUNCTIONS, 'iniciarDefesaTCC');
+    await fn({ peticao_id });
+    const pSnap2 = await getDoc(doc(db, 'peticoes', peticao_id));
+    _pgRenderDefesa(peticao_id, pSnap2.data());
+  } catch (e) { window.toast(e.message || 'Erro ao iniciar defesa.', 'ko'); }
+};
+
+function _pgRenderDefesa(peticao_id, p) {
+  const main = document.getElementById('main-content');
+  if (!main) return;
+  const defesa = p.defesa_banca;
+  const perguntas = defesa.pecas_restantes;
+
+  if (perguntas.length === 0) {
+    main.innerHTML = `
+      <div class="inv-scenario">
+        <div class="inv-titulo-caso">Defesa de TCC — Rodada ${defesa.rodada_atual}</div>
+        <div class="inv-sub-caso">Força total acumulada: <strong style="color:var(--ouro)">${defesa.forca_total}</strong> / ${defesa.forca_max}</div>
+        <button class="btn btn-prim" onclick="window._pgFinalizarDefesa('${peticao_id}')">Ver Resultado da Banca</button>
+      </div>`;
+    return;
+  }
+
+  const alvo = perguntas[0];
+  const j = window.JOGADOR || {};
+  const skJur = j.skills_jur || {};
+  const dominio = ((skJur.legal_drafting||0) + (skJur.legal_research||0)) / 2 + (j.didatica_academica||0) * 0.4;
+  const chanceDefender = Math.min(92, Math.max(8, Math.round(35 + dominio * 0.8 - alvo.dificuldade * 0.3)));
+
+  main.innerHTML = `
+    <div class="inv-scenario">
+      <div class="inv-titulo-caso">Defesa de TCC — Rodada ${defesa.rodada_atual + 1}</div>
+      <div class="inv-sub-caso">Força total acumulada: <strong style="color:var(--ouro)">${defesa.forca_total}</strong> / ${defesa.forca_max} · Perguntas restantes: ${perguntas.length}</div>
+
+      <div class="inv-julg-mao">
+        ${perguntas.map(q => `
+          <div class="inv-julg-peca${q === alvo ? ' inv-julg-alvo' : ''}">
+            ${q === alvo ? '<div class="inv-julg-tag">🎯 Pergunta atual</div>' : ''}
+            <div class="inv-julg-forca">Dificuldade ${q.dificuldade}</div>
+            <div class="inv-julg-badges"><span class="inv-julg-badge">${q.tema}</span></div>
+          </div>`).join('')}
+      </div>
+
+      <p style="color:#C9BFA6;margin:.9rem 0 .5rem">
+        A banca questiona <strong>${alvo.tema}</strong> (dificuldade ${alvo.dificuldade}). Como você reage?
+      </p>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+        <button class="btn btn-prim" onclick="window._pgResponderBanca('${peticao_id}','defender')">🛡️ Defender (~${chanceDefender}% de sucesso)</button>
+        <button class="btn btn-ghost" onclick="window._pgResponderBanca('${peticao_id}','deixar_cair')">🗑️ Deixar cair (0 força)</button>
+      </div>
+    </div>`;
+}
+
+window._pgResponderBanca = async function(peticao_id, reacao) {
+  window.toast && window.toast('⏳ Respondendo à banca...', 'neutro', 1200);
+  try {
+    const fn = httpsCallable(window.FB_FUNCTIONS, 'responderBancaTCC');
+    const r = await fn({ peticao_id, reacao });
+    window.toast(
+      reacao === 'deixar_cair' ? 'Pergunta deixada de lado — 0 força.'
+        : (r.data.sucesso ? `✅ Defesa bem-sucedida — força obtida: ${r.data.forca_obtida}.` : `⚠️ Defesa falhou (força parcial) — força obtida: ${r.data.forca_obtida}.`),
+      r.data.sucesso === false && reacao !== 'deixar_cair' ? 'neutro' : 'ok', 3000,
+    );
+    const pSnap = await getDoc(doc(db, 'peticoes', peticao_id));
+    _pgRenderDefesa(peticao_id, pSnap.data());
+  } catch (e) { window.toast(e.message || 'Erro.', 'ko'); }
+};
+
+window._pgFinalizarDefesa = async function(peticao_id) {
+  window.toast && window.toast('⏳ Apurando resultado da banca...', 'neutro', 1500);
+  try {
+    const fn = httpsCallable(window.FB_FUNCTIONS, 'finalizarDefesaTCC');
+    const r = await fn({ peticao_id });
+    window.toast(
+      r.data.aprovado ? `🎓 Aprovado na banca! (${r.data.pct}%)` : `❌ Reprovado na banca (${r.data.pct}%) — a peça continua pronta, tente a defesa de novo.`,
+      r.data.aprovado ? 'ok' : 'ko', 5000,
+    );
+    setTimeout(() => window.navTo?.('posgraduacao', null), 800);
   } catch (e) { window.toast(e.message || 'Erro.', 'ko'); }
 };

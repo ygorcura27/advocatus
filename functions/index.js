@@ -40,6 +40,12 @@ const {
   darAula,
   submeterDissertacao,
 } = require('./posgraduacao');
+// Defesa de TCC — banca em rodadas depois de frequência 12/12 (Mestrado/Doutorado)
+const {
+  iniciarDefesaTCC,
+  responderBancaTCC,
+  finalizarDefesaTCC,
+} = require('./defesa_tcc');
 // GDD v5.1 — Sistemas Sociais §25-30
 const {
   participarMootCourt,
@@ -112,6 +118,9 @@ exports.matricularPosGraduacao   = matricularPosGraduacao;
 exports.compararecerAula         = compararecerAula;
 exports.darAula                  = darAula;
 exports.submeterDissertacao      = submeterDissertacao;
+exports.iniciarDefesaTCC         = iniciarDefesaTCC;
+exports.responderBancaTCC        = responderBancaTCC;
+exports.finalizarDefesaTCC       = finalizarDefesaTCC;
 exports.participarMootCourt      = participarMootCourt;
 exports.iniciarIntercambio       = iniciarIntercambio;
 exports.gravarConteudoEducativo  = gravarConteudoEducativo;
