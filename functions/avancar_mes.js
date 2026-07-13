@@ -426,7 +426,7 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid, esc) {
       }
     }
     if (custoTotal > 0) {
-      benefProms.push(escRef.update({ caixa: FVb.increment(-custoTotal) }));
+      benefProms.push(escRef.update({ caixa: require('firebase-admin/firestore').FieldValue.increment(-custoTotal) }));
     }
     await Promise.all(benefProms);
   }
