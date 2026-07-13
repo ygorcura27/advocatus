@@ -59,7 +59,7 @@ function _postsListaHtml(posts, meuUid) {
     return `
     <div class="card" style="margin-bottom:.6rem">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
-        <div style="font-weight:600;font-size:.78rem;color:var(--txt)">${p.autor_nome || 'Advogado(a)'}</div>
+        <div style="font-weight:600;font-size:.78rem;color:var(--txt)">${p.autor_nome || 'Advogado(a)'}${p.auto_gerado?' <span style="font-size:.6rem;color:var(--txt4);font-weight:400">· 🤖 foco automático</span>':''}</div>
         <div style="display:flex;align-items:center;gap:.5rem">
           <span style="font-size:.62rem;color:var(--txt4)">${_tempoRelativo(p.criado_em)}</span>
           ${souAutor ? `<button style="background:none;border:none;color:var(--txt4);cursor:pointer;font-size:.7rem" onclick="window._postsDeletar('${p.id}')" title="Apagar">🗑️</button>` : ''}

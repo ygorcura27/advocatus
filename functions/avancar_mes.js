@@ -1301,6 +1301,39 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
   // disposição aqui, no mesmo bloco outer que grava updates.disposicao (ver
   // nota grande sobre dual-write hazard logo abaixo, linha ~2576).
   if (j.foco_atual === 'trabalhar_intensamente') disposicao = Math.max(0, disposicao - 3);
+
+  // "Postar em Redes Sociais" (foco_atual === 'redes') — travar esse foco
+  // antes só marcava intenção, sem nenhum efeito (mesma classe de vazio que
+  // Trabalhar Intensamente tinha antes de virar real). Agora gera 1 post de
+  // verdade no feed real (mesma coleção `posts` de functions/posts_sociais.js:
+  // publicarPost — aparece no feed igual um post manual) e tem 15% de chance
+  // de "viralizar", subindo Comunicação Midiática — o mesmo skill que já
+  // dirige Autoridade/Seguidores derivados em js/ui-main.js:renderRedes, sem
+  // inventar um contador de seguidor separado.
+  if (j.foco_atual === 'redes') {
+    const _POST_AUTO_TEMPLATES = [
+      'Mais um mês na advocacia — sempre aprendendo com cada caso.',
+      'Reflexões sobre o Direito e a prática forense de hoje.',
+      'Compartilhando um pouco da rotina de quem vive o Direito todo dia.',
+      'A prática jurídica exige atualização constante — seguimos estudando.',
+      'Cada processo é uma lição — obrigado(a) pela confiança dos clientes.',
+    ];
+    const textoAuto = _POST_AUTO_TEMPLATES[Math.floor(Math.random() * _POST_AUTO_TEMPLATES.length)];
+    try {
+      await db.collection('posts').add({
+        autor_uid: uid, autor_nome: j.nome_personagem || 'Advogado(a)',
+        autor_cargo: j.cargo_id || null, texto: textoAuto,
+        curtidas: 0, curtido_por: [], criado_em: new Date().toISOString(),
+        auto_gerado: true,
+      });
+      if (Math.random() < 0.15) {
+        const skJurBase = updates.skills_jur || j.skills_jur || {};
+        const comAtual  = skJurBase.comunicacao_midiatica || 0;
+        updates.skills_jur = { ...skJurBase, comunicacao_midiatica: Math.min(50, comAtual + 1) };
+        mensagens.push({ assunto: '🔥 Post viralizou', corpo: 'Sua postagem automática do mês viralizou — +1 Comunicação Midiática.', tipo: 'positivo' });
+      }
+    } catch (e) { logger.warn('Post automático (foco redes):', e.message); }
+  }
   // Disposição virou mecânica real em 2026-07-11 (antes só decaía/regenerava
   // sem efeito nenhum). Frequentar a academia é o jeito ativo de recuperar —
   // some com o -2 passivo e ainda soma. Efeito prático: modifica o

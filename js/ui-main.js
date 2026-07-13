@@ -1682,7 +1682,8 @@ function renderFoco(j, el) {
       Pra executar a ação de verdade (escrever a petição, etc), use "abrir tela →" dentro do card. "Estudar habilidade" é o
       <code>study_queue</code> real (R$500, +3 fixo, resultado em 1 mês). "Trabalhar Intensamente" dá +50% de XP de
       skill (Document Type/Practice Area) em toda petição/caso que você concluir enquanto travado, custando disposição
-      extra no mês. O resto marcado 📌 é proposta, sem efeito real.
+      extra no mês. "Postar em Redes Sociais" gera 1 post automático no feed real todo mês, com 15% de chance de
+      viralizar (+1 Comunicação Midiática). O resto marcado 📌 é proposta, sem efeito real.
     </div>
 
     ${focoLockedHtml}
