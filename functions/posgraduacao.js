@@ -29,6 +29,7 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { logger } = require('firebase-functions');
+const { clampReputacao } = require('./shared/repCap');
 
 // ─── Configurações dos programas ──────────────────────────────────────────────
 
@@ -328,7 +329,7 @@ exports.submeterDissertacao = onCall({ region: 'southamerica-east1' }, async (re
     posgrad_peca_final:   peticao_id,
     posgrad_nota_final:   notaEfetiva,
     posgrad_bonus_skill:  cfg.bonus_teto_skill_pct || 0,
-    reputacao:            FieldValue.increment(10),
+    reputacao:            clampReputacao(j.reputacao, j.cargo_id, 10),
     prestigio_academico:  FieldValue.increment(j.posgrad_programa === 'doutorado' ? 30 : 15),
   });
 

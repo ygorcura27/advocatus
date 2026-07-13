@@ -18,6 +18,7 @@
 
 const { FieldValue } = require('firebase-admin/firestore');
 const { logger }     = require('firebase-functions');
+const { clampReputacao } = require('./shared/repCap');
 
 const BONUS_PREMIADO = {
   advogado_do_ano:   { rep: 8,  dinheiro: 50000,  label: '🏆 Advogado do Ano' },
@@ -99,11 +100,18 @@ async function _premioEscritorioDoAno(db, anoJogo) {
     await _concederPremio(db, d.fundador_uid, 'escritorio_do_ano', cfg, anoJogo,
       `${d.nome || 'Seu escritório'} foi eleito o melhor do ano com ${d.prestigio || 0} de prestígio!`);
   }
-  // Bônus de reputação a todos os sócios
+  // Bônus de reputação a todos os sócios — clampado no cap do cargo
+  // (FieldValue.increment puro deixava passar de 100, travando toda escrita
+  // seguinte no jogador — a regra do Firestore exige reputacao <= 100).
   const socios = d.socios_uids || [];
-  await Promise.all(socios.filter(uid => uid !== d.fundador_uid).map(uid =>
-    db.collection('jogadores').doc(uid).update({ reputacao: FieldValue.increment(3) }).catch(() => {})
-  ));
+  await Promise.all(socios.filter(uid => uid !== d.fundador_uid).map(async uid => {
+    try {
+      const s = await db.collection('jogadores').doc(uid).get();
+      if (!s.exists) return;
+      const jd = s.data();
+      await db.collection('jogadores').doc(uid).update({ reputacao: clampReputacao(jd.reputacao, jd.cargo_id, 3) });
+    } catch (e) { /* silencioso */ }
+  }));
   // Bônus ao escritório em si
   await esc.ref.update({ caixa: FieldValue.increment(cfg.dinheiro) });
 
@@ -129,13 +137,17 @@ async function _premioPeticaoDoAno(db, anoJogo) {
     await _concederPremio(db, d.jogador_uid, 'peticao_do_ano', cfg, anoJogo,
       `"${d.titulo || 'Sua petição'}" foi a peça mais famosa do ano (fama: ${d.fama || 0}/100)!`);
   }
-  // Co-autores também recebem bônus proporcional
+  // Co-autores também recebem bônus proporcional — mesmo clamp acima
   if (Array.isArray(d.autores) && d.autores.length > 1) {
-    await Promise.all(d.autores.filter(a => a.uid !== d.jogador_uid).map(a =>
-      db.collection('jogadores').doc(a.uid).update({
-        reputacao: FieldValue.increment(Math.floor(cfg.rep * a.contribuicao_pct / 100)),
-      }).catch(() => {})
-    ));
+    await Promise.all(d.autores.filter(a => a.uid !== d.jogador_uid).map(async a => {
+      try {
+        const s = await db.collection('jogadores').doc(a.uid).get();
+        if (!s.exists) return;
+        const jd = s.data();
+        const ganho = Math.floor(cfg.rep * a.contribuicao_pct / 100);
+        await db.collection('jogadores').doc(a.uid).update({ reputacao: clampReputacao(jd.reputacao, jd.cargo_id, ganho) });
+      } catch (e) { /* silencioso */ }
+    }));
   }
 
   await db.collection('premios_anuais').doc(`ano_${anoJogo}`).set({
@@ -190,9 +202,12 @@ async function _premioPaladinoDaJustica(db, anoJogo) {
 
 async function _concederPremio(db, uid, categoria, cfg, anoJogo, detalhes) {
   const jogRef = db.collection('jogadores').doc(uid);
+  const jogSnap = await jogRef.get();
+  if (!jogSnap.exists) return;
+  const jd = jogSnap.data();
   await Promise.all([
     jogRef.update({
-      reputacao: FieldValue.increment(cfg.rep),
+      reputacao: clampReputacao(jd.reputacao, jd.cargo_id, cfg.rep),
       dinheiro:  FieldValue.increment(cfg.dinheiro),
       [`premios.${categoria}_${anoJogo}`]: true,
     }),

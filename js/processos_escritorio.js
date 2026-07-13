@@ -1319,7 +1319,7 @@ function _dgPillDominio(f) {
     ${_DG_DEPARTAMENTOS.map(dep => {
       const nivel = (f.skills_jur||{})[dep.skill] || 0;
       const fraco = nivel < _DG_LIMIAR_FRACO;
-      return `<span style="font-size:.62rem;padding:.15rem .5rem;border-radius:99px;background:${fraco?'rgba(214,90,60,.12)':'rgba(22,214,168,.12)'};color:${fraco?'var(--verm2)':'var(--verde2)'}">${fraco?'⚠️':'✓'} ${dep.l.replace(/^\S+\s/,'')} ${nivel}/50</span>`;
+      return `<span style="font-size:.62rem;padding:.15rem .5rem;border-radius:99px;background:${fraco?'var(--verm-bg,rgba(214,90,60,.12))':'var(--verde-bg)'};color:${fraco?'var(--verm2)':'var(--verde2)'}">${fraco?'⚠️':'✓'} ${dep.l.replace(/^\S+\s/,'')} ${nivel}/50</span>`;
     }).join('')}
   </div>
   <div style="font-size:.6rem;color:var(--txt4);margin-top:.4rem">⚠️ domínio fraco = processo futuro nesse ramo tem chance de vitória reduzida sob esse gestor (real — reduz a eficiência usada no roll de sentença em avancar_mes.js).</div>`;

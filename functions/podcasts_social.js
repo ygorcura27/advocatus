@@ -20,6 +20,7 @@ const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { logger } = require('firebase-functions');
 const { normalizarSkillsJur, capSkill, interpolate } = require('./skills');
 const { AREAS, CATALOGO_PODCASTS, getPodcastPorId } = require('./podcasts_catalogo');
+const { clampReputacao } = require('./shared/repCap');
 
 const ENERGIA_MIDIA = 6;
 
@@ -137,7 +138,7 @@ exports.responderConviteMidia = onCall({ region: 'southamerica-east1' }, async (
   await db.collection('jogadores').doc(advUid).update({
     energia:              FieldValue.increment(-ENERGIA_MIDIA),
     energia_usada_mes:    FieldValue.increment(ENERGIA_MIDIA),
-    reputacao:            FieldValue.increment(repGanho),
+    reputacao:            clampReputacao(j.reputacao, j.cargo_id, repGanho),
     popularidade_pessoal: FieldValue.increment(popGanho),
     dinheiro:             FieldValue.increment(honorarios),
     'skills_jur.comunicacao_midiatica': novaComunicacao,

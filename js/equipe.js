@@ -83,6 +83,10 @@ const NPC_CARTOON_SPECS = {
 function _nomeArquivoCartoon(spec) {
   return `${spec.id}_${spec.ethnicity.toUpperCase()}_${spec.age.toUpperCase()}_${spec.style.toUpperCase()}.png`;
 }
+// Exposto pra js/amigos.js reusar o mesmo pool de 40 cartoons (20+20) em vez
+// de duplicar a tabela — mesmo padrão de window._BENEFICIOS_CATALOGO acima.
+window._NPC_CARTOON_SPECS = NPC_CARTOON_SPECS;
+window._nomeArquivoCartoon = _nomeArquivoCartoon;
 
 // Capacidade por tier do escritório
 const TIER_CAPACIDADE = {
@@ -914,23 +918,60 @@ window.renderTreinamento = async function(j, el) {
 // BENEFÍCIOS DOS FUNCIONÁRIOS
 // Espelha functions/avancar_mes.js::BENEFICIOS_CATALOGO — precisa ficar em
 // sincronia manual (efeito real é aplicado lá; aqui só é catálogo pra UI).
+// Valores rebalanceados pelo usuário pra ficarem mais realistas. Bônus por
+// Performance virou % do salário (5-15%, escala com a eficiência do NPC)
+// em vez de valor fixo. Diminishing returns ao empilhar: o efeito (não o
+// custo) do N-ésimo benefício ATIVADO (ordem = esc.beneficios_ativos, um
+// array só de push/filter, então a ordem já É a cronologia real de
+// ativação) vale só BENEFICIOS_MULT_STACK[N-1] do efeito listado.
 // ════════════════════════════════════════════════════════
 const BENEFICIOS_CATALOGO = {
-  plano_saude:    { label: 'Plano de Saúde',        icone: '❤️', custo_por_func: 300, efeito_estresse: -8, efeito_rep_interna: 3 },
-  vale_refeicao:  { label: 'Vale-Refeição',         icone: '🍽️', custo_por_func: 150, efeito_estresse: -3, efeito_rep_interna: 2 },
-  plano_odonto:   { label: 'Plano Odontológico',    icone: '🦷', custo_por_func: 80,  efeito_estresse: -2, efeito_rep_interna: 1 },
-  gympass:        { label: 'Gympass',               icone: '💪', custo_por_func: 120, efeito_estresse: -5, efeito_rep_interna: 2 },
-  bonus_perform:  { label: 'Bônus por Performance',  icone: '⭐', custo_por_func: 400, efeito_estresse: -5, efeito_rep_interna: 5 },
+  plano_saude:    { label: 'Plano de Saúde',        icone: '❤️', custo_por_func: 550, efeito_estresse: -4, efeito_rep_interna: 3 },
+  vale_refeicao:  { label: 'Vale-Refeição',         icone: '🍽️', custo_por_func: 600, efeito_estresse: -6, efeito_rep_interna: 3 },
+  plano_odonto:   { label: 'Plano Odontológico',    icone: '🦷', custo_por_func: 120, efeito_estresse: -1, efeito_rep_interna: 1 },
+  gympass:        { label: 'Gympass',               icone: '💪', custo_por_func: 150, efeito_estresse: -3, efeito_rep_interna: 2 },
+  bonus_perform:  { label: 'Bônus por Performance',  icone: '⭐', custo_pct_salario: true, pct_min: 0.05, pct_max: 0.15, efeito_estresse: -2, efeito_rep_interna: 5 },
 };
+const BENEFICIOS_MULT_STACK = [1, 0.8, 0.6, 0.4, 0.25];
+const CARGO_SAL_BENEF_EQ = { est:1700, ass:2500, jnr:3500, pln:5500, snr:9000, asc:12000, soc:15000 };
+
+// Custo mensal total, incluindo o % de salário do Bônus por Performance
+// (precisa da lista de NPCs pra calcular salário×eficiência por pessoa).
+function _beneficiosCustoTotal(ativosIds, npcsAtivos) {
+  let custo = 0;
+  for (const bid of ativosIds) {
+    const cfg = BENEFICIOS_CATALOGO[bid];
+    if (!cfg) continue;
+    if (cfg.custo_pct_salario) {
+      for (const f of npcsAtivos) {
+        const sal = CARGO_SAL_BENEF_EQ[f.cargo_id] || 3500;
+        const pct = cfg.pct_min + (cfg.pct_max - cfg.pct_min) * (_calcEfic(f) / 100);
+        custo += Math.round(sal * pct);
+      }
+    } else {
+      custo += cfg.custo_por_func * npcsAtivos.length;
+    }
+  }
+  return custo;
+}
 
 // Usado pela prévia de Benefícios no dashboard do Escritório (js/ui-main.js).
+// nFuncs aqui já era só a contagem — mantido simples (aproximação sem
+// eficiência por pessoa); o valor exato aparece na tela de Benefícios e
+// no Balancete, que têm a lista completa de NPCs.
 window._beneficiosCatalogoResumo = function(esc, nFuncs) {
   const ativosIds = esc.beneficios_ativos || [];
-  const custoMensal = ativosIds.reduce((s, bid) => s + ((BENEFICIOS_CATALOGO[bid]||{}).custo_por_func||0), 0) * nFuncs;
+  const custoMensal = ativosIds.reduce((s, bid) => {
+    const cfg = BENEFICIOS_CATALOGO[bid] || {};
+    if (cfg.custo_pct_salario) return s + Math.round(3500 * ((cfg.pct_min + cfg.pct_max) / 2)) * nFuncs;
+    return s + (cfg.custo_por_func || 0) * nFuncs;
+  }, 0);
   return { custoMensal, ativos: ativosIds };
 };
 // Exposto pra Balancete (js/ui-main.js:_escKpis) itemizar cada benefício ativo.
 window._BENEFICIOS_CATALOGO = BENEFICIOS_CATALOGO;
+window._BENEFICIOS_MULT_STACK = BENEFICIOS_MULT_STACK;
+window._beneficiosCustoTotal = _beneficiosCustoTotal;
 
 window.renderBeneficios = async function(j, el) {
   const escId = j.escritorio_proprio_id;
@@ -946,21 +987,25 @@ window.renderBeneficios = async function(j, el) {
   const npcsAtivos = fSnap.docs.map(d => d.data()).filter(f => f.tipo === 'npc' && f.ativo !== false);
   const nFuncs = npcsAtivos.length;
 
-  const custoMensal = ativos.reduce((s, bid) => s + ((BENEFICIOS_CATALOGO[bid]||{}).custo_por_func||0), 0) * nFuncs;
+  const custoMensal = _beneficiosCustoTotal(ativos, npcsAtivos);
 
   const cardsHtml = Object.entries(BENEFICIOS_CATALOGO).map(([bid, cfg]) => {
     const ligado = ativos.includes(bid);
+    const idxAtivacao = ativos.indexOf(bid);
+    const mult = idxAtivacao >= 0 ? (BENEFICIOS_MULT_STACK[idxAtivacao] ?? BENEFICIOS_MULT_STACK[BENEFICIOS_MULT_STACK.length-1]) : 1;
+    const custoTxt = cfg.custo_pct_salario
+      ? `${Math.round(cfg.pct_min*100)}–${Math.round(cfg.pct_max*100)}% do salário · mês`
+      : `${window.fmtFull(cfg.custo_por_func)}/func · mês`;
     return `
     <div class="peca-card">
       <div class="peca-topo">
         <div class="peca-kicker">${cfg.icone} ${ligado ? '<span class="tag tag-ganho">ATIVO</span>' : ''}</div>
       </div>
       <div class="peca-titulo">${cfg.label}</div>
-      <div style="font-size:.72rem;color:var(--txt3);margin:.3rem 0">
-        ${window.fmtFull(cfg.custo_por_func)}/func · mês
-      </div>
+      <div style="font-size:.72rem;color:var(--txt3);margin:.3rem 0">${custoTxt}</div>
       <div style="font-size:.68rem;color:var(--txt4);line-height:1.6">
         Estresse ${cfg.efeito_estresse}/mês · Reputação interna +${cfg.efeito_rep_interna}/mês
+        ${ligado && mult < 1 ? `<br><span style="color:var(--amber)">${Math.round(mult*100)}% do efeito — ${idxAtivacao+1}º benefício ativado</span>` : ''}
       </div>
       <button class="btn btn-sm ${ligado ? 'btn-ghost' : 'btn-prim'}" style="margin-top:.6rem;width:100%"
         onclick="window._toggleBeneficio('${escId}','${bid}',${ligado})">
@@ -974,7 +1019,8 @@ window.renderBeneficios = async function(j, el) {
     ${window._capaHeader(`RECURSOS HUMANOS · ${(esc.nome||'—').toUpperCase()}`, 'Benefícios dos Funcionários', '')}
     <div class="card" style="font-size:.7rem;color:var(--txt3);margin-bottom:1rem">
       Cada benefício ativo custa por funcionário/mês (cobrado do caixa no avanço de mês) e reduz estresse
-      + aumenta reputação interna de todos os NPCs ativos do escritório.
+      + aumenta reputação interna de todos os NPCs ativos do escritório. Efeito de cada benefício empilhado
+      diminui pela ordem de ativação (1º 100%, 2º 80%, 3º 60%, 4º 40%, 5º 25%) — custo não diminui.
     </div>
     <div class="stat-row">
       <div class="stat"><div class="stat-label">Custo mensal total</div><div class="stat-value">${window.fmtFull(custoMensal)}</div></div>

@@ -24,6 +24,7 @@ const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { logger }             = require('firebase-functions');
 const { nomeAutorPeca }      = require('./shared/autorPeca');
+const { clampReputacao }     = require('./shared/repCap');
 
 const VEICULOS = {
   supreme_wire:    { label: 'Supreme Wire',       foco: 'decisoes_superiores' },
@@ -121,8 +122,17 @@ async function publicarNoticiaSentenca(db, { nomeJogador, uid, resultado, instan
       lida:       false,
       criado_em:  new Date().toISOString(),
     });
-    // Pequeno bônus de reputação pela cobertura
-    await db.collection('jogadores').doc(uid).update({ reputacao: FieldValue.increment(1) });
+    // Pequeno bônus de reputação pela cobertura — clampado no cap do cargo
+    // (FieldValue.increment puro deixava passar de 100, travando toda escrita
+    // seguinte no jogador — a regra do Firestore exige reputacao <= 100 em
+    // QUALQUER update do documento, não só nos que mexem em reputação).
+    try {
+      const jogSnap = await db.collection('jogadores').doc(uid).get();
+      if (jogSnap.exists) {
+        const jd = jogSnap.data();
+        await db.collection('jogadores').doc(uid).update({ reputacao: clampReputacao(jd.reputacao, jd.cargo_id, 1) });
+      }
+    } catch (e) { logger.warn('[IMPRENSA] Erro ao aplicar bônus de reputação:', e.message); }
     logger.info(`[IMPRENSA] Supreme Wire publicou: ${ref.id}`);
   } catch (e) {
     logger.warn('[IMPRENSA] Erro ao publicar notícia:', e.message);

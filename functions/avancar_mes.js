@@ -30,19 +30,33 @@ const { processarRoyaltiesLivros } = require('./artigos_livros');
 
 const ENERGIA_TOTAL        = 100;
 
-// Benefícios dos Funcionários (GDD proposta → real nesta sessão). Custo é
-// por funcionário coberto (todos os ativos do escritório, cobertura em
-// bloco — não dá pra escolher quem recebe). Efeitos aplicados direto em
-// estresse/reputacao_interna no processamento mensal de NPCs, mesmos
-// campos que já regem burnout/saída por estresse (functions/avancar_mes.js
-// mais abaixo: estresse>=85 → aviso_saida, streak de 3 meses → demissão).
+// Benefícios dos Funcionários (GDD proposta → real, valores rebalanceados
+// depois pelo usuário — tabela "mais realista"). Custo é por funcionário
+// coberto (todos os ativos do escritório, cobertura em bloco — não dá pra
+// escolher quem recebe), exceto Bônus por Performance, que é % do salário
+// de cada NPC (5-15%, escala com a eficiência real do NPC — _eficienciaNPC,
+// já calculada mais abaixo neste arquivo — em vez de sortear à toa).
+// Efeitos aplicados direto em estresse/reputacao_interna no processamento
+// mensal de NPCs, mesmos campos que já regem burnout/saída por estresse
+// (mais abaixo: estresse>=85 → aviso_saida, streak de 3 meses → demissão).
+//
+// Diminishing returns ao empilhar benefícios: o efeito (não o custo) de
+// cada benefício é multiplicado por BENEFICIOS_MULT_STACK[índice de
+// ATIVAÇÃO] — esc.beneficios_ativos é um array simples só de push/filter
+// (js/equipe.js:_toggleBeneficio), então a ORDEM do array já é a ordem
+// cronológica real de ativação: o 1º benefício ligado rende 100% do
+// efeito listado, o 2º rende 80%, e assim por diante. Pedido do usuário:
+// cada benefício adicional importa cada vez menos pro bem-estar, mas
+// custa o preço cheio igual (sem desconto no custo por empilhar).
 const BENEFICIOS_CATALOGO = {
-  plano_saude:    { label: 'Plano de Saúde',        custo_por_func: 300, efeito_estresse: -8,  efeito_rep_interna: 3 },
-  vale_refeicao:  { label: 'Vale-Refeição',         custo_por_func: 150, efeito_estresse: -3,  efeito_rep_interna: 2 },
-  plano_odonto:   { label: 'Plano Odontológico',    custo_por_func: 80,  efeito_estresse: -2,  efeito_rep_interna: 1 },
-  gympass:        { label: 'Gympass',               custo_por_func: 120, efeito_estresse: -5,  efeito_rep_interna: 2 },
-  bonus_perform:  { label: 'Bônus por Performance',  custo_por_func: 400, efeito_estresse: -5,  efeito_rep_interna: 5 },
+  plano_saude:    { label: 'Plano de Saúde',        custo_por_func: 550, efeito_estresse: -4, efeito_rep_interna: 3 },
+  vale_refeicao:  { label: 'Vale-Refeição',         custo_por_func: 600, efeito_estresse: -6, efeito_rep_interna: 3 },
+  plano_odonto:   { label: 'Plano Odontológico',    custo_por_func: 120, efeito_estresse: -1, efeito_rep_interna: 1 },
+  gympass:        { label: 'Gympass',               custo_por_func: 150, efeito_estresse: -3, efeito_rep_interna: 2 },
+  bonus_perform:  { label: 'Bônus por Performance',  custo_pct_salario: true, pct_min: 0.05, pct_max: 0.15, efeito_estresse: -2, efeito_rep_interna: 5 },
 };
+const BENEFICIOS_MULT_STACK = [1, 0.8, 0.6, 0.4, 0.25];
+const CARGO_SAL_BENEF = { est:1700, ass:2500, jnr:3500, pln:5500, snr:9000, asc:12000, soc:15000 };
 
 const REP_CAP = {
   est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100, snm:100,
@@ -157,16 +171,24 @@ function _sentencaOutcomeNPC(efic) {
 }
 
 async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid, esc) {
-  // Benefícios ativos: soma dos efeitos, cobertura em bloco pra todos os NPCs
+  // Benefícios ativos: soma dos efeitos (com diminishing returns por ordem
+  // de ativação — ver BENEFICIOS_MULT_STACK acima), cobertura em bloco pra
+  // todos os NPCs. bonus_perform não entra em benefCustoPorFunc porque é
+  // % do salário de cada NPC — calculado depois, por NPC, na aplicação.
   const beneficiosAtivos = (esc && esc.beneficios_ativos) || [];
   let benefEstresse = 0, benefRepInterna = 0, benefCustoPorFunc = 0;
-  for (const bid of beneficiosAtivos) {
+  let bonusPerformAtivo = false;
+  beneficiosAtivos.forEach((bid, idx) => {
     const cfg = BENEFICIOS_CATALOGO[bid];
-    if (!cfg) continue;
-    benefEstresse += cfg.efeito_estresse;
-    benefRepInterna += cfg.efeito_rep_interna;
-    benefCustoPorFunc += cfg.custo_por_func;
-  }
+    if (!cfg) return;
+    const mult = BENEFICIOS_MULT_STACK[idx] ?? BENEFICIOS_MULT_STACK[BENEFICIOS_MULT_STACK.length - 1];
+    benefEstresse += cfg.efeito_estresse * mult;
+    benefRepInterna += cfg.efeito_rep_interna * mult;
+    if (cfg.custo_pct_salario) bonusPerformAtivo = true;
+    else benefCustoPorFunc += cfg.custo_por_func;
+  });
+  benefEstresse = Math.round(benefEstresse);
+  benefRepInterna = Math.round(benefRepInterna);
 
   // Buscar todos os processos em andamento por NPCs (exclui processos assumidos pelo jogador)
   const poolSnap = await escRef.collection('processos_pool')
@@ -385,7 +407,18 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid, esc) {
       estresse:          FVb.increment(benefEstresse),
       reputacao_interna: FVb.increment(benefRepInterna),
     }));
-    const custoTotal = benefCustoPorFunc * npcsAtivosBenef.length;
+    let custoTotal = benefCustoPorFunc * npcsAtivosBenef.length;
+    // Bônus por Performance: % do salário do cargo, escalado pela eficiência
+    // real do NPC (5% no piso de eficiência, 15% no teto) — variável de
+    // verdade, não um número fixo travestido de "variável".
+    if (bonusPerformAtivo) {
+      const cfgBonus = BENEFICIOS_CATALOGO.bonus_perform;
+      for (const f of npcsAtivosBenef) {
+        const sal = CARGO_SAL_BENEF[f.cargo_id] || 3500;
+        const pct = cfgBonus.pct_min + (cfgBonus.pct_max - cfgBonus.pct_min) * _eficienciaNPC(f);
+        custoTotal += Math.round(sal * pct);
+      }
+    }
     if (custoTotal > 0) {
       benefProms.push(escRef.update({ caixa: FVb.increment(-custoTotal) }));
     }
@@ -1334,6 +1367,25 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
       }
     } catch (e) { logger.warn('Post automático (foco redes):', e.message); }
   }
+
+  // Decaimento de amizade por falta de interação (js/amigos.js) — mesma
+  // ideia do namoro (afinidade esfria sem atenção), mas SEM malefício: nunca
+  // vira evento negativo, nunca termina a amizade sozinha, só reduz o número
+  // com piso 0. 2 meses de graça sem interagir, depois -8/mês de neglect.
+  try {
+    const amigosSnap = await db.collection('jogadores').doc(uid).collection('amigos').get();
+    const novoMesTotal = novoAno * 12 + novoMes;
+    const amigosProms = [];
+    for (const aDoc of amigosSnap.docs) {
+      const a = aDoc.data();
+      const mesesSemContato = novoMesTotal - (a.ultima_interacao_mes ?? novoMesTotal);
+      if (mesesSemContato >= 2 && (a.afinidade || 0) > 0) {
+        amigosProms.push(aDoc.ref.update({ afinidade: Math.max(0, (a.afinidade || 0) - 8) }));
+      }
+    }
+    if (amigosProms.length) await Promise.all(amigosProms);
+  } catch (e) { logger.warn('Decaimento de amigos:', e.message); }
+
   // Disposição virou mecânica real em 2026-07-11 (antes só decaía/regenerava
   // sem efeito nenhum). Frequentar a academia é o jeito ativo de recuperar —
   // some com o -2 passivo e ainda soma. Efeito prático: modifica o

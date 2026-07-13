@@ -1384,7 +1384,14 @@ async function _escKpis(esc, j) {
   const beneficiosIds = (esc && esc.beneficios_ativos) || [];
   const beneficiosDetalhe = beneficiosIds.map(bid => {
     const cfg = catalogoBenef[bid] || {};
-    return { id: bid, label: cfg.label || bid, icone: cfg.icone || '💙', custo: (cfg.custo_por_func || 0) * listaFuncionarios.length };
+    // Bônus por Performance é % do salário real de cada funcionário (não
+    // um custo_por_func fixo) — usa o ponto médio da faixa 5-15% aqui
+    // (Balancete é resumo mensal, sem recalcular eficiência por NPC de novo;
+    // o valor exato que sai do caixa é o aplicado no tick, functions/avancar_mes.js).
+    const custo = cfg.custo_pct_salario
+      ? listaFuncionarios.reduce((s,f) => s + Math.round((f.sal||0) * ((cfg.pct_min+cfg.pct_max)/2)), 0)
+      : (cfg.custo_por_func || 0) * listaFuncionarios.length;
+    return { id: bid, label: cfg.label || bid, icone: cfg.icone || '💙', custo };
   });
   const beneficiosCustoTotal = beneficiosDetalhe.reduce((s, b) => s + b.custo, 0);
 
@@ -1654,7 +1661,7 @@ function renderFoco(j, el) {
     { k:'trabalhar_intensamente', icone:'💼', label:'Trabalhar Intensamente', tag:'real', tela:null },
   ];
   const focoLockedHtml = focoAtual
-    ? `<div class="card" style="margin-bottom:1rem;border-color:var(--navy3);background:rgba(22,214,168,.06)">
+    ? `<div class="card" style="margin-bottom:1rem;border-color:var(--navy3);background:var(--verde-bg)">
         <div style="font-size:.72rem;color:var(--navy4)">🔒 Foco travado neste mês</div>
         <div style="font-size:.9rem;font-weight:700;color:var(--txt);margin-top:.2rem">${FOCO_OPCOES.find(o=>o.k===focoAtual)?.label || focoAtual}</div>
         <button class="btn btn-ghost btn-sm" style="margin-top:.5rem" onclick="window._focoSelecionar(null)">Destravar</button>
@@ -1663,7 +1670,7 @@ function renderFoco(j, el) {
 
   const cardsHtml = FOCO_OPCOES.map(o => {
     const selecionado = focoAtual === o.k;
-    return `<div class="esc-acao-btn" style="cursor:pointer;position:relative;${selecionado?'border-color:var(--navy3);background:rgba(22,214,168,.08)':''}" onclick="window._focoSelecionar('${o.k}')">
+    return `<div class="esc-acao-btn" style="cursor:pointer;position:relative;${selecionado?'border-color:var(--navy3);background:var(--verde-bg)':''}" onclick="window._focoSelecionar('${o.k}')">
       ${selecionado ? `<span style="position:absolute;top:.3rem;right:.4rem;font-size:.7rem">🔒</span>` : ''}
       <span class="esc-acao-icone">${o.icone}</span>
       <span>${o.label}<br><small style="opacity:.7">${o.tag}</small></span>

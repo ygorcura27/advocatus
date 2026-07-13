@@ -104,8 +104,14 @@ function calcDeslocamento(morId, escZona) {
   return 8 * 22;
 }
 
-function _mesAtual() { return (((window.SERVER?.mes_global||1) - 1) % 12) + 1; }
-function _anoAtual()  { return Math.ceil((window.SERVER?.mes_global||1) / 12); }
+// Congresso é gated pelo calendário PESSOAL do jogador (mes_pessoal/
+// ano_pessoal, avança só quando ELE clica "avançar mês"), não pelo
+// relógio global do servidor (window.SERVER.mes_global — compartilhado
+// entre todos os jogadores, usado pra ranking/rotação de julgador). Usar
+// o relógio errado é por isso que "mesmo no mês certo" nunca batia — o
+// mês "certo" comparado era o do MUNDO, não o do jogador.
+function _mesAtual(j) { return ((j?.mes_pessoal ?? 0) % 12) + 1; }
+function _anoAtual(j)  { return j?.ano_pessoal || 1; }
 
 function _carroEhProprío(j, id) {
   if (id === 'onibus') return true;
@@ -411,8 +417,8 @@ window.renderLoja = function(j, el) {
 function _itemLojaStatus(j, it) {
   const comprados  = (j.compras||[]).map(c=>c.id);
   const congUsados = j.congressos_usados || {};
-  const mesAtual   = _mesAtual();
-  const anoAtual   = _anoAtual();
+  const mesAtual   = _mesAtual(j);
+  const anoAtual   = _anoAtual(j);
   const isCong     = it.cat === 'cong';
   const jatem      = comprados.includes(it.id);
   const usadoAno   = congUsados[it.id] === anoAtual;
@@ -462,7 +468,7 @@ function _renderLojaDetalhe(j, it) {
   let acao;
   if (isCong) {
     acao = usadoAno
-      ? `<div class="pc-ativo" style="color:var(--txt3)">✓ Participado este ano (${_anoAtual()})</div>`
+      ? `<div class="pc-ativo" style="color:var(--txt3)">✓ Participado este ano (${_anoAtual(j)})</div>`
       : !mesCorreto
         ? `<div style="font-size:.72rem;color:var(--txt3)">Disponível em ${MESES_NOME[it.mes-1]}</div>`
         : podeComprar
@@ -511,11 +517,11 @@ window.comprarItem = async function(id) {
   if ((j.dinheiro||0) < it.p) { toast('Saldo insuficiente.','ko'); return; }
 
   if (it.cat === 'cong') {
-    if (_mesAtual() !== it.mes) { toast(`Congresso disponível apenas em ${MESES_NOME[it.mes-1]}.`,'ko'); return; }
-    if ((j.congressos_usados||{})[it.id] === _anoAtual()) { toast('Você já participou deste congresso este ano.','ko'); return; }
+    if (_mesAtual(j) !== it.mes) { toast(`Congresso disponível apenas em ${MESES_NOME[it.mes-1]}.`,'ko'); return; }
+    if ((j.congressos_usados||{})[it.id] === _anoAtual(j)) { toast('Você já participou deste congresso este ano.','ko'); return; }
     const netBonus = {cong_par:8,cong_ber:7,cong_lis:6,cong_sp:5,cong_rio:5}[it.id]||5;
-    const updates  = { dinheiro:(j.dinheiro||0)-it.p, [`congressos_usados.${it.id}`]:_anoAtual() };
-    if (it.rep>0) updates.reputacao = Math.min(100,(j.reputacao||30)+it.rep);
+    const updates  = { dinheiro:(j.dinheiro||0)-it.p, [`congressos_usados.${it.id}`]:_anoAtual(j) };
+    if (it.rep>0) updates.reputacao = Math.min(window.REP_CAP?.[j.cargo_id]||55,(j.reputacao||30)+it.rep);
     updates['skills.networking'] = Math.min(window.REP_CAP?.[j.cargo_id]||55, ((j.skills||{}).networking||10)+netBonus);
     await _salvar(uid, updates);
     toast(`✈️ ${it.n} — participação confirmada!${it.rep>0?` +${it.rep} rep`:''}`, 'ok');

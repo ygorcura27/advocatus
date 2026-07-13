@@ -22,6 +22,7 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { logger } = require('firebase-functions');
+const { clampReputacao } = require('./shared/repCap');
 
 // ════════════════════════════════════════════════════════
 // §25 — MOOT COURT
@@ -64,7 +65,7 @@ exports.participarMootCourt = onCall({ region: 'southamerica-east1' }, async (re
     energia:           FieldValue.increment(-ENERGIA_MOOT),
     energia_usada_mes: FieldValue.increment(ENERGIA_MOOT),
     xp:                FieldValue.increment(xpGanho),
-    reputacao:         FieldValue.increment(reputacao),
+    reputacao:         clampReputacao(j.reputacao, j.cargo_id, reputacao),
     dinheiro:          FieldValue.increment(premioDinheiro),
     moot_ultimo_mes:   mesGlobal,
     moot_vitorias:     vitoria ? FieldValue.increment(1) : FieldValue.increment(0),
@@ -173,7 +174,7 @@ exports.gravarPodcast = onCall({ region: 'southamerica-east1' }, async (request)
   await db.collection('jogadores').doc(uid).update({
     energia:           FieldValue.increment(-ENERGIA_PODCAST),
     energia_usada_mes: FieldValue.increment(ENERGIA_PODCAST),
-    reputacao:         FieldValue.increment(baseRep),
+    reputacao:         clampReputacao(j.reputacao, j.cargo_id, baseRep),
     popularidade_pessoal: FieldValue.increment(basePop),
     oral_advocacy:     novaOral,
     podcast_ultimo_mes: mesGlobal,
