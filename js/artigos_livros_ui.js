@@ -13,7 +13,11 @@ import { httpsCallable }
 import { db } from './firebase-init.js';
 
 function _formatarMesGlobal(mesTotal) {
-  const ano = Math.floor((mesTotal || 0) / 12);
+  // +1 no ano: mes_conclusao conta a partir de 0 no mês/ano de criação do
+  // personagem, mas ano_pessoal (usado no resto da UI) é 1-indexado — sem
+  // isso o ano exibido aqui sempre ficava 1 a menos que o real (ex.: "ano 29"
+  // com o jogador já no ano 30).
+  const ano = Math.floor((mesTotal || 0) / 12) + 1;
   const mes = (mesTotal || 0) % 12 + 1;
   return `mês ${mes} do ano ${ano}`;
 }

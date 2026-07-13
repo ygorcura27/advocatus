@@ -16,7 +16,10 @@ import { db } from './firebase-init.js';
 // não diz nada pro jogador. Converte pro par (mês 1-12, ano) que ele já
 // reconhece do resto da UI.
 function _formatarMesGlobal(mesTotal) {
-  const ano = Math.floor((mesTotal || 0) / 12);
+  // +1 no ano: mes_conclusao conta a partir de 0 no mês/ano de criação do
+  // personagem, mas ano_pessoal (usado no resto da UI) é 1-indexado — sem
+  // isso o ano exibido aqui sempre ficava 1 a menos que o real.
+  const ano = Math.floor((mesTotal || 0) / 12) + 1;
   const mes = (mesTotal || 0) % 12 + 1;
   return `mês ${mes} do ano ${ano}`;
 }

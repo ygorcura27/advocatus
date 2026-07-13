@@ -13,7 +13,11 @@ import { db, functions } from './firebase-init.js';
 // mes_conclusao é total contínuo (ano_pessoal*12+mes_pessoal) — cru
 // ("mês 330") não diz nada; converte pro par mês/ano que o resto da UI usa.
 function _formatarMesGlobal(mesTotal) {
-  const ano = Math.floor((mesTotal || 0) / 12);
+  // mes_conclusao usa a mesma contagem de mes_global_pessoal (0 no mês/ano
+  // de criação do personagem), não a de ano_pessoal*12+mes_pessoal (que
+  // começa em 12, ano_pessoal 1-indexado) — sem o +1 aqui, o ano exibido
+  // ficava sempre 1 a menos que o ano_pessoal real do resto da UI.
+  const ano = Math.floor((mesTotal || 0) / 12) + 1;
   const mes = (mesTotal || 0) % 12 + 1;
   return `mês ${mes} do ano ${ano}`;
 }
