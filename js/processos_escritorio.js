@@ -48,6 +48,29 @@ const PROC_TITULOS = {
 
 const AREA_DEFAULT = ['civil','trabalhista','tributario','contencioso','consumidor'];
 
+// Poder do sócio (networking + prestígio) sobe o tier do caso sorteado pelo
+// valor do cliente — espelho de functions/avancar_mes.js::_fatorPoderCF/
+// _sortearTierComPoderCF/TIER_UP_PROC.
+const TIER_UP = { D:'C', C:'B', B:'A', A:'S', S:'S' };
+function _modificadorNetworking(networking) {
+  if (networking >= 81) return 1.00;
+  if (networking >= 61) return 0.50;
+  if (networking >= 41) return 0.25;
+  if (networking >= 21) return 0.10;
+  return 0;
+}
+function _fatorPoder(networking, prestigioPct) {
+  const net   = _modificadorNetworking(networking || 10);
+  const prest = Math.min(1, Math.max(0, ((prestigioPct || 0) - 40) / 60));
+  return Math.min(1, (net + prest) / 2);
+}
+function _sortearTierComPoder(clTier, fatorPoder) {
+  let t = clTier;
+  if (Math.random() < fatorPoder * 0.5) t = TIER_UP[t] || t;
+  if (Math.random() < fatorPoder * 0.2) t = TIER_UP[t] || t;
+  return t;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function _fmtP(n) {
@@ -192,12 +215,16 @@ window.renderProcessosPool = async function(j, escId, el) {
     const disponiveis  = todos.filter(p => p.status === 'disponivel');
     const emAndamento  = todos.filter(p => p.status === 'em_andamento');
     const aguardSent   = todos.filter(p => p.status === 'aguardando_sentenca');
-    // Pool docs assumidos pelo jogador que estão em fase recursal
-    const poolRecursal = todos.filter(p => p.assumido_uid && STATUSES_RECURSAL.includes(p.status));
-
     // Col 2: Fase recursal — dois casos:
-    // a) processos antigos do pool colaborativo (campo pool_escritorio_id)
-    // b) processos assumidos via _assumirCasoPool (campo pool_proc_esc_id)
+    // a) processos antigos do pool colaborativo (campo pool_escritorio_id) —
+    //    hoje só o "recorrer" manual (_criarProcessoRecursalPool) grava isso.
+    // b) processos assumidos via _assumirCasoPool (campo pool_proc_esc_id) —
+    //    a MAIORIA dos casos hoje (Investigação/Julgamento via
+    //    finalizarJulgamento, functions/investigacao.js) nunca sincroniza o
+    //    status do doc processos_pool de volta (só o doc `processos` top-
+    //    level muda) — por isso não dá pra confiar no status do pool doc
+    //    aqui; qualquer pool doc assumido e ainda não concluído/perdido
+    //    precisa ter seu processo_ref checado direto na fonte de verdade.
     let recursais = [];
     try {
       const recSnap = await getDocs(query(
@@ -209,14 +236,15 @@ window.renderProcessosPool = async function(j, escId, el) {
     } catch (e) { /* sem índice ainda — deixa vazio */ }
 
     // Buscar os processos ligados ao pool subcol (via processo_ref) para o Col 2
-    if (poolRecursal.length > 0) {
-      const refs = poolRecursal.filter(p => p.processo_ref);
-      if (refs.length > 0) {
-        const snaps = await Promise.all(refs.map(p => getDoc(doc(db, 'processos', p.processo_ref))));
-        for (const snap of snaps) {
-          if (snap.exists() && STATUSES_RECURSAL.includes(snap.data().status)) {
-            recursais.push({ id: snap.id, ...snap.data() });
-          }
+    const poolAssumidosAbertos = todos.filter(p => p.assumido_uid && p.processo_ref
+      && p.status !== 'concluido' && p.status !== 'perdido');
+    if (poolAssumidosAbertos.length > 0) {
+      const jaIncluidos = new Set(recursais.map(r => r.id));
+      const snaps = await Promise.all(poolAssumidosAbertos.map(p => getDoc(doc(db, 'processos', p.processo_ref))));
+      for (const snap of snaps) {
+        if (snap.exists() && STATUSES_RECURSAL.includes(snap.data().status) && !jaIncluidos.has(snap.id)) {
+          jaIncluidos.add(snap.id);
+          recursais.push({ id: snap.id, ...snap.data() });
         }
       }
     }
@@ -1108,11 +1136,23 @@ window._poolModalRecorrerContrario = async function() {
 window.gerarProcessosMensais = async function(escId, tierEscritorio) {
   // Tier real: ler do Firestore para evitar valor desatualizado em j.escritorio_tier
   let tierReal = tierEscritorio || 1;
+  let areasHabilitadas = AREA_DEFAULT;
+  let prestigioEsc = null;
   try {
     const escSnap2 = await getDoc(doc(db, 'escritorios', escId));
-    if (escSnap2.exists()) tierReal = escSnap2.data().tier || tierReal;
+    if (escSnap2.exists()) {
+      const escData = escSnap2.data();
+      tierReal = escData.tier || tierReal;
+      if (escData.areas_atuacao?.length) areasHabilitadas = escData.areas_atuacao;
+      prestigioEsc = escData.prestigio ?? null;
+    }
   } catch(e) {}
   const cap = TIER_CAP_ESC[tierReal] || 4;
+
+  const jog = window.JOGADOR || {};
+  const repCap = (window.REP_CAP||{})[jog.cargo_id] || 35;
+  const prestigioPct = prestigioEsc != null ? prestigioEsc : Math.min(100, Math.round((jog.reputacao||0)/repCap*100));
+  const fatorPoder = _fatorPoder(jog.networking, prestigioPct);
 
   try {
     const clSnap = await getDocs(collection(db, 'escritorios', escId, 'clientes'));
@@ -1136,11 +1176,12 @@ window.gerarProcessosMensais = async function(escId, tierEscritorio) {
 
     for (const cl of clientes) {
       if (gerados >= vagasRestantes) break;
-      const tier   = _clienteTier(cl.valor_mensal || 0);
-      const chance = TIER_CHANCE[tier] || .10;
+      const tierBase = _clienteTier(cl.valor_mensal || 0);
+      const chance   = TIER_CHANCE[tierBase] || .10;
       if (Math.random() > chance) continue;
 
-      const area       = cl.area || cl.especialidade || AREA_DEFAULT[Math.floor(Math.random() * AREA_DEFAULT.length)];
+      const tier       = _sortearTierComPoder(tierBase, fatorPoder);
+      const area       = cl.area || cl.especialidade || areasHabilitadas[Math.floor(Math.random() * areasHabilitadas.length)];
       const honorarios = _tierHonorarios(tier);
       const titulo     = _randTitulo(area);
 

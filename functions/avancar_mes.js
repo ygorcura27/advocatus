@@ -2323,7 +2323,7 @@ async function _processarServicosMensalCF(db, uid, j) {
   // espelha js/processos_escritorio.js:gerarProcessosMensais). O botão manual
   // só preenche a diferença até o cap (já era assim, não muda nada nele).
   try {
-    const gerados = await _gerarProcessosMensalAutomaticoCF(db, escRef, tier);
+    const gerados = await _gerarProcessosMensalAutomaticoCF(db, escRef, tier, esc, networking, prestigioPct);
     if (gerados > 0) {
       await db.collection('jogadores').doc(uid).collection('inbox').add({
         de: 'sistema',
@@ -2553,7 +2553,33 @@ function _randTituloProc(area) {
   return lista[Math.floor(Math.random() * lista.length)];
 }
 
-async function _gerarProcessosMensalAutomaticoCF(db, escRef, tier) {
+// Poder do sócio (networking + reputação/prestígio) sobe o tier do caso que
+// chega — antes o gerador só olhava valor_mensal do cliente, então mesmo o
+// dono de escritório Big Law só recebia processos tier D/C (chance deles é
+// a mais alta em TIER_CHANCE_PROC). Fator 0..1: metade networking, metade
+// prestígio (reputação/cap do cargo); rola upgrade de tier em cima do tier
+// já sorteado pelo valor do cliente. Espelho de js/processos_escritorio.js.
+const TIER_UP_PROC = { D:'C', C:'B', B:'A', A:'S', S:'S' };
+function _fatorPoderCF(networking, prestigioPct) {
+  const net    = _modificadorNetworkingCF(networking || 10);
+  const prest  = Math.min(1, Math.max(0, ((prestigioPct || 0) - 40) / 60));
+  return Math.min(1, (net + prest) / 2);
+}
+function _sortearTierComPoderCF(clTier, fatorPoder) {
+  let t = clTier;
+  if (Math.random() < fatorPoder * 0.5) t = TIER_UP_PROC[t] || t;
+  if (Math.random() < fatorPoder * 0.2) t = TIER_UP_PROC[t] || t;
+  return t;
+}
+
+async function _gerarProcessosMensalAutomaticoCF(db, escRef, tier, esc, networking, prestigioPct) {
+  // Área sorteada precisa vir das especializações REALMENTE habilitadas no
+  // escritório (esc.areas_atuacao) — antes caía sempre no AREA_DEFAULT_PROC
+  // fixo (civil/trabalhista/tributario/contencioso/consumidor) porque
+  // clientes nunca têm cl.area/cl.especialidade setado, então processo de
+  // área não-habilitada (ex.: trabalhista num escritório só Cível/
+  // Tributário/Administrativo) sempre podia aparecer.
+  const areasHabilitadas = (esc?.areas_atuacao?.length) ? esc.areas_atuacao : AREA_DEFAULT_PROC;
   const clSnap = await escRef.collection('clientes').get();
   const clientes = clSnap.docs.map(d => ({ id: d.id, ...d.data() }));
   if (clientes.length === 0) return 0;
@@ -2565,15 +2591,17 @@ async function _gerarProcessosMensalAutomaticoCF(db, escRef, tier) {
   if (ativosAtuais >= cap) return 0;
 
   const vagasRestantes = cap - ativosAtuais;
+  const fatorPoder = _fatorPoderCF(networking, prestigioPct);
   let gerados = 0;
   const promessas = [];
   for (const cl of clientes) {
     if (gerados >= vagasRestantes) break;
-    const clTier = _clienteTierProc(cl.valor_mensal || 0);
-    const chance = TIER_CHANCE_PROC[clTier] || .10;
+    const clTierBase = _clienteTierProc(cl.valor_mensal || 0);
+    const chance = TIER_CHANCE_PROC[clTierBase] || .10;
     if (Math.random() > chance) continue;
 
-    const area       = cl.area || cl.especialidade || AREA_DEFAULT_PROC[Math.floor(Math.random() * AREA_DEFAULT_PROC.length)];
+    const clTier     = _sortearTierComPoderCF(clTierBase, fatorPoder);
+    const area       = cl.area || cl.especialidade || areasHabilitadas[Math.floor(Math.random() * areasHabilitadas.length)];
     const honorarios = _tierHonorariosProc(clTier);
     const titulo     = _randTituloProc(area);
 
