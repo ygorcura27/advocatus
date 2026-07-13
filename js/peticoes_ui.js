@@ -378,8 +378,16 @@ window.renderRepertorioEscritorio = async function(j, el) {
 
 // ─── Card de petição ──────────────────────────────────────────────────────────
 
+// Obras acadêmicas (dissertação/tese/artigo/livro) nunca entram em setlist
+// de processo, então nunca acumulam fama/popularidade de verdade (só
+// citações — functions/artigos_livros.js já comenta isso na criação da
+// obra: "Obras acadêmicas não têm fama"). Sem essa exceção, o modificador
+// de popularidade ficava travado em 0.50x (pop sempre 0) e cortava a nota
+// efetiva pela metade pra sempre, mesmo aprovado no teto real.
+const CATEGORIAS_ACADEMICAS = ['dissertacao', 'tese', 'artigo', 'livro'];
 function _calcNotaEfetiva(p) {
   const notaTeto = p.nota_teto ?? p.teto_nota ?? 12;
+  if (CATEGORIAS_ACADEMICAS.includes(p.categoria)) return notaTeto;
   const pop = p.popularidade ?? 0;
   const fama = p.fama ?? 0;
   let modPop = pop >= 86 ? 1.20 : pop >= 71 ? 1.10 : pop >= 51 ? 1.05
@@ -424,6 +432,8 @@ function _cardPeticao(p) {
           : ''}
       </div>
 
+      ${CATEGORIAS_ACADEMICAS.includes(p.categoria) ? `
+      <div style="font-size:.7rem;color:var(--ardosia2)">🎓 Obra acadêmica · ${p.citacoes||0} citações</div>` : `
       <div style="margin-bottom:.3rem">
         <div style="font-size:.7rem;color:var(--ardosia2);display:flex;justify-content:space-between">
           <span>Fama ${p.fama||0}/100</span><span>teto ${p.fama_teto_desbloqueado||39}</span>
@@ -436,7 +446,7 @@ function _cardPeticao(p) {
           <span style="color:${(p.popularidade||0) < 16 ? 'var(--erro)' : 'inherit'}">${_popLabel(p.popularidade||0)}</span>
         </div>
         ${barHTML(p.popularidade||0, 100, _popCor(p.popularidade||0))}
-      </div>
+      </div>`}
 
       <div style="margin-top:.6rem;display:flex;gap:.4rem;flex-wrap:wrap">
         ${p.status === 'pronta' && !p.generica
@@ -511,6 +521,12 @@ window.renderPeticaoDetalhe = async function(peticaoId, j, el) {
         <div class="local-info-linha"><span class="local-info-label">Usos / Vitórias</span><span class="local-info-valor">${p.usos_total||0} / ${p.vitorias||0}</span></div>
       </div>
 
+      ${CATEGORIAS_ACADEMICAS.includes(p.categoria) ? `
+      <div class="esc-card-bloco" style="margin-bottom:1.1rem">
+        <div class="secao-header" style="margin-bottom:.6rem"><div class="secao-titulo" style="font-size:.85rem">🎓 Obra Acadêmica</div></div>
+        <div class="local-info-linha"><span class="local-info-label">Citações</span><span class="local-info-valor">${p.citacoes||0}</span></div>
+        <div style="font-size:.68rem;color:var(--txt4);margin-top:.3rem">Obras acadêmicas não têm fama/popularidade (nunca entram em processo) — o que conta aqui é citação.</div>
+      </div>` : `
       <div class="esc-card-bloco" style="margin-bottom:1.1rem">
         <div class="secao-header" style="margin-bottom:.6rem"><div class="secao-titulo" style="font-size:.85rem">Fama e Popularidade</div></div>
         <div style="margin-bottom:.6rem">
@@ -526,7 +542,7 @@ window.renderPeticaoDetalhe = async function(peticaoId, j, el) {
           </div>
           ${barHTML(p.popularidade||0, 100, _popCor(p.popularidade||0))}
         </div>
-      </div>
+      </div>`}
 
       <div style="display:flex;gap:.5rem;flex-wrap:wrap">
         ${podeAdicionar ? `<button class="btn btn-prim btn-sm" onclick="window.adicionarAoRepertorio('${peticaoId}')">📚 Adicionar ao Repertório do Escritório</button>` : ''}
@@ -828,6 +844,8 @@ window.abrirDetalhePeticao = async function(peticaoId) {
         </div>
       </div>
 
+      ${CATEGORIAS_ACADEMICAS.includes(p.categoria) ? `
+      <div style="margin-bottom:1rem;font-size:.72rem;color:var(--ardosia2)">🎓 Obra acadêmica · ${p.citacoes||0} citações (sem fama/popularidade)</div>` : `
       <div style="margin-bottom:.6rem">
         <div style="font-size:.72rem;display:flex;justify-content:space-between;margin-bottom:.2rem">
           <span>Fama ${p.fama||0}/100</span><span>Teto: ${p.fama_teto_desbloqueado||39}</span>
@@ -840,7 +858,7 @@ window.abrirDetalhePeticao = async function(peticaoId) {
           <span style="color:${(p.popularidade||0)<16?'var(--erro)':'inherit'}">${_popLabel(p.popularidade||0)}</span>
         </div>
         ${barHTML(p.popularidade||0, 100, _popCor(p.popularidade||0))}
-      </div>
+      </div>`}
 
       <div style="display:flex;gap:.5rem;flex-wrap:wrap">
         ${!p.generica && p.status === 'pronta'

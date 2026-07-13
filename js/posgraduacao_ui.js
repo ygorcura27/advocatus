@@ -59,15 +59,22 @@ window.renderPosGraduacao = async function(j, el) {
       const snap = await getDocs(query(collection(db, 'peticoes'),
         where('jogador_uid', '==', j.uid), where('categoria', '==', cfg.categoria_peca)));
       const pecas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      pecasHtml = pecas.length ? pecas.map(p => `
+      // Antes: só oferecia "Escrever" quando NÃO existia nenhuma peça — se a
+      // nota saísse insuficiente, a peça ficava "pronta" com nota travada
+      // pra sempre e não tinha como reescrever nem tentar de novo. Agora só
+      // trava enquanto uma peça está em composição (evita duplicar em
+      // paralelo); rejeitada ou com nota baixa sempre pode escrever outra.
+      const emComposicao = pecas.some(p => p.status === 'em_composicao');
+      const pecasCards = pecas.map(p => `
         <div class="card" style="margin-bottom:.4rem">
           <div style="font-weight:600;font-size:.78rem;color:var(--txt)">${p.titulo}</div>
           <div style="font-size:.68rem;color:var(--txt3)">
-            ${p.status === 'em_composicao' ? `⏳ em composição (pronta mês ${p.mes_conclusao})` : `nota ${p.nota_teto}/26 (mín. ${cfg.nota_min_peca})`}
+            ${p.status === 'em_composicao' ? `⏳ em composição (pronta mês ${p.mes_conclusao})` : `nota ${p.nota_teto}/26 (mín. ${cfg.nota_min_peca})${p.nota_teto < cfg.nota_min_peca ? ' · nota insuficiente' : ''}`}
           </div>
           ${p.status === 'pronta' ? `<button class="btn btn-prim btn-sm" style="margin-top:.4rem" onclick="window._pgSubmeter('${p.id}')">Submeter</button>` : ''}
-        </div>`).join('')
-        : `<button class="btn btn-prim btn-block" onclick="window._pgEscrever('${cfg.categoria_peca}')">✍️ Escrever ${cfg.categoria_peca === 'tese' ? 'Tese' : 'Dissertação'}</button>`;
+        </div>`).join('');
+      const escreverBtn = emComposicao ? '' : `<button class="btn btn-prim btn-block" style="margin-top:.4rem" onclick="window._pgEscrever('${cfg.categoria_peca}')">✍️ ${pecas.length ? 'Escrever nova versão' : `Escrever ${cfg.categoria_peca === 'tese' ? 'Tese' : 'Dissertação'}`}</button>`;
+      pecasHtml = pecasCards + escreverBtn;
     } catch (e) { pecasHtml = `<div class="card" style="color:var(--txt4)">Erro ao carregar peças.</div>`; }
 
     el.innerHTML = `
