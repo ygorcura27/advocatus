@@ -1251,6 +1251,7 @@ function _escHero(j, esc) {
           <span class="pill pill-oab">📍 ${local}</span>
           <span class="pill pill-oab">👥 ${numSocios} sócio${numSocios>1?'s':''}</span>
           <span class="pill pill-oab">⚖️ ${totalCasos} processo${totalCasos===1?'':'s'} ativo${totalCasos===1?'':'s'}</span>
+          ${esc && esc.gestor_id ? `<span class="pill pill-oab" style="background:var(--ouro,#D9B573);color:#1E293C;border-color:transparent">👑 Gestor: ${esc.gestor_nome||'—'}</span>` : ''}
         </div>
       </div>
     </div>

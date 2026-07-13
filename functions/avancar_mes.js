@@ -2480,6 +2480,16 @@ async function _autoAtribuirProcessosMensalCF(db, escRef, esc) {
     }
     if (!npc) continue; // nenhum NPC elegível — processo fica para dono/sócio
 
+    // "Domínio fraco" agora vale pra qualquer modo de delegação, não só
+    // Por Departamento — mede o domínio do NPC de fato designado na área
+    // real do processo, sempre que o campo skill correspondente existir.
+    if (!viaDepartamento) {
+      const deptoDoProc = DEPTO_AREA_AGRUPADA[proc.area] || 'civil';
+      const skillArea   = DEPTO_SKILL_AREA[deptoDoProc];
+      const nivelArea   = (npc.skills_jur || {})[skillArea] || 0;
+      areaFraca = nivelArea < DEPTO_AREA_FRACA_LIMIAR;
+    }
+
     // Incrementar contador local antes de continuar o loop
     procCount[npc.id] = (procCount[npc.id] || 0) + 1;
 
@@ -2494,7 +2504,7 @@ async function _autoAtribuirProcessosMensalCF(db, escRef, esc) {
       progresso: 0,
     });
 
-    if (viaDepartamento && areaFraca) {
+    if (areaFraca) {
       await _logGestaoCF(escRef,
         `⚠️ ${npc.nome} recebeu "${proc.titulo}" (${proc.cliente_nome||'cliente'}) fora do domínio forte da área.`);
       continue;

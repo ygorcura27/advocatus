@@ -13,6 +13,10 @@ import { SKILL_CAP } from './escritorios_npc.js';
 // ESTADO LOCAL (tab ativa na tela de Equipe)
 // ════════════════════════════════════════════════════════
 let _activeEquipeTab = 'equipe';
+// Gestor atual do escritório sendo renderizado — setado em renderEquipe,
+// lido em _cardFuncionario pra destacar visualmente quem é o gestor
+// (Task: "tem que ficar visualmente destacado quem é o Gestor").
+let _equipeGestorId = null;
 
 // ════════════════════════════════════════════════════════
 // CONSTANTES
@@ -135,6 +139,7 @@ window.renderEquipe = async function(j, el) {
   const escSnap = await getDoc(doc(db, 'escritorios', escId));
   if (!escSnap.exists()) { el.innerHTML = '<div class="card">Escritório não encontrado.</div>'; return; }
   const esc = escSnap.data();
+  _equipeGestorId = esc.gestor_id || null;
 
   // ── Verificar se o jogador é DONO, SÓCIO ou ASSOCIADO (pode gerenciar) ──
   // Empregados regulares (Advogado Sênior pra baixo, sem participação societária)
@@ -426,6 +431,7 @@ function _cardFuncionario(f, escId, energiaDisp, procCount = {}, mesGlobal = 0) 
   const efic      = f.tipo === 'npc' ? _calcEfic(f) : null;
   const eficColor = efic >= 80 ? '#2E8B57' : efic >= 55 ? '#B7791F' : '#C0392B';
   const status    = _statusFuncionario(f);
+  const souGestor = !!(_equipeGestorId && f.id === _equipeGestorId);
 
   const ini = (f.nome||'?').split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase().slice(0,2);
   const svgSrc = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='153' height='153'%3E%3Ccircle cx='76' cy='76' r='76' fill='%231E293C'/%3E%3Ctext x='76' y='96' font-size='36' font-weight='700' fill='%23D9B573' text-anchor='middle' font-family='IBM Plex Sans,Arial'%3E${ini}%3C/text%3E%3C/svg%3E`;
@@ -560,13 +566,14 @@ function _cardFuncionario(f, escId, energiaDisp, procCount = {}, mesGlobal = 0) 
   menuItens.push(`<button class="func-menu-danger" onclick="window.demitirFuncionario('${f.id}','${escId}','${f.nome}')">Demitir</button>`);
 
   return `
-    <div class="func-card" data-status="${status.key}">
+    <div class="func-card" data-status="${status.key}" style="${souGestor?'border:1.5px solid var(--ouro,#D9B573);background:rgba(217,181,115,.06)':''}">
       <div class="func-card-topo">
         ${fotoHtml}
         <div class="func-card-info">
           <div class="func-nome-row">
             <span class="func-dot func-dot-${status.cor}" title="${status.label}"></span>
             <span class="func-nome">${f.nome}</span>
+            ${souGestor ? `<span style="font-size:.62rem;background:var(--ouro,#D9B573);color:#1E293C;padding:.05rem .4rem;border-radius:99px;font-weight:700;margin-left:.3rem">👑 Gestor</span>` : ''}
           </div>
           <div class="func-cargo">${ci.l}${f.tipo === 'npc' && f.meses_no_cargo ? ` · ${f.meses_no_cargo}m no cargo` : ''}</div>
           <div class="func-badges">

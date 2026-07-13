@@ -1191,6 +1191,18 @@ const _DG_DEPARTAMENTOS = [
 const _DG_CARGO_L = { est:'Estagiário', ass:'Assistente', jnr:'Júnior', pln:'Pleno', snr:'Sênior', asc:'Associado', soc:'Sócio' };
 const _DG_LIMIAR_FRACO = 25;
 
+// Espelho de functions/avancar_mes.js::DEPTO_AREA_AGRUPADA — agrupa as 11+
+// áreas de especialização do escritório (js/escritorio_painel.js:TODAS_AREAS)
+// nos 5 departamentos que a Delegar Gestão de fato oferece.
+const _DG_AREA_AGRUPADA = {
+  civil:'civil', consumidor:'civil', ambiental:'civil', administrativo:'civil',
+  familia:'civil', imobiliario:'civil',
+  trabalhista:'trabalhista',
+  tributario:'tributario',
+  empresarial:'empresarial', societario:'empresarial',
+  criminal:'criminal',
+};
+
 // 5 permissões, todas com efeito real (avancar_mes.js + functions/
 // gestor_decisoes.js) — as outras 3 do design original (visualizar autos,
 // protocolar petições, encerrar/arquivar, receber citações) não tinham
@@ -1229,6 +1241,12 @@ let _dgResponsavelId = null;
 let _dgNivel  = 'parcial';
 let _dgPrazo  = 'revogacao';
 let _dgPermissoes = { ..._DG_NIVEL_FLAGS.parcial };
+let _dgAreasAtivas = [];
+
+// Regra: só Pleno+ pode ser gestor (Júnior pra baixo não tem senioridade
+// pra assumir gestão do escritório). Mesmo cargo mínimo de mentor
+// (_CARGO_MENTOR_EQ em js/equipe.js), reaproveitado aqui por consistência.
+const _DG_CARGO_MIN_GESTOR = new Set(['pln', 'snr', 'asc', 'soc']);
 
 window.abrirDelegacaoGestao = async function(escId) {
   const fSnap = await getDocs(query(
@@ -1236,7 +1254,7 @@ window.abrirDelegacaoGestao = async function(escId) {
     where('tipo', '==', 'npc')
   ));
   const npcs = fSnap.docs.map(d => ({id: d.id, ...d.data()}))
-    .filter(f => f.ativo !== false && !f.burnout_npc);
+    .filter(f => f.ativo !== false && !f.burnout_npc && _DG_CARGO_MIN_GESTOR.has(f.cargo_id));
 
   const escSnap = await getDoc(doc(db, 'escritorios', escId));
   const esc = escSnap.exists() ? escSnap.data() : {};
@@ -1249,6 +1267,13 @@ window.abrirDelegacaoGestao = async function(escId) {
   _dgNivel     = esc.gestor_nivel || 'parcial';
   _dgPrazo     = esc.gestor_prazo_meses ? String(esc.gestor_prazo_meses) : 'revogacao';
   _dgPermissoes = { ...(esc.gestor_permissoes || _DG_NIVEL_FLAGS[_dgNivel]) };
+  // Mesmo fallback de js/escritorio_painel.js:renderEspecializacoesEsc —
+  // escritório recém-criado ainda não tem areas_atuacao setado.
+  _dgAreasAtivas = esc.areas_atuacao?.length ? esc.areas_atuacao : [esc.especialidade_principal || 'civil'];
+
+  if (npcs.length === 0 && _dgEscopo !== 'jogador') {
+    toast('Nenhum funcionário Pleno+ disponível pra ser gestor.', 'ko');
+  }
 
   abrirModal('👤 Delegar Gestão do Escritório', _dgRenderModal(esc));
 };
@@ -1300,6 +1325,24 @@ function _dgPillDominio(f) {
   <div style="font-size:.6rem;color:var(--txt4);margin-top:.4rem">⚠️ domínio fraco = processo futuro nesse ramo tem chance de vitória reduzida sob esse gestor (real — reduz a eficiência usada no roll de sentença em avancar_mes.js).</div>`;
 }
 
+// Índice de Aptidão (1-10) — 50% gestão (skills.gestao/100, geral) + 50%
+// domínio médio nas áreas que o escritório de fato atua (skills_jur.area_X/50,
+// só departamentos com esc.areas_atuacao ativa contam). Sem área ativa
+// mapeável, cai 100% pra gestão. Só orienta a escolha — não é um requisito,
+// dá pra escolher qualquer um dos elegíveis mesmo com índice baixo.
+function _dgIndiceAptidao(f) {
+  const scoreGestao = ((f.skills || {}).gestao || 0) / 100;
+  const skJur = f.skills_jur || {};
+  const deptosAtivosSet = new Set(_dgAreasAtivas.map(a => _DG_AREA_AGRUPADA[a] || a));
+  const deptosRelevantes = _DG_DEPARTAMENTOS.filter(dep => deptosAtivosSet.has(dep.k));
+  let combinado = scoreGestao;
+  if (deptosRelevantes.length > 0) {
+    const scoreArea = deptosRelevantes.reduce((s, dep) => s + (skJur[dep.skill] || 0) / 50, 0) / deptosRelevantes.length;
+    combinado = scoreGestao * 0.5 + scoreArea * 0.5;
+  }
+  return Math.max(1, Math.min(10, Math.round(1 + combinado * 9)));
+}
+
 function _dgRenderGeral() {
   const respSelecionado = _dgNpcs.find(f => f.id === _dgResponsavelId);
   return `
@@ -1307,12 +1350,19 @@ function _dgRenderGeral() {
       <div>
         <div style="font-size:.78rem;font-weight:700;color:var(--txt);margin-bottom:.5rem">Responsável</div>
         <div style="display:flex;flex-direction:column;gap:.4rem;max-height:220px;overflow-y:auto">
-          ${_dgNpcs.map(f => `
+          ${_dgNpcs.map(f => {
+            const indice = _dgIndiceAptidao(f);
+            const corIndice = indice >= 7 ? 'var(--verde2)' : indice >= 4 ? 'var(--amber)' : 'var(--verm2)';
+            return `
             <div class="card" style="cursor:pointer;padding:.55rem .7rem;border-color:${_dgResponsavelId===f.id?'var(--navy3)':'var(--borda2)'};background:${_dgResponsavelId===f.id?'var(--verde-bg)':'var(--surface)'}"
               onclick="window._dgSetResponsavel('${f.id}')">
-              <div style="font-weight:600;font-size:.8rem;color:var(--txt)">${f.nome}</div>
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <div style="font-weight:600;font-size:.8rem;color:var(--txt)">${f.nome}</div>
+                <span style="font-size:.62rem;font-weight:700;color:${corIndice}">🎯 ${indice}/10</span>
+              </div>
               <div style="font-size:.64rem;color:var(--txt3)">${_DG_CARGO_L[f.cargo_id]||f.cargo_id}</div>
-            </div>`).join('')}
+            </div>`;
+          }).join('')}
         </div>
         ${respSelecionado ? `<div style="font-size:.66rem;color:var(--txt4);margin-top:.6rem">Domínio por área (real, escala /50)</div>${_dgPillDominio(respSelecionado)}` : ''}
       </div>
@@ -1358,7 +1408,17 @@ function _dgRenderGeral() {
 }
 
 function _dgRenderDepartamentos() {
-  const rows = _DG_DEPARTAMENTOS.map(dep => {
+  // Só departamentos com pelo menos 1 área ativa das especializações do
+  // escritório (esc.areas_atuacao) aparecem — não faz sentido delegar um
+  // departamento que o escritório nem atua.
+  const deptosAtivosSet = new Set(_dgAreasAtivas.map(a => _DG_AREA_AGRUPADA[a] || a));
+  const departamentosVisiveis = _DG_DEPARTAMENTOS.filter(dep => deptosAtivosSet.has(dep.k));
+
+  if (departamentosVisiveis.length === 0) {
+    return `<div class="card" style="text-align:center;padding:1.2rem;color:var(--txt3);font-size:.78rem">Nenhum departamento ativo — configure Especializações no Escritório primeiro.</div>`;
+  }
+
+  const rows = departamentosVisiveis.map(dep => {
     const atualId = _dgDeptosSel[dep.k] || '';
     const opts = _dgNpcs.map(f => {
       const nivel = (f.skills_jur||{})[dep.skill] || 0;
