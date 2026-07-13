@@ -2374,6 +2374,7 @@ async function _creditarHonorariosTransito(j, uid, hon) {
       await updateDoc(doc(db, 'escritorios', j.escritorio_proprio_id), {
         caixa: (esc.caixa||0) + hon,
         faturamento_mes_atual: (esc.faturamento_mes_atual||0) + hon,
+        faturamento_honorarios_mes: (esc.faturamento_honorarios_mes||0) + hon,
       });
       return { foiParaCaixa: true };
     }

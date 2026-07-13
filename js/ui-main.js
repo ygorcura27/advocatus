@@ -2197,7 +2197,8 @@ function renderHabilidades(j, el) {
 
   el.innerHTML = `
     ${_capaHeader('FICHA DE QUALIFICAÇÃO · ADVOCATUS ONLINE', '⚡ Habilidades',
-      `<span class="pill pill-cargo">Cap geral ${cap}</span><span class="pill pill-oab">Vaga: ${_vagaLabel(vaga)}</span>`)}
+      `<span class="pill pill-cargo">Cap geral ${cap}</span><span class="pill pill-oab">Vaga: ${_vagaLabel(vaga)}</span>`
+      + (capJur > 50 ? `<span class="pill pill-oab" title="Bônus de teto de skill do pós-graduação (Mestrado +10% / Doutorado +25%)">Teto Skills Jur. ${capJur} (bônus pós-grad)</span>` : ''))}
 
     <table class="skills-table">
       <thead>

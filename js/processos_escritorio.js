@@ -27,6 +27,18 @@ const NPC_ENERGIA_MES = 100;
 const NPC_CUSTO_PROC  = 40;   // energia NPC por processo designado
 const NPC_OVERLOAD_TH = 20;   // abaixo disso, aviso de sobrecarga
 
+// ─── Refresh do widget de processos ──────────────────────────────────────────
+// O mesmo renderProcessosPool() é montado em dois containers diferentes
+// dependendo da tela: 'esc-processos-bloco' no dashboard do escritório, ou
+// 'gestao-processos-pool' na tela dedicada de Gestão de Processos. As ações
+// (recorrer/aceitar/designar/etc) rodavam só o refresh do primeiro — se o
+// jogador estivesse na tela dedicada, a UI ficava com dado velho até navegar
+// pra fora e voltar.
+function _refreshProcessosPool(j, escId) {
+  const el = document.getElementById('esc-processos-bloco') || document.getElementById('gestao-processos-pool');
+  if (el) window.renderProcessosPool(j, escId, el);
+}
+
 // Exportar para uso em escritorio_painel.js
 window.NPC_CUSTO_OP   = 25;   // energia NPC por oportunidade delegada
 window.NPC_ENERGIA_MES = NPC_ENERGIA_MES;
@@ -649,8 +661,7 @@ window._assumirCasoPool = async function(escId, procId, containerId) {
       toast('Módulo de processos não carregado ainda. Tente novamente.', 'ko');
     }
 
-    const elPool = document.getElementById('esc-processos-bloco');
-    if (elPool) window.renderProcessosPool(j, escId, elPool);
+    _refreshProcessosPool(j, escId);
   } catch (e) {
     console.error('[ASSUMIR CASO]', e);
     toast('Erro ao assumir caso.', 'ko');
@@ -855,8 +866,7 @@ window._confirmarDesignar = async function(escId, procId, funcId, cargoId, nomeF
     window.JOGADOR = j;
     toast(`📋 ${nomeFunc} designado para o processo. ⚡-${CUSTO_DONO}`, 'ok');
 
-    const elPool = document.getElementById('esc-processos-bloco');
-    if (elPool) window.renderProcessosPool(j, escId, elPool);
+    _refreshProcessosPool(j, escId);
   } catch (e) {
     console.error('[CONFIRMAR DESIGNAR]', e);
     toast('Erro ao designar processo.', 'ko');
@@ -906,6 +916,7 @@ window._processarSentenca = async function(escId, procId, uid) {
         updateDoc(doc(db, 'escritorios', escId), {
           caixa: increment(valorRecebido),
           faturamento_mes_atual: increment(valorRecebido),
+          faturamento_honorarios_mes: increment(valorRecebido),
         }),
         updateDoc(doc(db, 'escritorios', escId, 'processos_pool', procId), {
           status: 'concluido', resultado, valor_recebido: valorRecebido,
@@ -922,8 +933,7 @@ window._processarSentenca = async function(escId, procId, uid) {
       j.energia_usada_mes = energiaUsada + CUSTO_SENT;
       window.JOGADOR = j;
       toast(`✅ Procedente! +${_fmtP(valorRecebido)} no caixa.`, 'ok');
-      const elPool = document.getElementById('esc-processos-bloco');
-      if (elPool) window.renderProcessosPool(j, escId, elPool);
+      _refreshProcessosPool(j, escId);
     } catch (e) {
       console.error('[SENTENÇA PROCEDENTE]', e);
       toast('Erro ao processar sentença.', 'ko');
@@ -996,6 +1006,7 @@ window._poolModalAceitar = async function() {
       updateDoc(doc(db, 'escritorios', ctx.escId), {
         caixa: increment(ctx.valorRecebido),
         faturamento_mes_atual: increment(ctx.valorRecebido),
+        faturamento_honorarios_mes: increment(ctx.valorRecebido),
       }),
       updateDoc(doc(db, 'escritorios', ctx.escId, 'processos_pool', ctx.procId), {
         status: 'concluido', resultado: ctx.resultado,
@@ -1013,8 +1024,7 @@ window._poolModalAceitar = async function() {
     window.JOGADOR = ctx.j;
     fecharModal();
     toast(`${ico} Sentença aceita. +${_fmtP(ctx.valorRecebido)} no caixa.`, ctx.resultado === 'parcial' ? 'neutro' : 'ko');
-    const elPool = document.getElementById('esc-processos-bloco');
-    if (elPool) window.renderProcessosPool(ctx.j, ctx.escId, elPool);
+    _refreshProcessosPool(ctx.j, ctx.escId);
   } catch (e) {
     console.error('[ACEITAR POOL]', e);
     toast('Erro ao encerrar processo.', 'ko');
@@ -1066,6 +1076,7 @@ window._poolModalRecorrer = async function() {
       updateDoc(doc(db, 'escritorios', ctx.escId), {
         caixa: increment(ctx.valorRecebido),
         faturamento_mes_atual: increment(ctx.valorRecebido),
+        faturamento_honorarios_mes: increment(ctx.valorRecebido),
       }),
       updateDoc(doc(db, 'escritorios', ctx.escId, 'processos_pool', ctx.procId), {
         status: 'recurso_pendente', resultado: ctx.resultado,
@@ -1083,8 +1094,7 @@ window._poolModalRecorrer = async function() {
     window.JOGADOR = ctx.j;
     fecharModal();
     toast('⚖️ Recurso protocolado. Acompanhe na aba Fase Recursal.', 'ok', 4000);
-    const elPool = document.getElementById('esc-processos-bloco');
-    if (elPool) window.renderProcessosPool(ctx.j, ctx.escId, elPool);
+    _refreshProcessosPool(ctx.j, ctx.escId);
   } catch (e) {
     console.error('[RECORRER POOL]', e);
     toast('Erro ao protocolar recurso.', 'ko');
@@ -1102,6 +1112,7 @@ window._poolModalRecorrerContrario = async function() {
       updateDoc(doc(db, 'escritorios', ctx.escId), {
         caixa: increment(ctx.valorRecebido),
         faturamento_mes_atual: increment(ctx.valorRecebido),
+        faturamento_honorarios_mes: increment(ctx.valorRecebido),
       }),
       updateDoc(doc(db, 'escritorios', ctx.escId, 'processos_pool', ctx.procId), {
         status: 'recurso_pendente', resultado: ctx.resultado,
@@ -1119,8 +1130,7 @@ window._poolModalRecorrerContrario = async function() {
     window.JOGADOR = ctx.j;
     fecharModal();
     toast('⚠️ Parte contrária recorreu. Processo na Fase Recursal.', 'neutro', 4000);
-    const elPool = document.getElementById('esc-processos-bloco');
-    if (elPool) window.renderProcessosPool(ctx.j, ctx.escId, elPool);
+    _refreshProcessosPool(ctx.j, ctx.escId);
   } catch (e) {
     console.error('[RECURSO CONTRÁRIO POOL]', e);
     toast('Erro ao registrar recurso adversarial.', 'ko');
@@ -1203,8 +1213,7 @@ window.gerarProcessosMensais = async function(escId, tierEscritorio) {
     await Promise.all(promessas);
     toast(`✅ ${gerados} processo(s) gerado(s) no pool!`, 'ok');
 
-    const el = document.getElementById('esc-processos-bloco');
-    if (el && window.JOGADOR) window.renderProcessosPool(window.JOGADOR, escId, el);
+    _refreshProcessosPool(window.JOGADOR, escId);
   } catch (e) {
     console.error('[GERAR PROCESSOS]', e);
     toast('Erro ao gerar processos.', 'ko');
@@ -1506,8 +1515,7 @@ window._dgSetDepto = function(area, funcId) {
 };
 
 async function _dgAtualizarTelas() {
-  const elProc = document.getElementById('esc-processos-bloco');
-  if (elProc && window.JOGADOR) window.renderProcessosPool(window.JOGADOR, _dgEscId, elProc);
+  if (window.JOGADOR) _refreshProcessosPool(window.JOGADOR, _dgEscId);
   if (window.navTo) setTimeout(() => window.navTo('equipe', null), 300);
 }
 

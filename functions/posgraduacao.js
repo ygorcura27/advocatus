@@ -296,6 +296,7 @@ exports.darAula = onCall({ region: 'southamerica-east1' }, async (request) => {
   await db.collection('jogadores').doc(uid).update({
     energia:                   FieldValue.increment(ENERGIA_AULA),  // Bônus — docência energiza
     dinheiro:                  FieldValue.increment(salario),
+    honorarios_mes:            FieldValue.increment(salario),  // conta pra "Renda/mês" (renda_calculada) no fechamento do tick
     didatica_academica:        novaDid,
     posgrad_ultima_aula_dada:  mesGlobal,
   });
