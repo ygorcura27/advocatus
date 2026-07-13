@@ -23,6 +23,21 @@ const banco = require('./shared/banco_juridico.js');
 const { aplicarXpPracticeArea } = require('./skills');
 const { atualizarFama }         = require('./peticoes');
 
+// Áreas reais de processo são em português (js/escritorio_painel.js::
+// TODAS_AREAS); os consumidores de tipoCaso abaixo (ranges de
+// sortearValorParcial, perfil do julgador em determinarSentencaSetlist,
+// attyFee, aplicarXpPracticeArea) são todos em inglês — sem tradução,
+// praticamente nenhum caso batia (só civil/criminal por coincidência).
+// Espelho de functions/investigacao.js::AREA_PARA_TAG_VADEMECUM.
+const AREA_PT_PARA_EN = {
+  civil:'civil', consumidor:'civil', familia:'civil', imobiliario:'civil',
+  contencioso:'civil', ambiental:'civil',
+  tributario:'tax',
+  trabalhista:'employment',
+  empresarial:'corporate', societario:'corporate', administrativo:'corporate',
+  criminal:'criminal',
+};
+
 // ── Perfis de cliente e deltas de satisfação — GDD Seção 28-30 ──
 const DELTA_SATISFACAO_PERFIL = {
   conservador: { procedente:8,  parcial:4,  improcedente:-15 },
@@ -349,7 +364,8 @@ async function _processarSentencaSetlist(db, processoRef, jogadorRef, p, j, uid,
   const ev           = p.evento_julgamento || {};
   const impactoEv    = (ev.impacto || 0) + (ev.segundo_evento?.impacto || 0);
   const posicao      = p.posicao || p.meu_lado || 'autor';
-  const tipoCaso     = p.area || p.tipo || 'civil';
+  const areaBrutaCaso = p.area || p.tipo || 'civil';
+  const tipoCaso      = AREA_PT_PARA_EN[areaBrutaCaso] || areaBrutaCaso;
   const _INST_MAP = { '1grau':'trial', TJ:'appeals', TJRJ:'appeals', TJSP:'appeals', STJ:'circuit', TST:'circuit', STF:'supreme' };
   // Usa setlist_instancia gravado pelo montarSetlist; fallback para instancia/instancia_atual
   const instRaw   = p.setlist_instancia || p.instancia_atual || p.instancia;

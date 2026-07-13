@@ -22,6 +22,21 @@ const { aplicarXpPracticeArea, normalizarSkillsJur } = require('./skills');
 const { modEstadoJogador } = require('./peticoes');
 const sk = require('./investigacao_skills');
 
+// Áreas reais de processo (js/escritorio_painel.js::TODAS_AREAS) são em
+// português; tags do Vade Mecum e as skills area_* (functions/skills.js)
+// são em inglês (COMPAT_AREAS) — sem tradução nenhum encaixe batia e o XP
+// de Practice Area Mastery nunca aplicava pra quase nenhuma área do jogo.
+// Espelho de js/banco_vademecum.js::AREA_PARA_TAG_VADEMECUM e
+// functions/processar_sentenca.js::AREA_PT_PARA_EN.
+const AREA_PARA_TAG_VADEMECUM = {
+  civil:'civil', consumidor:'civil', familia:'civil', imobiliario:'civil',
+  contencioso:'civil', ambiental:'civil',
+  tributario:'tax',
+  trabalhista:'employment',
+  empresarial:'corporate', societario:'corporate', administrativo:'corporate',
+  criminal:'criminal',
+};
+
 // ─── Config (Parte II/III/VI do GDD — "pendências de calibração" Parte VIII) ──
 
 const TURNOS_TOTAIS_PADRAO = 9;         // calibrar
@@ -582,16 +597,7 @@ exports.aplicarTeseVademecum = onCall({ region: 'southamerica-east1' }, async (r
   // (enviadas junto por já serem públicas no banco estático) precisam bater
   // com a área/tipo do processo — nunca confiamos em um bool do cliente.
   // p.area/p.tipo são em português (TODAS_AREAS); as tags do banco são em
-  // inglês (COMPAT_AREAS) — sem tradução, nunca batiam. Espelho de
-  // js/banco_vademecum.js::AREA_PARA_TAG_VADEMECUM.
-  const AREA_PARA_TAG_VADEMECUM = {
-    civil:'civil', consumidor:'civil', familia:'civil', imobiliario:'civil',
-    contencioso:'civil', ambiental:'civil',
-    tributario:'tax',
-    trabalhista:'employment',
-    empresarial:'corporate', societario:'corporate', administrativo:'corporate',
-    criminal:'criminal',
-  };
+  // inglês (COMPAT_AREAS) — sem tradução, nunca batiam.
   const tagsCaso = [p.area, p.tipo].filter(Boolean).map(a => AREA_PARA_TAG_VADEMECUM[a] || a);
   const encaixa = Array.isArray(tags_precedente) && tags_precedente.some(t => tagsCaso.includes(t));
 
@@ -746,7 +752,8 @@ exports.finalizarJulgamento = onCall({ region: 'southamerica-east1' }, async (re
                            : { losses: (j.losses||0)+1, losses_ano: (j.losses_ano||0)+1 }),
   });
 
-  try { await aplicarXpPracticeArea(db, uid, p.area || p.tipo || 'civil', resultado); }
+  const areaBrutaJulg = p.area || p.tipo || 'civil';
+  try { await aplicarXpPracticeArea(db, uid, AREA_PARA_TAG_VADEMECUM[areaBrutaJulg] || areaBrutaJulg, resultado); }
   catch (e) { logger.warn('[INVESTIGACAO] XP area falhou:', e.message); }
 
   julg.veredito = resultado;

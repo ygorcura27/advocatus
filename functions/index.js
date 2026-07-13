@@ -44,7 +44,7 @@ const {
 const {
   participarMootCourt,
   iniciarIntercambio,
-  gravarPodcast,
+  gravarConteudoEducativo,
   contratarSeguroMalpractice,
   abrirCasoProBono,
   registrarAlumni,
@@ -114,7 +114,7 @@ exports.darAula                  = darAula;
 exports.submeterDissertacao      = submeterDissertacao;
 exports.participarMootCourt      = participarMootCourt;
 exports.iniciarIntercambio       = iniciarIntercambio;
-exports.gravarPodcast            = gravarPodcast;
+exports.gravarConteudoEducativo  = gravarConteudoEducativo;
 exports.contratarSeguroMalpractice = contratarSeguroMalpractice;
 exports.abrirCasoProBono         = abrirCasoProBono;
 exports.registrarAlumni          = registrarAlumni;

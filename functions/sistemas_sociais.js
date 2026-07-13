@@ -23,6 +23,19 @@ const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { logger } = require('firebase-functions');
 const { clampReputacao } = require('./shared/repCap');
+const { aplicarXpPracticeArea } = require('./skills');
+
+// Áreas reais de processo são em português; Practice Area Mastery (area_*
+// em functions/skills.js) é em inglês. Espelho de functions/investigacao.js
+// ::AREA_PARA_TAG_VADEMECUM / functions/processar_sentenca.js::AREA_PT_PARA_EN.
+const AREA_PT_PARA_EN = {
+  civil:'civil', consumidor:'civil', familia:'civil', imobiliario:'civil',
+  contencioso:'civil', ambiental:'civil',
+  tributario:'tax',
+  trabalhista:'employment',
+  empresarial:'corporate', societario:'corporate', administrativo:'corporate',
+  criminal:'criminal',
+};
 
 // ════════════════════════════════════════════════════════
 // §25 — MOOT COURT
@@ -138,28 +151,34 @@ exports.iniciarIntercambio = onCall({ region: 'southamerica-east1' }, async (req
 });
 
 // ════════════════════════════════════════════════════════
-// §27 — PODCAST / TALK SHOW
+// §27 — CONTEÚDO EDUCATIVO (ex-"Podcast" — GDD addendum: virou produção de
+// conteúdo jurídico por área, com Didática Acadêmica limitada a um cap
+// (DIDATICA_CAP_CONTEUDO) — passado esse cap, só dar aula (posgraduacao.js
+// ::darAula) continua rendendo Didática.
 // ════════════════════════════════════════════════════════
 
 const ENERGIA_PODCAST = 6;
 const VIRAL_CHANCE    = 0.12;  // 12% de chance de viralizar
+const DIDATICA_CAP_CONTEUDO = 20;
+const XP_AREA_CONTEUDO = 1;
 
-exports.gravarPodcast = onCall({ region: 'southamerica-east1' }, async (request) => {
+exports.gravarConteudoEducativo = onCall({ region: 'southamerica-east1' }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
 
   const uid = request.auth.uid;
   const db  = getFirestore();
+  const areaBruta = request.data?.area || 'civil';
 
   const snap = await db.collection('jogadores').doc(uid).get();
   if (!snap.exists) throw new HttpsError('not-found', 'Jogador não encontrado.');
 
   const j = snap.data();
   if ((j.energia || 0) < ENERGIA_PODCAST) {
-    throw new HttpsError('failed-precondition', `Energia insuficiente. Gravar podcast custa ${ENERGIA_PODCAST}⚡.`);
+    throw new HttpsError('failed-precondition', `Energia insuficiente. Gravar conteúdo custa ${ENERGIA_PODCAST}⚡.`);
   }
   const mesGlobal = j.mes_global_pessoal || 0;
   if (j.podcast_ultimo_mes === mesGlobal) {
-    throw new HttpsError('failed-precondition', 'Você já gravou um podcast este mês.');
+    throw new HttpsError('failed-precondition', 'Você já gravou conteúdo este mês.');
   }
 
   // Skill Oral Advocacy — base para o resultado
@@ -167,7 +186,10 @@ exports.gravarPodcast = onCall({ region: 'southamerica-east1' }, async (request)
   const viral  = Math.random() < VIRAL_CHANCE + (oralAdvocacy / 500);
   const baseRep = viral ? 3 : 1;
   const basePop = viral ? 15 : 5;
-  const xpDidatica = 1;
+
+  const didaticaAtual = j.didatica_academica || 0;
+  const abaixoDoCap = didaticaAtual < DIDATICA_CAP_CONTEUDO;
+  const novaDidatica = abaixoDoCap ? Math.min(DIDATICA_CAP_CONTEUDO, didaticaAtual + 1) : didaticaAtual;
 
   const novaOral = Math.min(50, oralAdvocacy + 1);
 
@@ -179,15 +201,21 @@ exports.gravarPodcast = onCall({ region: 'southamerica-east1' }, async (request)
     oral_advocacy:     novaOral,
     podcast_ultimo_mes: mesGlobal,
     podcast_total:     FieldValue.increment(1),
-    didatica_academica: Math.min(50, (j.didatica_academica || 0) + xpDidatica),
+    didatica_academica: novaDidatica,
   });
 
-  const msg = viral
-    ? `🔥 Viralizou! Seu podcast foi compartilhado massivamente. +${baseRep} Rep, +${basePop} popularidade.`
-    : `Episódio publicado. +${baseRep} Rep, +${basePop} popularidade. Oral Advocacy: ${novaOral}/50.`;
+  try { await aplicarXpPracticeArea(db, uid, AREA_PT_PARA_EN[areaBruta] || areaBruta, 'parcial'); }
+  catch (e) { logger.warn('[CONTEUDO EDUCATIVO] XP area falhou:', e.message); }
 
-  logger.info(`[PODCAST] ${uid} — ${viral ? 'viral' : 'normal'}`);
-  return { ok: true, viral, rep: baseRep, popularidade: basePop, oral_advocacy: novaOral };
+  const msgDidatica = abaixoDoCap
+    ? `+1 Didática Acadêmica (${novaDidatica}/${DIDATICA_CAP_CONTEUDO}).`
+    : `Didática Acadêmica no limite de conteúdo (${DIDATICA_CAP_CONTEUDO}) — dê aulas pra continuar subindo.`;
+  const msg = (viral
+    ? `🔥 Viralizou! Seu conteúdo foi compartilhado massivamente. +${baseRep} Rep, +${basePop} popularidade.`
+    : `Conteúdo publicado. +${baseRep} Rep, +${basePop} popularidade. Oral Advocacy: ${novaOral}/50.`) + ` ${msgDidatica}`;
+
+  logger.info(`[CONTEUDO EDUCATIVO] ${uid} — ${viral ? 'viral' : 'normal'}, area=${areaBruta}`);
+  return { ok: true, viral, rep: baseRep, popularidade: basePop, oral_advocacy: novaOral, didatica: novaDidatica, didatica_cap_atingido: !abaixoDoCap, msg };
 });
 
 // ════════════════════════════════════════════════════════

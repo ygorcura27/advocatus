@@ -1742,44 +1742,59 @@ window._focoSelecionar = async function(key) {
 // ════════════════════════════════════════════════════════
 // Seguidores por plataforma: NÃO é um contador armazenado (evita virar um
 // segundo "sistema de seguidores" fake e desalinhado) — é derivado ao vivo
-// dos 2 campos reais que já governam autoridade de mídia (skills_jur.
-// comunicacao_midiatica e podcast_views_acumul), com split fixo por
-// plataforma. Determinístico: dois jogadores com os mesmos 2 campos reais
-// sempre veem o mesmo número, nada sorteado.
+// de 4 campos reais que já existem: Comunicação Midiática (skills_jur),
+// views acumuladas de mídia, Popularidade Pessoal (fama acumulada por
+// aparições/conteúdo) e Oral Advocacy (carisma de fala) — com split fixo
+// por plataforma. Determinístico: dois jogadores com os mesmos 4 campos
+// reais sempre veem o mesmo número, nada sorteado.
 const _REDES_PLATAFORMAS = [
   { k:'instagram', l:'Instagram', icone:'📸', peso:0.35 },
   { k:'youtube',   l:'YouTube',   icone:'▶️', peso:0.30 },
   { k:'linkedin',  l:'LinkedIn',  icone:'💼', peso:0.20 },
   { k:'x',         l:'X',         icone:'✖️', peso:0.15 },
 ];
-function _redesSeguidoresTotal(com, viewsAcumul) {
-  return Math.round(viewsAcumul / 8) + com * 15;
+function _redesSeguidoresTotal(com, viewsAcumul, popularidade, oralAdvocacy) {
+  return Math.round(viewsAcumul / 8) + com * 15 + Math.round((popularidade || 0) * 3) + Math.round((oralAdvocacy || 0) * 5);
 }
+
+const DIDATICA_CAP_CONTEUDO = 20;
 
 function renderRedes(j, el) {
   const com = (j.skills_jur || {}).comunicacao_midiatica || 0;
   const viewsMes = j.podcast_views_mes || 0;
   const viewsAcumul = j.podcast_views_acumul || 0;
   const autoridade = Math.min(100, Math.round(com * 2));
-  const seguidoresTotal = _redesSeguidoresTotal(com, viewsAcumul);
+  const seguidoresTotal = _redesSeguidoresTotal(com, viewsAcumul, j.popularidade_pessoal, j.oral_advocacy);
 
-  // Podcast/Talk Show — movido de Sistemas Sociais pra cá (mesma ação real,
-  // window._ssPodcast em js/sistemas_sociais_ui.js, chamada de fora do
-  // arquivo onde foi definida — window.* é global entre módulos). Faz mais
-  // sentido junto do resto da marca pessoal do que solto em Sistemas Sociais.
+  // Conteúdo Educativo (ex-Podcast/Talk Show) — movido de Sistemas Sociais
+  // pra cá (mesma ação real, window._ssConteudoEducativo em
+  // js/sistemas_sociais_ui.js, chamada de fora do arquivo onde foi definida
+  // — window.* é global entre módulos). Faz mais sentido junto do resto da
+  // marca pessoal do que solto em Sistemas Sociais. Didática Acadêmica só
+  // sobe por aqui até DIDATICA_CAP_CONTEUDO — depois, só dar aula
+  // (posgraduacao.js::darAula) continua rendendo.
   const mesGlobalPodcast = j.mes_global_pessoal || 0;
   const jaGravouMes = j.podcast_ultimo_mes === mesGlobalPodcast;
+  const didaticaAtual = j.didatica_academica || 0;
+  const didaticaNoCap = didaticaAtual >= DIDATICA_CAP_CONTEUDO;
   const podcastHtml = `<div class="card" style="margin-bottom:1rem">
-    <div style="font-weight:700;font-size:.82rem;color:var(--txt)">🎙️ Podcast / Talk Show</div>
-    <div style="font-size:.68rem;color:var(--txt3);margin:.3rem 0">Chance de viralizar cresce com Oral Advocacy (atual: ${j.oral_advocacy||0}/50). Cada episódio dá +1 Didática Acadêmica. Total gravado: ${j.podcast_total||0}.</div>
-    <button class="btn btn-prim btn-block" ${jaGravouMes?'disabled':''} onclick="window._ssPodcast && window._ssPodcast()">${jaGravouMes ? '✅ Já gravou este mês' : '🎙️ Gravar Episódio (6⚡)'}</button>
+    <div style="font-weight:700;font-size:.82rem;color:var(--txt)">🎓 Gravar Conteúdo Educativo</div>
+    <div style="font-size:.68rem;color:var(--txt3);margin:.3rem 0">Chance de viralizar cresce com Oral Advocacy (atual: ${j.oral_advocacy||0}/50). ${didaticaNoCap
+      ? `Didática Acadêmica já no limite de conteúdo (${DIDATICA_CAP_CONTEUDO}/50) — dê aulas pra continuar subindo.`
+      : `Cada episódio dá +1 Didática Acadêmica (até ${DIDATICA_CAP_CONTEUDO}/50, atual: ${didaticaAtual}).`} Total gravado: ${j.podcast_total||0}.</div>
+    <label style="font-size:.62rem;color:var(--txt4);display:block;margin:.5rem 0 .2rem">Área do conteúdo</label>
+    <select id="conteudo-edu-area" ${jaGravouMes?'disabled':''} style="width:100%;background:var(--bg2);border:var(--borda);border-radius:var(--r);color:var(--txt);padding:.4rem;font-size:.78rem;margin-bottom:.5rem">
+      ${_TODAS_AREAS_KEYS.map(k => `<option value="${k}">${_espLabel2(k)}</option>`).join('')}
+    </select>
+    <button class="btn btn-prim btn-block" ${jaGravouMes?'disabled':''} onclick="window._ssConteudoEducativo && window._ssConteudoEducativo()">${jaGravouMes ? '✅ Já gravou este mês' : '🎓 Gravar Conteúdo (6⚡)'}</button>
   </div>`;
 
   el.innerHTML = `
     ${_capaHeader(`MARCA PESSOAL · ${(j.nome_personagem||'—').toUpperCase()}`, '📱 Redes Sociais', '')}
     <div class="card" style="font-size:.72rem;color:var(--txt3);margin-bottom:1rem;line-height:1.6">
-      Seguidores por plataforma são derivados ao vivo de Comunicação Midiática + views acumulados (não é um contador
-      fake separado). DMs usam a Caixa de Entrada real do jogo. O feed abaixo é real e persistido (Firestore).
+      Seguidores por plataforma são derivados ao vivo de Comunicação Midiática + views acumulados + Popularidade Pessoal
+      + Oral Advocacy (não é um contador fake separado). DMs usam a Caixa de Entrada real do jogo. O feed abaixo é real
+      e persistido (Firestore).
     </div>
     <div class="card" style="display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap;text-align:center;justify-content:center">
       <div>

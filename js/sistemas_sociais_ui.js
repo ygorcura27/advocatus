@@ -188,11 +188,12 @@ window._ssIntercambio = async function(destino) {
   } catch (e) { window.toast(e.message || 'Erro.', 'ko'); }
 };
 
-window._ssPodcast = async function() {
+window._ssConteudoEducativo = async function() {
   try {
-    const fn = httpsCallable(window.FB_FUNCTIONS, 'gravarPodcast');
-    const r = await fn({});
-    window.toast(r.data.viral ? '🔥 Viralizou!' : 'Episódio publicado.', 'ok', 3000);
+    const area = document.getElementById('conteudo-edu-area')?.value || 'civil';
+    const fn = httpsCallable(window.FB_FUNCTIONS, 'gravarConteudoEducativo');
+    const r = await fn({ area });
+    window.toast(r.data.msg || (r.data.viral ? '🔥 Viralizou!' : 'Conteúdo publicado.'), 'ok', 3800);
     setTimeout(() => window.navTo?.('redes', null), 500);
   } catch (e) { window.toast(e.message || 'Erro.', 'ko'); }
 };
