@@ -2317,6 +2317,23 @@ async function _processarServicosMensalCF(db, uid, j) {
 
   await _processarAutogestaoOportunidadesCF(db, escRef, esc);
 
+  // Geração automática de processos novos, todo mês, sem precisar clicar em
+  // nada — mesmo cap por tier + chance por cliente que "Reunião com
+  // Clientes" (o botão manual, functions/avancar_mes.js:_gerarProcessosMensalAutomaticoCF
+  // espelha js/processos_escritorio.js:gerarProcessosMensais). O botão manual
+  // só preenche a diferença até o cap (já era assim, não muda nada nele).
+  try {
+    const gerados = await _gerarProcessosMensalAutomaticoCF(db, escRef, tier);
+    if (gerados > 0) {
+      await db.collection('jogadores').doc(uid).collection('inbox').add({
+        de: 'sistema',
+        assunto: '🤝 Novos Clientes',
+        corpo: `${gerados} novo(s) processo(s) chegaram ao pool do escritório este mês.`,
+        tipo: 'sistema', lida: false, criado_em: new Date().toISOString(),
+      });
+    }
+  } catch (e) { logger.warn('Geração automática de processos:', e.message); }
+
   if ((esc.gestor_escopo === 'departamento' && esc.gestores_departamento) ||
       (esc.gestor_id && (esc.gestor_delega_processos !== false))) {
     await _autoAtribuirProcessosMensalCF(db, escRef, esc);
@@ -2494,6 +2511,84 @@ const DEPTO_SKILL_AREA = {
   empresarial:'area_corporate', criminal:'area_criminal',
 };
 const DEPTO_AREA_FRACA_LIMIAR = 25;
+
+// ── Geração automática mensal de processos — espelha js/processos_
+// escritorio.js:gerarProcessosMensais (mesmas constantes/regras: cap por
+// tier do escritório, chance por cliente conforme o tier DELE). Roda sozinha
+// todo mês agora (chamada em _processarServicosMensalCF, antes de
+// _autoAtribuirProcessosMensalCF pra já entrar na distribuição do gestor no
+// mesmo tick); o botão manual "Reunião com Clientes" continua existindo,
+// só preenche a diferença que falta pro cap (nunca gera em dobro).
+const TIER_CHANCE_PROC  = { S:.10, A:.15, B:.25, C:.35, D:.50 };
+const TIER_CAP_ESC_PROC = { 1:4, 2:8, 3:12, 4:18, 5:24 };
+const AREA_DEFAULT_PROC = ['civil','trabalhista','tributario','contencioso','consumidor'];
+const PROC_TITULOS_PROC = {
+  civil:          ['Ação de Cobrança','Ação de Reparação de Danos','Ação Declaratória de Nulidade','Ação de Obrigação de Fazer'],
+  trabalhista:    ['Reclamação Trabalhista','Ação de Reconhecimento de Vínculo Empregatício','Ação de Horas Extras','Ação de Dano Moral'],
+  tributario:     ['Mandado de Segurança Tributário','Embargos à Execução Fiscal','Ação de Restituição de Tributos','Ação Declaratória de Inexigibilidade'],
+  contencioso:    ['Ação de Indenização','Ação Revisional de Contratos','Ação de Rescisão Contratual','Ação Monitória'],
+  criminal:       ['Defesa em Ação Penal','Habeas Corpus','Ação de Liberdade Provisória','Revisão Criminal'],
+  societario:     ['Dissolução Parcial de Sociedade','Ação de Prestação de Contas','Ação de Exclusão de Sócio','Apuração de Haveres'],
+  consumidor:     ['Ação de Restituição por Vício','Ação de Reparação ao Consumidor','Ação de Revisão de Contrato'],
+  administrativo: ['Mandado de Segurança','Ação Anulatória de Ato Administrativo','Ação Popular'],
+  familia:        ['Ação de Alimentos','Divórcio Litigioso','Ação de Guarda','Ação de Inventário'],
+  imobiliario:    ['Ação de Despejo','Ação de Usucapião','Ação de Manutenção de Posse'],
+  empresarial:    ['Dissolução de Empresa','Ação de Responsabilidade de Administradores','Recuperação Extrajudicial'],
+};
+
+function _clienteTierProc(valorMensal) {
+  if (valorMensal >= 50000) return 'S';
+  if (valorMensal >= 20000) return 'A';
+  if (valorMensal >= 8000)  return 'B';
+  if (valorMensal >= 3000)  return 'C';
+  return 'D';
+}
+function _tierHonorariosProc(tier) {
+  const ranges = { D:[1500,4500], C:[5000,14000], B:[15000,38000], A:[40000,95000], S:[100000,240000] };
+  const [min, max] = ranges[tier] || ranges.D;
+  return Math.round((min + Math.random() * (max - min)) / 500) * 500;
+}
+function _randTituloProc(area) {
+  const lista = PROC_TITULOS_PROC[area] || PROC_TITULOS_PROC.civil;
+  return lista[Math.floor(Math.random() * lista.length)];
+}
+
+async function _gerarProcessosMensalAutomaticoCF(db, escRef, tier) {
+  const clSnap = await escRef.collection('clientes').get();
+  const clientes = clSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  if (clientes.length === 0) return 0;
+
+  const existSnap = await escRef.collection('processos_pool')
+    .where('status', 'in', ['disponivel', 'em_andamento', 'aguardando_sentenca']).get();
+  const ativosAtuais = existSnap.size;
+  const cap = TIER_CAP_ESC_PROC[tier] || 4;
+  if (ativosAtuais >= cap) return 0;
+
+  const vagasRestantes = cap - ativosAtuais;
+  let gerados = 0;
+  const promessas = [];
+  for (const cl of clientes) {
+    if (gerados >= vagasRestantes) break;
+    const clTier = _clienteTierProc(cl.valor_mensal || 0);
+    const chance = TIER_CHANCE_PROC[clTier] || .10;
+    if (Math.random() > chance) continue;
+
+    const area       = cl.area || cl.especialidade || AREA_DEFAULT_PROC[Math.floor(Math.random() * AREA_DEFAULT_PROC.length)];
+    const honorarios = _tierHonorariosProc(clTier);
+    const titulo     = _randTituloProc(area);
+
+    promessas.push(escRef.collection('processos_pool').add({
+      titulo, cliente_id: cl.id, cliente_nome: cl.nome || 'Cliente',
+      area, tier: clTier, honorarios, icone: '⚖️',
+      status: 'disponivel', progresso: 0,
+      func_id: null, func_nome: null, func_cargo: null, resultado: null,
+      criado_em: new Date().toISOString(),
+    }));
+    gerados++;
+  }
+  if (promessas.length) await Promise.all(promessas);
+  return gerados;
+}
 
 async function _autoAtribuirProcessosMensalCF(db, escRef, esc) {
   const poolSnap = await escRef.collection('processos_pool')

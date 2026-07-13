@@ -291,7 +291,7 @@ window.renderProcessosPool = async function(j, escId, el) {
           <div style="display:flex;gap:.3rem;flex-shrink:0">
             <button class="btn btn-sm btn-ghost" style="font-size:.62rem;padding:.18rem .5rem"
               onclick="window.gerarProcessosMensais('${escId}',${tierEsc})">
-              🔄 Gerar do mês
+              🤝 Reunião com Clientes
             </button>
           </div>
         </div>
@@ -440,7 +440,7 @@ function _renderColPool(disponiveis, emAndamento, aguardSent, j, escId, investig
 
   if (!disponiveis.length && !emAndamento.length && !aguardSent.length) {
     return `<div style="font-size:.75rem;color:var(--txt3);padding:.5rem 0;text-align:center">
-      Nenhum processo no pool. Use "Gerar do mês" acima.
+      Nenhum processo no pool ainda. Novos chegam sozinhos todo mês, ou use "Reunião com Clientes" acima.
     </div>`;
   }
 
@@ -664,7 +664,7 @@ window._abrirDesignarParaFunc = async function(escId, funcId, cargoId, container
   picker.style.cssText = 'margin-top:.5rem;padding:.6rem .7rem;background:var(--bg2);border-radius:var(--r);border:1px solid var(--bg3);grid-column:1/-1';
 
   if (!processos.length) {
-    picker.innerHTML = `<div style="font-size:.75rem;color:var(--txt3)">Nenhum processo disponível. Use "Gerar do mês".</div>`;
+    picker.innerHTML = `<div style="font-size:.75rem;color:var(--txt3)">Nenhum processo disponível. Use "Reunião com Clientes".</div>`;
   } else {
     const npcEnergiaUsada = func?.energia_npc_usada_mes || 0;
     const npcEnergiaDisp  = NPC_ENERGIA_MES - npcEnergiaUsada;
@@ -1099,8 +1099,12 @@ window._poolModalRecorrerContrario = async function() {
   }
 };
 
-// ─── Geração mensal de processos ──────────────────────────────────────────────
-
+// ─── Reunião com Clientes (geração manual de processos) ───────────────────────
+// Desde que a geração automática entrou no tick mensal (functions/avancar_mes.js:
+// _gerarProcessosMensalAutomaticoCF, mesmas regras espelhadas aqui embaixo),
+// esta função virou o complemento manual: só preenche a DIFERENÇA que falta
+// até o cap do tier (a checagem de ativosAtuais>=cap já fazia isso, não
+// precisou mudar nada na lógica — só o nome/botão, que era "Gerar do mês").
 window.gerarProcessosMensais = async function(escId, tierEscritorio) {
   // Tier real: ler do Firestore para evitar valor desatualizado em j.escritorio_tier
   let tierReal = tierEscritorio || 1;
