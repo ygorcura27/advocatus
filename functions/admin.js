@@ -449,29 +449,44 @@ exports.adminAction = onCall({ region: 'southamerica-east1' }, async (request) =
     }
 
     case 'processos_resetar_jogador': {
-      // Apaga todos os processos "em_andamento" assumidos por este uid no pool
-      // do escritório (mesmo conjunto que a tela de Gestão de Processos conta
-      // em "⚙️ Seus casos em andamento") — client não tem permissão de deletar
-      // processos direto (regra de segurança), por isso precisa passar por aqui.
+      // BUG CORRIGIDO: versão anterior só apagava processos_pool navegando a
+      // PARTIR do doc em `processos` (via pool_proc_esc_id/pool_proc_subcol_id).
+      // Se o doc em `processos` já tinha sido apagado manualmente no console
+      // (como o usuário relatou), essa query voltava vazia e a entrada em
+      // processos_pool — que é uma SUBCOLEÇÃO independente por escritório e a
+      // fonte real do contador "⚙️ Seus casos em andamento" — nunca era
+      // tocada, ficando presa em status 'em_andamento' pra sempre (órfã).
+      // Agora limpa as duas fontes de forma independente e idempotente.
       const { uid } = payload;
       if (!uid) throw new HttpsError('invalid-argument', 'uid obrigatório.');
-      const snap = await db.collection('processos')
+
+      let apagados = 0;
+
+      const snapProc = await db.collection('processos')
         .where('assumido_uid', '==', uid)
         .where('status', '==', 'em_andamento')
         .get();
-      let apagados = 0;
-      for (const d of snap.docs) {
-        const p = d.data();
-        if (p.pool_proc_esc_id && p.pool_proc_subcol_id) {
-          try {
-            await db.collection('escritorios').doc(p.pool_proc_esc_id)
-              .collection('processos_pool').doc(p.pool_proc_subcol_id).delete();
-          } catch (e) { /* silencioso */ }
-        }
+      for (const d of snapProc.docs) {
         await d.ref.delete();
         apagados++;
       }
-      return { ok: true, msg: `${apagados} processo(s) em andamento apagado(s) para ${uid}.` };
+
+      const jogSnap = await db.collection('jogadores').doc(uid).get();
+      const jog = jogSnap.exists ? jogSnap.data() : {};
+      const escIds = [...new Set([jog.escritorio_proprio_id, jog.escritorio_empregado_id].filter(Boolean))];
+      for (const escId of escIds) {
+        const snapPool = await db.collection('escritorios').doc(escId)
+          .collection('processos_pool')
+          .where('assumido_uid', '==', uid)
+          .where('status', '==', 'em_andamento')
+          .get();
+        for (const d of snapPool.docs) {
+          await d.ref.delete();
+          apagados++;
+        }
+      }
+
+      return { ok: true, msg: `${apagados} processo(s)/entrada(s) de pool apagado(s) para ${uid}.` };
     }
 
     // ════════════════════════════════════════════════════

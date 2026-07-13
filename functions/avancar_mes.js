@@ -1103,7 +1103,7 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
       const escRefProprio = db.collection('escritorios').doc(j.escritorio_proprio_id);
       // Lê escritório antes do reset para processar sócio investidor (GDD §33)
       const escSnapPre  = await escRefProprio.get();
-      const escUpdReset = { faturamento_mes_atual: 0, faturamento_recorrente_mes: 0, faturamento_honorarios_mes: 0 };
+      const escUpdReset = { faturamento_mes_atual: 0, faturamento_recorrente_mes: 0, faturamento_honorarios_mes: 0, despesa_marketing_mes_atual: 0 };
       if (escSnapPre.exists) {
         const escPre = escSnapPre.data();
         const inv    = escPre.investidor;

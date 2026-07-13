@@ -929,6 +929,8 @@ window._beneficiosCatalogoResumo = function(esc, nFuncs) {
   const custoMensal = ativosIds.reduce((s, bid) => s + ((BENEFICIOS_CATALOGO[bid]||{}).custo_por_func||0), 0) * nFuncs;
   return { custoMensal, ativos: ativosIds };
 };
+// Exposto pra Balancete (js/ui-main.js:_escKpis) itemizar cada benefício ativo.
+window._BENEFICIOS_CATALOGO = BENEFICIOS_CATALOGO;
 
 window.renderBeneficios = async function(j, el) {
   const escId = j.escritorio_proprio_id;

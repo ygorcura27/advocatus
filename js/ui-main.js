@@ -553,15 +553,15 @@ function renderEscritorio(j, el) {
       ${_escKpisPlaceholder()}
       ${_escStatRow(null, j)}
       ${_escMarketingPreviewCard(j.escritorio_proprio_id)}
-      <div id="esc-workspace-bloco"></div>
       ${_escProcessosPreviewCard(j.escritorio_proprio_id)}
       ${_escEquipeCard(j.escritorio_proprio_id)}
       ${_escBeneficiosPreviewCard(j.escritorio_proprio_id)}
       ${_escClientesCard()}
       <div id="esc-oportunidades-bloco"></div>
       ${_escSocietarioCard(null, j)}
-      ${_escAtividadeCard()}
       <div id="esc-financas-upgrade"></div>
+      <div id="esc-workspace-bloco"></div>
+      ${_escAtividadeCard()}
       ${_escAcoesRapidas(j, null)}
     `;
     _carregarEscritorioProprio(j.escritorio_proprio_id, j);
@@ -696,17 +696,17 @@ async function _carregarEscritorioProprio(escId, j) {
         <div id="esc-kpis-placeholder">${_escKpisPlaceholder()}</div>
         ${_escStatRow(esc, j)}
         ${_escMarketingPreviewCard(esc.id)}
-        <div id="esc-workspace-bloco"></div>
         ${_escProcessosPreviewCard(esc.id)}
         ${_escEquipeCard(esc.id)}
         ${_escBeneficiosPreviewCard(esc.id)}
         ${_escClientesCard()}
         <div id="esc-oportunidades-bloco"></div>
         ${_escSocietarioCard(esc, j)}
-        ${_escAtividadeCard()}
         <div id="esc-financas-upgrade">
           ${window.renderBlocoFinancas ? window.renderBlocoFinancas(esc, j) : ''}
         </div>
+        <div id="esc-workspace-bloco"></div>
+        ${_escAtividadeCard()}
         ${_escAcoesRapidas(j, esc)}
       `;
 
@@ -820,6 +820,25 @@ async function renderBalancete(j, el) {
             <span>${data.workspaceLabel} <span style="color:var(--txt4);font-size:.85em">(gratuito)</span></span>
             <span style="color:var(--txt4)">—</span>
            </div>`}
+
+      ${data.beneficiosDetalhe && data.beneficiosDetalhe.length > 0 ? `
+      <div class="blcte-grupo">Benefícios</div>
+      ${data.beneficiosDetalhe.map(b => `
+        <div class="blcte-linha sub">
+          <span>${b.icone} ${b.label}</span>
+          <span class="blcte-val despesa">−${fmt(b.custo)}</span>
+        </div>`).join('')}
+      <div class="blcte-linha blcte-subtotal">
+        <span>Subtotal Benefícios</span>
+        <span class="blcte-val despesa">−${fmt(data.beneficiosCustoTotal)}</span>
+      </div>` : ''}
+
+      ${data.despesaMarketing > 0 ? `
+      <div class="blcte-grupo">Marketing</div>
+      <div class="blcte-linha sub">
+        <span>Campanhas lançadas este mês</span>
+        <span class="blcte-val despesa">−${fmt(data.despesaMarketing)}</span>
+      </div>` : ''}
 
       <div class="blcte-linha blcte-total">
         <span>TOTAL DESPESAS</span>
@@ -1071,8 +1090,8 @@ function _espLabel2(esp) {
 
 // Prévia de Marketing no dashboard — igual mockup, mas com dados reais
 // (reputação/prestígio do escritório, convites de mídia pendentes).
-// "Investido no mês" não existe como campo real (sem campanha paga
-// rastreada) — mostrado como "—" em vez de inventar um número.
+// "Investido no mês" = esc.despesa_marketing_mes_atual, incrementado real
+// por functions/financeiro.js:lancarCampanha, resetado a cada tick mensal.
 function _escMarketingPreviewCard(escId) {
   return `
   <div class="esc-card-bloco" style="margin-bottom:1.1rem">
@@ -1100,7 +1119,7 @@ async function _carregarMarketingPreview(escId) {
       where('status', '==', 'pendente')
     ));
     el.innerHTML = `
-      <div class="stat"><div class="stat-label">Investido no mês</div><div class="stat-value" style="font-size:1.1rem">—</div></div>
+      <div class="stat"><div class="stat-label">Investido no mês</div><div class="stat-value" style="font-size:1.1rem">${_fmtExt(esc.despesa_marketing_mes_atual||0)}</div></div>
       <div class="stat"><div class="stat-label">Reputação</div><div class="stat-value up" style="font-size:1.1rem">${esc.reputacao||0}</div></div>
       <div class="stat"><div class="stat-label">Prestígio</div><div class="stat-value" style="font-size:1.1rem">${esc.prestigio||0}</div></div>
       <div class="stat"><div class="stat-label">Convites pendentes</div><div class="stat-value" style="font-size:1.1rem;color:${conviteSnap.size?'var(--amber)':'var(--txt)'}">${conviteSnap.size}</div></div>`;
@@ -1359,7 +1378,22 @@ async function _escKpis(esc, j) {
     }
   }
 
-  const despMes   = custoFixo + salariosTotais + workspaceCm;
+  // Benefícios ativos, itemizados (js/equipe.js:BENEFICIOS_CATALOGO, exposto
+  // como window._BENEFICIOS_CATALOGO) — cada um custa por funcionário ativo/mês.
+  const catalogoBenef = window._BENEFICIOS_CATALOGO || {};
+  const beneficiosIds = (esc && esc.beneficios_ativos) || [];
+  const beneficiosDetalhe = beneficiosIds.map(bid => {
+    const cfg = catalogoBenef[bid] || {};
+    return { id: bid, label: cfg.label || bid, icone: cfg.icone || '💙', custo: (cfg.custo_por_func || 0) * listaFuncionarios.length };
+  });
+  const beneficiosCustoTotal = beneficiosDetalhe.reduce((s, b) => s + b.custo, 0);
+
+  // Despesa de marketing do mês — campanhas lançadas (functions/financeiro.js:
+  // lancarCampanha incrementa esc.despesa_marketing_mes_atual, resetado a
+  // cada tick igual faturamento_mes_atual).
+  const despesaMarketing = (esc && esc.despesa_marketing_mes_atual) || 0;
+
+  const despMes   = custoFixo + salariosTotais + workspaceCm + beneficiosCustoTotal + despesaMarketing;
   const lucroMes  = rendaMes - despMes;
   const socios    = esc ? _normalizarSociosUI(esc) : [{ participacao_pct: 100 }];
   const minhaUid  = j.uid || window.JOGADOR_UID;
@@ -1369,6 +1403,7 @@ async function _escKpis(esc, j) {
     escNome: (esc && esc.nome) || j.escritorio_nome || 'Escritório',
     rendaMes, honorariosMes, receitaRecorrente, custoFixo, salariosTotais, workspaceCm,
     workspaceLabel: wLabel, despMes, lucroMes, minhaCota,
+    beneficiosDetalhe, beneficiosCustoTotal, despesaMarketing,
     tier, funcionarios: listaFuncionarios, escId: esc?.id, caixa,
   };
 
@@ -1821,7 +1856,7 @@ async function renderMarketing(j, el) {
   el.innerHTML = `
     ${_capaHeader(`GESTÃO DE MARKETING · ${(esc.nome||'—').toUpperCase()}`, '📣 Marketing & Reputação', '')}
     <div class="stat-row stat-row-4">
-      <div class="stat"><div class="stat-label">Investido no mês</div><div class="stat-value">—</div></div>
+      <div class="stat"><div class="stat-label">Investido no mês</div><div class="stat-value">${_fmtExt(esc.despesa_marketing_mes_atual||0)}</div></div>
       <div class="stat"><div class="stat-label">Reputação</div><div class="stat-value up">${rep}<small>/${repCap}</small></div></div>
       <div class="stat"><div class="stat-label">Prestígio</div><div class="stat-value">${prestigio}<small>/100</small></div></div>
       <div class="stat"><div class="stat-label">Convites pendentes</div><div class="stat-value" style="color:${convitesPendentes?'var(--amber)':'var(--txt)'}">${convitesPendentes}</div></div>

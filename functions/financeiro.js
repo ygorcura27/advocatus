@@ -304,6 +304,10 @@ exports.lancarCampanha = onCall({ region: 'southamerica-east1' }, async (request
   await escRef.update({
     caixa: (esc.caixa || 0) - cfg.custo,
     campanhas_ativas: campanhas,
+    // Despesa de marketing do mês — mostrada no Balancete e no stat
+    // "Investido no mês" da tela Marketing (js/ui-main.js). Resetada a
+    // cada tick mensal junto com faturamento_mes_atual (avancar_mes.js).
+    despesa_marketing_mes_atual: (esc.despesa_marketing_mes_atual || 0) + cfg.custo,
   });
 
   return {
