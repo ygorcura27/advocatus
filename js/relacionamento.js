@@ -319,7 +319,7 @@ function _cardFilho(f) {
         </div>
         <div style="text-align:right">
           <div style="font-size:.7rem;color:var(--verm2)">-R$ ${custo}/mês</div>
-          ${f.jogavel ? `<button class="btn btn-sm btn-prim" style="margin-top:.3rem" onclick="window.assumirHerdeiro('${f.id}')">Assumir controle</button>` : ''}
+          ${f.jogavel ? `<button class="btn btn-sm btn-prim" style="margin-top:.3rem" onclick="window._abrirModalConcederHeranca('${f.id}','${(f.nome||'').replace(/'/g,"\\'")}')">Assumir controle</button>` : ''}
         </div>
       </div>
     </div>`;
