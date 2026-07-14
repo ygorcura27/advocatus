@@ -1057,6 +1057,12 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
 
   if (updates.idade >= 75 && !j.aposentado) {
     updates.aposentado = true;
+    // Não força a troca de personagem sozinho — só marca o pendente, que
+    // js/carreira.js:_renderAposentadoriaBloco mostra como um banner de
+    // aviso na tela de Progressão. Escolher o herdeiro continua sendo uma
+    // ação do jogador (window.assumirHerdeiro em js/relacionamento.js),
+    // pra não travar quem ainda não tem nenhum filho jogável nessa idade.
+    updates.aposentado_forcado_pendente = true;
     mensagens.push({ assunto:'🎓 Aposentadoria', corpo:'Você atingiu 75 anos. Escolha um herdeiro para continuar sua dinastia.', tipo:'sistema' });
     await _commit(db, uid, updates, mensagens, novoMes, novoAno);
     return { ok:true, mes:`${MESES[novoMes]}, Ano ${novoAno}`, aposentado:true };
@@ -3307,6 +3313,25 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
     await db.collection('jogadores').doc(uid).collection('filhos').doc(fDoc.id).update(upd);
   }
   updatesJogador.custo_filhos_mes = custoFilhos;
+
+  // ── Envelhecimento do personagem arquivado (jogadores/{uid}/meta/
+  // personagem_anterior) — é isso que faz a janela de "Voltar da
+  // Aposentadoria" (só permitida com idade < 70, ver js/relacionamento.js:
+  // window.voltarDaAposentadoria) ser um relógio de verdade correndo
+  // enquanto o jogador segue como herdeiro, e não uma checagem estática do
+  // dia da troca. Mesmo padrão de incremento mensal usado pra filhos acima.
+  try {
+    const anteriorRef  = db.collection('jogadores').doc(uid).collection('meta').doc('personagem_anterior');
+    const anteriorSnap = await anteriorRef.get();
+    if (anteriorSnap.exists) {
+      const ant = anteriorSnap.data();
+      const novaIdadeMesesAnt = (ant.idade_meses || (ant.idade||0)*12) + 1;
+      await anteriorRef.update({
+        idade_meses: novaIdadeMesesAnt,
+        idade: Math.floor(novaIdadeMesesAnt / 12),
+      });
+    }
+  } catch (e) { logger.warn('Erro ao envelhecer personagem_anterior:', e.message); }
 
   if (Object.keys(updatesJogador).length > 0) {
     await db.collection('jogadores').doc(uid).update(updatesJogador);

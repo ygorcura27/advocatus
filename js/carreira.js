@@ -3,7 +3,7 @@
  * Progressão, OAB, concurso público, cursos, contratação de equipe.
  */
 
-import { doc, updateDoc, collection, addDoc, getDocs, query, where }
+import { doc, getDoc, updateDoc, collection, addDoc, getDocs, query, where }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { httpsCallable }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
@@ -189,8 +189,81 @@ window.renderCarreiraProgressao = function(j, el) {
     <div class="card">
       <div class="card-sub" style="margin-bottom:.7rem">Você tem OAB e 3+ anos de carreira. Pode prestar concurso público.</div>
       <button class="btn btn-sec" onclick="navTo('concurso',null)">Ver concursos disponíveis →</button>
-    </div>` : ''}`;
+    </div>` : ''}
+
+    <div class="secao-header" style="margin-top:.5rem"><div class="secao-titulo">🎓 Aposentadoria</div></div>
+    <div id="aposentadoria-bloco"><div class="card" style="color:var(--ardosia)">Carregando...</div></div>`;
+
+  const elApos = el.querySelector('#aposentadoria-bloco');
+  if (elApos) _renderAposentadoriaBloco(j, elApos);
 };
+
+// ════════════════════════════════════════════════════════
+// APOSENTADORIA / ASSUMIR HERDEIRO
+// Ver js/relacionamento.js:window.assumirHerdeiro/voltarDaAposentadoria
+// para a lógica real de troca de personagem — aqui só monta a UI.
+// ════════════════════════════════════════════════════════
+async function _renderAposentadoriaBloco(j, el) {
+  const uid = j.uid || window.JOGADOR_UID;
+  try {
+    const [filhosSnap, anteriorSnap] = await Promise.all([
+      getDocs(query(collection(db,'jogadores',uid,'filhos'), where('jogavel','==',true))),
+      getDoc(doc(db,'jogadores',uid,'meta','personagem_anterior')),
+    ]);
+    const herdeiros = filhosSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+
+    let htmlVoltar = '';
+    if (anteriorSnap.exists()) {
+      const a = anteriorSnap.data();
+      if ((a.idade||0) < 70) {
+        htmlVoltar = `
+        <div class="card" style="margin-bottom:.7rem;border-color:var(--ouro2)">
+          <div class="card-sub" style="margin-bottom:.6rem">
+            Personagem anterior: <b>${a.nome_personagem}</b> (${a.idade} anos) — ainda dá pra voltar (antes dos 70).
+          </div>
+          <button class="btn btn-sec btn-block" onclick="window.voltarDaAposentadoria&&window.voltarDaAposentadoria()">
+            🔙 Voltar da Aposentadoria
+          </button>
+        </div>`;
+      } else {
+        htmlVoltar = `
+        <div class="card" style="margin-bottom:.7rem;color:var(--ardosia2)">
+          Sucessão definitiva — ${a.nome_personagem} já passou dos 70 anos, não é mais possível voltar.
+        </div>`;
+      }
+    }
+
+    let htmlAssumir;
+    if (herdeiros.length === 0) {
+      htmlAssumir = `<div class="card" style="color:var(--ardosia2)">
+        Nenhum herdeiro pronto ainda — precisa de um filho com 22+ anos formado em Direito.
+      </div>`;
+    } else {
+      htmlAssumir = herdeiros.map(h => `
+        <div class="card" style="margin-bottom:.5rem;display:flex;justify-content:space-between;align-items:center;gap:.6rem">
+          <div>
+            <div style="font-weight:700;color:var(--txt)">${h.nome}</div>
+            <div style="font-size:.7rem;color:var(--ardosia2)">${h.idade} anos · pronto para assumir</div>
+          </div>
+          <button class="btn btn-prim btn-sm" onclick="window.assumirHerdeiro&&window.assumirHerdeiro('${h.id}')">
+            🎓 Aposentar-se e Assumir
+          </button>
+        </div>`).join('');
+    }
+
+    el.innerHTML = `
+      ${j.aposentado_forcado_pendente ? `
+      <div class="card" style="margin-bottom:.7rem;border-color:var(--verm2);background:var(--verm-bg,transparent)">
+        <div style="font-weight:700;color:var(--verm2)">⚠️ Você completou 75 anos — hora de passar a banca adiante.</div>
+        <div style="font-size:.72rem;color:var(--ardosia2);margin-top:.2rem">Escolha um herdeiro abaixo quando estiver pronto.</div>
+      </div>` : ''}
+      ${htmlVoltar}
+      ${htmlAssumir}`;
+  } catch (e) {
+    console.error('[APOSENTADORIA]', e);
+    el.innerHTML = `<div class="card" style="color:var(--verm2)">Erro ao carregar aposentadoria.</div>`;
+  }
+}
 
 function _podePromover(j, prox) {
   if (!prox) return false;

@@ -247,6 +247,10 @@ async function processarJogador(j, mesAtual, anoAtual, mesGlobal, isJaneiro, db)
   // ── Aposentadoria obrigatória aos 75 ──
   if (updates.idade >= 75 && !j.aposentado) {
     updates.aposentado = true;
+    // Ver mesmo comentário em functions/avancar_mes.js: só marca o
+    // pendente, a troca de personagem é ação do jogador
+    // (window.assumirHerdeiro em js/relacionamento.js).
+    updates.aposentado_forcado_pendente = true;
     await enviarMensagem(db, j.uid, 'sistema', {
       assunto: '🎓 Aposentadoria — 75 anos',
       corpo: `Parabéns por uma carreira extraordinária, ${j.nome_personagem}! Você atingiu 75 anos e deve escolher um herdeiro para dar continuidade à sua dinastia jurídica.`,
