@@ -106,8 +106,14 @@ window.trocarPersonagem = async function(targetId) {
 
     // 1. Guarda o personagem que está saindo — cria jogadores/{uid}/
     // personagens/principal na primeira troca de saída dele, de forma
-    // preguiçosa (nunca precisou existir antes disso).
-    await setDoc(outgoingRef, _somenteFichaPersonagem(jd));
+    // preguiçosa (nunca precisou existir antes disso). Sem bounds check
+    // nas Rules pra essa subcoleção — sempre passa.
+    try {
+      await setDoc(outgoingRef, _somenteFichaPersonagem(jd));
+    } catch (e) {
+      console.error('[TROCAR PERSONAGEM] falhou salvando quem sai', e);
+      throw e;
+    }
 
     // 2. Busca a ficha de quem vai entrar.
     const targetRef  = doc(db, 'jogadores', uid, 'personagens', targetId);
@@ -130,11 +136,23 @@ window.trocarPersonagem = async function(targetId) {
       if (k === 'personagem_ativo_id') continue;
       if (jd[k] !== undefined) identidade[k] = jd[k];
     }
-    await setDoc(jogadorRef, {
-      ...identidade,
-      ...fichaAlvo,
-      personagem_ativo_id: targetId === 'principal' ? null : targetId,
-    });
+    // Clamp defensivo de reputacao: as Rules de jogadores/{uid} exigem
+    // 0-100 no documento inteiro pós-escrita. Uma ficha arquivada pode ter
+    // saído de faixa por algum caminho que grava via Admin SDK (Cloud
+    // Functions não passam pelas Rules) — sem isso, a troca pra esse
+    // personagem específico falhava com permission-denied pra sempre.
+    const reputacaoClamped = Math.max(0, Math.min(100, fichaAlvo.reputacao ?? 30));
+    try {
+      await setDoc(jogadorRef, {
+        ...identidade,
+        ...fichaAlvo,
+        reputacao: reputacaoClamped,
+        personagem_ativo_id: targetId === 'principal' ? null : targetId,
+      });
+    } catch (e) {
+      console.error('[TROCAR PERSONAGEM] falhou ativando quem entra', e, { fichaAlvo, identidade });
+      throw e;
+    }
 
     toast(`🔀 Trocou para ${fichaAlvo.nome_personagem}.`, 'ok', 4000);
   } catch (e) {
