@@ -105,9 +105,13 @@ service cloud.firestore {
         // Reputação só pode subir até o cap do cargo (verificado no cliente,
         // validação real está nas Cloud Functions)
         && request.resource.data.reputacao >= 0
-        && request.resource.data.reputacao <= 100
-        // Dinheiro não pode ser inflado do nada
-        && request.resource.data.dinheiro >= 0;
+        && request.resource.data.reputacao <= 100;
+        // Dinheiro SEM piso em 0 — dívida/Serasa é estado real de jogo
+        // (functions/avancar_mes.js:_processarFinanceiro pode levar o saldo
+        // a negativo), e troca de personagem restaura o saldo salvo de quem
+        // entra via setDoc completo (js/personagens.js:trocarPersonagem) —
+        // um personagem endividado nunca conseguia ser selecionado, batendo
+        // "Missing or insufficient permissions" nessa regra.
 
       // Deleção não permitida pelo cliente
       allow delete: if false;
