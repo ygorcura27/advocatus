@@ -18,6 +18,7 @@ import { collection, query, where, getDocs, doc, getDoc }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { db } from './firebase-init.js';
 import { sortearCandidatosVademecum } from './banco_vademecum.js';
+import { ehDoPersonagemAtivo } from './personagens.js';
 
 let _procId = null;
 let _procCache = null;
@@ -83,7 +84,11 @@ async function _renderListaCasos(j, main) {
   // SDK, na primeira vez que o caso é aberto).
   const casos = snap.docs
     .map(d => ({ id: d.id, ...d.data() }))
-    .filter(p => ['andamento', 'investigacao', 'montagem', 'julgamento', 'aguardando_decisao_sentenca'].includes(p.status));
+    .filter(p => ['andamento', 'investigacao', 'montagem', 'julgamento', 'aguardando_decisao_sentenca'].includes(p.status))
+    // Casos "solo"/pessoais são por advogado_uid — sem filtro por
+    // escritório, então precisam do filtro em memória por personagem_id
+    // (Firestore não sabe filtrar "campo ausente OU null" numa query).
+    .filter(p => ehDoPersonagemAtivo(p, j));
 
   if (casos.length === 0) {
     main.innerHTML = `

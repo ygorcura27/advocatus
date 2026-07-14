@@ -34,6 +34,7 @@ import {
   XP_BASE_INSTANCIA, RANK_INSTANCIA_2GRAU, RANK_INSTANCIA_SUPERIOR,
   tribunalRecursal, ehTopoDaCadeia, xpPorDecisao,
 } from './jurisdicao.js';
+import { personagemIdAtual } from './personagens.js';
 
 // ════════════════════════════════════════════════════════
 // CONSTANTES DE PRODUÇÃO (mantidas do processos.js original)
@@ -1945,6 +1946,7 @@ async function _gerarProcessoCompleto(j, distribuidoPeloEscritorio = false, area
     progresso: 0,                                  // % de rodadas de audiência concluídas (0/33/66/100)
     valor: PROC.valor_causa,
     advogado_uid: j.uid,
+    personagem_id: personagemIdAtual(j),
     escritorio_id: j.escritorio_id || null,
     distribuido_pelo_escritorio: distribuidoPeloEscritorio,
     escritorio_nome_etiqueta: distribuidoPeloEscritorio ? (j.escritorio_nome || null) : null,
@@ -2014,6 +2016,7 @@ window.criarProcessoDoPool = async function(escId, poolProcId, poolProc) {
     progresso: 0,
     valor: PROC.valor_causa,
     advogado_uid: j.uid,
+    personagem_id: personagemIdAtual(j),
     escritorio_id: j.escritorio_proprio_id || j.escritorio_empregado_id || null,
     distribuido_pelo_escritorio: false,
     hon_total_acumulado: 0,
@@ -2424,7 +2427,9 @@ window.renderCarteiraProcessual = async function(el) {
   }
 
   const procs = [
-    ...snapIndividual.docs.map(d => ({ id: d.id, ...d.data() })),
+    // Filtro em memória por personagem — Firestore não sabe filtrar "campo
+    // ausente OU null" (processos antigos sem personagem_id = principal).
+    ...snapIndividual.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => personagemIdAtual(j) === (p.personagem_id||null)),
     ...snapPool.docs.map(d => ({ id: d.id, ...d.data() })),
   ];
 

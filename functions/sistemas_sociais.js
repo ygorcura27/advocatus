@@ -313,7 +313,8 @@ exports.abrirCasoProBono = onCall({ region: 'southamerica-east1' }, async (reque
 
   const mesGlobal = j.mes_global_pessoal || 0;
   const novoProcesso = {
-    uid,
+    advogado_uid:  uid,
+    personagem_id: j.personagem_ativo_id || null,
     autor:         j.nome_personagem || j.nome || 'Advogado',
     practice_area,
     titulo:        descricao || `Caso Pro Bono — ${practice_area}`,

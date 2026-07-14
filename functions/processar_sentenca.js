@@ -239,7 +239,9 @@ const CARGO_IDX_CONCLUSAO_MIN = 2; // jnr — estagiário/assistente não proces
 // advogado_uid nunca é preenchido nesses casos (fica null mesmo depois
 // de alguém trabalhar nele).
 async function autorizadoParaProcessar(db, p, uid, j) {
-  if (p.advogado_uid === uid) return true; // caso individual, dono de fato
+  // Multi-personagem: mesmo uid não basta pro caso solo — precisa ser do
+  // personagem que está jogando agora (ver js/personagens.js).
+  if (p.advogado_uid === uid && (p.personagem_id||null) === (j.personagem_ativo_id||null)) return true;
 
   if (p.pool_escritorio_id) {
     const escId = j.escritorio_proprio_id || j.escritorio_empregado_id;

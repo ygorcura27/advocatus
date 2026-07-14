@@ -245,8 +245,9 @@ exports.montarSetlist = onCall({ region: 'southamerica-east1' }, async (request)
   const proc  = procSnap.data();
   const j     = jogSnap.data();
 
-  // Verificar autorização: advogado do processo ou membro do escritório
-  const isAdv = proc.advogado_uid === uid;
+  // Verificar autorização: advogado do processo (mesmo personagem, não só
+  // mesma conta — ver js/personagens.js) ou membro do escritório.
+  const isAdv = proc.advogado_uid === uid && (proc.personagem_id||null) === (j.personagem_ativo_id||null);
   const isEsc = proc.pool_escritorio_id && proc.pool_escritorio_id === j.escritorio_proprio_id;
   if (!isAdv && !isEsc) {
     throw new HttpsError('permission-denied', 'Você não tem permissão para montar setlist neste processo.');

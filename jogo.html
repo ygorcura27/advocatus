@@ -44,6 +44,12 @@
   <!-- Avançar mês — igual mockup, botão primário fica no topbar -->
   <button class="btn-avancar" id="btn-avancar-topo" onclick="window.avancarMes()">▸ Avançar mês</button>
 
+  <!-- Trocador de personagem — só aparece se a conta tiver mais de 1 -->
+  <div class="topbar-personagens" id="tb-personagens-wrap" style="display:none" title="Trocar de personagem">
+    <span class="ni-icon" aria-hidden="true">🔀</span>
+    <select id="tb-personagem-select" onchange="window.trocarPersonagem(this.value)"></select>
+  </div>
+
   <!-- Usuário -->
   <div class="topbar-user">
     <div id="tb-serasa" class="topbar-serasa"></div>
@@ -223,6 +229,7 @@
   import './js/escritorios_npc.js';
   import './js/equipe.js';
   import './js/relacionamento_dados.js';
+  import './js/personagens.js';
   import './js/relacionamento.js';
   import './js/amigos.js';
   import './js/servicos_dados.js';

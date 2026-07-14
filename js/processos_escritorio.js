@@ -6,6 +6,7 @@
 import { collection, query, where, orderBy, limit, getDocs, addDoc, doc, updateDoc, getDoc, increment }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { db } from './firebase-init.js';
+import { personagemIdAtual } from './personagens.js';
 
 // ─── Constantes do pool de processos ─────────────────────────────────────────
 
@@ -1053,6 +1054,7 @@ async function _criarProcessoRecursalPool(ctx, quemRecorre) {
     pool_proc_subcol_id: ctx.procId,
     pool_proc_esc_id:    ctx.escId,
     advogado_uid: ctx.uid,
+    personagem_id: personagemIdAtual(j),
     instancia_atual:    '1grau',
     instancia_seguinte: 'TJ',
     quem_recorre: quemRecorre,

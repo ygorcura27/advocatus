@@ -14,6 +14,8 @@ import {
   calcCompatibilidade, fichasElegiveis, candidatoDeFicha, labelEstagio, efeitoFelicidadeChance,
   efeitoFelicidadeCompatibilidade, custoFilhoPorIdade, custoAcademia,
 } from './relacionamento_dados.js';
+import { relColecaoAtual, filhosColecaoAtual, relDocAtual, filhoDocAtual }
+  from './personagens.js';
 
 // ════════════════════════════════════════════════════════
 // NPCs GLOBAIS — LOCK DE EXCLUSIVIDADE
@@ -102,7 +104,7 @@ window.renderVidaPessoal = async function(j, el) {
 
   // Buscar relacionamentos ativos do jogador
   const relSnap = await getDocs(query(
-    collection(db, 'jogadores', uid, 'relacionamentos'),
+    relColecaoAtual(uid, j),
     where('ativo', '==', true)
   ));
   const relacionamentos = relSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -111,7 +113,7 @@ window.renderVidaPessoal = async function(j, el) {
   let exConjuges = [];
   try {
     const exSnap = await getDocs(query(
-      collection(db, 'jogadores', uid, 'relacionamentos'),
+      relColecaoAtual(uid, j),
       where('ativo', '==', false),
       where('estagio', '==', 'esposo')
     ));
@@ -119,7 +121,7 @@ window.renderVidaPessoal = async function(j, el) {
   } catch(e) { /* índice composto pode não existir ainda */ }
 
   // Buscar filhos
-  const filhosSnap = await getDocs(collection(db, 'jogadores', uid, 'filhos'));
+  const filhosSnap = await getDocs(filhosColecaoAtual(uid, j));
   const filhos = filhosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
   // Amigos de trabalho/amizades (js/amigos.js) — sistema independente do
@@ -371,7 +373,7 @@ window.tentarReatar = async function(relId, nome) {
   const j   = window.JOGADOR;
   const uid = j?.uid || window.JOGADOR_UID;
 
-  const relRef  = doc(db, 'jogadores', uid, 'relacionamentos', relId);
+  const relRef  = relDocAtual(uid, j, relId);
   const relSnap = await getDoc(relRef);
   if (!relSnap.exists()) { toast('Relacionamento não encontrado.', 'ko'); return; }
   const r = relSnap.data();
@@ -397,7 +399,7 @@ window.tentarReatar = async function(relId, nome) {
     if (r.npc_id) {
       try { await _travarNpcParaJogador(r.npc_id, uid, relId, r.nome); } catch(e) {}
     }
-    await _registrarEvento(uid, relId, {
+    await _registrarEvento(uid, j, relId, {
       tipo: 'reatar', label: `Você e ${nome} reataram o casamento`,
       mes_pessoal: j.mes_pessoal||0, ano_pessoal: j.ano_pessoal||1,
     });
@@ -405,7 +407,7 @@ window.tentarReatar = async function(relId, nome) {
     setTimeout(()=>window.navTo&&window.navTo('vida_pessoal',null), 600);
   } else {
     await updateDoc(relRef, { tentou_reatar_mes: true });
-    await _registrarEvento(uid, relId, {
+    await _registrarEvento(uid, j, relId, {
       tipo: 'tentativa_reatar', label: `Você tentou reatar com ${nome}, mas ela não estava pronta`,
       mes_pessoal: j.mes_pessoal||0, ano_pessoal: j.ano_pessoal||1,
     });
@@ -450,7 +452,7 @@ window.irParaLocal = async function(localKey) {
   await updateDoc(doc(db, 'jogadores', uid), { energia_usada_mes: usado + local.energia });
 
   // Verificar relacionamentos ativos (máx 1 namorada+ mas pode ter affairs)
-  const relSnap = await getDocs(query(collection(db,'jogadores',uid,'relacionamentos'), where('ativo','==',true)));
+  const relSnap = await getDocs(query(relColecaoAtual(uid, j), where('ativo','==',true)));
   const rels    = relSnap.docs.map(d=>d.data());
   const temNamoradaOuMais = rels.some(r => r.estagio !== 'affair');
 
@@ -521,7 +523,7 @@ window.iniciarAffair = async function(candidato) {
   const uid = j?.uid || window.JOGADOR_UID;
   const compat = candidato.compatibilidade;
 
-  const relSnap = await getDocs(query(collection(db,'jogadores',uid,'relacionamentos'), where('ativo','==',true)));
+  const relSnap = await getDocs(query(relColecaoAtual(uid, j), where('ativo','==',true)));
   const numAffairs = relSnap.docs.filter(d => d.data().estagio === 'affair').length;
 
   try {
@@ -529,7 +531,7 @@ window.iniciarAffair = async function(candidato) {
     // para gravar no lock), depois tenta travar o NPC globalmente. Se a
     // trava falhar (alguém pegou no meio tempo), desfaz o relacionamento
     // criado — evita duas entidades "namorando a mesma pessoa".
-    const relRef = await addDoc(collection(db, 'jogadores', uid, 'relacionamentos'), {
+    const relRef = await addDoc(relColecaoAtual(uid, j), {
       npc_id: candidato.id || null,
       nome: candidato.nome, sexo: candidato.sexo, tracos: candidato.tracos,
       foto: candidato.foto || null, regiao: candidato.regiao || null,
@@ -573,9 +575,9 @@ window.iniciarAffair = async function(candidato) {
 // jogadores/{uid}/relacionamentos/{relId}/eventos/{eventoId}, exibido
 // depois na tela de perfil do NPC (estilo Facebook 2010).
 // ════════════════════════════════════════════════════════
-async function _registrarEvento(uid, relId, evento) {
+async function _registrarEvento(uid, j, relId, evento) {
   try {
-    await addDoc(collection(db, 'jogadores', uid, 'relacionamentos', relId, 'eventos'), {
+    await addDoc(collection(relDocAtual(uid, j, relId), 'eventos'), {
       ...evento,
       criado_em: new Date().toISOString(),
     });
@@ -595,7 +597,7 @@ window.interagirRelacionamento = async function(relId, interacaoKey) {
   const disp  = Math.max(0, (j.energia_total||100) - usado);
   if (disp < inter.energia) { toast(`⚡ Energia insuficiente.`, 'ko'); return; }
 
-  const relRef  = doc(db, 'jogadores', uid, 'relacionamentos', relId);
+  const relRef  = relDocAtual(uid, j, relId);
   const relSnap = await getDoc(relRef);
   if (!relSnap.exists()) return;
   const r = relSnap.data();
@@ -658,7 +660,7 @@ window.interagirRelacionamento = async function(relId, interacaoKey) {
 
   // Registrar na timeline do relacionamento — usado pela tela de perfil
   // estilo Facebook 2010 para montar o "histórico de interações".
-  await _registrarEvento(uid, relId, {
+  await _registrarEvento(uid, j, relId, {
     tipo: interacaoKey, label: `Você e ${r.nome} ${_fraseInteracao(interacaoKey)}`,
     mes_pessoal: j.mes_pessoal||0, ano_pessoal: j.ano_pessoal||1,
   });
@@ -718,7 +720,7 @@ window.darPresente = async function(relId, presenteKey) {
     return;
   }
 
-  const relRef  = doc(db, 'jogadores', uid, 'relacionamentos', relId);
+  const relRef  = relDocAtual(uid, j, relId);
   const relSnap = await getDoc(relRef);
   if (!relSnap.exists()) return;
   const r = relSnap.data();
@@ -738,7 +740,7 @@ window.darPresente = async function(relId, presenteKey) {
   });
   await updateDoc(doc(db,'jogadores',uid), { dinheiro: (j.dinheiro||0) - presente.custo });
 
-  await _registrarEvento(uid, relId, {
+  await _registrarEvento(uid, j, relId, {
     tipo: 'presente', label: `Você deu de presente: ${presente.l} para ${r.nome}`,
     mes_pessoal: j.mes_pessoal||0, ano_pessoal: j.ano_pessoal||1,
   });
@@ -759,7 +761,7 @@ window.progredirRelacionamento = async function(relId, progKey) {
 
   if ((j.dinheiro||0) < p.custo) { toast(`Saldo insuficiente. Requer R$ ${p.custo.toLocaleString('pt-BR')}.`,'ko'); return; }
 
-  const relRef  = doc(db,'jogadores',uid,'relacionamentos',relId);
+  const relRef  = relDocAtual(uid, j, relId);
   const relSnap = await getDoc(relRef);
   if (!relSnap.exists()) return;
   const r = relSnap.data();
@@ -785,7 +787,7 @@ window.progredirRelacionamento = async function(relId, progKey) {
   });
   await updateDoc(doc(db,'jogadores',uid), { dinheiro: (j.dinheiro||0) - p.custo });
 
-  await _registrarEvento(uid, relId, {
+  await _registrarEvento(uid, j, relId, {
     tipo: 'progressao', label: `${p.acao.replace('Pedir em','Você pediu')} para ${r.nome} — ${r.nome} aceitou!`,
     mes_pessoal: j.mes_pessoal||0, ano_pessoal: j.ano_pessoal||1,
   });
@@ -803,12 +805,12 @@ window.terminarRelacionamento = async function(relId, nome) {
   const j   = window.JOGADOR;
   const uid = j?.uid || window.JOGADOR_UID;
 
-  const relSnap = await getDoc(doc(db,'jogadores',uid,'relacionamentos',relId));
+  const relSnap = await getDoc(relDocAtual(uid, j, relId));
   if (!relSnap.exists()) return;
   const r = relSnap.data();
 
   const impacto = IMPACTO_SM.termino[r.estagio] || 10;
-  await updateDoc(doc(db,'jogadores',uid,'relacionamentos',relId), { ativo:false, terminado_em:new Date().toISOString() });
+  await updateDoc(relDocAtual(uid, j, relId), { ativo:false, terminado_em:new Date().toISOString() });
   await updateDoc(doc(db,'jogadores',uid), { saude_mental: Math.max(0, (j.saude_mental||80) - impacto) });
 
   // Término definitivo (manual, pelo jogador) sempre LIBERA o NPC de volta
@@ -816,7 +818,7 @@ window.terminarRelacionamento = async function(relId, nome) {
   // Cloud Function), que mantém a trava só para este jogador.
   if (r.npc_id) await _liberarNpc(r.npc_id);
 
-  await _registrarEvento(uid, relId, {
+  await _registrarEvento(uid, j, relId, {
     tipo: 'termino', label: `Você e ${nome} terminaram o relacionamento`,
     mes_pessoal: j.mes_pessoal||0, ano_pessoal: j.ano_pessoal||1,
   });
@@ -885,12 +887,12 @@ window.abrirPerfilNpc = async function(relId) {
   const j   = window.JOGADOR;
   const uid = j?.uid || window.JOGADOR_UID;
 
-  const relSnap = await getDoc(doc(db,'jogadores',uid,'relacionamentos',relId));
+  const relSnap = await getDoc(relDocAtual(uid, j, relId));
   if (!relSnap.exists()) { toast('Relacionamento não encontrado.', 'ko'); return; }
   const r = relSnap.data();
 
   const eventosSnap = await getDocs(query(
-    collection(db,'jogadores',uid,'relacionamentos',relId,'eventos'),
+    collection(relDocAtual(uid, j, relId), 'eventos'),
     orderBy('criado_em','desc'),
     limit(30)
   ));
@@ -1002,7 +1004,7 @@ export async function processarRelacionamentosMensal(j) {
   }
 
   // ── Relacionamentos: decaimento, eventos, gravidez ──
-  const relSnap = await getDocs(query(collection(db,'jogadores',uid,'relacionamentos'), where('ativo','==',true)));
+  const relSnap = await getDocs(query(relColecaoAtual(uid, j), where('ativo','==',true)));
   const rels    = relSnap.docs.map(d => ({ id:d.id, ...d.data() }));
 
   const numAffairs = rels.filter(r => r.estagio === 'affair').length;
@@ -1046,11 +1048,11 @@ export async function processarRelacionamentosMensal(j) {
       const novoMes = (r.mes_gravidez||0) + 1;
       if (novoMes >= DURACAO_GESTACAO) {
         // Nascimento!
-        await _gerarFilho(uid, r);
+        await _gerarFilho(uid, j, r);
         upd.gravida = false;
         upd.mes_gravidez = 0;
         smDelta += 10; // saúde mental do nascimento
-        await _registrarEvento(uid, r.id, {
+        await _registrarEvento(uid, j, r.id, {
           tipo: 'nascimento', label: `O filho de você e ${r.nome} nasceu`,
           mes_pessoal: j.mes_pessoal||0, ano_pessoal: j.ano_pessoal||1,
         });
@@ -1072,7 +1074,7 @@ export async function processarRelacionamentosMensal(j) {
           corpo:`${r.nome} descobriu seu affair e terminou o relacionamento. -${FLAGRA.penalidade_sm} saúde mental.`,
           tipo:'sistema', tipo_noticia:'negativo', lida:false, criado_em:new Date().toISOString(),
         });
-        await _registrarEvento(uid, r.id, {
+        await _registrarEvento(uid, j, r.id, {
           tipo: 'flagra', label: `${r.nome} descobriu um affair e terminou com você`,
           mes_pessoal: j.mes_pessoal||0, ano_pessoal: j.ano_pessoal||1,
         });
@@ -1094,7 +1096,7 @@ export async function processarRelacionamentosMensal(j) {
       smDelta -= IMPACTO_SM.tempo[r.estagio] || 5;
     }
 
-    await updateDoc(doc(db,'jogadores',uid,'relacionamentos',r.id), upd);
+    await updateDoc(relDocAtual(uid, j, r.id), upd);
 
     if (upd.ativo !== false) {
       felicidadeSomaCompat += efeitoFelicidadeCompatibilidade(r.compatibilidade||50);
@@ -1116,7 +1118,7 @@ export async function processarRelacionamentosMensal(j) {
   // ── Filhos: envelhecer e cobrar custos ──
   // Idade armazenada em MESES inteiros (evita acúmulo de erro de float).
   // idade_anos (campo legado/derivado) é calculado só para exibição.
-  const filhosSnap = await getDocs(collection(db,'jogadores',uid,'filhos'));
+  const filhosSnap = await getDocs(filhosColecaoAtual(uid, j));
   let custoFilhos = 0;
   for (const fDoc of filhosSnap.docs) {
     const f = fDoc.data();
@@ -1133,7 +1135,7 @@ export async function processarRelacionamentosMensal(j) {
     if (idadeAnosCompletos >= 22 && f.faculdade === 'Direito' && !f.jogavel) {
       upd.jogavel = true;
     }
-    await updateDoc(doc(db,'jogadores',uid,'filhos',fDoc.id), upd);
+    await updateDoc(filhoDocAtual(uid, j, fDoc.id), upd);
   }
   updatesJogador.custo_filhos_mes = custoFilhos;
 
@@ -1147,7 +1149,7 @@ export async function processarRelacionamentosMensal(j) {
 // Expor globalmente para ser chamado pelo avancar_mes.js
 window._processarRelacionamentosMensal = processarRelacionamentosMensal;
 
-async function _gerarFilho(uid, relacionamento) {
+async function _gerarFilho(uid, j, relacionamento) {
   const NOMES_BEBE = {
     m: ['Lucas','Gabriel','Pedro','Davi','Miguel','Arthur','Heitor','Théo'],
     f: ['Helena','Alice','Laura','Maria','Sofia','Valentina','Júlia','Lívia'],
@@ -1155,7 +1157,7 @@ async function _gerarFilho(uid, relacionamento) {
   const sexo = Math.random() < 0.5 ? 'm' : 'f';
   const nome = NOMES_BEBE[sexo][Math.floor(Math.random()*NOMES_BEBE[sexo].length)];
 
-  await addDoc(collection(db,'jogadores',uid,'filhos'), {
+  await addDoc(filhosColecaoAtual(uid, j), {
     nome, sexo, idade:0, idade_meses:0,
     mae_ou_pai: relacionamento.nome,
     faculdade: null, jogavel:false,
@@ -1171,203 +1173,141 @@ async function _gerarFilho(uid, relacionamento) {
 }
 
 // ════════════════════════════════════════════════════════
-// ASSUMIR HERDEIRO / VOLTAR DA APOSENTADORIA
-// Não há suporte a múltiplos personagens simultâneos — jogadores/{uid} é
-// 1:1 com o uid do Firebase Auth (index.html). A "troca" é sobrescrever os
-// campos de carreira/pessoa do doc ativo com os do herdeiro, mantendo o
-// mesmo uid — patrimônio, escritório, processos (advogado_uid) continuam
-// funcionando de graça porque o uid nunca muda, só não tocamos nesses
-// campos. O personagem que sai é arquivado em jogadores/{uid}/meta/
-// personagem_anterior — um único slot fixo, não uma coleção crescente —
-// reversível via voltarDaAposentadoria() enquanto sua idade arquivada for
-// < 70 (limite avançado mês a mês em functions/avancar_mes.js mesmo com o
-// personagem inativo).
+// ASSUMIR HERDEIRO — multi-personagem de verdade
+// Cada filho promovido vira um personagem PRÓPRIO e permanente em
+// jogadores/{uid}/personagens/{id} — vida isolada (relacionamentos/filhos
+// dele ficam em personagens/{id}/relacionamentos|filhos, ver
+// js/personagens.js:relColecaoAtual/filhosColecaoAtual), com um pedaço
+// escolhido do patrimônio do personagem que está concedendo (dinheiro até
+// REPUTACAO_HERANCA_PCT... ver custoTransferencia abaixo, um imóvel, um
+// carro) e reputação parcial herdada. Depois de criado, ele fica
+// disponível no trocador do topbar (js/personagens.js:window.
+// trocarPersonagem) — nada troca automaticamente aqui.
 // ════════════════════════════════════════════════════════
-const REPUTACAO_HERANCA_PCT = 0.4; // quanto da reputação do personagem anterior o herdeiro herda
-const IDADE_LIMITE_VOLTAR_APOSENTADORIA = 70;
+const REPUTACAO_HERANCA_PCT = 0.4;   // quanto da reputação do doador o herdeiro herda
+const DINHEIRO_HERANCA_PCT_MAX = 0.3; // teto de quanto dinheiro dá pra transferir de uma vez
+const BONUS_SKILLS_HERDEIRO = 10;     // pontos livres de Habilidades Gerais na criação
 
-function _snapshotPersonagemAtivo(jd) {
-  return {
-    nome_personagem: jd.nome_personagem, sexo: jd.sexo || null,
-    idade: jd.idade, idade_meses: jd.idade_meses ?? (jd.idade||0)*12,
-    cargo_id: jd.cargo_id, cargo_publico_id: jd.cargo_publico_id || null,
-    oab: jd.oab || false, concurso_aprovado: jd.concurso_aprovado || false,
-    anos_carreira: jd.anos_carreira || 0, reputacao: jd.reputacao || 0,
-    networking: jd.networking ?? 5, prestigio_academico: jd.prestigio_academico || 0,
-    xp: jd.xp || 0, xp_next: jd.xp_next || 120,
-    skills: jd.skills || {}, skills_jur: jd.skills_jur || {},
-    wins: jd.wins || 0, losses: jd.losses || 0,
-    wins_ano: jd.wins_ano || 0, losses_ano: jd.losses_ano || 0,
-    derrotas_consecutivas: jd.derrotas_consecutivas || 0,
-    study_queue: jd.study_queue || [], cursos_feitos: jd.cursos_feitos || [],
-    especialidade: jd.especialidade || null, faculdade: jd.faculdade || null,
-    estado_civil: jd.estado_civil || 'solteiro', conjuge_uid: jd.conjuge_uid || null,
-    geracao: jd.geracao || 1,
-  };
-}
+window.assumirHerdeiro = async function(filhoId, opts) {
+  const { dinheiroTransferido = 0, moradiaId = null, carroId = null, bonusSkills = {} } = opts || {};
 
-window.assumirHerdeiro = async function(filhoId) {
   const j   = window.JOGADOR;
   const uid = j?.uid || window.JOGADOR_UID;
   if (!uid) return;
 
-  const filhoRef  = doc(db, 'jogadores', uid, 'filhos', filhoId);
+  const filhoRef  = filhoDocAtual(uid, j, filhoId);
   const filhoSnap = await getDoc(filhoRef);
   if (!filhoSnap.exists()) { toast('Herdeiro não encontrado.', 'ko'); return; }
   const f = filhoSnap.data();
   if (!f.jogavel) { toast('Este herdeiro ainda não está pronto para assumir o controle.', 'ko'); return; }
 
-  if (!confirm(`Aposentar-se e assumir o controle de ${f.nome}? Você poderá reverter em "Voltar da Aposentadoria" enquanto ${j.nome_personagem||'seu personagem atual'} tiver menos de ${IDADE_LIMITE_VOLTAR_APOSENTADORIA} anos.`)) return;
+  const dinheiroDoador = j.dinheiro || 0;
+  const tetoDinheiro   = Math.floor(dinheiroDoador * DINHEIRO_HERANCA_PCT_MAX);
+  const dinheiro       = Math.max(0, Math.min(tetoDinheiro, Math.round(dinheiroTransferido || 0)));
 
-  const jogadorRef  = doc(db, 'jogadores', uid);
-  const anteriorRef = doc(db, 'jogadores', uid, 'meta', 'personagem_anterior');
+  const somaBonus = Object.values(bonusSkills || {}).reduce((s, v) => s + (v || 0), 0);
+  if (somaBonus > BONUS_SKILLS_HERDEIRO) { toast(`Só dá pra distribuir até ${BONUS_SKILLS_HERDEIRO} pontos de bônus.`, 'ko'); return; }
+
+  const moradiasDoador = { ...(j.moradias_compradas || {}) };
+  const carrosDoador    = { ...(j.carros_comprados || {}) };
+  if (moradiaId && (!moradiasDoador[moradiaId] || Object.keys(moradiasDoador).length < 2)) {
+    toast('Você precisa ter esse imóvel e mais um pra poder transferir.', 'ko'); return;
+  }
+  if (carroId) {
+    const financEmAberto = j.financiamentos?.[carroId]?.parcelas_restantes > 0;
+    if (!carrosDoador[carroId] || Object.keys(carrosDoador).length < 2) {
+      toast('Você precisa ter esse carro e mais um pra poder transferir.', 'ko'); return;
+    }
+    if (financEmAberto) { toast('Esse carro ainda tem financiamento em aberto — quite antes de transferir.', 'ko'); return; }
+  }
+
+  if (!confirm(`Dar controle de ${f.nome} agora? Ele vira um personagem separado, selecionável no trocador do topbar a qualquer momento.`)) return;
+
+  const novoId       = doc(collection(db, 'jogadores', uid, 'personagens')).id;
+  const jogadorRef   = doc(db, 'jogadores', uid);
+  const novoPersRef  = doc(db, 'jogadores', uid, 'personagens', novoId);
+  const mesGlobalAtual = j.mes_global_pessoal ?? j.mes_global_inicio ?? 0;
+
+  // Skills novato + bônus escolhido — mesmo shape de criação de personagem
+  // (index.html), 8 Habilidades Gerais, tudo mais em zero.
+  const skills = {};
+  for (const [sk, v] of Object.entries(bonusSkills || {})) {
+    if (v > 0) skills[sk] = v;
+  }
+
+  if (moradiaId) delete moradiasDoador[moradiaId];
+  if (carroId)   delete carrosDoador[carroId];
+
+  const patDoador = { ...(j.pat || {}) };
+  if (moradiaId && j.pat?.moradia === moradiaId) {
+    patDoador.moradia = Object.keys(moradiasDoador)[0] || 'pais';
+  }
+  if (carroId && j.pat?.transporte === carroId) {
+    patDoador.transporte = Object.keys(carrosDoador).find(k => k !== 'onibus') || 'onibus';
+  }
 
   try {
-    // Relacionamentos ativos ficam com o personagem que está saindo —
-    // não fazem sentido pro herdeiro. Query fora da transaction (client SDK
-    // não permite where() dentro de runTransaction), updates depois.
-    const relSnap = await getDocs(query(collection(db,'jogadores',uid,'relacionamentos'), where('ativo','==',true)));
-
     await runTransaction(db, async (tx) => {
       const jogadorSnap = await tx.get(jogadorRef);
       if (!jogadorSnap.exists()) throw new Error('Personagem não encontrado.');
       const jd = jogadorSnap.data();
 
-      const snapshotAnterior = {
-        ..._snapshotPersonagemAtivo(jd),
-        aposentado_em: new Date().toISOString(),
-        tipo_aposentadoria: jd.aposentado_forcado_pendente ? 'forcada' : 'manual',
-        filho_original: { id: filhoId, ...f },
-      };
-      tx.set(anteriorRef, snapshotAnterior);
-
-      const reputacaoHerdada = Math.round((jd.reputacao||0) * REPUTACAO_HERANCA_PCT);
-
-      // Campos de patrimônio/escritório (dinheiro, pat, moradias_compradas,
-      // financiamentos, escritorio_*, compras, estagiarios...) DELIBERADAMENTE
-      // não entram neste update — "são da conta", não do personagem, e é
-      // assim que a herança de patrimônio funciona: não copiando nada.
-      tx.update(jogadorRef, {
+      // Ficha nova — mesma base de um personagem recém-criado, só com os
+      // recursos escolhidos pelo doador por cima.
+      tx.set(novoPersRef, {
         nome_personagem: f.nome, sexo: f.sexo || null,
-        idade: f.idade, idade_meses: f.idade_meses ?? (f.idade||0)*12,
+        especialidade: jd.especialidade || 'civil', faculdade: 'Direito',
         cargo_id: 'est', cargo_publico_id: null, oab: false, concurso_aprovado: false,
-        anos_carreira: 0, mes_global_inicio: jd.mes_global_pessoal ?? jd.mes_global_inicio ?? 0,
-        reputacao: reputacaoHerdada, networking: 5, prestigio_academico: 0,
-        xp: 0, xp_next: 120, skills: {}, skills_jur: {},
-        wins: 0, losses: 0, wins_ano: 0, losses_ano: 0, derrotas_consecutivas: 0,
-        study_queue: [], cursos_feitos: [],
+        anos_carreira: 0, mes_global_inicio: mesGlobalAtual, idade: f.idade, idade_inicial: f.idade, idade_meses: f.idade_meses ?? (f.idade||0)*12,
+        reputacao: Math.round((jd.reputacao||0) * REPUTACAO_HERANCA_PCT),
+        networking: 5, saude_mental: 80, disposicao: 80,
+        prestigio_academico: 0, energia: 100, energia_usada_mes: 0,
+        skills,
+        dinheiro, meses_negativo: 0, meses_positivo_streak: 0, no_serasa: false,
+        renda_calculada: 0, despesas_calculadas: 0,
+        pat: {
+          moradia: moradiaId || 'pais',
+          transporte: carroId || 'onibus',
+          escritorio: 'home',
+        },
+        moradias_compradas: moradiaId ? { [moradiaId]: true } : {},
+        carros_comprados: carroId ? { [carroId]: true } : {},
+        prazo_sair_pais: 0, mora_com_pais: !moradiaId,
+        financiamentos: {},
+        escritorio_id: 'solo', escritorio_empregado_id: null, escritorio_proprio_id: null,
+        escritorio_nome: null, vaga_tipo: 'contencioso', sal_mult: 1.0,
+        xp: 0, xp_next: 120, wins: 0, losses: 0, wins_ano: 0, losses_ano: 0, derrotas_consecutivas: 0,
         estado_civil: 'solteiro', conjuge_uid: null, filhos: 0, geracao: (jd.geracao||1) + 1,
-        energia: 100, energia_usada_mes: 0, saude_mental: 80, disposicao: 80,
-        em_burnout: false, burnout_ate_mes: 0,
+        study_queue: [], cursos_feitos: [], compras: [], estagiarios: [],
+        em_burnout: false, burnout_ate_mes: 0, recesso_pendente: false,
         aposentado: false, aposentado_forcado_pendente: false,
+        ultimo_mes_processado: 0, bonus_pendente: 0,
+        criado_em: new Date().toISOString(),
+      });
+
+      // Doador perde só o que foi explicitamente transferido.
+      tx.update(jogadorRef, {
+        dinheiro: dinheiroDoador - dinheiro,
+        moradias_compradas: moradiasDoador,
+        carros_comprados: carrosDoador,
+        pat: patDoador,
       });
 
       tx.delete(filhoRef);
     });
 
-    await Promise.all(relSnap.docs.map(d =>
-      updateDoc(doc(db,'jogadores',uid,'relacionamentos',d.id), { ativo:false, encerrado_por_sucessao:true })
-    ));
-
     await addDoc(collection(db,'jogadores',uid,'inbox'), {
       de:'sistema', para_uid:uid,
-      assunto: '🎓 Nova geração assume a banca',
-      corpo: `${f.nome} assumiu o controle da carreira. Patrimônio e escritório continuam os mesmos — carreira e reputação começam uma nova fase.`,
+      assunto: '🎓 Novo herdeiro jogável',
+      corpo: `${f.nome} assumiu o controle e agora tem sua própria carreira — acesse pelo trocador de personagem no topo da tela.${dinheiro>0?` Recebeu ${dinheiro.toLocaleString('pt-BR')} em dinheiro.`:''}`,
       tipo:'sistema', tipo_noticia:'positivo', lida:false, criado_em:new Date().toISOString(),
     });
 
-    toast(`🎓 ${f.nome} assumiu o controle!`, 'ok', 5000);
+    toast(`🎓 ${f.nome} agora é jogável! Troque pra ele no topo da tela quando quiser.`, 'ok', 6000);
     setTimeout(()=>window.navTo&&window.navTo('vida_pessoal',null), 800);
   } catch (e) {
     console.error('[ASSUMIR HERDEIRO]', e);
     toast('Erro ao assumir herdeiro: ' + (e.message||''), 'ko');
-  }
-};
-
-window.voltarDaAposentadoria = async function() {
-  const j   = window.JOGADOR;
-  const uid = j?.uid || window.JOGADOR_UID;
-  if (!uid) return;
-
-  const anteriorRef  = doc(db, 'jogadores', uid, 'meta', 'personagem_anterior');
-  const anteriorSnap = await getDoc(anteriorRef);
-  if (!anteriorSnap.exists()) { toast('Não há personagem anterior pra retomar.', 'ko'); return; }
-  const a = anteriorSnap.data();
-
-  if ((a.idade||0) >= IDADE_LIMITE_VOLTAR_APOSENTADORIA) {
-    toast(`${a.nome_personagem} já passou dos ${IDADE_LIMITE_VOLTAR_APOSENTADORIA} anos — não dá mais pra voltar.`, 'ko');
-    return;
-  }
-
-  if (!confirm(`Voltar a jogar como ${a.nome_personagem} (${a.idade} anos)? ${j.nome_personagem||'O herdeiro atual'} volta a ser um herdeiro jogável — você pode assumi-lo de novo mais tarde.`)) return;
-
-  const jogadorRef = doc(db, 'jogadores', uid);
-  const filhosRef  = collection(db, 'jogadores', uid, 'filhos');
-
-  try {
-    const relSnap = await getDocs(query(collection(db,'jogadores',uid,'relacionamentos'), where('encerrado_por_sucessao','==',true)));
-
-    await runTransaction(db, async (tx) => {
-      const jogadorSnap = await tx.get(jogadorRef);
-      if (!jogadorSnap.exists()) throw new Error('Personagem não encontrado.');
-      const jd = jogadorSnap.data();
-
-      const snapshotHerdeiro = _snapshotPersonagemAtivo(jd);
-      const filhoNovoRef = doc(filhosRef);
-
-      tx.set(filhoNovoRef, {
-        nome: snapshotHerdeiro.nome_personagem, sexo: snapshotHerdeiro.sexo,
-        idade: snapshotHerdeiro.idade, idade_meses: snapshotHerdeiro.idade_meses,
-        faculdade: snapshotHerdeiro.faculdade, jogavel: true,
-        mae_ou_pai: a.nome_personagem,
-        criado_em: new Date().toISOString(),
-        _snapshot_reassumivel: snapshotHerdeiro,
-      });
-
-      tx.set(anteriorRef, {
-        ...snapshotHerdeiro,
-        aposentado_em: new Date().toISOString(),
-        tipo_aposentadoria: 'manual',
-        filho_original: { id: filhoNovoRef.id, nome: snapshotHerdeiro.nome_personagem, sexo: snapshotHerdeiro.sexo,
-          idade: snapshotHerdeiro.idade, idade_meses: snapshotHerdeiro.idade_meses,
-          faculdade: snapshotHerdeiro.faculdade, jogavel: true },
-      });
-
-      tx.update(jogadorRef, {
-        nome_personagem: a.nome_personagem, sexo: a.sexo || null,
-        idade: a.idade, idade_meses: a.idade_meses ?? (a.idade||0)*12,
-        cargo_id: a.cargo_id, cargo_publico_id: a.cargo_publico_id || null,
-        oab: a.oab || false, concurso_aprovado: a.concurso_aprovado || false,
-        anos_carreira: a.anos_carreira || 0, reputacao: a.reputacao || 0,
-        networking: a.networking ?? 5, prestigio_academico: a.prestigio_academico || 0,
-        xp: a.xp || 0, xp_next: a.xp_next || 120,
-        skills: a.skills || {}, skills_jur: a.skills_jur || {},
-        wins: a.wins || 0, losses: a.losses || 0, wins_ano: a.wins_ano || 0, losses_ano: a.losses_ano || 0,
-        derrotas_consecutivas: a.derrotas_consecutivas || 0,
-        study_queue: a.study_queue || [], cursos_feitos: a.cursos_feitos || [],
-        especialidade: a.especialidade || null, faculdade: a.faculdade || null,
-        estado_civil: a.estado_civil || 'solteiro', conjuge_uid: a.conjuge_uid || null,
-        geracao: a.geracao || 1,
-        aposentado: false, aposentado_forcado_pendente: false,
-      });
-    });
-
-    await Promise.all(relSnap.docs.map(d =>
-      updateDoc(doc(db,'jogadores',uid,'relacionamentos',d.id), { ativo:true, encerrado_por_sucessao:false })
-    ));
-
-    await addDoc(collection(db,'jogadores',uid,'inbox'), {
-      de:'sistema', para_uid:uid,
-      assunto: '🔙 Volta da aposentadoria',
-      corpo: `${a.nome_personagem} decidiu voltar à ativa. A sucessão foi desfeita.`,
-      tipo:'sistema', tipo_noticia:'neutro', lida:false, criado_em:new Date().toISOString(),
-    });
-
-    toast(`🔙 ${a.nome_personagem} voltou à ativa!`, 'ok', 5000);
-    setTimeout(()=>window.navTo&&window.navTo('progressao',null), 800);
-  } catch (e) {
-    console.error('[VOLTAR APOSENTADORIA]', e);
-    toast('Erro ao voltar da aposentadoria: ' + (e.message||''), 'ko');
   }
 };
 

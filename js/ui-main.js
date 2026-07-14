@@ -12,6 +12,7 @@ import { httpsCallable }
 import { db } from './firebase-init.js';
 import { icon } from './icons.js';
 import { renderAvatarJogador } from './avatar_svg.js';
+import { ehDoPersonagemAtivo } from './personagens.js';
 
 // ── Painel ativo ──
 let _painelAtivo = 'perfil';
@@ -657,8 +658,11 @@ async function _carregarProcessosSolo(j) {
       </div>`;
     };
 
-    const ativos = snapA.docs.map(d => renderCard(d.id, d.data()));
-    const encerrados = snapE.docs.map(d => renderCard(d.id, d.data()));
+    // Filtro em memória por personagem — Firestore não sabe filtrar "campo
+    // ausente OU null" numa query (processos antigos sem personagem_id são
+    // implicitamente do personagem principal).
+    const ativos = snapA.docs.filter(d => ehDoPersonagemAtivo(d.data(), j)).map(d => renderCard(d.id, d.data()));
+    const encerrados = snapE.docs.filter(d => ehDoPersonagemAtivo(d.data(), j)).map(d => renderCard(d.id, d.data()));
 
     if (ativos.length === 0 && encerrados.length === 0) {
       el.innerHTML = `<div style="font-size:.78rem;color:var(--ardosia);padding:.5rem 0">

@@ -69,7 +69,11 @@ exports.anteciparHonorarios = onCall({ region: 'southamerica-east1' }, async (re
         .where('status', '==', 'aguardando_decisao_sentenca')
         .get();
 
-  const processosComPendente = procSnap.docs.filter(d => (d.data().hon_pendente || 0) > 0);
+  // Casos solo (sem escId) precisam do filtro em memória por personagem —
+  // Firestore não sabe filtrar "campo ausente OU null" numa query.
+  const processosComPendente = procSnap.docs
+    .filter(d => escId || (d.data().personagem_id||null) === (j.personagem_ativo_id||null))
+    .filter(d => (d.data().hon_pendente || 0) > 0);
   if (processosComPendente.length === 0) {
     throw new HttpsError('failed-precondition', 'Nenhum honorário pendente para antecipar.');
   }

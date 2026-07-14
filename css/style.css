@@ -292,6 +292,16 @@ a:hover { color: var(--txt); }
 .topbar-saldo{ font-size: .75rem; color: #6EE7A0; font-weight: 600; }
 .topbar-serasa{ display:none; align-items:center; gap:.3rem; font-size:.62rem; font-weight:600; letter-spacing:.02em; padding:.15rem .55rem; background:rgba(231,76,60,.25); border:1px solid rgba(231,76,60,.5); border-radius:var(--r); color:#FF8A80; }
 .topbar-serasa .ni-icon svg { width: 12px; height: 12px; }
+.topbar-personagens { display:flex; align-items:center; gap:.35rem; margin-left:.6rem; flex-shrink:0; }
+.topbar-personagens select {
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: var(--r);
+  color: rgba(255,255,255,.85);
+  font-size: .68rem;
+  padding: .2rem .4rem;
+  max-width: 150px;
+}
 /* ── Topbar: bloco de prestígio ── */
 .tb-pres-bloco {
   display: flex;

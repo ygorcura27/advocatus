@@ -9,6 +9,8 @@ import { httpsCallable }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
 import { db } from './firebase-init.js';
 import { EFEITO_TRACO, ESTAGIOS } from './relacionamento_dados.js';
+import { filhosColecaoAtual, relColecaoAtual, relDocAtual } from './personagens.js';
+import { MORADIAS, CARROS } from './patrimonio.js';
 
 // ════════════════════════════════════════════════════════
 // CARGOS
@@ -199,39 +201,25 @@ window.renderCarreiraProgressao = function(j, el) {
 };
 
 // ════════════════════════════════════════════════════════
-// APOSENTADORIA / ASSUMIR HERDEIRO
-// Ver js/relacionamento.js:window.assumirHerdeiro/voltarDaAposentadoria
-// para a lógica real de troca de personagem — aqui só monta a UI.
+// APOSENTADORIA / ASSUMIR HERDEIRO — multi-personagem
+// Cada filho jogável vira um botão que abre o modal de concessão
+// (dinheiro/imóvel/carro/skills) e chama window.assumirHerdeiro real
+// (js/relacionamento.js). Depois de criado, o herdeiro fica disponível
+// no trocador do topbar (js/personagens.js) — nada troca sozinho aqui.
 // ════════════════════════════════════════════════════════
+const _SKILLS_HERANCA = [
+  { k:'oratoria',     l:'Oratória' }, { k:'argumentacao', l:'Argumentação' },
+  { k:'escrita',      l:'Escrita Jurídica' }, { k:'pesquisa', l:'Legislação & Pesquisa' },
+  { k:'negociacao',   l:'Negociação' }, { k:'persuasao',  l:'Persuasão' },
+  { k:'gestao',       l:'Gestão & Liderança' }, { k:'networking', l:'Networking' },
+];
+const BONUS_SKILLS_HERDEIRO = 10;
+
 async function _renderAposentadoriaBloco(j, el) {
   const uid = j.uid || window.JOGADOR_UID;
   try {
-    const [filhosSnap, anteriorSnap] = await Promise.all([
-      getDocs(query(collection(db,'jogadores',uid,'filhos'), where('jogavel','==',true))),
-      getDoc(doc(db,'jogadores',uid,'meta','personagem_anterior')),
-    ]);
+    const filhosSnap = await getDocs(query(filhosColecaoAtual(uid, j), where('jogavel','==',true)));
     const herdeiros = filhosSnap.docs.map(d => ({ id:d.id, ...d.data() }));
-
-    let htmlVoltar = '';
-    if (anteriorSnap.exists()) {
-      const a = anteriorSnap.data();
-      if ((a.idade||0) < 70) {
-        htmlVoltar = `
-        <div class="card" style="margin-bottom:.7rem;border-color:var(--ouro2)">
-          <div class="card-sub" style="margin-bottom:.6rem">
-            Personagem anterior: <b>${a.nome_personagem}</b> (${a.idade} anos) — ainda dá pra voltar (antes dos 70).
-          </div>
-          <button class="btn btn-sec btn-block" onclick="window.voltarDaAposentadoria&&window.voltarDaAposentadoria()">
-            🔙 Voltar da Aposentadoria
-          </button>
-        </div>`;
-      } else {
-        htmlVoltar = `
-        <div class="card" style="margin-bottom:.7rem;color:var(--ardosia2)">
-          Sucessão definitiva — ${a.nome_personagem} já passou dos 70 anos, não é mais possível voltar.
-        </div>`;
-      }
-    }
 
     let htmlAssumir;
     if (herdeiros.length === 0) {
@@ -243,27 +231,117 @@ async function _renderAposentadoriaBloco(j, el) {
         <div class="card" style="margin-bottom:.5rem;display:flex;justify-content:space-between;align-items:center;gap:.6rem">
           <div>
             <div style="font-weight:700;color:var(--txt)">${h.nome}</div>
-            <div style="font-size:.7rem;color:var(--ardosia2)">${h.idade} anos · pronto para assumir</div>
+            <div style="font-size:.7rem;color:var(--ardosia2)">${h.idade} anos · pronto para assumir controle</div>
           </div>
-          <button class="btn btn-prim btn-sm" onclick="window.assumirHerdeiro&&window.assumirHerdeiro('${h.id}')">
-            🎓 Aposentar-se e Assumir
+          <button class="btn btn-prim btn-sm" onclick="window._abrirModalConcederHeranca('${h.id}','${(h.nome||'').replace(/'/g,"\\'")}')">
+            🎓 Conceder Controle
           </button>
         </div>`).join('');
     }
 
     el.innerHTML = `
       ${j.aposentado_forcado_pendente ? `
-      <div class="card" style="margin-bottom:.7rem;border-color:var(--verm2);background:var(--verm-bg,transparent)">
-        <div style="font-weight:700;color:var(--verm2)">⚠️ Você completou 75 anos — hora de passar a banca adiante.</div>
-        <div style="font-size:.72rem;color:var(--ardosia2);margin-top:.2rem">Escolha um herdeiro abaixo quando estiver pronto.</div>
+      <div class="card" style="margin-bottom:.7rem;border-color:var(--verm2)">
+        <div style="font-weight:700;color:var(--verm2)">⚠️ Você completou 75 anos — não dá mais pra jogar ativamente com este personagem, só passar a herança.</div>
+        <div style="font-size:.72rem;color:var(--ardosia2);margin-top:.2rem">Escolha um herdeiro abaixo, ou troque pra outro personagem já jogável no topo da tela.</div>
       </div>` : ''}
-      ${htmlVoltar}
+      <div style="font-size:.7rem;color:var(--ardosia2);margin-bottom:.6rem">
+        Conceder controle cria um personagem novo e independente (vida, processos e escritório próprios) que fica disponível pra jogar a qualquer momento no seletor do topbar.
+      </div>
       ${htmlAssumir}`;
   } catch (e) {
     console.error('[APOSENTADORIA]', e);
     el.innerHTML = `<div class="card" style="color:var(--verm2)">Erro ao carregar aposentadoria.</div>`;
   }
 }
+
+window._abrirModalConcederHeranca = function(filhoId, nome) {
+  const j = window.JOGADOR;
+  const dinheiroAtual = j.dinheiro || 0;
+  const teto = Math.floor(dinheiroAtual * 0.3);
+
+  const moradias = Object.keys(j.moradias_compradas || {});
+  const podeTransferirImovel = moradias.length >= 2;
+  const optsImovel = moradias.map(id => {
+    const m = MORADIAS.find(x => x.id === id);
+    return `<option value="${id}">${m ? m.l : id}</option>`;
+  }).join('');
+
+  const carros = Object.keys(j.carros_comprados || {}).filter(id => id !== 'onibus');
+  const carrosLivres = carros.filter(id => !(j.financiamentos?.[id]?.parcelas_restantes > 0));
+  const podeTransferirCarro = carros.length >= 2 && carrosLivres.length >= 1;
+  const optsCarro = carrosLivres.map(id => {
+    const c = CARROS.find(x => x.id === id);
+    return `<option value="${id}">${c ? c.l : id}</option>`;
+  }).join('');
+
+  abrirModal(`🎓 Conceder Controle — ${nome}`, `
+    <div style="font-size:.75rem;color:var(--ardosia2);margin-bottom:1rem">
+      ${nome} vira um personagem novo e independente, começando do zero na carreira, com reputação parcial herdada e o que você escolher ceder abaixo.
+    </div>
+
+    <div style="margin-bottom:1rem">
+      <label style="font-size:.75rem;font-weight:600;color:var(--txt)">💰 Dinheiro (até ${teto.toLocaleString('pt-BR')} — 30% do seu saldo)</label>
+      <input type="range" id="herd-dinheiro" min="0" max="${teto}" step="${Math.max(100, Math.round(teto/100))}" value="0"
+        oninput="document.getElementById('herd-dinheiro-label').textContent = Number(this.value).toLocaleString('pt-BR')"
+        style="width:100%">
+      <div style="text-align:right;font-size:.8rem;color:var(--ouro2);font-weight:700">R$ <span id="herd-dinheiro-label">0</span></div>
+    </div>
+
+    <div style="margin-bottom:1rem">
+      <label style="font-size:.75rem;font-weight:600;color:var(--txt)">🏠 Imóvel</label>
+      ${podeTransferirImovel
+        ? `<select id="herd-moradia" style="width:100%;margin-top:.3rem"><option value="">Nenhum</option>${optsImovel}</select>`
+        : `<div style="font-size:.7rem;color:var(--ardosia2)">Precisa ter 2+ imóveis próprios pra ceder um (sempre sobra 1 pra você).</div>`}
+    </div>
+
+    <div style="margin-bottom:1rem">
+      <label style="font-size:.75rem;font-weight:600;color:var(--txt)">🚗 Carro</label>
+      ${podeTransferirCarro
+        ? `<select id="herd-carro" style="width:100%;margin-top:.3rem"><option value="">Nenhum</option>${optsCarro}</select>`
+        : `<div style="font-size:.7rem;color:var(--ardosia2)">Precisa ter 2+ carros próprios sem financiamento em aberto pra ceder um.</div>`}
+    </div>
+
+    <div style="margin-bottom:1rem">
+      <label style="font-size:.75rem;font-weight:600;color:var(--txt)">⭐ Bônus de experiência — distribua ${BONUS_SKILLS_HERDEIRO} pontos</label>
+      <div style="font-size:.68rem;color:var(--ardosia2);margin-bottom:.4rem">Total: <span id="herd-skills-total" style="font-weight:700">0</span>/${BONUS_SKILLS_HERDEIRO}</div>
+      <div style="display:grid;grid-template-columns:1fr auto;gap:.3rem .6rem;align-items:center">
+        ${_SKILLS_HERANCA.map(s => `
+          <span style="font-size:.72rem;color:var(--ardosia2)">${s.l}</span>
+          <input type="number" min="0" max="${BONUS_SKILLS_HERDEIRO}" value="0" id="herd-skill-${s.k}" style="width:52px"
+            oninput="window._atualizarTotalSkillsHeranca()">
+        `).join('')}
+      </div>
+    </div>
+
+    <button class="btn btn-prim btn-block" onclick="window._confirmarConcederHeranca('${filhoId}')">
+      Confirmar e criar personagem
+    </button>
+  `);
+};
+
+window._atualizarTotalSkillsHeranca = function() {
+  const total = _SKILLS_HERANCA.reduce((s, sk) => s + (Number(document.getElementById(`herd-skill-${sk.k}`)?.value) || 0), 0);
+  const el = document.getElementById('herd-skills-total');
+  if (el) { el.textContent = total; el.style.color = total > BONUS_SKILLS_HERDEIRO ? 'var(--verm2)' : ''; }
+};
+
+window._confirmarConcederHeranca = async function(filhoId) {
+  const dinheiroTransferido = Number(document.getElementById('herd-dinheiro')?.value) || 0;
+  const moradiaId = document.getElementById('herd-moradia')?.value || null;
+  const carroId   = document.getElementById('herd-carro')?.value || null;
+
+  const bonusSkills = {};
+  let soma = 0;
+  for (const s of _SKILLS_HERANCA) {
+    const v = Number(document.getElementById(`herd-skill-${s.k}`)?.value) || 0;
+    if (v > 0) { bonusSkills[s.k] = v; soma += v; }
+  }
+  if (soma > BONUS_SKILLS_HERDEIRO) { toast(`Distribua no máximo ${BONUS_SKILLS_HERDEIRO} pontos de bônus.`, 'ko'); return; }
+
+  fecharModal();
+  await window.assumirHerdeiro(filhoId, { dinheiroTransferido, moradiaId, carroId, bonusSkills });
+};
 
 function _podePromover(j, prox) {
   if (!prox) return false;
@@ -315,7 +393,7 @@ window.promover = async function() {
   // empilhando se ela tiver os dois (ver EFEITO_TRACO.ambiciosa/.competitiva
   // .afinidade_promocao em relacionamento_dados.js). ──
   try {
-    await _aplicarBonusPromocaoNosRelacionamentos(uid);
+    await _aplicarBonusPromocaoNosRelacionamentos(uid, j);
   } catch (e) {
     console.warn('[CARREIRA] Erro ao aplicar bônus de promoção nos relacionamentos:', e.message);
   }
@@ -327,9 +405,9 @@ window.promover = async function() {
  * (ambiciosa +4 E competitiva +8 = +12) por decisão de design, já que
  * esses dois traços são narrativamente compatíveis entre si.
  */
-async function _aplicarBonusPromocaoNosRelacionamentos(uid) {
+async function _aplicarBonusPromocaoNosRelacionamentos(uid, j) {
   const relSnap = await getDocs(query(
-    collection(db, 'jogadores', uid, 'relacionamentos'),
+    relColecaoAtual(uid, j),
     where('ativo', '==', true)
   ));
 
@@ -343,7 +421,7 @@ async function _aplicarBonusPromocaoNosRelacionamentos(uid) {
 
     const estagio = ESTAGIOS[r.estagio] || ESTAGIOS.affair;
     const novaAfinidade = Math.min(estagio.cap, (r.afinidade||0) + bonus);
-    await updateDoc(doc(db,'jogadores',uid,'relacionamentos',relDoc.id), { afinidade: novaAfinidade });
+    await updateDoc(relDocAtual(uid, j, relDoc.id), { afinidade: novaAfinidade });
   }
 }
 

@@ -8,6 +8,7 @@ import { httpsCallable }
 import { collection, getDocs, query, where, doc, getDoc }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { db } from './firebase-init.js';
+import { ehDoPersonagemAtivo } from './personagens.js';
 
 // Nonce por chamada — protege contra reenvio duplicado da mesma ação (GDD P1.7).
 function _gerarNonce() {
@@ -114,7 +115,13 @@ window.renderFinanceiroAvancado = async function(j, el) {
     const procSnap = escId
       ? await getDocs(query(collection(db,'processos'), where('pool_escritorio_id','==',escId), where('status','==','aguardando_decisao_sentenca')))
       : await getDocs(query(collection(db,'processos'), where('advogado_uid','==',uid), where('status','==','aguardando_decisao_sentenca')));
-    for (const d of procSnap.docs) totalHonPendente += (d.data().hon_pendente || 0);
+    for (const d of procSnap.docs) {
+      const p = d.data();
+      // Casos solo (sem escId) precisam do filtro em memória por
+      // personagem — Firestore não sabe filtrar "campo ausente OU null".
+      if (!escId && !ehDoPersonagemAtivo(p, j)) continue;
+      totalHonPendente += (p.hon_pendente || 0);
+    }
   } catch(e) { /* silencioso */ }
 
   const maxAntecipavel = Math.floor(totalHonPendente * 0.60);

@@ -81,7 +81,10 @@ const CARGO_IDX = {
 const CARGO_IDX_CONCLUSAO_MIN = 2;
 
 async function autorizadoParaProcessar(db, p, uid, j) {
-  if (p.advogado_uid === uid) return true;
+  // Multi-personagem: mesmo uid não basta — o caso solo precisa ser do
+  // personagem que está jogando agora, não de um irmão/pai/filho na
+  // mesma conta (ver js/personagens.js:personagemIdAtual).
+  if (p.advogado_uid === uid && (p.personagem_id||null) === (j.personagem_ativo_id||null)) return true;
   if (p.pool_escritorio_id) {
     const escId = j.escritorio_proprio_id || j.escritorio_empregado_id;
     if (escId !== p.pool_escritorio_id) return false;
@@ -416,6 +419,7 @@ exports.pedirFavor = onCall({ region: 'southamerica-east1' }, async (request) =>
     const favorRef = db.collection('favores').doc();
     await favorRef.set({
       devedor_uid: uid, credor_npc_id: npc_id,
+      personagem_id: j.personagem_ativo_id || null,
       origem: origem || 'pedido_investigacao',
       peso: pesoFavor, tipo: tipo || 'profissional',
       dias_para_apodrecer: 20, criado_em: new Date().toISOString(),
@@ -430,6 +434,7 @@ exports.pedirFavor = onCall({ region: 'southamerica-east1' }, async (request) =>
     const favorRef = db.collection('favores').doc();
     await favorRef.set({
       devedor_npc_id: npc_id, credor_uid: uid,
+      personagem_id: j.personagem_ativo_id || null,
       origem: origem || 'pedido_investigacao',
       peso: pesoFavor, tipo: tipo || 'profissional',
       dias_para_apodrecer: 20, criado_em: new Date().toISOString(),
@@ -485,7 +490,8 @@ exports.consumirFavorNode = onCall({ region: 'southamerica-east1' }, async (requ
 
   const p = pSnap.data(), f = fSnap.data(), j = jSnap.data();
   if (!(await autorizadoParaProcessar(db, p, uid, j))) throw new HttpsError('permission-denied', 'Este processo não é seu.');
-  if (f.devedor_npc_id ? f.credor_uid !== uid : f.devedor_uid !== uid) throw new HttpsError('permission-denied', 'Este favor não é seu.');
+  const favorEhMeu = f.devedor_npc_id ? f.credor_uid === uid : f.devedor_uid === uid;
+  if (!favorEhMeu || (f.personagem_id||null) !== (j.personagem_ativo_id||null)) throw new HttpsError('permission-denied', 'Este favor não é seu.');
   if (f.status !== 'ativo') throw new HttpsError('failed-precondition', 'Favor não está mais ativo.');
 
   const investigacao = p.investigacao;

@@ -23,7 +23,7 @@ const ZONAS = {
 // ════════════════════════════════════════════════════════
 // DADOS — MORADIAS
 // ════════════════════════════════════════════════════════
-const MORADIAS = [
+export const MORADIAS = [
   {id:'pais',        l:'Casa dos pais',         bairro:'—',                zona:'norte',   img:null,                               v:0,        rep_al:0,   rep_cp:0,  perigo:0, pais:true},
   {id:'belford',     l:'Casa em Belford Roxo',  bairro:'Belford Roxo',     zona:'baixada', img:'img/imoveis/belford-roxo.jpeg',    v:150000,   rep_al:-2,  rep_cp:0,  perigo:2},
   {id:'penha',       l:'Casa na Penha',         bairro:'Penha',            zona:'norte',   img:'img/imoveis/penha.jpeg',           v:250000,   rep_al:0,   rep_cp:3,  perigo:2},
@@ -38,7 +38,7 @@ const MORADIAS = [
 // ════════════════════════════════════════════════════════
 // DADOS — TRANSPORTES
 // ════════════════════════════════════════════════════════
-const CARROS = [
+export const CARROS = [
   {id:'onibus',     l:'Ônibus / Metrô',             img:'img/transportes/onibus.png',       v:0,       cm:176,   rep:-1, desc:'R$8/dia × 22 dias'},
   {id:'hatch',      l:'Hatchback',                  img:'img/transportes/hatch.png',        v:75000,   cm:950,   rep:2,  desc:'Compacto popular urbano'},
   {id:'sedan',      l:'Sedã Executivo',             img:'img/transportes/sedan.png',        v:160000,  cm:2200,  rep:7,  desc:'Sedã espaçoso e confiável'},

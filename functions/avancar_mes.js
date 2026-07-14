@@ -1042,7 +1042,11 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
   updates.energia            = ENERGIA_TOTAL;
   updates.energia_usada_mes  = 0;
 
-  updates.idade = 22 + Math.floor(mesGlobal / 12);
+  // idade_inicial existe pra personagens criados via assumirHerdeiro
+  // (podem começar com mais de 22 anos, ver js/relacionamento.js) — ausente
+  // pro personagem original, que sempre começa aos 22 (index.html), mesma
+  // conta de sempre.
+  updates.idade = (j.idade_inicial ?? 22) + Math.floor(mesGlobal / 12);
 
   // Falta na Pós-Graduação: todo mês que o jogador não comparece à aula
   // (compararecerAula, functions/posgraduacao.js) enquanto cursando conta
@@ -1685,6 +1689,15 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
 
   await _commit(db, uid, updates, mensagens, novoMes, novoAno);
 
+  // Personagens no banco (multi-personagem) avançam junto — ver
+  // _processarPersonagensBancoCF. Isolado num try/catch próprio pra nunca
+  // derrubar a resposta do avanço do personagem ativo por causa disso.
+  try {
+    await _processarPersonagensBancoCF(db, uid);
+  } catch (e) {
+    logger.warn('Erro ao processar personagens do banco:', e.message);
+  }
+
   logger.info(`[AVANÇAR] ${uid} → ${MESES[novoMes]}, Ano ${novoAno}`);
 
   return {
@@ -2005,6 +2018,26 @@ async function _reconciliarNpcCF(db, npcId, uid, relId) {
 }
 
 /**
+ * Resolução de path por personagem — equivalente Admin SDK de
+ * js/personagens.js:relColecaoAtual/filhosColecaoAtual. `j` é o snapshot do
+ * jogador que está sendo processado (o doc top-level espelha sempre o
+ * personagem ATIVO, então `j.personagem_ativo_id` já diz onde procurar —
+ * null/ausente = principal, path legado direto em jogadores/{uid}).
+ */
+function _relColecaoCF(db, uid, j) {
+  const pid = j?.personagem_ativo_id;
+  return pid
+    ? db.collection('jogadores').doc(uid).collection('personagens').doc(pid).collection('relacionamentos')
+    : db.collection('jogadores').doc(uid).collection('relacionamentos');
+}
+function _filhosColecaoCF(db, uid, j) {
+  const pid = j?.personagem_ativo_id;
+  return pid
+    ? db.collection('jogadores').doc(uid).collection('personagens').doc(pid).collection('filhos')
+    : db.collection('jogadores').doc(uid).collection('filhos');
+}
+
+/**
  * Grava evento na timeline do relacionamento
  * (jogadores/{uid}/relacionamentos/{relId}/eventos) — equivalente Admin SDK
  * de _registrarEvento em js/relacionamento.js. Eventos disparados pela
@@ -2012,9 +2045,9 @@ async function _reconciliarNpcCF(db, npcId, uid, relId) {
  * jogador recebia a notificação, mas o perfil da NPC (tela estilo Facebook
  * 2010) não sabia de nada, mostrando só as interações manuais.
  */
-async function _registrarEventoCF(db, uid, relId, evento) {
+async function _registrarEventoCF(db, uid, j, relId, evento) {
   try {
-    await db.collection('jogadores').doc(uid).collection('relacionamentos').doc(relId)
+    await _relColecaoCF(db, uid, j).doc(relId)
       .collection('eventos').add({ ...evento, criado_em: new Date().toISOString() });
   } catch (e) {
     // timeline é cosmética — não pode derrubar o tick mensal por causa dela
@@ -2212,7 +2245,7 @@ async function _gerarProcessoAutomaticoCF(db, j, oportunidade) {
     tipo: 'Ação decorrente de ' + oportunidade.tipo,
     area, tipo_processo: 'judicial',
     autor: oportunidade.cliente_nome, reu: contraparte,
-    tribunal: 'TJRJ', advogado_uid: j.uid, escritorio_id: j.escritorio_proprio_id||null,
+    tribunal: 'TJRJ', advogado_uid: j.uid, personagem_id: j.personagem_ativo_id||null, escritorio_id: j.escritorio_proprio_id||null,
     status:'andamento', instancia:1, progresso:0, chance_sucesso:55,
     valor: Math.floor(valorCausa), nivel:5, hon_total_acumulado:0,
     urgente:false, recurso_pendente:false,
@@ -2883,7 +2916,7 @@ async function _processarCursosMensalCF(db, uid, j) {
   // concluir (aprovar) qualquer curso neste mês. ──
   if (cursoAprovadoNesteMs) {
     try {
-      const relSnap = await db.collection('jogadores').doc(uid).collection('relacionamentos')
+      const relSnap = await _relColecaoCF(db, uid, j)
         .where('ativo', '==', true).get();
       for (const relDoc of relSnap.docs) {
         const r = relDoc.data();
@@ -2901,7 +2934,14 @@ async function _processarCursosMensalCF(db, uid, j) {
 }
 
 
-async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, novaIdadeJogador) {
+async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, novaIdadeJogador, destRef) {
+  // destRef: onde gravar o resultado final (updatesJogador) — o doc
+  // top-level jogadores/{uid} pro personagem ATIVO (default), ou o doc
+  // jogadores/{uid}/personagens/{id} de um personagem no banco (ver
+  // _processarPersonagensBancoCF, chamada por exports.avancarMes depois do
+  // personagem ativo). `j` já resolve os paths de relacionamentos/filhos
+  // certos via _relColecaoCF/_filhosColecaoCF (personagem_ativo_id em j).
+  destRef = destRef || db.collection('jogadores').doc(uid);
   const updatesJogador = {};
 
   // ── Academia: bônus ou perda de energia ──
@@ -2925,13 +2965,13 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
   }
 
   // ── Relacionamentos: decaimento, eventos, gravidez ──
-  const relSnap = await db.collection('jogadores').doc(uid).collection('relacionamentos')
+  const relSnap = await _relColecaoCF(db, uid, j)
     .where('ativo', '==', true).get();
   const rels = relSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
   // Reset mensal da flag de tentativa de reatar para ex-cônjuges separados
   try {
-    const exEspSnap = await db.collection('jogadores').doc(uid).collection('relacionamentos')
+    const exEspSnap = await _relColecaoCF(db, uid, j)
       .where('ativo', '==', false).where('estagio', '==', 'esposo').get();
     for (const eDoc of exEspSnap.docs) {
       if (eDoc.data().tentou_reatar_mes) await eDoc.ref.update({ tentou_reatar_mes: false });
@@ -2942,7 +2982,7 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
   // ("sem filhos COM ELA após os 30") — evita N queries redundantes para
   // N relacionamentos ativos. Monta um Set de relacionamento_id que já
   // geraram filho, para lookup O(1) dentro do loop abaixo.
-  const filhosSnapParaChecagem = await db.collection('jogadores').doc(uid).collection('filhos').get();
+  const filhosSnapParaChecagem = await _filhosColecaoCF(db, uid, j).get();
   // IDs dos filhos que já existiam ANTES do loop de relacionamentos abaixo
   // (que pode gerar filhos novos via _gerarFilhoCF). Usado no loop de
   // envelhecimento (mais abaixo) para não aplicar +1 mês num filho recém
@@ -3094,7 +3134,7 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
     } else if (r.gravida) {
       const novoMesGrav = (r.mes_gravidez||0) + 1;
       if (novoMesGrav >= DURACAO_GESTACAO_REL) {
-        await _gerarFilhoCF(db, uid, r, j.nome_personagem);
+        await _gerarFilhoCF(db, uid, j, r, j.nome_personagem);
         upd.gravida = false;
         upd.mes_gravidez = 0;
         smDelta += 10;
@@ -3130,7 +3170,7 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
             de:'sistema', para_uid:uid, assunto:assuntoFimTempo, corpo:corpoFimTempo,
             tipo:'sistema', tipo_noticia:'negativo', lida:false, criado_em:new Date().toISOString(),
           });
-          await _registrarEventoCF(db, uid, r.id, {
+          await _registrarEventoCF(db, uid, j, r.id, {
             tipo:'termino_apos_tempo', label:`${r.nome} decidiu terminar depois do tempo`,
             mes_pessoal: novoCalendario.mes_pessoal, ano_pessoal: novoCalendario.ano_pessoal,
           });
@@ -3142,7 +3182,7 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
             de:'sistema', para_uid:uid, assunto:assuntoVolta, corpo:corpoVolta,
             tipo:'sistema', tipo_noticia:'positivo', lida:false, criado_em:new Date().toISOString(),
           });
-          await _registrarEventoCF(db, uid, r.id, {
+          await _registrarEventoCF(db, uid, j, r.id, {
             tipo:'reatou_apos_tempo', label:`Você e ${r.nome} voltaram depois do tempo`,
             mes_pessoal: novoCalendario.mes_pessoal, ano_pessoal: novoCalendario.ano_pessoal,
           });
@@ -3168,7 +3208,7 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
             corpo:`${r.nome} terminou com você após uma crise de ciúmes.`,
             tipo:'sistema', tipo_noticia:'negativo', lida:false, criado_em:new Date().toISOString(),
           });
-          await _registrarEventoCF(db, uid, r.id, {
+          await _registrarEventoCF(db, uid, j, r.id, {
             tipo:'termino_ciumes', label:`${r.nome} terminou com você após uma crise de ciúmes`,
             mes_pessoal: novoCalendario.mes_pessoal, ano_pessoal: novoCalendario.ano_pessoal,
           });
@@ -3180,7 +3220,7 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
             corpo:`${r.nome} teve uma crise de ciúmes este mês. -5 afinidade.`,
             tipo:'sistema', tipo_noticia:'negativo', lida:false, criado_em:new Date().toISOString(),
           });
-          await _registrarEventoCF(db, uid, r.id, {
+          await _registrarEventoCF(db, uid, j, r.id, {
             tipo:'crise_ciumes', label:`${r.nome} teve uma crise de ciúmes`,
             mes_pessoal: novoCalendario.mes_pessoal, ano_pessoal: novoCalendario.ano_pessoal,
           });
@@ -3204,7 +3244,7 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
           corpo:`${r.nome} descobriu seu affair e ${r.estagio === 'esposo' ? 'pediu a separação' : 'terminou o relacionamento'}. -${FLAGRA_REL.penalidade_sm} saúde mental.`,
           tipo:'sistema', tipo_noticia:'negativo', lida:false, criado_em:new Date().toISOString(),
         });
-        await _registrarEventoCF(db, uid, r.id, {
+        await _registrarEventoCF(db, uid, j, r.id, {
           tipo:'flagra', label:`${r.nome} descobriu o affair e ${r.estagio === 'esposo' ? 'pediu a separação' : 'terminou o relacionamento'}`,
           mes_pessoal: novoCalendario.mes_pessoal, ano_pessoal: novoCalendario.ano_pessoal,
         });
@@ -3229,7 +3269,7 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
         de:'sistema', para_uid:uid, assunto:assuntoTerm, corpo:corpoTerm,
         tipo:'sistema', tipo_noticia:'negativo', lida:false, criado_em:new Date().toISOString(),
       });
-      await _registrarEventoCF(db, uid, r.id, {
+      await _registrarEventoCF(db, uid, j, r.id, {
         tipo:'termino_natural', label: r.estagio === 'esposo' ? `${r.nome} pediu a separação` : `${r.nome} encerrou o relacionamento`,
         mes_pessoal: novoCalendario.mes_pessoal, ano_pessoal: novoCalendario.ano_pessoal,
       });
@@ -3248,7 +3288,7 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
         de:'sistema', para_uid:uid, assunto:assuntoTempo, corpo:corpoTempo,
         tipo:'sistema', tipo_noticia:'negativo', lida:false, criado_em:new Date().toISOString(),
       });
-      await _registrarEventoCF(db, uid, r.id, {
+      await _registrarEventoCF(db, uid, j, r.id, {
         tipo:'pediu_tempo', label: r.estagio === 'esposo' ? `${r.nome} pediu um tempo no casamento` : `${r.nome} pediu um tempo`,
         mes_pessoal: novoCalendario.mes_pessoal, ano_pessoal: novoCalendario.ano_pessoal,
       });
@@ -3265,7 +3305,7 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
       await _liberarNpcCF(db, r.npc_id);
     }
 
-    await db.collection('jogadores').doc(uid).collection('relacionamentos').doc(r.id).update(upd);
+    await _relColecaoCF(db, uid, j).doc(r.id).update(upd);
 
     if (upd.ativo !== false) {
       felicidadeSomaCompat += efeitoFelicidadeCompatibilidadeCF(r.compatibilidade||50);
@@ -3285,7 +3325,7 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
   updatesJogador.felicidade = novaFelicidade;
 
   // ── Filhos: envelhecer e cobrar custo ──
-  const filhosSnap = await db.collection('jogadores').doc(uid).collection('filhos').get();
+  const filhosSnap = await _filhosColecaoCF(db, uid, j).get();
   let custoFilhos = 0;
   for (const fDoc of filhosSnap.docs) {
     // Filho nascido NESTE mesmo avancar_mes (via _gerarFilhoCF acima) não
@@ -3310,31 +3350,92 @@ async function _processarRelacionamentosMensalCF(db, uid, j, novoCalendario, nov
     if (idadeAnosCompletos >= 22 && f.faculdade === 'Direito' && !f.jogavel) {
       upd.jogavel = true;
     }
-    await db.collection('jogadores').doc(uid).collection('filhos').doc(fDoc.id).update(upd);
+    await _filhosColecaoCF(db, uid, j).doc(fDoc.id).update(upd);
   }
   updatesJogador.custo_filhos_mes = custoFilhos;
 
-  // ── Envelhecimento do personagem arquivado (jogadores/{uid}/meta/
-  // personagem_anterior) — é isso que faz a janela de "Voltar da
-  // Aposentadoria" (só permitida com idade < 70, ver js/relacionamento.js:
-  // window.voltarDaAposentadoria) ser um relógio de verdade correndo
-  // enquanto o jogador segue como herdeiro, e não uma checagem estática do
-  // dia da troca. Mesmo padrão de incremento mensal usado pra filhos acima.
-  try {
-    const anteriorRef  = db.collection('jogadores').doc(uid).collection('meta').doc('personagem_anterior');
-    const anteriorSnap = await anteriorRef.get();
-    if (anteriorSnap.exists) {
-      const ant = anteriorSnap.data();
-      const novaIdadeMesesAnt = (ant.idade_meses || (ant.idade||0)*12) + 1;
-      await anteriorRef.update({
-        idade_meses: novaIdadeMesesAnt,
-        idade: Math.floor(novaIdadeMesesAnt / 12),
-      });
-    }
-  } catch (e) { logger.warn('Erro ao envelhecer personagem_anterior:', e.message); }
-
   if (Object.keys(updatesJogador).length > 0) {
-    await db.collection('jogadores').doc(uid).update(updatesJogador);
+    await destRef.update(updatesJogador);
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// PERSONAGENS NO BANCO — cada um "vive em paralelo" mesmo sem ser jogado:
+// avança 1 mês junto sempre que o jogador avança QUALQUER personagem da
+// conta (não ganham um clock próprio — quem controla o tempo continua
+// sendo o jogador, só que agora pra conta inteira de uma vez, não só pra
+// quem está ativo). Escopo deliberadamente menor que o personagem ativo:
+// idade, relacionamentos/filhos (reaproveita _processarRelacionamentosMensalCF
+// parametrizada por destRef), financeiro básico (custo de vida + upkeep de
+// patrimônio próprio, sem renda de escritório/casos — ninguém está jogando
+// esse personagem pra gerar receita ativa). Cursos/posgraduação/
+// investimentos/serviços de escritório ficam de fora nesta entrega — um
+// herdeiro recém-criado normalmente não tem nada disso em andamento ainda.
+// ════════════════════════════════════════════════════════
+const CUSTO_BASE_BANCO = {
+  est:600, ass:700, jnr:900, pln:1400, snr:2200,
+  asc:3000, soc:4500, snm:6000,
+  jsub:2200, jtit:3000, dsb:4000, mstj:5500,
+  padj:2000, prom:2800, pjus:3800, pgj:5000,
+  dadj:1800, def:2400, dch:3200, dge:4500,
+};
+const ESCRITORIO_CM_BANCO = { home:0, cw:600, sal:3000, esm:7500, esp:18000 };
+
+async function _processarPersonagensBancoCF(db, uid) {
+  const bancoSnap = await db.collection('jogadores').doc(uid).collection('personagens').get();
+  for (const pDoc of bancoSnap.docs) {
+    try {
+      const p = pDoc.data();
+      const jBanco = { ...p, personagem_ativo_id: pDoc.id };
+
+      const mesAtual  = p.mes_pessoal ?? 0;
+      const anoAtual  = p.ano_pessoal ?? 1;
+      const novoMes   = (mesAtual + 1) % 12;
+      const novoAno   = novoMes === 0 ? anoAtual + 1 : anoAtual;
+      const mesGlobal = (p.mes_global_pessoal || 0) + 1;
+      const novaIdade = (p.idade_inicial ?? p.idade ?? 22) + Math.floor(mesGlobal / 12);
+
+      const morId    = p.pat?.moradia || 'pais';
+      const carId    = p.pat?.transporte || 'onibus';
+      const escId    = p.pat?.escritorio || 'home';
+      const comprada = p.moradias_compradas?.[morId];
+      let despesas = ESCRITORIO_CM_BANCO[escId] || 0;
+      if (morId !== 'pais' && !comprada) {
+        const v = IMOVEL_VALOR[morId] || 0;
+        despesas += v < 500000 ? Math.floor(v*0.0055) : v < 1000000 ? Math.floor(v*0.004) : Math.floor(v*0.003);
+      }
+      despesas += CARRO_CM[carId] || 0;
+
+      const fins = { ...(p.financiamentos || {}) };
+      let finsAlterados = false;
+      for (const [id, fin] of Object.entries(fins)) {
+        if (fin.parcelas_restantes > 0) {
+          despesas += fin.parcela_mensal || 0;
+          fins[id] = { ...fin, parcelas_restantes: fin.parcelas_restantes - 1 };
+          finsAlterados = true;
+        }
+      }
+
+      const custoVida = CUSTO_BASE_BANCO[p.cargo_id] || 700;
+      const saldoMes  = -(despesas + custoVida);
+
+      const updatesBanco = {
+        mes_pessoal: novoMes, ano_pessoal: novoAno, mes_global_pessoal: mesGlobal,
+        idade: novaIdade, energia_usada_mes: 0,
+        dinheiro: (p.dinheiro || 0) + saldoMes,
+      };
+      if (finsAlterados) updatesBanco.financiamentos = fins;
+
+      await pDoc.ref.update(updatesBanco);
+      await _processarRelacionamentosMensalCF(
+        db, uid, jBanco,
+        { mes_pessoal: novoMes, ano_pessoal: novoAno },
+        novaIdade,
+        pDoc.ref,
+      );
+    } catch (e) {
+      logger.warn(`Erro ao processar personagem do banco ${pDoc.id}:`, e.message);
+    }
   }
 }
 
@@ -3345,7 +3446,7 @@ function _sobrenomeCF(nomeCompleto) {
   return partes.length > 1 ? partes[partes.length - 1] : '';
 }
 
-async function _gerarFilhoCF(db, uid, relacionamento, nomeJogador) {
+async function _gerarFilhoCF(db, uid, j, relacionamento, nomeJogador) {
   const sexo = Math.random() < 0.5 ? 'm' : 'f';
   const primeiroNome = NOMES_BEBE_CF[sexo][Math.floor(Math.random()*NOMES_BEBE_CF[sexo].length)];
   // Sobrenome da mãe (relacionamento) primeiro, do pai (jogador) por último.
@@ -3353,7 +3454,7 @@ async function _gerarFilhoCF(db, uid, relacionamento, nomeJogador) {
   const sobrenomePai = _sobrenomeCF(nomeJogador);
   const nome = [primeiroNome, sobrenomeMae, sobrenomePai].filter(Boolean).join(' ');
 
-  await db.collection('jogadores').doc(uid).collection('filhos').add({
+  await _filhosColecaoCF(db, uid, j).add({
     nome, sexo, idade:0, idade_meses:0,
     mae_ou_pai: relacionamento.nome,
     // Vínculo com o relacionamento que gerou este filho — necessário para
