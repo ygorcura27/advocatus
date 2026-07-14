@@ -142,10 +142,15 @@ window.trocarPersonagem = async function(targetId) {
     // Functions não passam pelas Rules) — sem isso, a troca pra esse
     // personagem específico falhava com permission-denied pra sempre.
     const reputacaoClamped = Math.max(0, Math.min(100, fichaAlvo.reputacao ?? 30));
+    // fichaAlvo pode ter seu PRÓPRIO criado_em (ex.: personagem gerado via
+    // assumirHerdeiro, que grava a data de criação do personagem, não da
+    // conta) — sem passar por _somenteFichaPersonagem aqui, esse campo
+    // sobrescrevia o criado_em da conta e violava notChanging('criado_em')
+    // nas Rules, derrubando a troca com permission-denied.
     try {
       await setDoc(jogadorRef, {
         ...identidade,
-        ...fichaAlvo,
+        ..._somenteFichaPersonagem(fichaAlvo),
         reputacao: reputacaoClamped,
         personagem_ativo_id: targetId === 'principal' ? null : targetId,
       });
