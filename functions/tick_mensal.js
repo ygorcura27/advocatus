@@ -114,8 +114,15 @@ exports.tickMensal = onSchedule({
     logger.info('[TICK] Servidor inicializado — Ano 1, Janeiro');
   } else {
     serverData = serverSnap.data();
+    // Guard contra mes_jogo ausente/não-numérico no doc existente — sem
+    // isso, (undefined + 1) % 12 = NaN, MESES[NaN] = undefined, e o
+    // .update() abaixo rejeita valor undefined e derruba a function
+    // inteira (crash confirmado em produção via functions:log, todo dia,
+    // antes até de chegar nos sistemas globais — imprensa, prêmios anuais,
+    // mídia, apodrecimento de favores, tick de NPC — nenhum deles rodava).
+    const mesJogoAtual  = Number.isInteger(serverData.mes_jogo) ? serverData.mes_jogo : 0;
     const novoMesGlobal = (serverData.mes_global || 0) + 1;
-    const novoMesJogo   = (serverData.mes_jogo + 1) % 12;
+    const novoMesJogo   = (mesJogoAtual + 1) % 12;
     const novoAnoJogo   = novoMesJogo === 0
       ? (serverData.ano_jogo || 1) + 1
       : (serverData.ano_jogo || 1);
@@ -137,47 +144,22 @@ exports.tickMensal = onSchedule({
   const mesGlobal = serverData.mes_global;  // 1, 2, 3... (absoluto)
   const isJaneiro = mesAtual === 0;
 
-  // ── 2. Processar jogadores em batches ──
-  let processados = 0;
-  let cursor = null;
-
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    let query = db.collection('jogadores')
-      .orderBy('uid')
-      .limit(400);
-
-    if (cursor) query = query.startAfter(cursor);
-
-    const snap = await query.get();
-    if (snap.empty) break;
-
-    // Batch de escritas
-    const batch = db.batch();
-
-    for (const doc of snap.docs) {
-      const j = doc.data();
-
-      // Evitar processar dois vezes no mesmo tick
-      if (j.ultimo_mes_processado === mesGlobal) continue;
-
-      try {
-        const updates = await processarJogador(j, mesAtual, anoAtual, mesGlobal, isJaneiro, db);
-        if (Object.keys(updates).length > 0) {
-          batch.update(doc.ref, updates);
-        }
-        processados++;
-      } catch (err) {
-        logger.error(`[TICK] Erro ao processar jogador ${j.uid}:`, err);
-      }
-    }
-
-    await batch.commit();
-    cursor = snap.docs[snap.docs.length - 1];
-    if (snap.docs.length < 400) break;
-  }
-
-  logger.info(`[TICK] ${processados} jogadores processados`);
+  // ── 2. Processamento por jogador (dinheiro/idade/energia/skills/
+  // financiamentos) foi REMOVIDO daqui em 2026-07-13 — duplicava
+  // integralmente functions/avancar_mes.js:exports.avancarMes (o
+  // "Avançar Mês" que o próprio jogador clica), processando o MESMO
+  // conjunto de campos por um caminho totalmente separado. Só não causou
+  // dupla-cobrança/dupla-idade em produção porque o passo 1 acima estava
+  // crashando todo dia antes de chegar aqui (undefined em mes_nome) — ou
+  // seja, esse loop NUNCA rodou de verdade. Reativar isso agora que o
+  // crash foi corrigido cobraria/envelheceria todo jogador em dobro (uma
+  // vez ao clicar Avançar Mês, outra vez sozinho aqui todo dia). A função
+  // processarJogador() e seus helpers (_processarFinanceiro,
+  // processarFinanceiro, gerarEventoJogador, enviarMensagem) ficam
+  // definidos mais abaixo neste arquivo, mas não são mais chamados por
+  // nada — mortos de propósito, não removidos ainda por segurança.
+  const processados = 0;
+  logger.info(`[TICK] ${processados} jogadores processados (loop desativado — ver comentário acima)`);
 
   // ── 3. Atualizar rankings ──
   await atualizarRankings(db);
@@ -235,7 +217,11 @@ exports.tickMensal = onSchedule({
 });
 
 // ════════════════════════════════════════════════════════
-// PROCESSAMENTO INDIVIDUAL DO JOGADOR
+// PROCESSAMENTO INDIVIDUAL DO JOGADOR — MORTO, sem caller desde 2026-07-13
+// (ver comentário no passo 2 do handler principal, acima). Duplicava
+// functions/avancar_mes.js:exports.avancarMes. Mantido aqui só como
+// referência histórica — não chamar de novo sem antes decidir o que fazer
+// com o avancarMes real (são dois sistemas incompatíveis de avanço de mês).
 // ════════════════════════════════════════════════════════
 async function processarJogador(j, mesAtual, anoAtual, mesGlobal, isJaneiro, db) {
   const updates = { ultimo_mes_processado: mesGlobal };
