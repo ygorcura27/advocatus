@@ -294,13 +294,31 @@ a:hover { color: var(--txt); }
 .topbar-serasa .ni-icon svg { width: 12px; height: 12px; }
 .topbar-personagens { display:flex; align-items:center; gap:.35rem; margin-left:.6rem; flex-shrink:0; }
 .topbar-personagens select {
-  background: rgba(255,255,255,.08);
-  border: 1px solid rgba(255,255,255,.18);
+  /* Cor sólida (não translúcida) — a versão com rgba(255,255,255,.08) de
+     fundo ficava com contraste ruim, sobretudo com o texto claro por
+     cima quase se perdendo no próprio fundo escuro do topbar. */
+  background: #1c2130;
+  border: 1px solid rgba(255,255,255,.35);
   border-radius: var(--r);
-  color: rgba(255,255,255,.85);
-  font-size: .68rem;
-  padding: .2rem .4rem;
+  color: #fff;
+  font-size: .7rem;
+  font-weight: 600;
+  padding: .25rem .45rem;
   max-width: 150px;
+}
+.topbar-personagens select:hover,
+.topbar-personagens select:focus {
+  border-color: var(--ouro2, #D9B573);
+}
+/* <option> ignora a maioria dos estilos do <select> pai em vários
+   navegadores — precisa de cor explícita própria, senão a lista aberta
+   cai no branco-no-branco padrão do SO/navegador. */
+.topbar-personagens select option {
+  background: #1c2130;
+  color: #fff;
+}
+.topbar-personagens select option:disabled {
+  color: rgba(255,255,255,.4);
 }
 /* ── Topbar: bloco de prestígio ── */
 .tb-pres-bloco {

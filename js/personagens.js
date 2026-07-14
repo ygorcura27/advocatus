@@ -97,10 +97,17 @@ window.trocarPersonagem = async function(targetId) {
   const outgoingRef = doc(db, 'jogadores', uid, 'personagens', idAtual);
 
   try {
+    // Leitura fresca do doc ativo ANTES de escrever qualquer coisa — não
+    // confia em window.JOGADOR (pode estar um passo atrás do que o
+    // Firestore tem gravado). As Rules exigem notChanging('uid')/
+    // notChanging('criado_em') batendo com o valor real armazenado.
+    const jogadorAtualSnap = await getDoc(jogadorRef);
+    const jd = jogadorAtualSnap.exists() ? jogadorAtualSnap.data() : j;
+
     // 1. Guarda o personagem que está saindo — cria jogadores/{uid}/
     // personagens/principal na primeira troca de saída dele, de forma
     // preguiçosa (nunca precisou existir antes disso).
-    await setDoc(outgoingRef, _somenteFichaPersonagem(j));
+    await setDoc(outgoingRef, _somenteFichaPersonagem(jd));
 
     // 2. Busca a ficha de quem vai entrar.
     const targetRef  = doc(db, 'jogadores', uid, 'personagens', targetId);
@@ -121,7 +128,7 @@ window.trocarPersonagem = async function(targetId) {
     const identidade = {};
     for (const k of _EXCLUIR_TROCA) {
       if (k === 'personagem_ativo_id') continue;
-      if (j[k] !== undefined) identidade[k] = j[k];
+      if (jd[k] !== undefined) identidade[k] = jd[k];
     }
     await setDoc(jogadorRef, {
       ...identidade,
