@@ -214,10 +214,19 @@ window.renderGestaoProcessos = async function(j, el) {
 
 window.renderProcessosPool = async function(j, escId, el) {
   try {
-    // Busca sem orderBy para incluir docs sem criado_mes (processos auto-atribuídos
-    // pela gestora via Cloud Function não têm esse campo). Ordena em JS depois.
+    // Filtra por status DIRETO na query (mesmo filtro do cap-check em
+    // gerarProcessosMensais) — antes buscava até 80 docs da subcoleção
+    // INTEIRA (concluídos/perdidos incluídos), sem orderBy, e só filtrava
+    // por status depois no cliente. Num escritório com mais de 80 docs
+    // acumulados (histórico de meses), o limit(80) cortava ANTES do
+    // filtro — processos ativos auto-atribuídos pela gestora (sem
+    // criado_mes, então iam pro fim da ordenação) simplesmente não
+    // apareciam nunca em "Novos Processos"/"Fase Recursal", mesmo contando
+    // certinho no cap ("Pool cheio X/Y"). Sem limit aqui: o total de
+    // ativos já é naturalmente pequeno (teto por tier, no máximo ~36).
     const poolSnap = await getDocs(
-      query(collection(db, 'escritorios', escId, 'processos_pool'), limit(80))
+      query(collection(db, 'escritorios', escId, 'processos_pool'),
+        where('status', 'in', ['disponivel', 'em_andamento', 'aguardando_sentenca']))
     );
     const todos = poolSnap.docs
       .map(d => ({ id: d.id, ...d.data() }))

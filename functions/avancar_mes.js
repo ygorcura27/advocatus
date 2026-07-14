@@ -26,7 +26,7 @@ const _skillsJur             = require('./skills');
 const _peticoes              = require('./peticoes');
 const _genericas             = require('./peticoes_genericas');
 const _perfis                = require('./perfis');
-const { processarRoyaltiesLivros } = require('./artigos_livros');
+const { processarRoyaltiesLivros, processarCitacoesNPCMensal } = require('./artigos_livros');
 
 const ENERGIA_TOTAL        = 100;
 
@@ -1685,6 +1685,24 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
     }
   } catch (e) {
     logger.warn('[ROYALTIES] Erro ao processar royalties:', e.message);
+  }
+
+  // ── CITAÇÕES DE NPCs (comunidade acadêmica fictícia) ──
+  // citarObra real só é acionável por OUTRO jogador numa tela de biblioteca
+  // pública que nunca foi construída — em servidor com poucos jogadores
+  // reais, citações eram praticamente impossíveis de conseguir. Ver
+  // functions/artigos_livros.js:processarCitacoesNPCMensal.
+  try {
+    const citacoes = await processarCitacoesNPCMensal(db, uid);
+    if (citacoes > 0) {
+      mensagens.push({
+        assunto: '📚 Sua obra foi citada',
+        corpo:   `Sua produção acadêmica recebeu ${citacoes} nova${citacoes>1?'s':''} citação${citacoes>1?'ões':'ão'} este mês.`,
+        tipo:    'positivo',
+      });
+    }
+  } catch (e) {
+    logger.warn('[CITACOES_NPC] Erro ao processar citações:', e.message);
   }
 
   await _commit(db, uid, updates, mensagens, novoMes, novoAno);

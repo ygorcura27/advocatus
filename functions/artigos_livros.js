@@ -316,6 +316,70 @@ async function processarRoyaltiesLivros(db, uid, mesGlobal) {
   return totalRoyalties;
 }
 
+// ─── Processamento mensal: citações de NPCs ───────────────────────────────────
+
+/**
+ * Chamado por avancar_mes para cada jogador, junto com os royalties.
+ * Citações reais só existiam via citarObra, uma callable que exige OUTRO
+ * JOGADOR navegar até a obra publicada e clicar em citar — sem nenhuma
+ * tela de "biblioteca pública" pra isso (obterObrasPublicas nunca ganhou
+ * frontend), citações eram, na prática, impossíveis de conseguir num
+ * servidor com poucos jogadores reais. Este processamento gera citações
+ * de NPCs (a comunidade acadêmica fictícia) todo mês, escaladas pela nota
+ * da obra — mesmos campos que citarObra já incrementa (citacoes na obra,
+ * citacoes_totais/didatica_academica/prestigio_academico no jogador), só
+ * a origem que muda.
+ */
+function _chanceCitacaoMensalPorNota(notaTeto) {
+  if (notaTeto >= 22) return 0.35; // obra de referência
+  if (notaTeto >= 18) return 0.22; // muito citada
+  if (notaTeto >= 14) return 0.12; // citação ocasional
+  return 0.05;                      // obra fraca, quase nunca citada
+}
+
+async function processarCitacoesNPCMensal(db, uid) {
+  const snap = await db.collection('peticoes')
+    .where('jogador_uid', '==', uid)
+    .where('categoria', 'in', ['artigo', 'livro'])
+    .where('status', '==', 'pronta')
+    .get();
+
+  if (snap.empty) return 0;
+
+  let totalCitacoes = 0;
+  const proms = [];
+
+  for (const doc of snap.docs) {
+    const p = doc.data();
+    const chance = _chanceCitacaoMensalPorNota(p.nota_teto || 0);
+    if (Math.random() >= chance) continue;
+
+    const ganho = 1 + Math.floor(Math.random() * 2); // 1-2 citações
+    totalCitacoes += ganho;
+    proms.push(doc.ref.update({
+      citacoes:     FieldValue.increment(ganho),
+      citacoes_mes: FieldValue.increment(ganho),
+      ultimo_uso:   new Date().toISOString(),
+    }));
+  }
+
+  if (proms.length > 0) await Promise.all(proms);
+
+  if (totalCitacoes > 0) {
+    const jogRef  = db.collection('jogadores').doc(uid);
+    const jogSnap = await jogRef.get();
+    const didaticaAtual = jogSnap.exists ? (jogSnap.data().didatica_academica || 0) : 0;
+    await jogRef.update({
+      citacoes_totais:     FieldValue.increment(totalCitacoes),
+      didatica_academica:  Math.min(50, didaticaAtual + totalCitacoes),
+      prestigio_academico: FieldValue.increment(totalCitacoes),
+    });
+    logger.info(`[CITACOES_NPC] ${uid} recebeu ${totalCitacoes} citação(ões) de NPCs este mês`);
+  }
+
+  return totalCitacoes;
+}
+
 // ─── Hook: registrar cópia vendida ───────────────────────────────────────────
 
 /**
@@ -335,5 +399,6 @@ async function registrarCopiaVendida(db, peticaoId) {
 
 module.exports = Object.assign(module.exports, {
   processarRoyaltiesLivros,
+  processarCitacoesNPCMensal,
   registrarCopiaVendida,
 });

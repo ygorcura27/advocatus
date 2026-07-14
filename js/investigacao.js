@@ -106,7 +106,9 @@ async function _renderListaCasos(j, main) {
       <div style="display:flex;flex-direction:column;gap:.5rem;margin-top:.75rem">
         ${casos.map(p => `
           <div class="card" style="cursor:pointer" onclick="window.abrirInvestigacao('${p.id}')">
-            <div class="card-titulo">${p.titulo || p.area || 'Processo'}</div>
+            <div class="card-titulo">${p.titulo || p.tipo || p.area || 'Processo'}</div>
+            <div class="card-sub" style="font-family:var(--font-mono,monospace)">${p.numero || '—'}</div>
+            <div class="card-sub">${p.autor||'—'} vs ${p.reu||'—'} · ${p.area||'—'}</div>
             <div class="card-sub">Fase: ${_labelFase(p.status)}</div>
           </div>`).join('')}
       </div>

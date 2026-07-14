@@ -1205,7 +1205,12 @@ async function _carregarProcessosPreview(escId) {
     const todos = poolSnap.docs.map(d => d.data());
     const disponiveis = todos.filter(p => p.status === 'disponivel');
     const emAndamento = todos.filter(p => p.status === 'em_andamento');
-    const ativos   = disponiveis.length + emAndamento.length;
+    // "Ativos" tinha só disponivel+em_andamento, sem contar
+    // aguardando_sentenca — mesmo critério do cap-check em
+    // js/processos_escritorio.js:gerarProcessosMensais ("Pool cheio
+    // X/Y"), senão esse número nunca batia com o real.
+    const aguardSent = todos.filter(p => p.status === 'aguardando_sentenca');
+    const ativos   = disponiveis.length + emAndamento.length + aguardSent.length;
     const recursal = todos.filter(p => _PROC_STATUSES_RECURSAL.includes(p.status));
     const irVerTodos = `window.navTo('processos',null)`;
 

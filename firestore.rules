@@ -98,7 +98,10 @@ service cloud.firestore {
         // Campos que NUNCA podem ser alterados pelo cliente diretamente
         && notChanging('uid')
         && notChanging('criado_em')
-        && notChanging('geracao')
+        // geracao MUDA de propósito ao trocar de personagem ativo (cada
+        // personagem tem a sua, ver js/personagens.js:trocarPersonagem) —
+        // não é mais um invariante da conta desde a feature de
+        // multi-personagem, só do personagem individual.
         // Reputação só pode subir até o cap do cargo (verificado no cliente,
         // validação real está nas Cloud Functions)
         && request.resource.data.reputacao >= 0
@@ -144,6 +147,39 @@ service cloud.firestore {
         allow create: if isOwner(uid);
         allow update: if isOwner(uid);
         allow delete: if isOwner(uid);
+      }
+
+      // ── Subcoleção: personagens (multi-personagem, js/personagens.js) ──
+      // Ficha de cada personagem que não está ativo agora (o ativo vive
+      // nos campos do próprio doc jogadores/{uid}). Mesma vida pessoal
+      // isolada por personagem que filhos/relacionamentos têm no doc
+      // principal, só que aninhada — mesmo dono, mesmas regras.
+      match /personagens/{personagemId} {
+        allow read:   if isOwner(uid);
+        allow create: if isOwner(uid);
+        allow update: if isOwner(uid);
+        allow delete: if isOwner(uid);
+
+        match /relacionamentos/{relId} {
+          allow read:   if isOwner(uid);
+          allow create: if isOwner(uid);
+          allow update: if isOwner(uid);
+          allow delete: if isOwner(uid);
+
+          match /eventos/{eventoId} {
+            allow read:   if isOwner(uid);
+            allow create: if isOwner(uid);
+            allow update: if isOwner(uid);
+            allow delete: if isOwner(uid);
+          }
+        }
+
+        match /filhos/{filhoId} {
+          allow read:   if isOwner(uid);
+          allow create: if isOwner(uid);
+          allow update: if isOwner(uid);
+          allow delete: if isOwner(uid);
+        }
       }
 
       // ── Subcoleção: amigos (amizades/trabalho, js/amigos.js) ──

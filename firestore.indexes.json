@@ -67,6 +67,15 @@
       ]
     },
     {
+      "collectionGroup": "peticoes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "jogador_uid", "order": "ASCENDING" },
+        { "fieldPath": "categoria",   "order": "ASCENDING" },
+        { "fieldPath": "status",      "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "convites_midia",
       "queryScope": "COLLECTION",
       "fields": [
