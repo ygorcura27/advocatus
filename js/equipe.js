@@ -811,7 +811,7 @@ window.renderContratacao = async function(j, el) {
       <div class="oport-valor"><div class="oport-preco" style="font-size:.8rem">${salLabel}</div></div>
       <div class="oport-acoes">
         ${vagas>0
-          ? `<button class="btn btn-sm btn-prim" onclick="window._contratarNPC('${cargoKey}','${escId}')">Ver candidatos</button>`
+          ? `<button class="btn btn-sm btn-prim" onclick="window.abrirModalContratar('${cargoKey}','${escId}')">Contratar</button>`
           : `<button class="btn btn-sm btn-ghost" disabled>Indisponível</button>`}
       </div>
     </div>`;
