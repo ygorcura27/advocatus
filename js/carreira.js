@@ -664,7 +664,7 @@ const ENERGIA_FREQUENTAR_AULA = 8;
 window.renderCursosPanel = function(j, el) {
   const feitos      = j.cursos_feitos || [];
   const matriculas  = j.cursos_matriculas || {}; // { cursoId: { mes_inicio, presencas, faltas, mes_pessoal_inicio, ano_pessoal_inicio } }
-  const cap         = window.REP_CAP[j.cargo_id] || 55;
+  const cap         = window.HABILIDADE_CAP || 50;
 
   el.innerHTML = `
     ${window._capaHeader('CURSOS & PÓS-GRADUAÇÃO · ADVOCATUS ONLINE', 'Formação Continuada',
@@ -807,7 +807,7 @@ export async function processarCursosMensal(j) {
 
     const frequencia = (m.presencas||0)/c.sem;
     if (frequencia >= 0.75) {
-      const cap = window.REP_CAP[j.cargo_id]||55;
+      const cap = window.HABILIDADE_CAP || 50;
       const sk1 = Math.min(cap, ((j.skills||{})[c.sk]||0)+c.b);
       const sk2 = Math.min(cap, ((j.skills||{})[c.sk2]||0)+c.b2);
       updatesSkills[`skills.${c.sk}`]=sk1;

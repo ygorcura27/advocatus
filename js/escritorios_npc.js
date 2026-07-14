@@ -5,14 +5,7 @@
  */
 
 // ════════════════════════════════════════════════════════
-// LIMITES DE SKILL POR CARGO (espelho de REP_CAP)
-// ════════════════════════════════════════════════════════
-export const SKILL_CAP = {
-  est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100, snm:100,
-};
-
-// ════════════════════════════════════════════════════════
-// TIPOS DE VAGA — requisitos compatíveis com SKILL_CAP
+// TIPOS DE VAGA — requisitos compatíveis com HABILIDADE_CAP
 // ════════════════════════════════════════════════════════
 export const TIPOS_VAGA = {
   estagiario_pesquisa: {
@@ -314,7 +307,7 @@ export function escritoriosCompativeis(jogador) {
       if (meuIdx < vagaIdx) return false;
       // Verificar skills mínimas (respeitando o cap do cargo)
       return Object.entries(vaga.skills).every(([sk, min]) => {
-        const capAtual = SKILL_CAP[jogador.cargo_id] || 20;
+        const capAtual = window.HABILIDADE_CAP || 50;
         const minAdj   = Math.min(min, capAtual); // nunca exigir acima do cap
         return (skills[sk] || 0) >= minAdj;
       });
@@ -341,6 +334,6 @@ export function temVagaAberta(esc) {
 /** Calcula o prestígio atual do jogador no seu tier
  *  (rep / REP_CAP do cargo atual, em %) */
 export function prestigioNoTier(jogador) {
-  const cap = SKILL_CAP[jogador.cargo_id] || 20;
+  const cap = window.REP_CAP?.[jogador.cargo_id] || 55;
   return Math.round(((jogador.reputacao || 0) / cap) * 100);
 }

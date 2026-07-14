@@ -12,7 +12,6 @@ import { personagemIdAtual } from './personagens.js';
 
 const SKILLS_REL     = ['escrita_juridica', 'pesquisa', 'oratoria', 'persuasao', 'argumentacao'];
 const CARGO_MULT     = { est:.30, ass:.42, jnr:.58, pln:.70, snr:.85, asc:.94, soc:1.00 };
-const CARGO_CAP_P    = { est:20,  ass:35,  jnr:45,  pln:55,  snr:65,  asc:80,  soc:100  };
 const CARGO_L_P      = { est:'Estagiário', ass:'Assistente', jnr:'Jur. Júnior', pln:'Jur. Pleno', snr:'Jur. Sênior', asc:'Associado', soc:'Sócio' };
 
 const TIER_ORDER     = { D:0, C:1, B:2, A:3, S:4 };
@@ -25,7 +24,7 @@ const TIER_COR = { S:'var(--verm2)', A:'var(--amber)', B:'var(--navy3)', C:'var(
 // ─── Constantes de energia NPC ────────────────────────────────────────────────
 
 const NPC_ENERGIA_MES = 100;
-const NPC_CUSTO_PROC  = 40;   // energia NPC por processo designado
+const NPC_CUSTO_PROC  = 25;   // energia NPC por processo designado — pool único (processo/demanda/mentoria/estudo)
 const NPC_OVERLOAD_TH = 20;   // abaixo disso, aviso de sobrecarga
 
 // ─── Refresh do widget de processos ──────────────────────────────────────────
@@ -116,7 +115,7 @@ function _calcEficiencia(func) {
   const skills = func.skills || {};
   const vals   = SKILLS_REL.map(s => skills[s] || 0);
   const media  = vals.reduce((a, b) => a + b, 0) / vals.length;
-  const cap    = CARGO_CAP_P[func.cargo_id] || 35;
+  const cap    = window.HABILIDADE_CAP || 50;
   const mult   = CARGO_MULT[func.cargo_id] || .30;
   return Math.min(mult, (media / cap) * mult);
 }
@@ -446,7 +445,17 @@ function _renderColPool(disponiveis, emAndamento, aguardSent, j, escId, investig
     </div>`;
   }).join('');
 
-  const rowsAndGes = andGestao.map(p => `
+  const CARGOS_RESP_APOIO = new Set(['jnr','pln','snr','asc','soc']);
+  const rowsAndGes = andGestao.map(p => {
+    const podeApoio = CARGOS_RESP_APOIO.has(p.func_cargo);
+    const apoioHtml = p.apoio_func_id
+      ? `<div style="font-size:.55rem;color:var(--ouro2);margin-top:.1rem">🤝 ${p.apoio_func_nome||'apoio'}</div>`
+      : (podeApoio
+          ? `<button class="btn btn-sm btn-ghost" style="font-size:.55rem;padding:.12rem .3rem;margin-top:.15rem"
+              onclick="window._abrirApoioPicker('${escId}','${p.id}','apoio-${p.id}')">+ Apoio</button>
+             <div id="apoio-${p.id}"></div>`
+          : '');
+    return `
     <div class="proc-pool-row" style="border-left:2px solid var(--verde2)">
       <div class="proc-pool-area">👤</div>
       <div style="flex:1;min-width:0">
@@ -458,8 +467,10 @@ function _renderColPool(disponiveis, emAndamento, aguardSent, j, escId, investig
         <div style="font-size:.68rem;font-weight:700;color:var(--txt)">${p.progresso||0}%</div>
         <div style="font-size:.6rem;color:var(--txt4)">${_fmtP(p.honorarios)}</div>
         <div style="font-size:.55rem;color:var(--verde2);margin-top:.1rem">gestão auto</div>
+        ${apoioHtml}
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   // Disponíveis — botões "Assumir" e "Designar ↓"
   const rowsDisp = disponiveis.map(p => `
@@ -883,6 +894,69 @@ window._confirmarDesignar = async function(escId, procId, funcId, cargoId, nomeF
   }
 };
 
+// ─── Apoio de estagiário/assistente (Parte B3) ───────────────────────────────
+// Não substitui o responsável (só jnr+ processa sentença) — soma um bônus na
+// força dele. Custo de energia próprio do apoio: 15 (não uniformiza com os
+// 25 do resto do pool — é contribuição parcial, não a responsabilidade
+// inteira do processo).
+const CUSTO_APOIO = 15;
+
+window._abrirApoioPicker = async function(escId, procId, containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const existente = container.querySelector('.apoio-picker');
+  if (existente) { existente.remove(); return; }
+
+  let funcs = [];
+  try {
+    const fSnap = await getDocs(collection(db, 'escritorios', escId, 'funcionarios'));
+    funcs = fSnap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(f => ['est','ass'].includes(f.cargo_id) && f.ativo !== false && !f.burnout_npc
+        && (NPC_ENERGIA_MES - (f.energia_npc_usada_mes || 0)) >= CUSTO_APOIO);
+  } catch (e) { console.error('[ABRIR APOIO PICKER]', e); }
+
+  const picker = document.createElement('div');
+  picker.className = 'apoio-picker';
+
+  if (!funcs.length) {
+    picker.innerHTML = `<div style="font-size:.68rem;color:var(--txt3)">Nenhum estagiário/assistente disponível (energia insuficiente ou ocupados).</div>`;
+  } else {
+    picker.innerHTML = `
+      <div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin:.3rem 0 .2rem">Apoio (⚡${CUSTO_APOIO}):</div>
+      ${funcs.map(f => `
+        <div style="display:flex;align-items:center;gap:.4rem;padding:.2rem 0">
+          <div style="flex:1;font-size:.68rem;color:var(--txt1)">${f.nome||'—'} <span style="color:var(--txt4)">(${CARGO_L_P[f.cargo_id]||f.cargo_id})</span></div>
+          <button class="btn btn-sm btn-sec" style="font-size:.58rem;padding:.15rem .35rem"
+            onclick="window._confirmarApoio('${escId}','${procId}','${f.id}','${(f.nome||'').replace(/'/g,"\\'")}')">Atrelar</button>
+        </div>`).join('')}`;
+  }
+  container.appendChild(picker);
+};
+
+window._confirmarApoio = async function(escId, procId, funcId, nomeFunc) {
+  try {
+    const fSnap = await getDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId));
+    const funcData = fSnap.exists() ? fSnap.data() : {};
+    const energiaNova = (funcData.energia_npc_usada_mes || 0) + CUSTO_APOIO;
+    if (energiaNova > NPC_ENERGIA_MES) { toast('⚡ Energia insuficiente para apoio.', 'ko'); return; }
+
+    await Promise.all([
+      updateDoc(doc(db, 'escritorios', escId, 'processos_pool', procId), {
+        apoio_func_id: funcId, apoio_func_nome: nomeFunc,
+      }),
+      updateDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId), {
+        energia_npc_usada_mes: energiaNova,
+      }),
+    ]);
+    toast(`🤝 ${nomeFunc} atrelado como apoio. ⚡-${CUSTO_APOIO}`, 'ok');
+    _refreshProcessosPool(window.JOGADOR, escId);
+  } catch (e) {
+    console.error('[CONFIRMAR APOIO]', e);
+    toast('Erro ao atrelar apoio.', 'ko');
+  }
+};
+
 // ─── Processar sentença ───────────────────────────────────────────────────────
 
 window._processarSentenca = async function(escId, procId, uid) {
@@ -909,7 +983,7 @@ window._processarSentenca = async function(escId, procId, uid) {
   const skills = j.skills || {};
   const vals   = SKILLS_REL.map(s => skills[s] || 0);
   const media  = vals.reduce((a, b) => a + b, 0) / vals.length;
-  const capDono = window.REP_CAP?.[j.cargo_id] || 55;
+  const capDono = window.HABILIDADE_CAP || 50;
   const efic   = Math.min(1, media / capDono);
   const resultado = _sentencaOutcome(efic);
 

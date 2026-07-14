@@ -27,6 +27,7 @@ const _peticoes              = require('./peticoes');
 const _genericas             = require('./peticoes_genericas');
 const _perfis                = require('./perfis');
 const { processarRoyaltiesLivros, processarCitacoesNPCMensal } = require('./artigos_livros');
+const { determinarSentencaSetlist, AREA_PT_PARA_EN } = require('./processar_sentenca');
 
 const ENERGIA_TOTAL        = 100;
 
@@ -80,7 +81,10 @@ const REP_CAP = {
 const NPC_PROG_TOTAL  = { est:20, ass:28, jnr:40, pln:55, snr:70, asc:82, soc:95 };
 
 // Custo de energia por processo ativo por mês (debita de energia_npc_usada_mes)
-const NPC_ENERGIA_POR_PROC = 20;
+// Pool único: processo, demanda/oportunidade, mentoria e estudo custam todos
+// 25 (competem pelo mesmo teto de 100/mês) — só o "apoio" de estagiário/
+// assistente (Parte B3) fica em 15, por ser contribuição parcial.
+const NPC_ENERGIA_POR_PROC = 25;
 const NPC_ENERGIA_MES = 100;
 const NPC_OVERLOAD_TH = 20; // sobrecarga se usado > 80
 
@@ -106,8 +110,7 @@ const RECORRENCIA_CHANCE = { 5: 0.90, 4: 0.60, 3: 0.25, 2: 0.10, 1: 0 };
 
 // ── Skill com maior gap para o cap (candidata ao bônus de ranking) ──
 function _escolherSkillBonus(npc) {
-  const CARGO_CAP_SKL = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
-  const cap    = CARGO_CAP_SKL[npc.cargo_id] || 35;
+  const cap    = 50;
   const skills = npc.skills || {};
   const KEYS   = ['pesquisa','escrita_juridica','argumentacao','oratoria','persuasao'];
   let gap = -1, sk = 'pesquisa';
@@ -148,26 +151,38 @@ function _eficienciaNPC(f) {
   return Math.max(0.4, Math.min(1.0, media / cap));
 }
 
-// ── Sentença automática pelo NPC (mirrors _sentencaOutcome do frontend) ──
+// ── Sentença automática pelo NPC — mesma mecânica única do jogador ──
 // Cargos jnr+ processam sentença com base nas próprias skills.
 // Est e ass não processam sentença — o processo fica em aguardando_sentenca
 // para o dono ou sócio do escritório resolver manualmente.
 const CARGOS_PROC_SENTENCA = new Set(['jnr','pln','snr','asc','soc']);
 
-function _rollSentenca([a, b]) {
-  const r = Math.random();
-  if (r < a) return 'procedente';
-  if (r < a + b) return 'parcial';
-  return 'improcedente';
+// Força do NPC — mesmos pesos do preview de OAB (js/ui-main.js:renderHabilidades,
+// BASE_SKILLS), aplicados às skills_jur do NPC. Score 0-50, mesma escala do
+// jogador — não é mais um "eficiência" solto, é a força real da peça dele.
+const PESOS_FORCA_NPC = { legal_drafting:.30, legal_research:.30, argumentation:.25, procedure:.15 };
+function _forcaNPC(npc) {
+  const sk = npc.skills_jur || {};
+  return Object.entries(PESOS_FORCA_NPC).reduce((acc, [k, w]) => acc + (sk[k] || 0) * w, 0);
 }
 
-function _sentencaOutcomeNPC(efic) {
-  if (efic >= .85) return _rollSentenca([.38,.45,.17]);
-  if (efic >= .70) return _rollSentenca([.25,.50,.25]);
-  if (efic >= .55) return _rollSentenca([.14,.48,.38]);
-  if (efic >= .40) return _rollSentenca([.07,.38,.55]);
-  if (efic >= .25) return _rollSentenca([.03,.25,.72]);
-  return                   _rollSentenca([.01,.12,.87]);
+// Penalidade por levar mais de um processo no mesmo mês — índice = nº de
+// processos simultâneos designados ao NPC. 1 processo não perde nada.
+const MULT_FORCA_POR_ACUMULO = [1, 1, .75, .5, .25];
+
+// Apoio de estagiário/assistente (Parte B3): não é responsável pelo
+// processo (nunca processa sentença sozinho), mas soma 18% da própria
+// força na força do jnr+ responsável. Custo de energia próprio: 15
+// (contribuição parcial, não a responsabilidade inteira — não uniformiza
+// com os 25 do resto do pool).
+const BONUS_FORCA_APOIO = 0.18;
+const CUSTO_APOIO = 15;
+
+// Converte força (0-50) pra "nota" 1-26 da TABELA_SENTENCA — mesma curva de
+// convencimento usada na sentença do jogador (determinarSentencaSetlist),
+// sem inventar uma tabela nova só pro NPC.
+function _notaDeForcaNPC(forca) {
+  return Math.max(1, Math.min(26, Math.round(1 + (forca / 50) * 25)));
 }
 
 async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid, esc) {
@@ -240,14 +255,22 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid, esc) {
         // Jnr+ processa sentença automaticamente com suas próprias skills.
         // "Domínio fraco" (js/processos_escritorio.js:_dgPillDominio, definido
         // no momento da designação por departamento — ver designado_area_fraca
-        // acima) agora reduz de verdade a eficiência usada no roll de sentença;
-        // antes só era um aviso visual sem efeito nenhum no resultado.
-        const eficSentenca = p.designado_area_fraca ? Math.max(0.15, eff * 0.6) : eff;
-        const resultado  = _sentencaOutcomeNPC(eficSentenca);
+        // acima) reduz de verdade a força usada na sentença.
+        let forcaBase     = p.designado_area_fraca ? Math.max(2, _forcaNPC(npc) * 0.6) : _forcaNPC(npc);
+        // Apoio de estagiário/assistente (Parte B3): não processa sentença
+        // sozinho, mas soma um % da própria força na do responsável.
+        const apoio = p.apoio_func_id ? npcMap[p.apoio_func_id] : null;
+        if (apoio) forcaBase += _forcaNPC(apoio) * BONUS_FORCA_APOIO;
+        const mult        = MULT_FORCA_POR_ACUMULO[Math.min(numAtivos, MULT_FORCA_POR_ACUMULO.length - 1)] ?? .25;
+        const nota        = _notaDeForcaNPC(forcaBase * mult);
+        const tipoCaso    = AREA_PT_PARA_EN[p.area] || p.area || 'civil';
+        const ctxSentenca = { processos_concluidos: npc.casos_resolvidos_total || 0, supervisao_ativa: false, tipo_caso: tipoCaso, alta_originalidade: false };
+        // Mesma curva de convencimento (TABELA_SENTENCA) usada na sentença do
+        // jogador — NPC não tem posição de réu nem julgador com perfil aqui
+        // (processos do pool não simulam a audiência nó a nó).
+        const { resultado, valor_pct } = determinarSentencaSetlist(nota, 'autor', null, 0, ctxSentenca);
         const hon        = p.honorarios || 0;
-        const valorRecebido = resultado === 'procedente' ? hon
-          : resultado === 'parcial' ? Math.round(hon * 0.55)
-          : 0; // improcedente nunca gera honorários (mesma regra do setlist/investigação)
+        const valorRecebido = resultado === 'improcedente' ? 0 : Math.round(hon * valor_pct);
 
         // Rastrear feedback para estresse e ranking
         if (resultado === 'procedente') {
@@ -436,13 +459,12 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid, esc) {
     const FV = require('firebase-admin/firestore').FieldValue;
     rankingData.sort((a, b) => b.rankScore - a.rankScore);
 
-    const CARGO_CAP_SKL = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
     const rankProms = [];
     const rankLogs  = [];
 
     const _bumpSkill = (npc, pts) => {
       const sk  = _escolherSkillBonus(npc);
-      const cap = CARGO_CAP_SKL[npc.cargo_id] || 35;
+      const cap = 50;
       const val = Math.min(cap, ((npc.skills || {})[sk] || 0) + pts);
       return { field: `skills.${sk}`, val, skLabel: _SKL_LABEL[sk] || sk };
     };
@@ -529,12 +551,14 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid, esc) {
 // ════════════════════════════════════════════════════════
 // PROCESSAMENTO MENSAL: MENTORIA
 // ════════════════════════════════════════════════════════
+const CUSTO_MENTORIA = 25;
+
 async function _processarMentoriaNPCsCF(db, escRef, fSnap, uid) {
   const allNpcs = {};
   for (const fd of fSnap.docs) allNpcs[fd.id] = { id: fd.id, ref: fd.ref, ...fd.data() };
 
   const proms = [], logs = [];
-  const CARGO_CAP_SKL = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
+  const energiaMentorAcum = {}; // mentor.id → energia já comprometida neste tick (mentor pode ter 2 aprendizes)
 
   for (const fd of fSnap.docs) {
     const aprendiz = fd.data();
@@ -548,6 +572,12 @@ async function _processarMentoriaNPCsCF(db, escRef, fSnap, uid) {
     const skill = aprendiz.skill_sendo_treinada;
     if (!skill) continue;
 
+    // Pool único de energia: mentoria compete com processo/demanda/estudo
+    // pelo mesmo teto de 100/mês — sem isso a mentoria rodava de graça.
+    const energiaJaGasta = energiaMentorAcum[mentor.id] || 0;
+    if ((mentor.energia_npc_usada_mes || 0) + energiaJaGasta + CUSTO_MENTORIA > 100) continue;
+    energiaMentorAcum[mentor.id] = energiaJaGasta + CUSTO_MENTORIA;
+
     const mentorSkillVal  = (mentor.skills || {})[skill] || 10;
     const ganhoBase       = Math.max(1, Math.round(mentorSkillVal * 0.1));
     const numAprendizes   = (mentor.aprendizes_ids || []).length;
@@ -559,14 +589,12 @@ async function _processarMentoriaNPCsCF(db, escRef, fSnap, uid) {
     const malusMulti      = numAprendizes > 1 ? 2 : 0;
     const ganhoTotal      = Math.max(1, Math.round((ganhoBase + bonusAfinidade - malusMulti) * penaltyIncompat));
 
-    const capAprendiz    = CARGO_CAP_SKL[aprendiz.cargo_id] || 20;
-    const novoValAprendiz = Math.min(capAprendiz, ((aprendiz.skills || {})[skill] || 0) + ganhoTotal);
-    const capMentor      = CARGO_CAP_SKL[mentor.cargo_id] || 55;
-    const novoValMentor  = Math.min(capMentor, mentorSkillVal + 2);
+    const novoValAprendiz = Math.min(50, ((aprendiz.skills || {})[skill] || 0) + ganhoTotal);
+    const novoValMentor  = Math.min(50, mentorSkillVal + 2);
     const novosRestantes = (aprendiz.meses_mentoria_restantes || 1) - 1;
 
     const updAprendiz = { [`skills.${skill}`]: novoValAprendiz, meses_mentoria_restantes: novosRestantes };
-    const updMentor   = { [`skills.${skill}`]: novoValMentor, energia_npc_usada_mes: (mentor.energia_npc_usada_mes || 0) + 30 };
+    const updMentor   = { [`skills.${skill}`]: novoValMentor, energia_npc_usada_mes: (mentor.energia_npc_usada_mes || 0) + CUSTO_MENTORIA };
 
     if (novosRestantes <= 0) {
       updAprendiz.mentor_id = null;
@@ -762,8 +790,7 @@ async function _processarFeriasNPCsCF(db, escRef, fSnap, mesGlobal, uid) {
 // PROCESSAMENTO MENSAL: ESTUDO AUTÔNOMO
 // ════════════════════════════════════════════════════════
 async function _processarEstudoNPCsCF(db, escRef, fSnap, uid) {
-  const CARGO_CAP_SKL = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
-  const CUSTO_ESTUDO  = 20;
+  const CUSTO_ESTUDO  = 25;
 
   const proms = [], logs = [];
 
@@ -776,7 +803,7 @@ async function _processarEstudoNPCsCF(db, escRef, fSnap, uid) {
     const energiaUsada = f.energia_npc_usada_mes || 0;
     if (energiaUsada + CUSTO_ESTUDO > 100) continue;
 
-    const cap       = CARGO_CAP_SKL[f.cargo_id] || 20;
+    const cap       = 50;
     const skills    = f.skills || {};
     const skillsJur = f.skills_jur || {};
     const skillKeys    = Object.keys(skills).filter(k => typeof skills[k] === 'number');
@@ -2275,7 +2302,6 @@ async function _gerarProcessoAutomaticoCF(db, j, oportunidade) {
 // GESTOR: AUTO-MENTORIA
 // ════════════════════════════════════════════════════════
 async function _gestorAutoMentoriaCF(db, escRef, fSnap, uid) {
-  const CARGO_CAP_SKL = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
   const MENTOR_CARGOS = new Set(['pln','snr','asc','soc']);
   const APRENDIZ_CARGOS = new Set(['est','ass','jnr']);
 
@@ -2599,6 +2625,25 @@ function _npcPodeManejar(cargo_id, tier) {
   return (_TIER_ORDER_CF[tier] || 0) <= (_TIER_ORDER_CF[maxTier] || 0);
 }
 
+// Risco de sobrecarga na designação automática (Parte B4) — só entra em
+// jogo quando a designação está DELEGADA à gestora (nunca na gestão manual
+// pelo próprio jogador). Baseado em skills.gestao do gestor (1-50, teto
+// único depois da Parte A). Âncoras confirmadas pelo usuário como metade
+// dos números originalmente discutidos numa escala 0-100.
+function _chanceZerarEnergiaGestor(skillGestao) {
+  const g = Math.max(1, Math.min(50, skillGestao || 1));
+  if (g <= 25) return 70 + (g - 1) * (20 - 70) / (25 - 1);   // 1→70%, 25→20%
+  return Math.max(5, 20 + (g - 25) * (5 - 20) / (50 - 25));  // 25→20%, 50→5% (piso)
+}
+function _npcsAfetadosGestor(skillGestao, totalDesignados) {
+  const g = skillGestao || 1;
+  let n;
+  if (g >= 22)      n = 1;
+  else if (g >= 20) n = 2;
+  else              n = 3 + Math.floor((19 - Math.min(g, 19)) / 3); // desce de 3 em 3 pontos abaixo de 20
+  return Math.max(1, Math.min(n, totalDesignados));
+}
+
 // Delegar Gestão por departamento — agrupa as 11 áreas reais de processo
 // (js/processos_escritorio.js::AREA_DEFAULT) nos 5 departamentos que a UI
 // oferece, e cada departamento aponta pra uma skill_jur.area_* real
@@ -2753,8 +2798,8 @@ async function _autoAtribuirProcessosMensalCF(db, escRef, esc) {
   const eficMap = {};
   for (const f of npcsDisponiveis) eficMap[f.id] = _eficienciaNPC(f);
 
-  // Limite de energia: (procCount+1)*20 <= 80 → máx 4 processos ativos por NPC
-  const ENERGIA_LIMITE_PROC = Math.floor((NPC_ENERGIA_MES - NPC_OVERLOAD_TH) / NPC_ENERGIA_POR_PROC); // = 4
+  // Limite de energia: (procCount+1)*25 <= 80 → máx 3 processos ativos por NPC
+  const ENERGIA_LIMITE_PROC = Math.floor((NPC_ENERGIA_MES - NPC_OVERLOAD_TH) / NPC_ENERGIA_POR_PROC); // = 3
 
   const npcElegivel = (f, proc) => {
     const atual = procCount[f.id] || 0;
@@ -2762,6 +2807,8 @@ async function _autoAtribuirProcessosMensalCF(db, escRef, esc) {
     const naoPerdeEnergia = (atual + 1) <= ENERGIA_LIMITE_PROC;
     return cabeNoMax && naoPerdeEnergia && _npcPodeManejar(f.cargo_id, proc.tier || 'D');
   };
+
+  const designadosEsteMes = []; // npcs designados nesta passada — só estes entram no sorteio de risco (B4)
 
   for (const procDoc of poolSnap.docs) {
     const proc = procDoc.data();
@@ -2806,6 +2853,7 @@ async function _autoAtribuirProcessosMensalCF(db, escRef, esc) {
 
     // Incrementar contador local antes de continuar o loop
     procCount[npc.id] = (procCount[npc.id] || 0) + 1;
+    if (!designadosEsteMes.some(d => d.id === npc.id)) designadosEsteMes.push(npc);
 
     await procDoc.ref.update({
       status: 'em_andamento',
@@ -2826,6 +2874,32 @@ async function _autoAtribuirProcessosMensalCF(db, escRef, esc) {
 
     await _logGestaoCF(escRef,
       `👤 ${gestorNome} designou "${proc.titulo}" (${proc.cliente_nome||'cliente'}) para ${npc.nome}.`);
+  }
+
+  // Risco de sobrecarga (Parte B4) — um roll por mês nesta passada de
+  // designação automática. Só se aplica aqui (delegado à gestora); gestão
+  // manual pelo jogador nunca dispara isso sozinha.
+  if (esc.gestor_id && designadosEsteMes.length > 0) {
+    const gestor      = npcMap[esc.gestor_id];
+    const skillGestao = (gestor && gestor.skills || {}).gestao || 1;
+    const chance      = _chanceZerarEnergiaGestor(skillGestao) / 100;
+    if (Math.random() < chance) {
+      const n        = _npcsAfetadosGestor(skillGestao, designadosEsteMes.length);
+      const afetados = [...designadosEsteMes].sort(() => Math.random() - 0.5).slice(0, n);
+      const proms    = afetados.map(f => {
+        const novosMeses = (f.meses_sobrecarregado || 0) + 1;
+        const vaiBurnout = !f.burnout_npc && novosMeses >= 3;
+        return escRef.collection('funcionarios').doc(f.id).update({
+          energia_npc_usada_mes: NPC_ENERGIA_MES,
+          mes_energia:           esc.mes_global || 0,
+          meses_sobrecarregado:  vaiBurnout ? 0 : novosMeses,
+          ...(vaiBurnout ? { burnout_npc: true, burnout_npc_restante: 3 } : {}),
+        });
+      });
+      await Promise.all(proms);
+      await _logGestaoCF(escRef,
+        `⚠️ ${gestorNome} sobrecarregou a agenda este mês — ${afetados.map(f => f.nome).join(', ')} ficaram sem energia.`);
+    }
   }
 }
 

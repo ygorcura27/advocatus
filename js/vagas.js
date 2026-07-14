@@ -9,7 +9,7 @@ import { doc, updateDoc, collection, addDoc, getDoc, getDocs, query, where, arra
 import { db } from './firebase-init.js';
 import {
   ESCRITORIOS_NPC, TIPOS_VAGA, TIER_BONUS, VAGA_FREQ,
-  escritoriosCompativeis, calcSalarioVaga, temVagaAberta, prestigioNoTier, SKILL_CAP
+  escritoriosCompativeis, calcSalarioVaga, temVagaAberta, prestigioNoTier
 } from './escritorios_npc.js';
 
 // ════════════════════════════════════════════════════════
@@ -633,7 +633,7 @@ function _vagaAcessivel(vagaId, j) {
   const vagaIdx = CARGO_IDX[vaga.cargo] || 0;
   if (meuIdx < vagaIdx) return false;
   const skills  = j.skills || {};
-  const cap     = SKILL_CAP[j.cargo_id] || 20;
+  const cap     = window.HABILIDADE_CAP || 50;
   return Object.entries(vaga.skills).every(([sk, min]) => {
     const minAdj = Math.min(min, cap);
     return (skills[sk] || 0) >= minAdj;

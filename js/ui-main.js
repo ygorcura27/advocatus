@@ -1668,7 +1668,7 @@ function renderEquipe(j, el) {
 const _FOCO_BASE_SKILLS = [
   { k:'legal_drafting', l:'Redação Jurídica' }, { k:'legal_research', l:'Pesquisa Jurídica' },
   { k:'argumentation', l:'Argumentação' }, { k:'oral_advocacy', l:'Sustentação Oral' },
-  { k:'negotiation', l:'Negociação' }, { k:'procedure', l:'Litigância' }, { k:'gestao', l:'Gestão' },
+  { k:'negotiation', l:'Negociação' }, { k:'procedure', l:'Litigância' },
 ];
 const _FOCO_DOC_SKILLS = [
   { k:'doc_initial_filing', l:'Petição Inicial' }, { k:'doc_responsive_pleading', l:'Contestação' },
@@ -2098,7 +2098,7 @@ function renderProgressao(j, el) {
 // HABILIDADES
 // ════════════════════════════════════════════════════════
 function renderHabilidades(j, el) {
-  const cap    = window.REP_CAP[j.cargo_id] || 55;
+  const cap    = window.HABILIDADE_CAP || 50;
   const skills = j.skills || {};
   const skJur  = j.skills_jur || {};
   const queue  = j.study_queue || [];
@@ -2122,7 +2122,6 @@ function renderHabilidades(j, el) {
     { k: 'oral_advocacy',    l: 'Sustentação Oral',    w: 0    },
     { k: 'negotiation',      l: 'Negociação',          w: 0    },
     { k: 'procedure',        l: 'Litigância',          w: 0.15 },
-    { k: 'gestao',           l: 'Gestão',              w: 0    },
   ];
   const DOC_SKILLS = [
     { k: 'doc_initial_filing',      l: 'Petição Inicial'          },
@@ -2160,7 +2159,10 @@ function renderHabilidades(j, el) {
   }
 
   function skRowGeral(sk) {
-    const val     = skills[sk.k] || 0;
+    // Clamp defensivo: dado antigo pode ter passado de 100 (teto anterior
+    // escalado por cargo) — a correção real só chega na próxima escrita,
+    // isso aqui é só pra não mostrar "80/50" até lá.
+    const val     = Math.min(skills[sk.k] || 0, cap);
     const isPrior = prioridades.includes(sk.k);
     const emEst   = queue.some(q => q.skill === sk.k);
     const isCap   = val >= cap;
@@ -2486,7 +2488,7 @@ window.fazerCursoRecesso = async function(uid, sk, skLabel) {
   const j = window.JOGADOR;
   if ((j?.dinheiro||0) < 3000) { toast('Saldo insuficiente.','ko'); return; }
   try {
-    const cap = window.REP_CAP[j.cargo_id] || 55;
+    const cap = window.HABILIDADE_CAP || 50;
     const nova = Math.min(cap, ((j.skills||{})[sk]||0) + 5);
     await updateDoc(doc(db, 'jogadores', uid), {
       dinheiro:          (j.dinheiro||0) - 3000,

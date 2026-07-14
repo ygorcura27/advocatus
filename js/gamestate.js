@@ -37,6 +37,14 @@ const CARGO_LABEL = {
 window.CARGO_LABEL = CARGO_LABEL;
 window.REP_CAP     = REP_CAP;
 
+// Teto ÚNICO e flat de habilidade (Habilidades Gerais + Skills Jurídicas) —
+// antes Habilidades Gerais usava REP_CAP (0-100, escalado por cargo, uma
+// cópia por arquivo: SKILL_CAP em escritorios_npc.js, CARGO_CAP_SKL em
+// avancar_mes.js), enquanto Skills Jurídicas já era flat 0-50. Unificado:
+// toda habilidade (não confundir com reputação, que segue cargo-escalada
+// via REP_CAP normalmente) tem o mesmo teto pra todo mundo.
+window.HABILIDADE_CAP = 50;
+
 // ════════════════════════════════════════════════════════
 // ÍCONES ESTÁTICOS DO CHROME (topbar / sidebar direita)
 // Rodam uma vez no load — substituem os emojis crus por SVG (icons.js)

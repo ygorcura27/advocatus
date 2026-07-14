@@ -714,6 +714,11 @@ async function _aceitarDecisaoSentenca(db, processoRef, jogadorRef, p, j, isSetl
 }
 exports._aceitarDecisaoSentenca = _aceitarDecisaoSentenca;
 
+// Reaproveitadas pela resolução mensal de processos de NPC (avancar_mes.js) —
+// mesma curva de convencimento do jogador, sem duplicar a tabela.
+exports.determinarSentencaSetlist = determinarSentencaSetlist;
+exports.AREA_PT_PARA_EN = AREA_PT_PARA_EN;
+
 // ════════════════════════════════════════════════════════
 // DECIDIR RECURSO DA SENTENÇA — callable chamada pelo client
 // (window.decidirRecursoSentencaProducao) quando o JOGADOR decide se

@@ -522,7 +522,7 @@ window.comprarItem = async function(id) {
     const netBonus = {cong_par:8,cong_ber:7,cong_lis:6,cong_sp:5,cong_rio:5}[it.id]||5;
     const updates  = { dinheiro:(j.dinheiro||0)-it.p, [`congressos_usados.${it.id}`]:_anoAtual(j) };
     if (it.rep>0) updates.reputacao = Math.min(window.REP_CAP?.[j.cargo_id]||55,(j.reputacao||30)+it.rep);
-    updates['skills.networking'] = Math.min(window.REP_CAP?.[j.cargo_id]||55, ((j.skills||{}).networking||10)+netBonus);
+    updates['skills.networking'] = Math.min(window.HABILIDADE_CAP||50, ((j.skills||{}).networking||10)+netBonus);
     await _salvar(uid, updates);
     toast(`✈️ ${it.n} — participação confirmada!${it.rep>0?` +${it.rep} rep`:''}`, 'ok');
     return;
@@ -532,17 +532,17 @@ window.comprarItem = async function(id) {
   const novasCompras = [...(j.compras||[]), {id:it.id,n:it.n,rep:it.rep||0,p:it.p,img:it.img}];
   const updates = { dinheiro:(j.dinheiro||0)-it.p, compras:novasCompras };
   if (it.rep>0) updates.reputacao = Math.min(100,(j.reputacao||30)+it.rep);
-  if (it.id==='bj') updates['skills.pesquisa'] = Math.min(window.REP_CAP?.[j.cargo_id]||55,((j.skills||{}).pesquisa||18)+8);
+  if (it.id==='bj') updates['skills.pesquisa'] = Math.min(window.HABILIDADE_CAP||50,((j.skills||{}).pesquisa||18)+8);
   if (it.id==='nb') {
-    updates['skills.escrita']  = Math.min(window.REP_CAP?.[j.cargo_id]||55,((j.skills||{}).escrita||15)+6);
-    updates['skills.pesquisa'] = Math.min(window.REP_CAP?.[j.cargo_id]||55,((j.skills||{}).pesquisa||18)+6);
+    updates['skills.escrita']  = Math.min(window.HABILIDADE_CAP||50,((j.skills||{}).escrita||15)+6);
+    updates['skills.pesquisa'] = Math.min(window.HABILIDADE_CAP||50,((j.skills||{}).pesquisa||18)+6);
   }
   if (it.id==='ai') Object.keys(j.skills||{}).forEach(k=>{
-    updates[`skills.${k}`]=Math.min(window.REP_CAP?.[j.cargo_id]||55,((j.skills||{})[k]||15)+8);
+    updates[`skills.${k}`]=Math.min(window.HABILIDADE_CAP||50,((j.skills||{})[k]||15)+8);
   });
   if (it.id==='ac') {
-    updates['skills.persuasao']=Math.min(window.REP_CAP?.[j.cargo_id]||55,((j.skills||{}).persuasao||12)+6);
-    updates['skills.oratoria'] =Math.min(window.REP_CAP?.[j.cargo_id]||55,((j.skills||{}).oratoria||15)+4);
+    updates['skills.persuasao']=Math.min(window.HABILIDADE_CAP||50,((j.skills||{}).persuasao||12)+6);
+    updates['skills.oratoria'] =Math.min(window.HABILIDADE_CAP||50,((j.skills||{}).oratoria||15)+4);
   }
   await _salvar(uid, updates);
   toast(`${it.n} adquirido!${it.rep>0?` +${it.rep} rep`:''}`, 'ok');
@@ -570,7 +570,7 @@ window.venderItem = async function(id) {
 window.estudarSkill = async function(sk, skLabel) {
   const j   = window.JOGADOR;
   const uid = j.uid || window.JOGADOR_UID;
-  const cap = (window.REP_CAP||{})[j.cargo_id] || 55;
+  const cap = window.HABILIDADE_CAP || 50;
   if ((j.skills?.[sk]||0) >= cap) { toast(`${skLabel} já está no máximo (${cap}).`, 'ko'); return; }
   if ((j.dinheiro||0) < 500) { toast('Saldo insuficiente. Estudar custa R$500.','ko'); return; }
   if ((j.study_queue||[]).some(s => s.skill === sk)) { toast('Já há um estudo desta skill em andamento.','ko'); return; }

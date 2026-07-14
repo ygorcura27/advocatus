@@ -14,11 +14,10 @@
  *    reaproveitados para os popups de nó (entrevista, perícia, etc.).
  */
 
-import { collection, query, where, getDocs, doc, getDoc }
+import { doc, getDoc }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { db } from './firebase-init.js';
 import { sortearCandidatosVademecum } from './banco_vademecum.js';
-import { ehDoPersonagemAtivo } from './personagens.js';
 
 let _procId = null;
 let _procCache = null;
@@ -73,53 +72,18 @@ window.renderInvestigacao = async function(j, main) {
   }
 };
 
+// Investigação deixou de ser um destino navegável próprio — Gestão de
+// Processos é o hub único (jogador, contratado e NPC no mesmo lugar). Sem
+// caso selecionado (ex.: logo depois de concluir um, ou reload nesta aba),
+// redireciona pra lá em vez de mostrar uma lista solta e incompleta (só
+// pegava casos por advogado_uid, nunca os do escritório).
 async function _renderListaCasos(j, main) {
-  main.innerHTML = '<div class="card" style="color:var(--txt3)">Carregando seus casos...</div>';
-  const uid = j.uid;
-  const qy = query(collection(db, 'processos'), where('advogado_uid', '==', uid));
-  const snap = await getDocs(qy);
-  // 'andamento' é o status inicial de todo caso novo (mantido assim de
-  // propósito — ver nota em js/processos.js — a transição para
-  // 'investigacao' só ocorre dentro de iniciarCasoInvestigativo, via Admin
-  // SDK, na primeira vez que o caso é aberto).
-  const casos = snap.docs
-    .map(d => ({ id: d.id, ...d.data() }))
-    .filter(p => ['andamento', 'investigacao', 'montagem', 'julgamento', 'aguardando_decisao_sentenca'].includes(p.status))
-    // Casos "solo"/pessoais são por advogado_uid — sem filtro por
-    // escritório, então precisam do filtro em memória por personagem_id
-    // (Firestore não sabe filtrar "campo ausente OU null" numa query).
-    .filter(p => ehDoPersonagemAtivo(p, j));
-
-  if (casos.length === 0) {
-    main.innerHTML = `
-      <div class="card">
-        <div class="card-titulo">Investigação</div>
-        <div class="card-sub">Nenhum caso em investigação no momento. Assuma um novo processo para começar.</div>
-      </div>`;
-    return;
-  }
-
+  if (window.navTo) { window.navTo('processos'); return; }
   main.innerHTML = `
     <div class="card">
-      <div class="card-titulo">Casos em andamento</div>
-      <div class="card-sub">Selecione um caso para continuar a investigação.</div>
-      <div style="display:flex;flex-direction:column;gap:.5rem;margin-top:.75rem">
-        ${casos.map(p => `
-          <div class="card" style="cursor:pointer" onclick="window.abrirInvestigacao('${p.id}')">
-            <div class="card-titulo">${p.titulo || p.tipo || p.area || 'Processo'}</div>
-            <div class="card-sub" style="font-family:var(--font-mono,monospace)">${p.numero || '—'}</div>
-            <div class="card-sub">${p.autor||'—'} vs ${p.reu||'—'} · ${p.area||'—'}</div>
-            <div class="card-sub">Fase: ${_labelFase(p.status)}</div>
-          </div>`).join('')}
-      </div>
+      <div class="card-titulo">Investigação</div>
+      <div class="card-sub">Nenhum caso selecionado. Veja seus processos em Gestão de Processos.</div>
     </div>`;
-}
-
-function _labelFase(status) {
-  return {
-    investigacao: 'Investigação', montagem: 'Montagem de Estratégia',
-    julgamento: 'Julgamento', aguardando_decisao_sentenca: 'Aguardando decisão',
-  }[status] || status;
 }
 
 // ─── Dispatcher por fase ────────────────────────────────────────────────────

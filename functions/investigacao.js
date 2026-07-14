@@ -319,7 +319,7 @@ exports.executarAcaoInvestigacao = onCall({ region: 'southamerica-east1' }, asyn
 
   const skJur = normalizarSkillsJur(j.skills_jur);
   let custo = CUSTO_TURNO[no.tipo] || 1;
-  if (ACOES_DIRETAS.has(no.tipo)) custo = sk.descontoGestaoTempo(custo, skJur.gestao);
+  if (ACOES_DIRETAS.has(no.tipo)) custo = sk.descontoGestaoTempo(custo, (j.skills||{}).gestao);
 
   let resultado = {};
   if (no.tipo === 'consulta') {

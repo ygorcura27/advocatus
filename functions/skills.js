@@ -98,7 +98,6 @@ function defaultSkillsJur() {
     oral_advocacy:  0,
     negotiation:    0,
     procedure:      0,
-    gestao:         0,
     // Document Type Mastery — 8 skills (Etapa 5)
     doc_initial_filing: 0,
     doc_responsive:     0,
@@ -186,14 +185,17 @@ async function processarEvolucaoSkillsJurMensalCF(db, uid, jogadorData) {
   }
 
   // gestao: +1/mês por ter escritório próprio com equipe (passivo de gestão)
-  // cap em +3/mês mesmo que tenha equipe grande
+  // cap em +3/mês mesmo que tenha equipe grande — vive em skills.gestao
+  // (Habilidades Gerais), não skills_jur (as duas skills de gestão foram
+  // consolidadas numa só).
   if (temEscritorio) {
     const escSnap = await db.collection('escritorios').doc(j.escritorio_proprio_id).collection('funcionarios').limit(5).get();
     const numNpcs = escSnap.docs.filter(d => d.data().tipo === 'npc' && !d.data().burnout_npc).length;
     if (numNpcs > 0) {
-      const ganhoGestao = Math.min(3, numNpcs); // +1 por NPC ativo, max 3/mês
-      const novoGestao  = capSkill(atual.gestao + ganhoGestao);
-      if (novoGestao !== atual.gestao) upd['skills_jur.gestao'] = novoGestao;
+      const ganhoGestao   = Math.min(3, numNpcs); // +1 por NPC ativo, max 3/mês
+      const gestaoAtual   = (j.skills || {}).gestao || 0;
+      const novoGestao    = capSkill(gestaoAtual + ganhoGestao);
+      if (novoGestao !== gestaoAtual) upd['skills.gestao'] = novoGestao;
     }
   }
 

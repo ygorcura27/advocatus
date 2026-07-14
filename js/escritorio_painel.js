@@ -84,15 +84,14 @@ const ACEITAR_ENERGIA = 25;
 const DELEGAR_ENERGIA = { est:5, ass:5, jnr:6, pln:7, snr:8, asc:10, soc:5 };
 const DELEGAR_PCT     = { est:.20, ass:.20, jnr:.30, pln:.40, snr:.50, asc:.70, soc:1.00 };
 
-// Produtividade dinâmica: skills média / cap do cargo (70%) + bônus senioridade (20%) + base (10%)
-const _SKILL_CAP  = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
+// Produtividade dinâmica: skills média / cap flat de habilidade (70%) + bônus senioridade (20%) + base (10%)
 const _CARGO_BON  = { est:0,  ass:5,  jnr:10, pln:15, snr:20, asc:25, soc:30  };
 
 function calcProdutividade(func) {
   const skills = func.skills || {};
   const vals   = Object.values(skills).filter(v => typeof v === 'number');
   const media  = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 15;
-  const cap    = _SKILL_CAP[func.cargo_id] || 35;
+  const cap    = window.HABILIDADE_CAP || 50;
   const bon    = _CARGO_BON[func.cargo_id] || 0;
   // Penalidade leve se sobrecarregado (ação em andamento com < 20% progresso)
   const pen    = (func.acao_atual && (func.acao_atual.progresso_delegado || 0) < 20) ? -5 : 0;

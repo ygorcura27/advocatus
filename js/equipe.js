@@ -6,7 +6,6 @@
 import { collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where, orderBy, limit }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { db } from './firebase-init.js';
-import { SKILL_CAP } from './escritorios_npc.js';
 
 
 // ════════════════════════════════════════════════════════
@@ -342,7 +341,6 @@ window._filtrarEquipeStatus = function(valor, el) {
   _aplicarFiltrosEquipe();
 };
 
-const _SKILL_CAP_EQ = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
 const _CARGO_BON_EQ = { est:0,  ass:5,  jnr:10, pln:15, snr:20, asc:25, soc:30  };
 
 const _CARGO_MENTOR_EQ   = new Set(['pln','snr','asc','soc']);
@@ -386,7 +384,7 @@ function _calcProd(func) {
   const skills = func.skills || {};
   const vals   = Object.values(skills).filter(v => typeof v === 'number');
   const media  = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 15;
-  const cap    = _SKILL_CAP_EQ[func.cargo_id] || 35;
+  const cap    = window.HABILIDADE_CAP || 50;
   const bon    = _CARGO_BON_EQ[func.cargo_id] || 0;
   const pen    = (func.acao_atual && (func.acao_atual.progresso_delegado || 0) < 20) ? -5 : 0;
   const stressMod = _calcStressMod(func);
@@ -396,7 +394,6 @@ function _calcProd(func) {
 const _NPC_MAX_PROC_EQ   = { est:1, ass:1, jnr:2, pln:3, snr:4, asc:5, soc:5 };
 const _CUSTO_NPC_TAREFA  = { est:15, ass:15, jnr:20, pln:20, snr:25, asc:25, soc:30 };
 const _SKILLS_REL_EQ     = ['escrita_juridica','pesquisa','oratoria','persuasao','argumentacao'];
-const _CARGO_CAP_EQ_EFIC = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100 };
 
 // Modificador de produtividade por faixa de estresse
 function _calcStressMod(func) {
@@ -409,13 +406,13 @@ function _calcStressMod(func) {
 function _calcEfic(func) {
   const vals = _SKILLS_REL_EQ.map(s => (func.skills||{})[s] || 0);
   const media = vals.reduce((a,b)=>a+b,0) / vals.length;
-  return Math.round(Math.min(100, (media / (_CARGO_CAP_EQ_EFIC[func.cargo_id]||35)) * 100));
+  return Math.round(Math.min(100, (media / (window.HABILIDADE_CAP||50)) * 100));
 };
 
 function _elegibilidadePromocao(f) {
   const prox = _CARGO_PROX_EQ[f.cargo_id];
   if (!prox) return null;
-  const cap_prox   = _SKILL_CAP_EQ[prox] || 0;
+  const cap_prox   = window.HABILIDADE_CAP || 50;
   const skillVals  = Object.values(f.skills || {}).filter(v => typeof v === 'number');
   const mediaSkill = skillVals.length ? skillVals.reduce((a,b)=>a+b,0)/skillVals.length : 0;
   const ok_meses   = (f.meses_no_cargo || 0) >= 6;
@@ -445,7 +442,7 @@ function _cardFuncionario(f, escId, energiaDisp, procCount = {}, mesGlobal = 0) 
     : `<img class="func-avatar" src="${svgSrc}" alt="${ini}">`;
 
   // Duas skills de maior valor viram barra — o resto fica no Perfil, sem perder o dado.
-  const capSkill  = _SKILL_CAP_EQ[f.cargo_id] || 35;
+  const capSkill  = window.HABILIDADE_CAP || 50;
   const skillsOrd = Object.entries(skills).sort((a,b) => b[1]-a[1]);
   const topSkills = skillsOrd.slice(0, 2);
   const restantes = skillsOrd.length - topSkills.length;
@@ -742,11 +739,11 @@ window.abrirModalContratar = function(cargo_min, escId) {
 };
 
 const _EQ_BASE_SKILLS_CARGO = {
-  est: { pesquisa:12, escrita:10, argumentacao:10, oratoria:8  },
-  ass: { pesquisa:22, escrita:20, argumentacao:18, oratoria:15 },
-  jnr: { pesquisa:30, escrita:28, argumentacao:28, oratoria:25 },
-  pln: { pesquisa:40, escrita:38, argumentacao:38, oratoria:35 },
-  snr: { pesquisa:50, escrita:48, argumentacao:48, oratoria:45 },
+  est: { pesquisa:12, escrita:10, argumentacao:10, oratoria:8,  gestao:3  },
+  ass: { pesquisa:22, escrita:20, argumentacao:18, oratoria:15, gestao:8  },
+  jnr: { pesquisa:30, escrita:28, argumentacao:28, oratoria:25, gestao:15 },
+  pln: { pesquisa:40, escrita:38, argumentacao:38, oratoria:35, gestao:25 },
+  snr: { pesquisa:50, escrita:48, argumentacao:48, oratoria:45, gestao:35 },
 };
 
 function _gerarCandidatoNPC(cargo_id, fotosUsadas) {
@@ -1115,11 +1112,11 @@ window._finalizarContratacaoNPC = async function(idx) {
 
   try {
     await addDoc(collection(db, 'escritorios', escId, 'funcionarios'), funcionario);
-    const gestaoAtual = (j?.skills_jur?.gestao || 0);
+    const gestaoAtual = (j?.skills?.gestao || 0);
     await updateDoc(doc(db, 'jogadores', uid), {
-      'skills_jur.gestao': Math.min(50, gestaoAtual + 2),
+      'skills.gestao': Math.min(50, gestaoAtual + 2),
     });
-    if (window.JOGADOR?.skills_jur) window.JOGADOR.skills_jur.gestao = Math.min(50, gestaoAtual + 2);
+    if (window.JOGADOR?.skills) window.JOGADOR.skills.gestao = Math.min(50, gestaoAtual + 2);
     fecharModal();
     toast(`✅ ${c.nome} (${ci.l}) contratado! Salário: R$ ${ci.sal.toLocaleString('pt-BR')}/mês · +2 Gestão`, 'ok', 5000);
     setTimeout(() => window.navTo && window.navTo('equipe', null), 600);
@@ -1227,7 +1224,7 @@ function _chanceAcertoSelecao(funcionario) {
   const relevantes = ['pesquisa', 'argumentacao', 'escrita'];
   const soma = relevantes.reduce((s, k) => s + (skills[k] || 0), 0);
   const media = soma / relevantes.length;
-  const cap = SKILL_CAP[funcionario.cargo_id] || 20;
+  const cap = window.HABILIDADE_CAP || 50;
   return Math.min(1, media / cap);
 }
 
@@ -1369,12 +1366,12 @@ window._confirmarDesignar = async function(funcId, procId, escId) {
   });
 
   // +1 gestao por delegar processo
-  const gestaoAtual = (j?.skills_jur?.gestao || 0);
+  const gestaoAtual = (j?.skills?.gestao || 0);
   if (gestaoAtual < 50) {
     await updateDoc(doc(db, 'jogadores', uid), {
-      'skills_jur.gestao': Math.min(50, gestaoAtual + 1),
+      'skills.gestao': Math.min(50, gestaoAtual + 1),
     });
-    if (window.JOGADOR?.skills_jur) window.JOGADOR.skills_jur.gestao = Math.min(50, gestaoAtual + 1);
+    if (window.JOGADOR?.skills) window.JOGADOR.skills.gestao = Math.min(50, gestaoAtual + 1);
   }
 
   fecharModal();
@@ -1588,7 +1585,7 @@ window.designarEstudo = async function(funcId, escId) {
     toast('Nenhuma skill disponível.', 'ko'); return;
   }
 
-  const cap = _SKILL_CAP_EQ[f.cargo_id] || 20;
+  const cap = window.HABILIDADE_CAP || 50;
   const optGroup = (titulo, keys, src, capV) => {
     const disponiveis = keys.filter(k => k in src);
     if (!disponiveis.length) return '';

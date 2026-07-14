@@ -147,13 +147,6 @@ const ENERGIA_POR_RODADA_AUDIENCIA = 12;
 const ENERGIA_PREPARACAO_RECURSO = 10;
 const ENERGIA_POR_RODADA_RECURSO = 15;
 
-// REP_CAP — teto de reputação por cargo (já usado em outros módulos via
-// window.REP_CAP; mantido aqui como fallback local caso não esteja setado).
-const REP_CAP_FALLBACK = { est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100, snm:100 };
-function repCapDoJogador(j){
-  return (window.REP_CAP || REP_CAP_FALLBACK)[j.cargo_id] || 55;
-}
-
 // ════════════════════════════════════════════════════════
 // BANCO JURÍDICO — portado integralmente do motor procedural v8.
 // Mesma estrutura, mesma base legal pesquisada (Tema 69 STF, Súmula 436
