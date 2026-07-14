@@ -9,7 +9,7 @@ import { httpsCallable }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
 import { db } from './firebase-init.js';
 import { EFEITO_TRACO, ESTAGIOS } from './relacionamento_dados.js';
-import { filhosColecaoAtual, relColecaoAtual, relDocAtual } from './personagens.js';
+import { filhosColecaoAtual, relColecaoAtual, relDocAtual, listarPersonagens } from './personagens.js';
 import { MORADIAS, CARROS } from './patrimonio.js';
 
 // ════════════════════════════════════════════════════════
@@ -239,6 +239,25 @@ async function _renderAposentadoriaBloco(j, el) {
         </div>`).join('');
     }
 
+    // Outros personagens já jogáveis da mesma conta (irmãos) — transferência
+    // de dinheiro contínua, não só o repasse único no momento de conceder
+    // controle.
+    const lista = await listarPersonagens(uid, j);
+    const ativoId = j.personagem_ativo_id || 'principal';
+    const outros  = lista.filter(p => p.id !== ativoId && (p.idade||0) < 75);
+    const htmlTransferir = outros.length === 0 ? '' : `
+      <div class="secao-header" style="margin-top:1.2rem"><div class="secao-titulo">💰 Enviar dinheiro pra outro personagem seu</div></div>
+      ${outros.map(p => `
+        <div class="card" style="margin-bottom:.5rem;display:flex;justify-content:space-between;align-items:center;gap:.6rem">
+          <div>
+            <div style="font-weight:700;color:var(--txt)">${p.nome_personagem||'—'}</div>
+            <div style="font-size:.7rem;color:var(--ardosia2)">${p.idade ?? '?'} anos · R$ ${(p.dinheiro||0).toLocaleString('pt-BR')}</div>
+          </div>
+          <button class="btn btn-sec btn-sm" onclick="window._abrirModalTransferirDinheiro('${p.id}','${(p.nome_personagem||'').replace(/'/g,"\\'")}')">
+            💰 Transferir
+          </button>
+        </div>`).join('')}`;
+
     el.innerHTML = `
       ${j.aposentado_forcado_pendente ? `
       <div class="card" style="margin-bottom:.7rem;border-color:var(--verm2)">
@@ -248,12 +267,70 @@ async function _renderAposentadoriaBloco(j, el) {
       <div style="font-size:.7rem;color:var(--ardosia2);margin-bottom:.6rem">
         Conceder controle cria um personagem novo e independente (vida, processos e escritório próprios) que fica disponível pra jogar a qualquer momento no seletor do topbar.
       </div>
-      ${htmlAssumir}`;
+      ${htmlAssumir}
+      ${htmlTransferir}`;
   } catch (e) {
     console.error('[APOSENTADORIA]', e);
     el.innerHTML = `<div class="card" style="color:var(--verm2)">Erro ao carregar aposentadoria.</div>`;
   }
 }
+
+// ════════════════════════════════════════════════════════
+// TRANSFERIR DINHEIRO ENTRE PERSONAGENS DA MESMA CONTA
+// ════════════════════════════════════════════════════════
+window._abrirModalTransferirDinheiro = function(personagemId, nome) {
+  const j = window.JOGADOR;
+  const disponivel = j.dinheiro || 0;
+
+  abrirModal(`💰 Transferir para ${nome}`, `
+    <div style="font-size:.75rem;color:var(--ardosia2);margin-bottom:1rem">
+      Saldo atual de ${j.nome_personagem||'você'}: R$ ${disponivel.toLocaleString('pt-BR')}
+    </div>
+    <div class="campo">
+      <label>Valor a transferir</label>
+      <input type="number" id="transf-valor" min="0" max="${Math.max(0,disponivel)}" step="100" value="0" style="width:100%">
+    </div>
+    <div style="display:flex;gap:.5rem;margin-top:.8rem">
+      <button class="btn btn-ghost" style="flex:1" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-prim" style="flex:1" onclick="window._confirmarTransferirDinheiro('${personagemId}')">Transferir →</button>
+    </div>`
+  );
+};
+
+window._confirmarTransferirDinheiro = async function(personagemId) {
+  const valor = Math.round(Number(document.getElementById('transf-valor')?.value) || 0);
+  const j     = window.JOGADOR;
+  const uid   = j.uid || window.JOGADOR_UID;
+  if (valor <= 0) { toast('Digite um valor válido.', 'ko'); return; }
+  if (valor > (j.dinheiro||0)) { toast('Saldo insuficiente.', 'ko'); return; }
+
+  try {
+    const { runTransaction } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+    const jogadorRef = doc(db, 'jogadores', uid);
+    const destRef     = doc(db, 'jogadores', uid, 'personagens', personagemId);
+
+    await runTransaction(db, async (tx) => {
+      const jogadorSnap = await tx.get(jogadorRef);
+      const destSnap     = await tx.get(destRef);
+      if (!jogadorSnap.exists() || !destSnap.exists()) throw new Error('Personagem não encontrado.');
+      const jd   = jogadorSnap.data();
+      const dest = destSnap.data();
+      if (valor > (jd.dinheiro||0)) throw new Error('Saldo insuficiente.');
+
+      tx.update(jogadorRef, { dinheiro: (jd.dinheiro||0) - valor });
+      tx.update(destRef,     { dinheiro: (dest.dinheiro||0) + valor });
+    });
+
+    j.dinheiro = (j.dinheiro||0) - valor;
+    window.JOGADOR = j;
+    fecharModal();
+    toast(`💰 R$ ${valor.toLocaleString('pt-BR')} transferido(s)!`, 'ok', 4000);
+    if (window.navTo) window.navTo('carreira', null);
+  } catch (e) {
+    console.error('[TRANSFERIR DINHEIRO]', e);
+    toast('Erro ao transferir: ' + (e.message||''), 'ko');
+  }
+};
 
 window._abrirModalConcederHeranca = function(filhoId, nome) {
   const j = window.JOGADOR;

@@ -1073,7 +1073,16 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
   // (podem começar com mais de 22 anos, ver js/relacionamento.js) — ausente
   // pro personagem original, que sempre começa aos 22 (index.html), mesma
   // conta de sempre.
-  updates.idade = (j.idade_inicial ?? 22) + Math.floor(mesGlobal / 12);
+  // Deriva de ano_pessoal (incremental, só sobe 1 por virada de janeiro),
+  // NUNCA de mes_global_pessoal/mes_global_inicio — esses dois são
+  // contadores históricos reaproveitados por petições/pós-graduação/etc,
+  // não "meses desde que este personagem nasceu"; usá-los aqui fazia a
+  // idade saltar pra centenas de anos numa conta antiga (idade_inicial +
+  // floor(contador_absoluto/12), contador esse já nas milhares de contas
+  // de teste) e forçava aposentadoria bugada. ano_pessoal é auto-corretivo:
+  // já reflete os anos reais decorridos, então essa troca conserta contas
+  // já corrompidas no próximo avançar mês, sem precisar de patch manual.
+  updates.idade = (j.idade_inicial ?? 22) + (novoAno - 1);
 
   // Falta na Pós-Graduação: todo mês que o jogador não comparece à aula
   // (compararecerAula, functions/posgraduacao.js) enquanto cursando conta
@@ -3485,7 +3494,12 @@ async function _processarPersonagensBancoCF(db, uid) {
       const novoMes   = (mesAtual + 1) % 12;
       const novoAno   = novoMes === 0 ? anoAtual + 1 : anoAtual;
       const mesGlobal = (p.mes_global_pessoal || 0) + 1;
-      const novaIdade = (p.idade_inicial ?? p.idade ?? 22) + Math.floor(mesGlobal / 12);
+      // Mesmo motivo do personagem ativo (ver comentário na função de
+      // avanço principal): deriva de ano_pessoal, nunca de mes_global_
+      // pessoal — evita idade saltar pra centenas de anos numa conta
+      // antiga. Base fixa em idade_inicial (nunca p.idade em si — reusar
+      // a própria idade corrente como âncora a cada tick compunha o erro).
+      const novaIdade = (p.idade_inicial ?? 22) + (novoAno - 1);
 
       const morId    = p.pat?.moradia || 'pais';
       const carId    = p.pat?.transporte || 'onibus';

@@ -278,6 +278,9 @@ function renderPerfil(j, el) {
                 <span class="pill" style="background:var(--bg2);color:var(--txt3);border:var(--borda-sub)">${esp} · ${j.escritorio_bairro || 'Rio de Janeiro'}</span>
                 ${j.no_serasa ? '<span class="pill" style="background:rgba(122,32,32,.25);color:var(--verm3);border:1px solid rgba(200,80,80,.35)">🚨 Serasa</span>' : ''}
               </div>
+              <div style="margin-top:.4rem;font-size:.65rem;color:var(--txt4)">
+                ID pra convites: <span id="perfil-id-jogador" style="font-family:var(--font-mono,monospace);color:var(--txt3);cursor:pointer" title="Clique pra copiar" onclick="navigator.clipboard?.writeText('${j.uid||''}');toast&&toast('ID copiado!','ok')">${j.uid||'—'}</span>
+              </div>
             </div>
           </div>
           ${j.oab ? `<div class="selo-stamp"><div class="selo-stamp-text">Registro<br>Ativo<br>OAB</div></div>` : ''}

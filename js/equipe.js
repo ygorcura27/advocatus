@@ -1653,8 +1653,8 @@ window.toggleGestorDelegacao = async function(escId, tipo) {
 window._abrirConviteJogador = function(cargo_min, escId) {
   abrirModal('👤 Convidar Jogador',
     `<div class="campo">
-      <label>E-mail do jogador</label>
-      <input type="email" id="convite-email" placeholder="email@exemplo.com">
+      <label>ID do jogador (Perfil dele → "ID pra convites")</label>
+      <input type="text" id="convite-id" placeholder="cole o ID aqui">
     </div>
     <div class="campo">
       <label>Cargo oferecido</label>
@@ -1671,23 +1671,19 @@ window._abrirConviteJogador = function(cargo_min, escId) {
 };
 
 window._enviarConviteJogador = async function(escId) {
-  const email   = document.getElementById('convite-email')?.value?.trim();
+  const alvoUid = document.getElementById('convite-id')?.value?.trim();
   const cargoId = document.getElementById('convite-cargo')?.value;
-  if (!email) { toast('Digite o e-mail do jogador.','ko'); return; }
+  if (!alvoUid) { toast('Cole o ID do jogador.','ko'); return; }
 
   const j   = window.JOGADOR;
   const uid = j?.uid||window.JOGADOR_UID;
+  if (alvoUid === uid) { toast('Você não pode se convidar.','ko'); return; }
   const ci  = CARGO_INFO[cargoId]||CARGO_INFO.jnr;
   const escSnap = await getDoc(doc(db,'escritorios',escId));
   const escNome = escSnap.exists() ? escSnap.data().nome : 'Escritório';
 
-  // Buscar jogador pelo e-mail
-  const { query: fq, where: fw, getDocs: fgd } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-  const snap = await getDocs(query(collection(db,'jogadores'), where('email','==',email)));
-  if (snap.empty) { toast('Jogador não encontrado com este e-mail.','ko'); return; }
-
-  const alvo    = snap.docs[0];
-  const alvoUid = alvo.id;
+  const alvoSnap = await getDoc(doc(db,'jogadores',alvoUid));
+  if (!alvoSnap.exists()) { toast('Jogador não encontrado com esse ID.','ko'); return; }
 
   await addDoc(collection(db,'jogadores',alvoUid,'inbox'), {
     de: uid, para_uid: alvoUid,
@@ -1698,7 +1694,7 @@ window._enviarConviteJogador = async function(escId) {
   });
 
   fecharModal();
-  toast(`✉️ Convite enviado para ${email}!`, 'ok', 4000);
+  toast(`✉️ Convite enviado!`, 'ok', 4000);
 };
 
 // ════════════════════════════════════════════════════════

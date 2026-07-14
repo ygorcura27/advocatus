@@ -1228,11 +1228,17 @@ window.assumirHerdeiro = async function(filhoId, opts) {
   const novoPersRef  = doc(db, 'jogadores', uid, 'personagens', novoId);
   const mesGlobalAtual = j.mes_global_pessoal ?? j.mes_global_inicio ?? 0;
 
-  // Skills novato + bônus escolhido — mesmo shape de criação de personagem
-  // (index.html), 8 Habilidades Gerais, tudo mais em zero.
-  const skills = {};
+  // Skills novato — MESMA base de index.html (sem isso, um herdeiro sem
+  // bônus alocado em "pesquisa" nascia com skills.pesquisa ausente/0 e
+  // nunca batia o mínimo de nenhuma vaga, mesmo meses depois). Bônus
+  // escolhido pelo doador soma por cima.
+  const skills = {
+    oratoria:10, argumentacao:10, escrita:10,
+    pesquisa:10, negociacao:10, persuasao:10,
+    gestao:5,   networking:5,
+  };
   for (const [sk, v] of Object.entries(bonusSkills || {})) {
-    if (v > 0) skills[sk] = v;
+    if (v > 0) skills[sk] = (skills[sk]||0) + v;
   }
 
   if (moradiaId) delete moradiasDoador[moradiaId];
