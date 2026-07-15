@@ -59,6 +59,48 @@ const CARGOS_STAFF_POR_TIER = {
   4: ['jnr', 'pln'], 5: ['pln', 'snr'],
 };
 
+// Clientes iniciais — sem isso o escritório nasce com 0 clientes, e tanto o
+// botão manual "Reunião com Clientes" (js/processos_escritorio.js::
+// gerarProcessosMensais) quanto a geração automática mensal
+// (avancar_mes.js::_gerarProcessosMensalAutomaticoCF) recusam gerar QUALQUER
+// processo sem pelo menos 1 cliente (`if (clientes.length === 0) return 0`)
+// — um escritório recém-materializado ficava travado em "Nenhum processo
+// gerado" até o próximo avançar mês criar oportunidades do zero E alguém
+// aceitar uma recorrente pra virar cliente. Mesmo shape gravado quando uma
+// oportunidade recorrente é aceita (avancar_mes.js:_processarAutogestaoOportunidadesCF).
+const CLIENTES_INICIAL_POR_TIER = { 1: 1, 2: 2, 3: 2, 4: 3, 5: 3 };
+const PERFIS_CLIENTE = ['conservador', 'ansioso', 'pragmatico', 'exigente', 'leal'];
+const NOMES_CLIENTE_PF = [
+  'Marcos Vinícius Andrade', 'Beatriz Souza Lima', 'Carlos Eduardo Ferreira',
+  'Juliana Martins Rocha', 'Roberto Carlos Nunes', 'Simone Aparecida Diniz',
+];
+const NOMES_CLIENTE_PJ = {
+  micro: ['Padaria Bom Pão', 'Oficina do Zé', 'Salão Beleza Rara'],
+  pequena: ['Comercial Rio Doce', 'Transportes Bravo', 'Clínica Vitalis'],
+  media: ['Metalúrgica Aço Forte', 'Grupo Nordeste Alimentos', 'TechSul Sistemas'],
+  grande: ['Construtora Horizonte', 'Indústrias Cavalcante', 'Rede Mercantil Central'],
+};
+const PORTE_POR_TIER = { 1: 'micro', 2: 'micro', 3: 'pequena', 4: 'media', 5: 'grande' };
+const VALOR_MENSAL_POR_TIER = { 1: [1200, 2500], 2: [1800, 3200], 3: [2500, 6000], 4: [4000, 12000], 5: [8000, 22000] };
+
+function sortear(arr) { return arr[rndInt(0, arr.length - 1)]; }
+
+function gerarClienteInicial(tier) {
+  const ehPJ = Math.random() < 0.5;
+  const porte = ehPJ ? PORTE_POR_TIER[tier] : null;
+  const nome = ehPJ ? sortear(NOMES_CLIENTE_PJ[porte]) : sortear(NOMES_CLIENTE_PF);
+  const [vMin, vMax] = VALOR_MENSAL_POR_TIER[tier] || VALOR_MENSAL_POR_TIER[1];
+  return {
+    nome, tipo: ehPJ ? 'PJ' : 'PF', porte,
+    confianca: rndInt(50, 70),
+    recorrente: true,
+    valor_mensal: rndInt(vMin, vMax),
+    perfil: sortear(PERFIS_CLIENTE),
+    rede_tamanho: !ehPJ ? 'pequena' : (porte === 'grande' ? 'grande' : porte === 'media' ? 'media' : 'pequena'),
+    criado_em: new Date().toISOString(),
+  };
+}
+
 function rndInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
 
 function gerarSkillsJur(cargoId) {
@@ -161,6 +203,12 @@ async function _garantirEscritorioEmpregadorNPC(db, escId, catalogo = {}) {
       tx.set(funcRef, gerarFuncionarioNPC(cargoId));
     }
 
+    const nClientes = CLIENTES_INICIAL_POR_TIER[tier] || 1;
+    for (let i = 0; i < nClientes; i++) {
+      const clRef = escRef.collection('clientes').doc();
+      tx.set(clRef, gerarClienteInicial(tier));
+    }
+
     return { id: escId, data: escData, criado: true };
   });
 }
@@ -182,6 +230,26 @@ exports.garantirEscritorioEmpregadorNPC = onCall({ region: 'southamerica-east1' 
 
   const db = getFirestore();
   const resultado = await _garantirEscritorioEmpregadorNPC(db, escId, { nome, esp, bairro });
+
+  // Reparo pra escritórios materializados ANTES desta versão ter clientes
+  // iniciais (deploy anterior só criava dono/sócio NPC + staff, 0 clientes —
+  // travava toda geração de processo, ver comentário em
+  // CLIENTES_INICIAL_POR_TIER acima). Só roda quando o doc já existia
+  // (senão _garantirEscritorioEmpregadorNPC acima já semeou na criação) e é
+  // barato: 1 query de tamanho, sem custo quando já tem cliente.
+  if (!resultado.criado && resultado.data.npc_catalogo) {
+    const clSnap = await db.collection('escritorios').doc(escId).collection('clientes').limit(1).get();
+    if (clSnap.empty) {
+      const tier = resultado.data.tier || 1;
+      const nClientes = CLIENTES_INICIAL_POR_TIER[tier] || 1;
+      const batch = db.batch();
+      for (let i = 0; i < nClientes; i++) {
+        batch.set(db.collection('escritorios').doc(escId).collection('clientes').doc(), gerarClienteInicial(tier));
+      }
+      await batch.commit();
+      logger.info(`[ESCRITÓRIO NPC] Backfill de ${nClientes} cliente(s) inicial(is) em ${escId}`);
+    }
+  }
 
   if (tornarSocio) {
     const escRef = db.collection('escritorios').doc(escId);
