@@ -103,6 +103,39 @@ function gerarClienteInicial(tier) {
 
 function rndInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
 
+// Um processo GARANTIDO por cliente semeado, em vez de depender do roll de
+// chance de _gerarProcessosMensalAutomaticoCF — sem isso o funcionário
+// contratado hoje só veria o primeiro caso no próximo avançar mês (e nem
+// isso é garantido, é só uma chance por cliente). Mesmo shape gravado por
+// js/processos_escritorio.js::gerarProcessosMensais.
+const AREAS_PROCESSO = ['civil', 'trabalhista', 'tributario', 'empresarial', 'consumidor'];
+const TITULOS_PROCESSO = [
+  'Ação de Cobrança', 'Ação Revisional de Contrato', 'Reclamação Trabalhista',
+  'Ação de Indenização', 'Mandado de Segurança', 'Ação Declaratória',
+];
+function _clienteTierLocal(valorMensal) {
+  if (valorMensal >= 50000) return 'S';
+  if (valorMensal >= 20000) return 'A';
+  if (valorMensal >= 8000) return 'B';
+  if (valorMensal >= 3000) return 'C';
+  return 'D';
+}
+function _honorariosPorTierLocal(tier) {
+  const ranges = { D: [1500, 4500], C: [5000, 14000], B: [15000, 38000], A: [40000, 95000], S: [100000, 240000] };
+  const [min, max] = ranges[tier] || ranges.D;
+  return Math.round((min + Math.random() * (max - min)) / 500) * 500;
+}
+function gerarProcessoInicial(clienteId, cliente) {
+  const tier = _clienteTierLocal(cliente.valor_mensal || 0);
+  return {
+    titulo: sortear(TITULOS_PROCESSO), cliente_id: clienteId, cliente_nome: cliente.nome,
+    area: sortear(AREAS_PROCESSO), tier, honorarios: _honorariosPorTierLocal(tier), icone: '⚖️',
+    status: 'disponivel', progresso: 0,
+    func_id: null, func_nome: null, func_cargo: null, resultado: null,
+    criado_em: new Date().toISOString(),
+  };
+}
+
 function gerarSkillsJur(cargoId) {
   const base = CARGO_JUR_BASE[cargoId] || CARGO_JUR_BASE.est;
   const skills = {};
@@ -206,7 +239,9 @@ async function _garantirEscritorioEmpregadorNPC(db, escId, catalogo = {}) {
     const nClientes = CLIENTES_INICIAL_POR_TIER[tier] || 1;
     for (let i = 0; i < nClientes; i++) {
       const clRef = escRef.collection('clientes').doc();
-      tx.set(clRef, gerarClienteInicial(tier));
+      const cliente = gerarClienteInicial(tier);
+      tx.set(clRef, cliente);
+      tx.set(escRef.collection('processos_pool').doc(), gerarProcessoInicial(clRef.id, cliente));
     }
 
     return { id: escId, data: escData, criado: true };
@@ -244,7 +279,10 @@ exports.garantirEscritorioEmpregadorNPC = onCall({ region: 'southamerica-east1' 
       const nClientes = CLIENTES_INICIAL_POR_TIER[tier] || 1;
       const batch = db.batch();
       for (let i = 0; i < nClientes; i++) {
-        batch.set(db.collection('escritorios').doc(escId).collection('clientes').doc(), gerarClienteInicial(tier));
+        const clRef = db.collection('escritorios').doc(escId).collection('clientes').doc();
+        const cliente = gerarClienteInicial(tier);
+        batch.set(clRef, cliente);
+        batch.set(db.collection('escritorios').doc(escId).collection('processos_pool').doc(), gerarProcessoInicial(clRef.id, cliente));
       }
       await batch.commit();
       logger.info(`[ESCRITÓRIO NPC] Backfill de ${nClientes} cliente(s) inicial(is) em ${escId}`);

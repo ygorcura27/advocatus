@@ -285,6 +285,11 @@ window.renderProcessosPool = async function(j, escId, el) {
     // Gestor atual e tier real do escritório
     let gestorNome = null;
     let tierEsc    = j.escritorio_tier || 1;
+    // "Reunião com Clientes" grava direto em processos_pool (create), regra
+    // exige dono/sócio/gestor — escritório NPC nunca tem dono/sócio jogador,
+    // então só sobra gestor. Botão ficava visível pra QUALQUER funcionário
+    // antes, batendo permission-denied pra quem não é nenhum dos três.
+    let podeGerarProcessos = false;
     try {
       const escSnap = await getDoc(doc(db, 'escritorios', escId));
       if (escSnap.exists()) {
@@ -292,6 +297,10 @@ window.renderProcessosPool = async function(j, escId, el) {
         gestorNome = escData.gestor_nome || null;
         // Usar tier do documento (j.escritorio_tier pode estar desatualizado após upgrades)
         tierEsc = escData.tier || tierEsc;
+        const meuUid = j.uid || window.JOGADOR_UID;
+        podeGerarProcessos = escData.gestor_id === meuUid
+          || escData.dono_uid === meuUid || escData.fundador_uid === meuUid
+          || (escData.socios_uids || []).includes(meuUid);
       }
     } catch(e) {}
 
@@ -338,10 +347,10 @@ window.renderProcessosPool = async function(j, escId, el) {
             ${gestorNome ? `<span style="font-size:.65rem;color:var(--verde2)">👤 Gestor: ${gestorNome}</span>` : ''}
           </div>
           <div style="display:flex;gap:.3rem;flex-shrink:0">
-            <button class="btn btn-sm btn-ghost" style="font-size:.62rem;padding:.18rem .5rem"
+            ${podeGerarProcessos ? `<button class="btn btn-sm btn-ghost" style="font-size:.62rem;padding:.18rem .5rem"
               onclick="window.gerarProcessosMensais('${escId}',${tierEsc})">
               🤝 Reunião com Clientes
-            </button>
+            </button>` : ''}
           </div>
         </div>
         <div class="proc-tres-cols">
