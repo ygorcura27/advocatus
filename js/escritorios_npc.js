@@ -66,7 +66,7 @@ export const TIPOS_VAGA = {
   },
   socio_associado: {
     l:       'Sócio-Associado',
-    cargo:   'snr',
+    cargo:   'soc',
     skills:  { gestao: 42, argumentacao: 45, escrita: 42 }, // cap snr = 65
     sal_mult: 1.35,
     desc:    'Gestão de equipe, carteira de clientes e participação nos lucros.',

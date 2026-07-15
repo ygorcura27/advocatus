@@ -1597,6 +1597,18 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
     logger.warn('Erro no processamento mensal de serviços/clientes:', e.message);
   }
 
+  // ── ELEGIBILIDADE A GESTOR (bloco novo) ──
+  // Mesmo bug "função existe mas nunca é chamada" dos blocos acima:
+  // _verificarElegibilidadeGestorCF sempre existiu mas nunca era invocada
+  // por exports.avancarMes — nenhum funcionário-jogador jamais virava
+  // gestor automaticamente, mesmo batendo os critérios (gestão/networking
+  // no cap do cargo + cargo mais alto do escritório).
+  try {
+    await _verificarElegibilidadeGestorCF(db, uid, { ...j, cargo_id: updates.cargo_id || j.cargo_id });
+  } catch (e) {
+    logger.warn('Erro ao verificar elegibilidade a gestor:', e.message);
+  }
+
   // ── PROCESSAMENTO MENSAL DE CURSOS (bloco novo) ──
   // Reset do bug "função existe mas nunca é chamada", idêntico ao caso de
   // relacionamentos: carreira.js::processarCursosMensal era exposta como

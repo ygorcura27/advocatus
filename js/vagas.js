@@ -6,11 +6,45 @@
 
 import { doc, updateDoc, collection, addDoc, getDoc, getDocs, query, where, arrayUnion, arrayRemove }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { httpsCallable }
+  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
 import { db } from './firebase-init.js';
 import {
   ESCRITORIOS_NPC, TIPOS_VAGA, TIER_BONUS, VAGA_FREQ,
   escritoriosCompativeis, calcSalarioVaga, temVagaAberta, prestigioNoTier
 } from './escritorios_npc.js';
+import { personagemDocRef } from './personagens.js';
+
+// Salário fixo por cargo pra vagas do catálogo NPC (a skill do candidato só
+// varia contratação de NPC via equipe.js, não o próprio salário do jogador
+// aqui). 'soc' = trilha de sócio (vaga socio_associado) — ver escritorios_npc.js.
+const CARGO_SAL = { est:1700, ass:2500, jnr:3500, pln:5500, snr:9000, soc:14000 };
+
+// Capacidade de vagas por tier — mesma tabela usada na materialização do
+// escritório NPC (functions/npc_escritorios_empregadores.js:STAFF_INICIAL_POR_TIER
+// é a equipe JÁ contratada; isto aqui é o teto total de vagas do tier).
+const TIER_CAPACIDADE = {
+  1: { est:1, ass:1, adv:0 }, 2: { est:2, ass:2, adv:1 },
+  3: { est:3, ass:2, adv:2 }, 4: { est:4, ass:3, adv:3 },
+  5: { est:5, ass:4, adv:4 },
+};
+
+// Garante (idempotente) que o doc do escritório NPC exista de verdade no
+// Firestore antes de registrar o jogador como funcionário — catálogo inteiro
+// (js/escritorios_npc.js) é só dado estático até a primeira contratação.
+// Ver functions/npc_escritorios_empregadores.js pro porquê disso precisar
+// ser uma Cloud Function (dono/sócio NPC e equipe inicial não passam pelas
+// regras de escrita do cliente).
+async function _garantirEscritorioNPC(escId, opts = {}) {
+  const fn = httpsCallable(window.FB_FUNCTIONS, 'garantirEscritorioEmpregadorNPC');
+  const catalogo = ESCRITORIOS_NPC.find(e => e.id === escId);
+  const result = await fn({
+    escId,
+    nome: catalogo?.nome, esp: catalogo?.esp, bairro: catalogo?.bairro,
+    ...opts,
+  });
+  return result.data.escritorio;
+}
 
 // ════════════════════════════════════════════════════════
 // PAINEL DE VAGAS (renderizado em ui-main.js via navTo)
@@ -295,7 +329,6 @@ window.aceitarConviteEscritorio = async function(msgId) {
   if (!escSnap.exists()) { toast('Escritório não existe mais.', 'ko'); return; }
   const esc = escSnap.data();
 
-  const CARGO_SAL = { est:1700, ass:2500, jnr:3500, pln:5500, snr:9000 };
   const sal = CARGO_SAL[c.cargo_id] || 0;
 
   // Verificar se ainda há vaga disponível para esse cargo no escritório.
@@ -306,11 +339,6 @@ window.aceitarConviteEscritorio = async function(msgId) {
   // mantido no próprio doc do escritório (`vagas_ocupadas: { est, ass, adv }`),
   // que é atualizado a cada contratação/saída e pode ser lido por qualquer
   // jogador autenticado (a regra de leitura de /escritorios/{id} já é pública).
-  const TIER_CAPACIDADE = {
-    1: { est:1, ass:1, adv:0 }, 2: { est:2, ass:2, adv:1 },
-    3: { est:3, ass:2, adv:2 }, 4: { est:4, ass:3, adv:3 },
-    5: { est:5, ass:4, adv:4 },
-  };
   const cap = TIER_CAPACIDADE[esc.tier||1] || TIER_CAPACIDADE[1];
   const ocupadasMap = esc.vagas_ocupadas || { est:0, ass:0, adv:0 };
   const grupo = c.cargo_id==='est' ? 'est' : c.cargo_id==='ass' ? 'ass' : 'adv';
@@ -323,7 +351,22 @@ window.aceitarConviteEscritorio = async function(msgId) {
   }
 
   try {
-    await updateDoc(doc(db, 'jogadores', uid), {
+    // Convite é endereçado a um personagem ESPECÍFICO (uid+personagem_id no
+    // ID de convite) — pode não ser o personagem ativo agora. Resolve o doc
+    // certo (ativo vive em jogadores/{uid}; os outros, arquivados em
+    // jogadores/{uid}/personagens/{id}) em vez de assumir sempre window.JOGADOR.
+    const ativoId  = j.personagem_ativo_id || 'principal';
+    const alvoId   = c.personagem_id || 'principal';
+    const éAtivo   = alvoId === ativoId;
+    const alvoRef  = personagemDocRef(uid, ativoId, alvoId);
+    let alvoData = j;
+    if (!éAtivo) {
+      const alvoSnap = await getDoc(alvoRef);
+      if (!alvoSnap.exists()) { toast('Personagem do convite não encontrado.', 'ko'); return; }
+      alvoData = alvoSnap.data();
+    }
+
+    await updateDoc(alvoRef, {
       escritorio_id:           c.esc_id,
       escritorio_empregado_id: c.esc_id,
       escritorio_proprio_id:   null,
@@ -336,11 +379,11 @@ window.aceitarConviteEscritorio = async function(msgId) {
       derrotas_consecutivas:   0,
     });
 
-    // Registrar o jogador como FUNCIONÁRIO no escritório (aparece pro dono na Equipe)
+    // Registrar o personagem como FUNCIONÁRIO no escritório (aparece pro dono na Equipe)
     await addDoc(collection(db, 'escritorios', c.esc_id, 'funcionarios'), {
-      nome: j.nome_personagem || 'Advogado', cargo_id: c.cargo_id,
-      tipo: 'jogador', jogador_uid: uid,
-      skills: j.skills || {}, sexo: j.sexo || 'm',
+      nome: alvoData.nome_personagem || 'Advogado', cargo_id: c.cargo_id,
+      tipo: 'jogador', jogador_uid: uid, personagem_id: c.personagem_id || null,
+      skills: alvoData.skills || {}, sexo: alvoData.sexo || 'm',
       ativo: true, acoes_mes_usadas: 0, acao_atual: null,
       criado_em: new Date().toISOString(),
     });
@@ -356,6 +399,7 @@ window.aceitarConviteEscritorio = async function(msgId) {
     });
 
     await updateDoc(doc(db, 'jogadores', uid, 'inbox', msgId), { status: 'aceito', lida: true });
+    if (éAtivo) window.JOGADOR = { ...j, escritorio_id: c.esc_id, escritorio_empregado_id: c.esc_id, cargo_id: c.cargo_id };
     toast(`✅ Bem-vindo(a) a ${esc.nome}!`, 'ok', 5000);
     setTimeout(() => window.navTo && window.navTo('vagas', null), 600);
   } catch (err) {
@@ -401,7 +445,55 @@ window._confirmarCandidatura = async function(escId, vagaId, sal) {
   const vaga = TIPOS_VAGA[vagaId];
   if (!esc || !vaga || !j) return;
 
+  const éPromocaoNoMesmoEsc = j.escritorio_empregado_id === escId;
+
   try {
+    // Materializa o doc real do escritório NPC (idempotente — no-op se já
+    // existir) antes de mexer em qualquer coisa. 'soc' é a trilha de sócio:
+    // a própria Cloud Function faz o arrayUnion em socios_uids/socios, que
+    // as regras do cliente não deixariam o jogador fazer sozinho.
+    const escReal = await _garantirEscritorioNPC(escId, { tornarSocio: vaga.cargo === 'soc' });
+
+    const cap = TIER_CAPACIDADE[esc.tier||1] || TIER_CAPACIDADE[1];
+    const grupo = vaga.cargo==='est' ? 'est' : vaga.cargo==='ass' ? 'ass' : 'adv';
+    const ocupadasMap = escReal.vagas_ocupadas || { est:0, ass:0, adv:0 };
+
+    // Vaga cheia? Só bloqueia contratação NOVA — promoção no mesmo
+    // escritório não disputa uma vaga nova, é o mesmo posto trocando de cargo.
+    if (!éPromocaoNoMesmoEsc && (ocupadasMap[grupo]||0) >= (cap[grupo]||0)) {
+      toast('A vaga já foi ocupada por outro candidato. Tente novamente mais tarde.', 'ko', 5000);
+      fecharModal();
+      return;
+    }
+
+    // Se estava empregado em OUTRO escritório, desliga o registro de
+    // funcionário de lá antes de entrar no novo (mesma limpeza de
+    // window.sairEscritorio, sem o solo intermediário).
+    if (j.escritorio_empregado_id && !éPromocaoNoMesmoEsc && j.escritorio_empregado_id !== 'solo') {
+      try {
+        const escIdAntigo = j.escritorio_empregado_id;
+        const cargoAntigo = j.cargo_id;
+        const fSnapAntigo = await getDocs(query(
+          collection(db, 'escritorios', escIdAntigo, 'funcionarios'),
+          where('jogador_uid', '==', uid)
+        ));
+        for (const fDoc of fSnapAntigo.docs) {
+          await updateDoc(doc(db, 'escritorios', escIdAntigo, 'funcionarios', fDoc.id), { ativo: false, saiu_em: new Date().toISOString() });
+        }
+        if (fSnapAntigo.docs.length > 0 && cargoAntigo) {
+          const grupoAntigo = cargoAntigo==='est' ? 'est' : cargoAntigo==='ass' ? 'ass' : 'adv';
+          const escAntigoSnap = await getDoc(doc(db, 'escritorios', escIdAntigo));
+          if (escAntigoSnap.exists()) {
+            const atual = (escAntigoSnap.data().vagas_ocupadas || {})[grupoAntigo] || 0;
+            await updateDoc(doc(db, 'escritorios', escIdAntigo), {
+              [`vagas_ocupadas.${grupoAntigo}`]: Math.max(0, atual - 1),
+              funcionarios_uids: arrayRemove(uid),
+            });
+          }
+        }
+      } catch (e) { /* escritório antigo sem subcoleção populada — ignora */ }
+    }
+
     await updateDoc(doc(db, 'jogadores', uid), {
       escritorio_id:          escId,
       escritorio_empregado_id:escId,
@@ -409,10 +501,37 @@ window._confirmarCandidatura = async function(escId, vagaId, sal) {
       escritorio_tier:        esc.tier,
       escritorio_esp:         esc.esp,
       escritorio_bairro:      esc.bairro,
+      cargo_id:               vaga.cargo,
       vaga_tipo:              vagaId,
       sal_base_escritorio:    sal,
       derrotas_consecutivas:  0,
     });
+    if (window.JOGADOR) window.JOGADOR = { ...j, escritorio_id: escId, escritorio_empregado_id: escId, cargo_id: vaga.cargo };
+
+    // Registro de funcionário: promoção no mesmo escritório atualiza o
+    // registro que já existe (senão vira jogador "fantasma" duplicado);
+    // contratação nova cria e ocupa vaga.
+    if (éPromocaoNoMesmoEsc) {
+      const fSnapAtual = await getDocs(query(
+        collection(db, 'escritorios', escId, 'funcionarios'),
+        where('jogador_uid', '==', uid)
+      ));
+      for (const fDoc of fSnapAtual.docs) {
+        await updateDoc(doc(db, 'escritorios', escId, 'funcionarios', fDoc.id), { cargo_id: vaga.cargo });
+      }
+    } else {
+      await addDoc(collection(db, 'escritorios', escId, 'funcionarios'), {
+        nome: j.nome_personagem || 'Advogado', cargo_id: vaga.cargo,
+        tipo: 'jogador', jogador_uid: uid,
+        skills: j.skills || {}, sexo: j.sexo || 'm',
+        ativo: true, acoes_mes_usadas: 0, acao_atual: null,
+        criado_em: new Date().toISOString(),
+      });
+      await updateDoc(doc(db, 'escritorios', escId), {
+        [`vagas_ocupadas.${grupo}`]: (ocupadasMap[grupo]||0) + 1,
+        funcionarios_uids: arrayUnion(uid),
+      });
+    }
 
     fecharModal();
     toast(`✅ Bem-vindo(a) a ${esc.nome}! Salário: R$ ${sal.toLocaleString('pt-BR')}/mês`, 'ok', 5000);
@@ -563,7 +682,7 @@ export async function processarConvitesNPC(j, mesGlobal) {
         advogado_palestrante:  'socio_associado',
       };
       const vagaProxId = VAGA_PROX[j.vaga_tipo];
-      if (vagaProxId && escAtual.vagas.includes(vagaProxId) && _vagaAcessivel(vagaProxId, j)) {
+      if (vagaProxId && escAtual.vagas.includes(vagaProxId) && _vagaAcessivel(vagaProxId, j, true)) {
         const vagaProx = TIPOS_VAGA[vagaProxId];
         const salProx  = calcSalarioVaga(escAtual, vagaProxId, j);
         await addDoc(collection(db, 'jogadores', uid, 'inbox'), {
@@ -625,13 +744,21 @@ window.getBonusEsc = function(jogador, espCaso) {
 // ════════════════════════════════════════════════════════
 // HELPERS INTERNOS
 // ════════════════════════════════════════════════════════
-function _vagaAcessivel(vagaId, j) {
+// ignorarCargo: usado pelo fluxo de PROMOÇÃO (processarConvitesNPC) — lá a
+// vaga-alvo é sempre um cargo ACIMA do atual por definição (é o ponto da
+// promoção), então o gate "já preciso estar nesse cargo pra acessar a vaga"
+// bloquearia toda promoção sem exceção. Auto-candidatura (candidatarVaga)
+// continua exigindo já estar no cargo — evita pular pra um cargo sênior
+// sem nunca ter passado pelos anteriores.
+function _vagaAcessivel(vagaId, j, ignorarCargo = false) {
   const vaga = TIPOS_VAGA[vagaId];
   if (!vaga) return false;
-  const CARGO_IDX = { est:0, ass:1, jnr:2, pln:3, snr:4, asc:5, soc:6, snm:7 };
-  const meuIdx  = CARGO_IDX[j.cargo_id] || 0;
-  const vagaIdx = CARGO_IDX[vaga.cargo] || 0;
-  if (meuIdx < vagaIdx) return false;
+  if (!ignorarCargo) {
+    const CARGO_IDX = { est:0, ass:1, jnr:2, pln:3, snr:4, asc:5, soc:6, snm:7 };
+    const meuIdx  = CARGO_IDX[j.cargo_id] || 0;
+    const vagaIdx = CARGO_IDX[vaga.cargo] || 0;
+    if (meuIdx < vagaIdx) return false;
+  }
   const skills  = j.skills || {};
   const cap     = window.HABILIDADE_CAP || 50;
   return Object.entries(vaga.skills).every(([sk, min]) => {

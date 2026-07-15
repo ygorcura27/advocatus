@@ -45,6 +45,18 @@ service cloud.firestore {
         ('socios_uids' in escritorioData && request.auth.uid in escritorioData.socios_uids);
     }
 
+    // Verifica se o usuário é o gestor delegado do escritório — papel real
+    // pra escritórios NPC (sem dono/sócio jogador nenhum até alguém virar
+    // sócio, ver functions/npc_escritorios_empregadores.js e
+    // avancar_mes.js::_verificarElegibilidadeGestorCF, que promove
+    // automaticamente o funcionário-jogador de cargo mais alto quando
+    // gestão/networking batem o cap). Sem isso, um gestor promovido não
+    // conseguia de fato gerenciar nada (funcionários, clientes,
+    // oportunidades, pool) — só via dono/sócio, que uma NPC não tem.
+    function isGestor(escritorioData) {
+      return isAuth() && escritorioData.gestor_id == request.auth.uid;
+    }
+
     // Verifica se o usuário é um funcionário (advogado jogador contratado,
     // não dono/sócio) do escritório — mesmo array 'funcionarios_uids' que
     // vagas.js::responderConvite popula ao aceitar um convite de emprego.
@@ -390,10 +402,14 @@ service cloud.firestore {
         allow create: if isAuth()
           && (
             isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+            || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+            || isGestor(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
             || request.resource.data.jogador_uid == request.auth.uid
           );
         allow update: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isGestor(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
               || resource.data.jogador_uid == request.auth.uid);
         allow delete: if isAuth()
           && isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data);
@@ -410,17 +426,19 @@ service cloud.firestore {
               || isFuncionario(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
         allow create: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
-              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isGestor(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
         allow update: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
-              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isGestor(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
         allow delete: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
               || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
       }
 
       // Subcoleção: carteira de clientes — mesmo padrão de acesso das
-      // oportunidades (apenas dono/sócios).
+      // oportunidades (dono/sócios, +gestor delegado pra criar/atualizar).
       match /clientes/{clienteId} {
         allow read: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
@@ -428,16 +446,21 @@ service cloud.firestore {
               || isFuncionario(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
         allow create: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
-              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isGestor(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
         allow update: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
-              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isGestor(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
         allow delete: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
               || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
       }
 
-      // Subcoleção: pool de processos — dono/sócios do escritório leem e escrevem.
+      // Subcoleção: pool de processos — dono/sócios do escritório leem e
+      // escrevem; gestor delegado também cria/atualiza (é o que
+      // "Delegar processos ao gestor" em equipe.js de fato precisa pra
+      // funcionar num escritório NPC, que nunca tem dono/sócio jogador).
       match /processos_pool/{procId} {
         allow read: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
@@ -445,10 +468,12 @@ service cloud.firestore {
               || isFuncionario(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
         allow create: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
-              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isGestor(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
         allow update: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
-              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isGestor(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
         allow delete: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
               || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
@@ -460,10 +485,12 @@ service cloud.firestore {
       match /log_gestao/{logId} {
         allow read: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
-              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isGestor(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
         allow create: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
-              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isGestor(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
         allow update, delete: if false;
       }
 
@@ -484,7 +511,8 @@ service cloud.firestore {
               || isFuncionario(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
         allow create: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
-              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isGestor(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
         allow update, delete: if false;
       }
 

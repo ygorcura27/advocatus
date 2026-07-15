@@ -9,6 +9,7 @@ const { processarAcordao, decidirProximaInstancia } = require('./processar_acord
 const { criarEscritorio, convidarSocio,
         responderConvite, distribuirLucros,
         aportarCapital }                    = require('./criar_escritorio');
+const { garantirEscritorioEmpregadorNPC }   = require('./npc_escritorios_empregadores');
 const { adminAction }                       = require('./admin');
 // GDD v4.1 — novas callables
 const { fazerBarExam, matricularBarPrep }   = require('./barexam');
@@ -91,6 +92,7 @@ exports.convidarSocio           = convidarSocio;
 exports.responderConvite        = responderConvite;
 exports.distribuirLucros        = distribuirLucros;
 exports.aportarCapital          = aportarCapital;
+exports.garantirEscritorioEmpregadorNPC = garantirEscritorioEmpregadorNPC;
 exports.adminAction             = adminAction;
 // GDD v4.1
 exports.fazerBarExam             = fazerBarExam;
