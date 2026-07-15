@@ -47,6 +47,40 @@ async function _garantirEscritorioNPC(escId, opts = {}) {
 }
 
 // ════════════════════════════════════════════════════════
+// AUTO-REPARO: jogador empregado ANTES do fix de materialização do
+// escritório NPC (ver _garantirEscritorioNPC acima) — nunca teve o doc
+// criado nem foi registrado em funcionarios_uids/funcionarios, então fica
+// "fantasma" pra sempre: permission-denied em clientes/oportunidades/
+// processos_pool mesmo depois do fix, porque o fix só age no momento da
+// CANDIDATURA, e esse jogador já passou por ela. Chamado toda vez que a
+// tela de "empregado" carrega (ui-main.js::_renderEscritorioFuncionario) —
+// idempotente e barato quando já está tudo certo (um read).
+// ════════════════════════════════════════════════════════
+window.garantirFuncionarioRegistrado = async function(j, escId) {
+  const uid = j?.uid || window.JOGADOR_UID;
+  if (!uid || !escId || escId === 'solo') return;
+  try {
+    const escReal = await _garantirEscritorioNPC(escId);
+    if ((escReal.funcionarios_uids || []).includes(uid)) return; // já registrado
+
+    const fSnap = await getDocs(query(
+      collection(db, 'escritorios', escId, 'funcionarios'),
+      where('jogador_uid', '==', uid)
+    ));
+    if (fSnap.empty) {
+      await addDoc(collection(db, 'escritorios', escId, 'funcionarios'), {
+        nome: j.nome_personagem || 'Advogado', cargo_id: j.cargo_id || 'jnr',
+        tipo: 'jogador', jogador_uid: uid,
+        skills: j.skills || {}, sexo: j.sexo || 'm',
+        ativo: true, acoes_mes_usadas: 0, acao_atual: null,
+        criado_em: new Date().toISOString(),
+      });
+    }
+    await updateDoc(doc(db, 'escritorios', escId), { funcionarios_uids: arrayUnion(uid) });
+  } catch (e) { console.warn('[GARANTIR FUNCIONARIO]', e); }
+};
+
+// ════════════════════════════════════════════════════════
 // PAINEL DE VAGAS (renderizado em ui-main.js via navTo)
 // ════════════════════════════════════════════════════════
 window.renderVagas = async function(j, el) {

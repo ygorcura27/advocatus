@@ -279,7 +279,7 @@ function renderPerfil(j, el) {
                 ${j.no_serasa ? '<span class="pill" style="background:rgba(122,32,32,.25);color:var(--verm3);border:1px solid rgba(200,80,80,.35)">🚨 Serasa</span>' : ''}
               </div>
               <div style="margin-top:.4rem;font-size:.65rem;color:var(--txt4)">
-                ID pra convites: <span id="perfil-id-jogador" style="font-family:var(--font-mono,monospace);color:var(--txt3);cursor:pointer" title="Clique pra copiar" onclick="navigator.clipboard?.writeText('${j.uid||''}');toast&&toast('ID copiado!','ok')">${j.uid||'—'}</span>
+                ID pra convites: <span id="perfil-id-jogador" style="font-family:var(--font-mono,monospace);color:var(--txt3);cursor:pointer" title="Clique pra copiar — único deste personagem; cada personagem seu (incluindo herdeiros assumidos) tem o próprio ID" onclick="navigator.clipboard?.writeText('${j.uid||''}:${j.personagem_ativo_id||'principal'}');toast&&toast('ID copiado!','ok')">${j.uid||''}:${j.personagem_ativo_id||'principal'}</span>
               </div>
             </div>
           </div>
@@ -982,6 +982,16 @@ async function _renderEscritorioFuncionario(j, el, escId) {
     </div>
     <div id="esc-processos-bloco"></div>
     <div id="esc-oportunidades-bloco"></div>`;
+
+  // Auto-reparo pra quem foi contratado ANTES do fix de materialização do
+  // escritório NPC (ver js/vagas.js::garantirFuncionarioRegistrado) —
+  // idempotente, um read quando já está tudo certo. Sem isso, quem ficou
+  // "fantasma" continuava vendo permission-denied pra sempre nos 4 painéis
+  // abaixo mesmo depois do deploy do fix.
+  if (window.garantirFuncionarioRegistrado) {
+    try { await window.garantirFuncionarioRegistrado(j, escId); }
+    catch (e) { console.warn('[AUTO-REPARO FUNCIONARIO]', e); }
+  }
 
   const elAtividade = document.getElementById('esc-atividade-embed');
   if (elAtividade && window.renderAtividadeEscritorioPainel) window.renderAtividadeEscritorioPainel(escId, elAtividade);
