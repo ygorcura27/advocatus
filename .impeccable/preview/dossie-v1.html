@@ -2470,29 +2470,36 @@ window._fmtMoeda = function(v){
               <span class="pill pill-cargo">📅 resolve em 08 Mai</span>
             </div>
 
-            <div class="card" style="margin-bottom:.6rem">
+            <label style="font-size:.66rem;color:var(--text-faint)">Tese salva como padrão (Banco de Teses)</label>
+            <select style="width:100%;margin:.2rem 0 .6rem" onchange="window._estratTrocarTese(this,'estrat-tese-1')">
+              <option value="civil">Responsabilidade civil objetiva — nota 84, atual. 64%</option>
+              <option value="boafe">Boa-fé objetiva — nota 61, atual. 40%</option>
+              <option value="nenhuma">(nenhuma — auto-resolve sem tese, só peças de investigação se jogar ativo)</option>
+            </select>
+
+            <div class="card" id="estrat-tese-1" style="margin-bottom:.6rem">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
-                <div style="font-weight:600;font-size:.78rem;color:var(--text)">📜 Tese: Responsabilidade civil objetiva</div>
-                <span class="pill-estilo estilo-jurisprudencial">Jurisprudencial</span>
+                <div style="font-weight:600;font-size:.78rem;color:var(--text)" data-f="titulo">📜 Tese: Responsabilidade civil objetiva</div>
+                <span class="pill-estilo estilo-jurisprudencial" data-f="estilo">Jurisprudencial</span>
               </div>
-              <div class="peca-nota" style="margin:.2rem 0"><b>84</b><span>/100</span> <small>teto 91</small></div>
+              <div class="peca-nota" style="margin:.2rem 0"><b data-f="nota">84</b><span>/100</span> <small data-f="teto">teto 91</small></div>
               <div class="inv-dossie-grid" style="border-top:none;margin:.4rem 0;width:auto">
                 <div class="inv-dossie-item"><div class="inv-dossie-num">58</div><div class="inv-dossie-lbl">Fundamento<br>(Cível 44/50)</div></div>
                 <div class="inv-dossie-item"><div class="inv-dossie-num">22</div><div class="inv-dossie-lbl">Redação<br>(Legal Drafting 38/50)</div></div>
                 <div class="inv-dossie-item"><div class="inv-dossie-num">+3</div><div class="inv-dossie-lbl">Pesquisa<br>(Legal Research 34/50)</div></div>
                 <div class="inv-dossie-item"><div class="inv-dossie-num">×1,05</div><div class="inv-dossie-lbl">Tipo doc.<br>(Inicial 32/50)</div></div>
                 <div class="inv-dossie-item"><div class="inv-dossie-num">×1,15</div><div class="inv-dossie-lbl">Prática de Área<br>mastery</div></div>
-                <div class="inv-dossie-item"><div class="inv-dossie-num" style="color:var(--verde)">+10%</div><div class="inv-dossie-lbl">🌟 Original<br>(ninguém usou em 2 meses)</div></div>
+                <div class="inv-dossie-item" data-f="orig"><div class="inv-dossie-num" style="color:var(--verde)">+10%</div><div class="inv-dossie-lbl">🌟 Original<br>(ninguém usou em 2 meses)</div></div>
               </div>
               <div class="peca-metro">
-                <div class="peca-metro-head"><span>Fama</span><span>62/100</span></div>
-                <div class="membro-prod-bar"><div class="membro-prod-fill" style="width:62%;background:var(--bronze-bright)"></div></div>
+                <div class="peca-metro-head"><span>Fama</span><span data-f="fama">62/100</span></div>
+                <div class="membro-prod-bar"><div class="membro-prod-fill" data-f="fama-bar" style="width:62%;background:var(--bronze-bright)"></div></div>
               </div>
               <div class="peca-metro">
-                <div class="peca-metro-head"><span>Popularidade</span><span style="color:var(--verde)">ESTABELECIDA</span></div>
-                <div class="membro-prod-bar"><div class="membro-prod-fill" style="width:58%;background:var(--verde)"></div></div>
+                <div class="peca-metro-head"><span>Popularidade</span><span style="color:var(--verde)" data-f="pop">ESTABELECIDA</span></div>
+                <div class="membro-prod-bar"><div class="membro-prod-fill" data-f="pop-bar" style="width:58%;background:var(--verde)"></div></div>
               </div>
-              <div style="font-size:.64rem;color:var(--text-faint);margin-top:.4rem">Atualização% 64 · decai 3%/mês (Cível) — mantida com Supervisão/Pesquisa no Banco de Teses.</div>
+              <div style="font-size:.64rem;color:var(--text-faint);margin-top:.4rem" data-f="atualizacao">Atualização% 64 · decai 3%/mês (Cível) — mantida com Supervisão/Pesquisa no Banco de Teses.</div>
             </div>
 
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem .9rem">
@@ -7001,6 +7008,53 @@ window._supRecalc = function(){
 };
 document.addEventListener('DOMContentLoaded', () => window._supRecalc && window._supRecalc());
 window._supRecalc();
+
+// Estratégia Padrão — troca de Tese salva (mockup do card "modelo show").
+// A 2ª instância não tem seletor próprio de propósito: reusa a MESMA tese
+// já salva na 1ª (é o ponto da unificação, não um esquecimento).
+window._ESTRAT_TESES = {
+  civil: {
+    titulo: '📜 Tese: Responsabilidade civil objetiva', estilo: 'Jurisprudencial', estiloClass: 'estilo-jurisprudencial',
+    nota: '84', teto: 'teto 91',
+    orig: '<div class="inv-dossie-num" style="color:var(--verde)">+10%</div><div class="inv-dossie-lbl">🌟 Original<br>(ninguém usou em 2 meses)</div>',
+    fama: '62/100', famaBar: '62%', pop: 'ESTABELECIDA', popColor: 'var(--verde)', popBar: '58%', popBarColor: 'var(--verde)',
+    atualizacao: 'Atualização% 64 · decai 3%/mês (Cível) — mantida com Supervisão/Pesquisa no Banco de Teses.',
+  },
+  boafe: {
+    titulo: '📜 Tese: Boa-fé objetiva', estilo: 'Legalista', estiloClass: 'estilo-legalista',
+    nota: '61', teto: 'teto 70',
+    orig: '<div class="inv-dossie-num" style="color:var(--perigo-text)">−15%</div><div class="inv-dossie-lbl">⚠ Repetida<br>(outro jogador usou há 1 mês)</div>',
+    fama: '30/100', famaBar: '30%', pop: 'OBSOLETA', popColor: 'var(--perigo)', popBar: '9%', popBarColor: 'var(--perigo)',
+    atualizacao: 'Atualização% 40 · decai 3%/mês (Cível) — precisa de manutenção antes de contar com ela.',
+  },
+  nenhuma: {
+    titulo: '— Nenhuma tese selecionada —', estilo: '', estiloClass: '',
+    nota: '0', teto: 'sem tese',
+    orig: '<div class="inv-dossie-num">—</div><div class="inv-dossie-lbl">Auto-resolve só com peças de investigação, se você jogar ativo</div>',
+    fama: '—', famaBar: '0%', pop: '—', popColor: 'var(--text-faint)', popBar: '0%', popBarColor: 'var(--text-faint)',
+    atualizacao: 'Sem tese o auto-resolve na base fica bem mais fraco — considere jogar ativo pra compensar.',
+  },
+};
+window._estratTrocarTese = function(sel, cardId){
+  const d = window._ESTRAT_TESES[sel.value];
+  const card = document.getElementById(cardId);
+  if (!d || !card) return;
+  card.querySelector('[data-f="titulo"]').textContent = d.titulo;
+  const estiloEl = card.querySelector('[data-f="estilo"]');
+  estiloEl.textContent = d.estilo;
+  estiloEl.className = 'pill-estilo ' + d.estiloClass;
+  estiloEl.style.display = d.estilo ? '' : 'none';
+  card.querySelector('[data-f="nota"]').textContent = d.nota;
+  card.querySelector('[data-f="teto"]').textContent = d.teto;
+  card.querySelector('[data-f="orig"]').innerHTML = d.orig;
+  card.querySelector('[data-f="fama"]').textContent = d.fama;
+  card.querySelector('[data-f="fama-bar"]').style.width = d.famaBar;
+  const popEl = card.querySelector('[data-f="pop"]');
+  popEl.textContent = d.pop; popEl.style.color = d.popColor;
+  const popBarEl = card.querySelector('[data-f="pop-bar"]');
+  popBarEl.style.width = d.popBar; popBarEl.style.background = d.popBarColor;
+  card.querySelector('[data-f="atualizacao"]').textContent = d.atualizacao;
+};
 </script>
 
 <script>
