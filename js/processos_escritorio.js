@@ -449,7 +449,9 @@ function _renderColPool(disponiveis, emAndamento, aguardSent, j, escId, investig
       </div>
       <div style="text-align:right;flex-shrink:0">
         <div style="font-size:.6rem;color:var(--txt4)">${_fmtP(p.honorarios)}</div>
-        ${podeContinuar ? `<div style="font-size:.6rem;color:var(--ouro2);font-weight:600;margin-top:.2rem">Continuar →</div>` : ''}
+        ${podeContinuar
+          ? `<div style="font-size:.6rem;color:var(--ouro2);font-weight:600;margin-top:.2rem">Continuar →</div>`
+          : `<button class="btn btn-sm btn-ghost" style="font-size:.6rem;padding:.2rem .4rem;margin-top:.2rem" onclick="event.stopPropagation();window._retomarCasoPool('${escId}','${p.id}')">🔄 Destravar</button>`}
       </div>
     </div>`;
   }).join('');
@@ -683,10 +685,23 @@ window._assumirCasoPool = async function(escId, procId, containerId) {
 
     // Criar processo completo (provas → teses → audiência) e abrir
     if (window.criarProcessoDoPool) {
-      const novoProcId = await window.criarProcessoDoPool(escId, procId, poolProc);
-      await updateDoc(poolRef, { processo_ref: novoProcId });
-      toast(`⚖️ Caso assumido! Siga o fluxo: provas → teses → audiência. -${CUSTO}⚡`, 'ok', 4000);
-      window.abrirProcesso(novoProcId);
+      try {
+        const novoProcId = await window.criarProcessoDoPool(escId, procId, poolProc);
+        await updateDoc(poolRef, { processo_ref: novoProcId });
+        toast(`⚖️ Caso assumido! Siga o fluxo: provas → teses → audiência. -${CUSTO}⚡`, 'ok', 4000);
+        window.abrirProcesso(novoProcId);
+      } catch (eCriar) {
+        // Sem isso, um erro aqui deixava o pool marcado como "assumido" pra
+        // sempre sem processo_ref — caso zumbi, sem investigação vinculada
+        // e sem jeito de tentar de novo (reportado em produção). Reverte pro
+        // estado "disponível" pra poder tentar assumir de novo.
+        console.error('[CRIAR PROCESSO DO POOL]', eCriar);
+        await updateDoc(poolRef, {
+          status: 'disponivel', assumido_uid: null, assumido_nome: null,
+          func_id: null, func_nome: null, func_cargo: null, progresso: 0, assumido_em: null,
+        });
+        toast('Erro ao montar o processo — devolvido pro pool, tente assumir de novo. (' + (eCriar.message || '') + ')', 'ko', 6000);
+      }
     } else {
       toast('Módulo de processos não carregado ainda. Tente novamente.', 'ko');
     }
@@ -695,6 +710,29 @@ window._assumirCasoPool = async function(escId, procId, containerId) {
   } catch (e) {
     console.error('[ASSUMIR CASO]', e);
     toast('Erro ao assumir caso.', 'ko');
+  }
+};
+
+// Repara um caso "zumbi": pool doc já marcado assumido (energia já foi
+// descontada) mas sem processo_ref, porque criarProcessoDoPool falhou antes
+// do fix acima e nunca reverteu o status. Só tenta criar o processo de novo
+// e linkar — não cobra energia outra vez.
+window._retomarCasoPool = async function(escId, procId) {
+  try {
+    const poolRef  = doc(db, 'escritorios', escId, 'processos_pool', procId);
+    const poolSnap = await getDoc(poolRef);
+    if (!poolSnap.exists()) { toast('Processo não encontrado.', 'ko'); return; }
+    const poolProc = poolSnap.data();
+    if (!window.criarProcessoDoPool) { toast('Módulo de processos não carregado ainda. Tente novamente.', 'ko'); return; }
+
+    const novoProcId = await window.criarProcessoDoPool(escId, procId, poolProc);
+    await updateDoc(poolRef, { processo_ref: novoProcId });
+    toast('⚖️ Caso destravado! Siga o fluxo: provas → teses → audiência.', 'ok', 4000);
+    window.abrirProcesso(novoProcId);
+    _refreshProcessosPool(window.JOGADOR, escId);
+  } catch (e) {
+    console.error('[RETOMAR CASO POOL]', e);
+    toast('Ainda não deu — erro: ' + (e.message || ''), 'ko', 6000);
   }
 };
 
