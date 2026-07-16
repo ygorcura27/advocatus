@@ -443,7 +443,7 @@ function _renderColPool(disponiveis, emAndamento, aguardSent, j, escId, investig
       <div class="proc-pool-area">⚙️</div>
       <div style="flex:1;min-width:0">
         <div class="proc-pool-titulo">${p.titulo}</div>
-        <div class="proc-pool-meta">Você · ${p.cliente_nome||'—'}</div>
+        <div class="proc-pool-meta">${p.cliente_nome||'—'} · você</div>
         <div style="font-size:.62rem;color:var(--navy3);margin-top:.1rem">${fase.label}</div>
         ${_barraProgresso(fase.pct)}
       </div>

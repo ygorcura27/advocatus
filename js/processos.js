@@ -1981,11 +1981,22 @@ window.criarProcessoDoPool = async function(escId, poolProcId, poolProc) {
   const numero = await _proximoNumeroProcesso();
   const mesG = mesTotalPessoalProc(j);
 
+  // O nome da parte que representamos precisa ser o CLIENTE de verdade
+  // (poolProc.cliente_nome), não um nome aleatório do gerador de texto —
+  // sem isso, um caso assumido do pool nunca mostrava o cliente em lugar
+  // nenhum do processo, só nomes inventados dos dois lados. PROC.meuLado
+  // já diz qual polo é "nosso" (autor ou réu varia por matéria/conflito —
+  // ver comentário em gerarTextoLocal sobre Execução Fiscal etc.), então
+  // o cliente entra nesse polo; o outro continua gerado normalmente.
+  const clienteNome = poolProc.cliente_nome || null;
+  const autorNome = (clienteNome && PROC.meuLado === 'autor') ? clienteNome : TXT.autor_nome;
+  const reuNome    = (clienteNome && PROC.meuLado === 'reu')   ? clienteNome : TXT.reu_nome;
+
   const proc = {
     numero,
     tipo: PROC.conflito.nome,
-    autor: TXT.autor_nome,
-    reu: TXT.reu_nome,
+    autor: autorNome,
+    reu: reuNome,
     area: poolProc.area || j.especialidade || 'civil',
     area_banco: areaBanco,
     tribunal: PROC.tribunal,

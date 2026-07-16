@@ -1010,6 +1010,9 @@ window.renderSetlistBuilder = async function(processoId, j, containerEl) {
   const slots = Array.from({ length: maxSlots }, (_, i) => ({
     slot: i + 1, tipo: null, peticao_id: null, acao_tipo: null
   }));
+  // Qual slot vazio está com o seletor aberto (nunca prompt() nativo —
+  // era uma janelinha do navegador feia e sem estilo do jogo).
+  let pickerAberto = null; // { slot, tipo: 'peticao'|'acao' }
 
   function _linhaSlot(s, i) {
     const podeSubir = i > 0;
@@ -1041,6 +1044,41 @@ window.renderSetlistBuilder = async function(processoId, j, containerEl) {
           <div style="font-size:.68rem;color:var(--txt4)">Ação processual</div>
         </div>
         <div class="setlist-slot-acoes">${setas}<button class="btn-setlist-seta" onclick="window._slotRemover(${i})">✕</button></div>
+      </div>`;
+    }
+    if (pickerAberto && pickerAberto.slot === i) {
+      if (pickerAberto.tipo === 'peticao') {
+        return `
+        <div class="setlist-slot setlist-slot-vazio">
+          <div class="setlist-slot-num">${i+1}</div>
+          <div class="setlist-slot-corpo">
+            <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.4rem">Escolha uma petição:</div>
+            ${peticoes.length === 0
+              ? `<div style="font-size:.7rem;color:var(--txt4)">Nenhuma petição disponível.</div>`
+              : `<div style="display:flex;flex-direction:column;gap:.25rem;max-height:220px;overflow-y:auto">
+                  ${peticoes.map(p => `
+                    <button class="btn btn-sm btn-ghost" style="text-align:left;justify-content:flex-start"
+                      onclick="window._slotEscolherPet(${i},'${p.id}')">
+                      ${p.titulo || p.nome} <span style="color:var(--txt4);font-size:.66rem">[${DOC_LABELS[p.document_type]||p.document_type}]</span>
+                    </button>`).join('')}
+                </div>`}
+            <button class="btn btn-sm btn-ghost" style="margin-top:.4rem;color:var(--txt4)" onclick="window._slotFecharPicker()">Cancelar</button>
+          </div>
+        </div>`;
+      }
+      const acoes = Object.entries(ACAO_LABELS);
+      return `
+      <div class="setlist-slot setlist-slot-vazio">
+        <div class="setlist-slot-num">${i+1}</div>
+        <div class="setlist-slot-corpo">
+          <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.4rem">Escolha uma ação processual:</div>
+          <div style="display:flex;flex-direction:column;gap:.25rem">
+            ${acoes.map(([k,label]) => `
+              <button class="btn btn-sm btn-ghost" style="text-align:left;justify-content:flex-start"
+                onclick="window._slotEscolherAcao(${i},'${k}')">${label}</button>`).join('')}
+          </div>
+          <button class="btn btn-sm btn-ghost" style="margin-top:.4rem;color:var(--txt4)" onclick="window._slotFecharPicker()">Cancelar</button>
+        </div>
       </div>`;
     }
     return `
@@ -1084,14 +1122,18 @@ window.renderSetlistBuilder = async function(processoId, j, containerEl) {
     };
 
     window._slotAddPet = (i) => {
-      const lista = peticoes.map(p =>
-        `${p.titulo || p.nome} [${DOC_LABELS[p.document_type]||p.document_type}]`
-      );
-      const idx = lista.length === 0
-        ? -1
-        : parseInt(prompt('Escolha a petição (número):\n' + lista.map((l,n)=>`${n+1}. ${l}`).join('\n')), 10) - 1;
-      if (idx < 0 || idx >= peticoes.length) return;
-      slots[i] = { slot: i + 1, tipo: 'peticao', peticao_id: peticoes[idx].id, acao_tipo: null };
+      pickerAberto = { slot: i, tipo: 'peticao' };
+      _renderBuilder();
+    };
+
+    window._slotEscolherPet = (i, peticaoId) => {
+      slots[i] = { slot: i + 1, tipo: 'peticao', peticao_id: peticaoId, acao_tipo: null };
+      pickerAberto = null;
+      _renderBuilder();
+    };
+
+    window._slotFecharPicker = () => {
+      pickerAberto = null;
       _renderBuilder();
     };
 
@@ -1108,10 +1150,13 @@ window.renderSetlistBuilder = async function(processoId, j, containerEl) {
     };
 
     window._slotAddAcao = (i) => {
-      const acoes = Object.entries(ACAO_LABELS);
-      const idx   = parseInt(prompt('Ação processual:\n' + acoes.map(([,v],n)=>`${n+1}. ${v}`).join('\n')), 10) - 1;
-      if (idx < 0 || idx >= acoes.length) return;
-      slots[i] = { slot: i + 1, tipo: 'acao_processual', acao_tipo: acoes[idx][0], peticao_id: null };
+      pickerAberto = { slot: i, tipo: 'acao' };
+      _renderBuilder();
+    };
+
+    window._slotEscolherAcao = (i, acaoTipo) => {
+      slots[i] = { slot: i + 1, tipo: 'acao_processual', acao_tipo: acaoTipo, peticao_id: null };
+      pickerAberto = null;
       _renderBuilder();
     };
   }
