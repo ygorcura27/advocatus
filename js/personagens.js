@@ -63,6 +63,22 @@ export function personagemIdAtual(j) {
   return j?.personagem_ativo_id || null;
 }
 
+/**
+ * Doc certo pra ler/escrever um personagem específico (uid+id), mesmo que
+ * NÃO seja o ativo agora — ativo vive em jogadores/{uid}, os outros em
+ * jogadores/{uid}/personagens/{id}. Usado por convites de emprego, que
+ * apontam pra um personagem específico e não podem assumir "quem estiver
+ * ativo quando a pessoa clicar aceitar" (cada personagem tem seu próprio
+ * ID de convite, uid+personagemId).
+ */
+export function personagemDocRef(uid, ativoId, personagemId) {
+  const alvo = personagemId || 'principal';
+  const ativo = ativoId || 'principal';
+  return alvo === ativo
+    ? doc(db, 'jogadores', uid)
+    : doc(db, 'jogadores', uid, 'personagens', alvo);
+}
+
 /** Compara a tag salva num doc (processo/favor) com quem está jogando agora. */
 export function ehDoPersonagemAtivo(doc, j) {
   return (doc?.personagem_id || null) === personagemIdAtual(j);

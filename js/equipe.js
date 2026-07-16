@@ -1654,7 +1654,7 @@ window._abrirConviteJogador = function(cargo_min, escId) {
   abrirModal('👤 Convidar Jogador',
     `<div class="campo">
       <label>ID do jogador (Perfil dele → "ID pra convites")</label>
-      <input type="text" id="convite-id" placeholder="cole o ID aqui">
+      <input type="text" id="convite-id" placeholder="uid:personagem — cole o ID inteiro">
     </div>
     <div class="campo">
       <label>Cargo oferecido</label>
@@ -1671,13 +1671,23 @@ window._abrirConviteJogador = function(cargo_min, escId) {
 };
 
 window._enviarConviteJogador = async function(escId) {
-  const alvoUid = document.getElementById('convite-id')?.value?.trim();
+  const idBruto = document.getElementById('convite-id')?.value?.trim();
   const cargoId = document.getElementById('convite-cargo')?.value;
-  if (!alvoUid) { toast('Cole o ID do jogador.','ko'); return; }
+  if (!idBruto) { toast('Cole o ID do jogador.','ko'); return; }
+
+  // ID = uid:personagemId ("principal" ou o id de um herdeiro assumido) —
+  // cada personagem tem o SEU (mesmo sendo a mesma conta), pra não
+  // convidar/contratar "quem estiver ativo quando a pessoa aceitar" por
+  // engano.
+  const [alvoUid, alvoPersonagemIdBruto] = idBruto.split(':');
+  const alvoPersonagemId = alvoPersonagemIdBruto || 'principal';
+  if (!alvoUid) { toast('ID inválido.','ko'); return; }
 
   const j   = window.JOGADOR;
   const uid = j?.uid||window.JOGADOR_UID;
-  if (alvoUid === uid) { toast('Você não pode se convidar.','ko'); return; }
+  if (alvoUid === uid && alvoPersonagemId === (j.personagem_ativo_id||'principal')) {
+    toast('Você não pode convidar a si mesmo.','ko'); return;
+  }
   const ci  = CARGO_INFO[cargoId]||CARGO_INFO.jnr;
   const escSnap = await getDoc(doc(db,'escritorios',escId));
   const escNome = escSnap.exists() ? escSnap.data().nome : 'Escritório';
@@ -1686,7 +1696,7 @@ window._enviarConviteJogador = async function(escId) {
   if (!alvoSnap.exists()) { toast('Jogador não encontrado com esse ID.','ko'); return; }
 
   await addDoc(collection(db,'jogadores',alvoUid,'inbox'), {
-    de: uid, para_uid: alvoUid,
+    de: uid, para_uid: alvoUid, personagem_id: alvoPersonagemId === 'principal' ? null : alvoPersonagemId,
     assunto: `🏛️ Convite — ${escNome}`,
     corpo: `${j.nome_personagem||'Um advogado'} convidou você para trabalhar em ${escNome} como ${ci.l}.\n\nSalário: R$ ${ci.sal.toLocaleString('pt-BR')}/mês\n\nAcesse Vagas → Convites para aceitar.`,
     tipo:'convite_escritorio', esc_id:escId, cargo_id:cargoId,
