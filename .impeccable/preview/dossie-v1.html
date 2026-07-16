@@ -2456,11 +2456,14 @@ window._fmtMoeda = function(v){
         <div style="padding:.5rem 1.1rem 1rem;font-size:.72rem;color:var(--text-faint);line-height:1.6">
           Todo processo — 1ª instância ou recurso, seu ou da carteira — passa a ter uma <b style="color:var(--text)">data de
           resolução</b> e uma <b style="color:var(--text)">Tese salva</b>. Na virada do mês ele resolve sozinho com essa
-          Tese, exatamente como um show toca a setlist salva sem você precisar estar online. Jogar ativamente
-          (Investigação → Julgamento) antes da data é <em>opcional</em> — troca o auto-resolve pela banda −15%/+20%.
+          Tese, exatamente como um show toca a setlist salva sem você precisar estar online.
           <b style="color:var(--bronze-bright)">Isso substitui o Setlist legado</b> que hoje ainda resolve recurso
           sozinho, num motor diferente da Investigação que resolve 1ª instância — os 2 cards abaixo usam o MESMO
           componente, só a instância muda.
+        </div>
+        <div style="padding:0 1.1rem 1rem;font-size:.7rem;color:var(--text-faint);line-height:1.6;display:flex;gap:1rem;flex-wrap:wrap">
+          <span><b style="color:var(--text)">⚡ Expresso</b> — pula os turnos de investigação, vai direto pro roll de Julgamento só com a Tese. Banda menor (−8%/+10%). Pro jogador casual que só quer dar uma conferida.</span>
+          <span><b style="color:var(--text)">🔎 Investigar a fundo</b> — Quadro de Investigação completo, revela peças, Montagem com Tese + peças, Julgamento jogado rodada a rodada. Banda cheia (−15%/+20%). Pro jogador que quer o minigame.</span>
         </div>
 
         <div class="painel" style="border-color:var(--borda2, rgba(255,255,255,.08));margin:0 1.1rem .6rem">
@@ -2512,9 +2515,12 @@ window._fmtMoeda = function(v){
                 <input type="range" min="0" max="100" value="60" style="width:100%;margin-top:.5rem;accent-color:var(--bronze)">
               </div>
             </div>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.7rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.7rem;flex-wrap:wrap;gap:.5rem">
               <span style="font-size:.68rem;color:var(--text-faint)">Sem ação sua: resolve em 08 Mai com essa Tese, na base.</span>
-              <button class="btn-sair" style="padding:.4rem .8rem;font-size:.72rem">🎮 Jogar agora (opcional, banda −15%/+20%)</button>
+              <div style="display:flex;gap:.4rem">
+                <button class="btn-sair" style="padding:.4rem .7rem;font-size:.68rem" title="Pula os turnos de investigação — vai direto pro roll de Julgamento só com a Tese">⚡ Expresso <small style="color:var(--text-faint)">(−8%/+10%)</small></button>
+                <button class="btn-avancar" style="padding:.4rem .8rem;font-size:.68rem" title="Abre o Quadro de Investigação — revela peças, monta a mão com a Tese, joga o Julgamento completo">🔎 Investigar a fundo <small style="opacity:.8">(−15%/+20%)</small></button>
+              </div>
             </div>
           </div>
         </div>
@@ -2536,9 +2542,12 @@ window._fmtMoeda = function(v){
               </div>
               <span class="pill-estilo estilo-jurisprudencial">Jurisprudencial</span>
             </div>
-            <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
               <span style="font-size:.68rem;color:var(--text-faint)">Sem ação sua: resolve sozinho na base, mesma lógica da 1ª instância.</span>
-              <button class="btn-sair" style="padding:.4rem .8rem;font-size:.72rem">🎮 Jogar agora (opcional)</button>
+              <div style="display:flex;gap:.4rem">
+                <button class="btn-sair" style="padding:.4rem .7rem;font-size:.68rem">⚡ Expresso <small style="color:var(--text-faint)">(−8%/+10%)</small></button>
+                <button class="btn-avancar" style="padding:.4rem .8rem;font-size:.68rem">🔎 Investigar a fundo <small style="opacity:.8">(−15%/+20%)</small></button>
+              </div>
             </div>
           </div>
         </div>
