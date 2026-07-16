@@ -223,15 +223,22 @@ window.renderProcessosPool = async function(j, escId, el) {
     // apareciam nunca em "Novos Processos"/"Fase Recursal", mesmo contando
     // certinho no cap ("Pool cheio X/Y"). Sem limit aqui: o total de
     // ativos já é naturalmente pequeno (teto por tier, no máximo ~36).
+    const STATUSES_RECURSAL = ['recurso_pendente', 'aguardando_decisao_sentenca', 'aguardando_decisao_recurso', 'aguardando_evento', 'pronto_para_sentenca'];
+
+    // Precisa incluir os status recursais aqui também — decidirRecursoSentenca
+    // (processar_sentenca.js) grava status:'recurso_pendente' de volta no pool
+    // doc quando o caso veio de _assumirCasoPool, mas esse doc não entrava
+    // nesta query (só disponivel/em_andamento/aguardando_sentenca), então o
+    // fallback "poolAssumidosAbertos" abaixo nunca via o processo pra buscar
+    // o processo_ref — recurso protocolado simplesmente sumia da Fase
+    // Recursal (reportado em produção).
     const poolSnap = await getDocs(
       query(collection(db, 'escritorios', escId, 'processos_pool'),
-        where('status', 'in', ['disponivel', 'em_andamento', 'aguardando_sentenca']))
+        where('status', 'in', ['disponivel', 'em_andamento', 'aguardando_sentenca', ...STATUSES_RECURSAL]))
     );
     const todos = poolSnap.docs
       .map(d => ({ id: d.id, ...d.data() }))
       .sort((a, b) => (b.criado_mes || 0) - (a.criado_mes || 0));
-
-    const STATUSES_RECURSAL = ['recurso_pendente', 'aguardando_decisao_sentenca', 'aguardando_decisao_recurso', 'aguardando_evento', 'pronto_para_sentenca'];
 
     const disponiveis  = todos.filter(p => p.status === 'disponivel');
     const emAndamento  = todos.filter(p => p.status === 'em_andamento');
