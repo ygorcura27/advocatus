@@ -81,6 +81,8 @@ const {
 const { abrirVotacao, votar, encerrarVotacao } = require('./assembleia_socios');
 // Posts (Redes Sociais) — feed real
 const { publicarPost, curtirPost, deletarPost } = require('./posts_sociais');
+// Banco de Teses do Escritório — GDD v6.0 §5
+const { criarTese, manterTese } = require('./banco_teses');
 
 exports.avancarMes              = avancarMes;
 exports.processarSentenca       = processarSentenca;
@@ -164,3 +166,6 @@ exports.encerrarVotacao          = encerrarVotacao;
 exports.publicarPost             = publicarPost;
 exports.curtirPost               = curtirPost;
 exports.deletarPost              = deletarPost;
+// Banco de Teses do Escritório
+exports.criarTese_banco          = criarTese;
+exports.manterTese_banco         = manterTese;

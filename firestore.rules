@@ -457,6 +457,18 @@ service cloud.firestore {
               || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
       }
 
+      // Subcoleção: banco de teses do escritório (GDD v6.0 §5) — nota e
+      // atualização% afetam força de Julgamento, então só Cloud Functions
+      // (admin SDK, bypassa estas regras) criam/atualizam/decaem; cliente
+      // só lê, mesmo padrão de oportunidades/clientes.
+      match /teses/{teseId} {
+        allow read: if isAuth()
+          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
+              || isFuncionario(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+        allow write: if false;
+      }
+
       // Subcoleção: pool de processos — dono/sócios do escritório leem e
       // escrevem; gestor delegado também cria/atualiza (é o que
       // "Delegar processos ao gestor" em equipe.js de fato precisa pra

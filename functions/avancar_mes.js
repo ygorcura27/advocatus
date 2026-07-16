@@ -28,6 +28,7 @@ const _genericas             = require('./peticoes_genericas');
 const _perfis                = require('./perfis');
 const { processarRoyaltiesLivros, processarCitacoesNPCMensal } = require('./artigos_livros');
 const { determinarSentencaSetlist, AREA_PT_PARA_EN } = require('./processar_sentenca');
+const { processarDecaimentoMensal: processarDecaimentoTesesMensal } = require('./banco_teses');
 
 const ENERGIA_TOTAL        = 100;
 
@@ -1265,6 +1266,7 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
       const funcSnap = await escRefProprio.collection('funcionarios').get();
       const resets   = funcSnap.docs.map(d => d.ref.update({ acoes_mes_usadas: 0, acao_atual: null }));
       await Promise.all(resets);
+      await processarDecaimentoTesesMensal(db, j.escritorio_proprio_id);
     } catch(e) {
       logger.warn('Erro ao resetar ações dos funcionários:', e.message);
     }

@@ -14,7 +14,7 @@
  *    reaproveitados para os popups de nó (entrevista, perícia, etc.).
  */
 
-import { doc, getDoc }
+import { doc, getDoc, collection, getDocs }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { db } from './firebase-init.js';
 import { sortearCandidatosVademecum } from './banco_vademecum.js';
@@ -453,6 +453,23 @@ window._invAplicarTese = async function(precedenteId, tags) {
 // ─── Tela: Montagem de Estratégia ──────────────────────────────────────────
 
 let _maoSelecionada = new Set();
+let _teseSelecionadaId = null;
+let _teseCacheEscId = null;
+let _teseCacheLista = null;
+
+// Banco de Teses do escritório (GDD v6.0 §5-6) — lida direto do Firestore
+// (leitura liberada em firestore.rules pra dono/sócio/funcionário), só a
+// escrita (criarTese/manterTese) passa por callable porque envolve roll
+// server-side de nota a partir da skill.
+async function _teseCarregarBanco(j) {
+  const escId = j?.escritorio_proprio_id || j?.escritorio_empregado_id;
+  if (!escId) return [];
+  if (_teseCacheEscId === escId && _teseCacheLista) return _teseCacheLista;
+  const snap = await getDocs(collection(db, 'escritorios', escId, 'teses'));
+  _teseCacheEscId = escId;
+  _teseCacheLista = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return _teseCacheLista;
+}
 
 function _renderMontagem(j, main, p) {
   const inv = p.investigacao;
@@ -470,9 +487,41 @@ function _renderMontagem(j, main, p) {
             <div class="inv-no-peca ${no.peca.suja ? 'suja' : ''}">Força ${no.peca.forca}${no.peca.suja ? ' · suja' : ''}${no.peca.pilar ? ' · pilar' : ''}</div>
           </div>`).join('')}
       </div>
-      <button class="btn btn-prim" style="margin-top:1rem" ${_maoSelecionada.size === 0 ? 'disabled' : ''} onclick="window._invConfirmarMontagem()">Confirmar Mão (${_maoSelecionada.size})</button>
+      <div id="inv-tese-banco" class="inv-tese-banco" style="margin-top:1rem">Carregando Banco de Teses...</div>
+      <button class="btn btn-prim" style="margin-top:1rem" ${_maoSelecionada.size === 0 && !_teseSelecionadaId ? 'disabled' : ''} onclick="window._invConfirmarMontagem()">Confirmar Mão (${_maoSelecionada.size}${_teseSelecionadaId ? ' + 1 tese' : ''})</button>
     </div>`;
+
+  _teseCarregarBanco(j).then(teses => {
+    const wrap = document.getElementById('inv-tese-banco');
+    if (!wrap) return;
+    if (teses.length === 0) {
+      wrap.innerHTML = `<div style="font-size:.72rem;color:var(--ardosia2)">Nenhuma tese no Banco de Teses do escritório ainda — componha uma em Escritório → Banco de Teses.</div>`;
+      return;
+    }
+    const relevantes = teses.filter(t => t.materia === p.area).concat(teses.filter(t => t.materia !== p.area));
+    wrap.innerHTML = `
+      <div style="font-size:.75rem;font-weight:600;color:var(--txt);margin-bottom:.4rem">📚 Tese do Banco (opcional — pesa mais que uma peça isolada)</div>
+      <div style="display:flex;flex-direction:column;gap:.4rem">
+        ${relevantes.map(t => `
+          <label class="card" style="display:flex;align-items:center;gap:.5rem;cursor:pointer;padding:.5rem .7rem">
+            <input type="radio" name="inv-tese-radio" value="${t.id}" ${_teseSelecionadaId === t.id ? 'checked' : ''} onchange="window._invSelecionarTese('${t.id}')">
+            <div style="flex:1">
+              <div style="font-weight:600;color:var(--txt);font-size:.78rem">${t.titulo || (t.materia + ' — sem título')} ${t.materia !== p.area ? '<span style="color:var(--ardosia2);font-weight:400">(fora da área)</span>' : ''}</div>
+              <div style="font-size:.68rem;color:var(--ardosia2)">Nota ${t.nota}/100 · Atualização ${Math.round(t.atualizacao_pct)}%</div>
+            </div>
+          </label>`).join('')}
+        ${_teseSelecionadaId ? `<button class="btn btn-ghost btn-sm" onclick="window._invSelecionarTese(null)">Não usar tese</button>` : ''}
+      </div>`;
+  }).catch(() => {
+    const wrap = document.getElementById('inv-tese-banco');
+    if (wrap) wrap.innerHTML = '';
+  });
 }
+
+window._invSelecionarTese = function(teseId) {
+  _teseSelecionadaId = teseId || null;
+  _renderMontagem(window.JOGADOR, document.getElementById('main-content'), _procCache);
+};
 
 window._invToggleMao = function(noId) {
   if (_maoSelecionada.has(noId)) _maoSelecionada.delete(noId); else _maoSelecionada.add(noId);
@@ -482,9 +531,10 @@ window._invToggleMao = function(noId) {
 window._invConfirmarMontagem = async function() {
   window.toast && window.toast('⏳ Montando estratégia...', 'neutro', 1500);
   try {
-    const r = await callFn('confirmarMontagem', { processo_id: _procId, mao_escolhida: Array.from(_maoSelecionada) });
+    const r = await callFn('confirmarMontagem', { processo_id: _procId, mao_escolhida: Array.from(_maoSelecionada), tese_id: _teseSelecionadaId });
     _procCache.investigacao = r.investigacao;
     _maoSelecionada = new Set();
+    _teseSelecionadaId = null;
     _renderFase(window.JOGADOR, document.getElementById('main-content'), _procCache);
   } catch (err) {
     window.toast && window.toast('Erro: ' + erroAmigavel(err), 'ko');

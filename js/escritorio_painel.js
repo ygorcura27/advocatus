@@ -886,3 +886,71 @@ window._removerAreaEsc = async function(escId, area) {
     if (el) window.renderEspecializacoesEsc(escId, el);
   } catch(e) { toast('Erro ao remover área.', 'ko'); }
 };
+
+// ════════════════════════════════════════════════════════
+// BANCO DE TESES — GDD v6.0 §5. Ativo permanente do escritório (não do
+// processo): nota rolada no servidor (força de área + redação), Atualização%
+// decai todo mês (avancar_mes.js) e sobe com manutenção. Usada como peça
+// extra em Montagem de Estratégia (js/investigacao.js).
+// ════════════════════════════════════════════════════════
+async function _callFnTeses(nome, payload) {
+  let tentativas = 0;
+  while (!window.FB_FUNCTIONS && tentativas < 30) { await new Promise(r=>setTimeout(r,300)); tentativas++; }
+  if (!window.FB_FUNCTIONS) throw new Error('Firebase Functions não inicializado. Recarregue a página.');
+  const { httpsCallable } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js');
+  const r = await httpsCallable(window.FB_FUNCTIONS, nome)(payload || {});
+  return r.data;
+}
+
+window.renderBancoTesesPainel = async function(j, escId, el) {
+  try {
+    const snap = await getDocs(collection(db, 'escritorios', escId, 'teses'));
+    const teses = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (b.criada_em||'').localeCompare(a.criada_em||''));
+
+    const optsArea = TODAS_AREAS.map(a => `<option value="${a.k}">${a.l}</option>`).join('');
+
+    el.innerHTML = `
+      <div style="display:flex;gap:.4rem;align-items:center;margin-bottom:.8rem;flex-wrap:wrap">
+        <select id="tese-nova-materia" style="flex:1;min-width:160px">${optsArea}</select>
+        <button class="btn btn-sm btn-prim" onclick="window._criarTeseBanco('${escId}')">+ compor tese (30⚡)</button>
+      </div>
+      ${teses.length === 0 ? `<div style="font-size:.78rem;color:var(--txt3);padding:.4rem 0">Nenhuma tese composta ainda.</div>` : teses.map(t => `
+        <div class="card" style="margin-bottom:.5rem;padding:.6rem .8rem">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:.6rem">
+            <div>
+              <div style="font-weight:700;color:var(--txt);font-size:.82rem">${t.titulo || (TODAS_AREAS.find(a=>a.k===t.materia)?.l || t.materia)}</div>
+              <div style="font-size:.7rem;color:var(--ardosia2)">Nota ${t.nota}/100 · Atualização ${Math.round(t.atualizacao_pct)}% · usada ${(t.historico_uso||[]).length}x</div>
+            </div>
+            <button class="btn btn-sm btn-ghost" onclick="window._manterTeseBanco('${escId}','${t.id}')">🔧 manter (15⚡)</button>
+          </div>
+          <div class="membro-prod-bar" style="height:5px;margin-top:.4rem"><div class="membro-prod-fill" style="width:${Math.round(t.atualizacao_pct)}%"></div></div>
+        </div>`).join('')}`;
+  } catch (e) {
+    console.error('[BANCO DE TESES]', e);
+    el.innerHTML = `<div style="color:var(--verm2);font-size:.78rem">Erro ao carregar Banco de Teses.</div>`;
+  }
+};
+
+window._criarTeseBanco = async function(escId) {
+  const materia = document.getElementById('tese-nova-materia')?.value;
+  if (!materia) return;
+  try {
+    const r = await _callFnTeses('criarTese_banco', { escritorio_id: escId, materia });
+    toast(`📚 Tese composta — nota ${r.nota}/100!`, 'ok', 5000);
+    const el = document.getElementById('esc-teses-embed');
+    if (el) window.renderBancoTesesPainel(window.JOGADOR, escId, el);
+  } catch (e) {
+    toast('Erro: ' + (e.message||'não foi possível compor a tese'), 'ko');
+  }
+};
+
+window._manterTeseBanco = async function(escId, teseId) {
+  try {
+    const r = await _callFnTeses('manterTese_banco', { escritorio_id: escId, tese_id: teseId });
+    toast(`🔧 Atualização subiu pra ${Math.round(r.atualizacao_pct)}% (teto ${Math.round(r.teto)}%).`, 'ok', 5000);
+    const el = document.getElementById('esc-teses-embed');
+    if (el) window.renderBancoTesesPainel(window.JOGADOR, escId, el);
+  } catch (e) {
+    toast('Erro: ' + (e.message||'não foi possível fazer a manutenção'), 'ko');
+  }
+};

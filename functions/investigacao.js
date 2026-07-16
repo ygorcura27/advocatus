@@ -21,6 +21,7 @@ const banco                  = require('./shared/banco_juridico.js');
 const { aplicarXpPracticeArea, normalizarSkillsJur } = require('./skills');
 const { modEstadoJogador } = require('./peticoes');
 const sk = require('./investigacao_skills');
+const { forcaDaTese, registrarUsoTese } = require('./banco_teses');
 
 // Áreas reais de processo (js/escritorio_painel.js::TODAS_AREAS) são em
 // português; tags do Vade Mecum e as skills area_* (functions/skills.js)
@@ -519,7 +520,7 @@ exports.consumirFavorNode = onCall({ region: 'southamerica-east1' }, async (requ
 exports.confirmarMontagem = onCall({ region: 'southamerica-east1' }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
   const uid = request.auth.uid;
-  const { processo_id, mao_escolhida } = request.data || {};
+  const { processo_id, mao_escolhida, tese_id } = request.data || {};
   if (!processo_id || !Array.isArray(mao_escolhida)) throw new HttpsError('invalid-argument', 'processo_id e mao_escolhida obrigatórios.');
 
   const db = getFirestore();
@@ -538,22 +539,41 @@ exports.confirmarMontagem = onCall({ region: 'southamerica-east1' }, async (requ
 
   const idsValidos = new Set(investigacao.nos.filter(n => n.status === 'revelado' && n.peca).map(n => n.id));
   const maoValida = mao_escolhida.filter(id => idsValidos.has(id));
-  if (maoValida.length === 0) throw new HttpsError('invalid-argument', 'Nenhuma evidência válida selecionada.');
+
+  // Tese do Banco de Teses do escritório (GDD v6.0 §5-6) — opcional, some
+  // como uma peça extra (não-suja, não-pilar) na mão, com força server-side
+  // a partir de nota × atualização%, nunca do que o cliente mandar.
+  const escritorioIdTese = j.escritorio_proprio_id || j.escritorio_empregado_id || null;
+  let teseUsada = null;
+  if (tese_id && escritorioIdTese) {
+    const teseSnap = await db.collection('escritorios').doc(escritorioIdTese).collection('teses').doc(tese_id).get();
+    if (teseSnap.exists) teseUsada = { id: teseSnap.id, ...teseSnap.data() };
+  }
+
+  if (maoValida.length === 0 && !teseUsada) throw new HttpsError('invalid-argument', 'Nenhuma evidência válida selecionada.');
 
   investigacao.mao_evidencias = maoValida;
+  investigacao.tese_banco_id = teseUsada ? teseUsada.id : null;
   investigacao.fase = 'julgamento';
+  const pecasEvidencias = maoValida.map(id => {
+    const no = investigacao.nos.find(n => n.id === id);
+    return { no_id: id, forca: no.peca.forca, suja: no.peca.suja, pilar: no.peca.pilar, exposta: false };
+  });
+  const pecaTese = teseUsada
+    ? [{ no_id: `tese:${teseUsada.id}`, forca: forcaDaTese(teseUsada), suja: false, pilar: false, exposta: false, tese: true }]
+    : [];
   investigacao.julgamento = {
     rodada_atual: 0,
-    pecas_restantes: maoValida.map(id => {
-      const no = investigacao.nos.find(n => n.id === id);
-      return { no_id: id, forca: no.peca.forca, suja: no.peca.suja, pilar: no.peca.pilar, exposta: false };
-    }),
+    pecas_restantes: [...pecaTese, ...pecasEvidencias],
     forca_total: 0,
     log: [],
     veredito: null,
   };
 
   await processoRef.update({ investigacao });
+  if (teseUsada) {
+    await registrarUsoTese(db, escritorioIdTese, teseUsada.id, processo_id, mesTotalPessoal(j)).catch(() => {});
+  }
   return { investigacao: publicoDoNos(investigacao) };
 });
 

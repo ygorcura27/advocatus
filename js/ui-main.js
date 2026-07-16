@@ -706,6 +706,7 @@ async function _carregarEscritorioProprio(escId, j) {
         ${_escProcessosPreviewCard(esc.id)}
         ${_escEquipeCard(esc.id)}
         ${_escBeneficiosPreviewCard(esc.id)}
+        ${_escTesesCard()}
         ${_escClientesCard()}
         <div id="esc-oportunidades-bloco"></div>
         ${_escSocietarioCard(esc, j)}
@@ -733,6 +734,8 @@ async function _carregarEscritorioProprio(escId, j) {
       if (elEquipe && window.renderEquipePainel) window.renderEquipePainel(j, escId, elEquipe);
       const elClientes = document.getElementById('esc-clientes-embed');
       if (elClientes && window.renderClientesPainel) window.renderClientesPainel(j, escId, elClientes);
+      const elTeses = document.getElementById('esc-teses-embed');
+      if (elTeses && window.renderBancoTesesPainel) window.renderBancoTesesPainel(j, escId, elTeses);
       const elOportunidades = document.getElementById('esc-oportunidades-bloco');
       if (elOportunidades && window.renderOportunidadesPainel) window.renderOportunidadesPainel(j, escId, elOportunidades);
       const elWorkspace = document.getElementById('esc-workspace-bloco');
@@ -1519,6 +1522,18 @@ function _escEquipeCard(escId) {
     </div>
     <div id="esc-equipe-embed">
       <div style="font-size:.78rem;color:var(--txt3);padding:.5rem 0">Carregando equipe...</div>
+    </div>
+  </div>`;
+}
+
+function _escTesesCard() {
+  return `
+  <div class="esc-card-bloco" style="margin-bottom:1.1rem">
+    <div class="secao-header" style="margin-bottom:.8rem">
+      <div class="secao-titulo">📚 Banco de Teses</div>
+    </div>
+    <div id="esc-teses-embed">
+      <div style="font-size:.78rem;color:var(--txt3);padding:.5rem 0">Carregando Banco de Teses...</div>
     </div>
   </div>`;
 }
