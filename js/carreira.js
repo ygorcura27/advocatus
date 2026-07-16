@@ -11,6 +11,7 @@ import { db } from './firebase-init.js';
 import { EFEITO_TRACO, ESTAGIOS } from './relacionamento_dados.js';
 import { filhosColecaoAtual, relColecaoAtual, relDocAtual, listarPersonagens } from './personagens.js';
 import { MORADIAS, CARROS } from './patrimonio.js';
+import { calcularITCMD } from './relacionamento.js';
 
 // ════════════════════════════════════════════════════════
 // CARGOS
@@ -258,6 +259,30 @@ async function _renderAposentadoriaBloco(j, el) {
           </button>
         </div>`).join('')}`;
 
+    const htmlPlanejamento = `
+      <div class="secao-header" style="margin-top:1.2rem"><div class="secao-titulo">📜 Planejamento Sucessório</div></div>
+      <div style="font-size:.7rem;color:var(--ardosia2);margin-bottom:.6rem">
+        Reduz o ITCMD (imposto sobre a doação/herança) cobrado quando você conceder controle a um herdeiro. Feito uma vez, vale pra sempre.
+      </div>
+      <div class="card" style="margin-bottom:.5rem;display:flex;justify-content:space-between;align-items:center;gap:.6rem">
+        <div>
+          <div style="font-weight:700;color:var(--txt)">🏛️ Holding Familiar</div>
+          <div style="font-size:.7rem;color:var(--ardosia2)">${j.holding_familiar ? 'Ativa — −55% de ITCMD' : '−55% de ITCMD em futuras doações'}</div>
+        </div>
+        ${j.holding_familiar
+          ? `<span style="color:var(--verde2);font-size:.75rem;font-weight:700">✓ Ativa</span>`
+          : `<button class="btn btn-sec btn-sm" onclick="window.criarHoldingFamiliar()">Montar</button>`}
+      </div>
+      <div class="card" style="margin-bottom:.5rem;display:flex;justify-content:space-between;align-items:center;gap:.6rem">
+        <div>
+          <div style="font-weight:700;color:var(--txt)">📜 Testamento</div>
+          <div style="font-size:.7rem;color:var(--ardosia2)">${j.testamento_pronto ? 'Redigido — −10% de ITCMD' : '−10% de ITCMD em futuras doações'}</div>
+        </div>
+        ${j.testamento_pronto
+          ? `<span style="color:var(--verde2);font-size:.75rem;font-weight:700">✓ Pronto</span>`
+          : `<button class="btn btn-sec btn-sm" onclick="window.redigirTestamento()">Redigir</button>`}
+      </div>`;
+
     el.innerHTML = `
       ${j.aposentado_forcado_pendente ? `
       <div class="card" style="margin-bottom:.7rem;border-color:var(--verm2)">
@@ -268,7 +293,8 @@ async function _renderAposentadoriaBloco(j, el) {
         Conceder controle cria um personagem novo e independente (vida, processos e escritório próprios) que fica disponível pra jogar a qualquer momento no seletor do topbar.
       </div>
       ${htmlAssumir}
-      ${htmlTransferir}`;
+      ${htmlTransferir}
+      ${htmlPlanejamento}`;
   } catch (e) {
     console.error('[APOSENTADORIA]', e);
     el.innerHTML = `<div class="card" style="color:var(--verm2)">Erro ao carregar aposentadoria.</div>`;
@@ -360,7 +386,7 @@ window._abrirModalConcederHeranca = function(filhoId, nome) {
     <div style="margin-bottom:1rem">
       <label style="font-size:.75rem;font-weight:600;color:var(--txt)">💰 Dinheiro (até ${teto.toLocaleString('pt-BR')} — 30% do seu saldo)</label>
       <input type="range" id="herd-dinheiro" min="0" max="${teto}" step="${Math.max(100, Math.round(teto/100))}" value="0"
-        oninput="document.getElementById('herd-dinheiro-label').textContent = Number(this.value).toLocaleString('pt-BR')"
+        oninput="document.getElementById('herd-dinheiro-label').textContent = Number(this.value).toLocaleString('pt-BR'); window._herdRecalcITCMD()"
         style="width:100%">
       <div style="text-align:right;font-size:.8rem;color:var(--ouro2);font-weight:700">R$ <span id="herd-dinheiro-label">0</span></div>
     </div>
@@ -368,15 +394,26 @@ window._abrirModalConcederHeranca = function(filhoId, nome) {
     <div style="margin-bottom:1rem">
       <label style="font-size:.75rem;font-weight:600;color:var(--txt)">🏠 Imóvel</label>
       ${podeTransferirImovel
-        ? `<select id="herd-moradia" style="width:100%;margin-top:.3rem"><option value="">Nenhum</option>${optsImovel}</select>`
+        ? `<select id="herd-moradia" style="width:100%;margin-top:.3rem" onchange="window._herdRecalcITCMD()"><option value="">Nenhum</option>${optsImovel}</select>`
         : `<div style="font-size:.7rem;color:var(--ardosia2)">Precisa ter 2+ imóveis próprios pra ceder um (sempre sobra 1 pra você).</div>`}
     </div>
 
     <div style="margin-bottom:1rem">
       <label style="font-size:.75rem;font-weight:600;color:var(--txt)">🚗 Carro</label>
       ${podeTransferirCarro
-        ? `<select id="herd-carro" style="width:100%;margin-top:.3rem"><option value="">Nenhum</option>${optsCarro}</select>`
+        ? `<select id="herd-carro" style="width:100%;margin-top:.3rem" onchange="window._herdRecalcITCMD()"><option value="">Nenhum</option>${optsCarro}</select>`
         : `<div style="font-size:.7rem;color:var(--ardosia2)">Precisa ter 2+ carros próprios sem financiamento em aberto pra ceder um.</div>`}
+    </div>
+
+    <div class="card" style="margin-bottom:1rem">
+      <label style="font-size:.75rem;display:flex;align-items:center;gap:.4rem;cursor:pointer">
+        <input type="checkbox" id="herd-usufruto" onchange="window._herdRecalcITCMD()">
+        Doar com reserva de usufruto (−${Math.round(0.20*100)}% de ITCMD)
+      </label>
+      <div style="font-size:.68rem;color:var(--ardosia2);margin-top:.4rem;display:flex;justify-content:space-between">
+        <span>ITCMD estimado${j.holding_familiar||j.testamento_pronto?' (com desconto de holding/testamento)':''}</span>
+        <b id="herd-itcmd-preview" style="color:var(--ouro2)">R$ 0</b>
+      </div>
     </div>
 
     <div style="margin-bottom:1rem">
@@ -395,6 +432,23 @@ window._abrirModalConcederHeranca = function(filhoId, nome) {
       Confirmar e criar personagem
     </button>
   `);
+  setTimeout(() => window._herdRecalcITCMD(), 50);
+};
+
+window._herdRecalcITCMD = function() {
+  const j = window.JOGADOR;
+  const el = document.getElementById('herd-itcmd-preview');
+  if (!j || !el) return;
+  const dinheiro  = Number(document.getElementById('herd-dinheiro')?.value) || 0;
+  const moradiaId = document.getElementById('herd-moradia')?.value || null;
+  const carroId   = document.getElementById('herd-carro')?.value || null;
+  const usufruto  = document.getElementById('herd-usufruto')?.checked || false;
+  const valorImovel = moradiaId ? (MORADIAS.find(m => m.id === moradiaId)?.v || 0) : 0;
+  const valorCarro  = carroId   ? (CARROS.find(c => c.id === carroId)?.v || 0)   : 0;
+  const { imposto } = calcularITCMD(dinheiro + valorImovel + valorCarro, {
+    holding: !!j.holding_familiar, usufruto, testamento: !!j.testamento_pronto,
+  });
+  el.textContent = 'R$ ' + imposto.toLocaleString('pt-BR');
 };
 
 window._atualizarTotalSkillsHeranca = function() {
@@ -407,6 +461,7 @@ window._confirmarConcederHeranca = async function(filhoId) {
   const dinheiroTransferido = Number(document.getElementById('herd-dinheiro')?.value) || 0;
   const moradiaId = document.getElementById('herd-moradia')?.value || null;
   const carroId   = document.getElementById('herd-carro')?.value || null;
+  const usarUsufruto = document.getElementById('herd-usufruto')?.checked || false;
 
   const bonusSkills = {};
   let soma = 0;
@@ -417,7 +472,7 @@ window._confirmarConcederHeranca = async function(filhoId) {
   if (soma > BONUS_SKILLS_HERDEIRO) { toast(`Distribua no máximo ${BONUS_SKILLS_HERDEIRO} pontos de bônus.`, 'ko'); return; }
 
   fecharModal();
-  await window.assumirHerdeiro(filhoId, { dinheiroTransferido, moradiaId, carroId, bonusSkills });
+  await window.assumirHerdeiro(filhoId, { dinheiroTransferido, moradiaId, carroId, bonusSkills, usarUsufruto });
 };
 
 function _podePromover(j, prox) {

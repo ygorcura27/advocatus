@@ -897,6 +897,7 @@ window._fmtMoeda = function(v){
       <div class="nav-item" data-view="escritorio"><span class="dot"></span>Escritório</div>
       <div class="nav-item" data-view="investigacao"><span class="dot"></span>Investigação</div>
       <div class="nav-item" data-view="foco"><span class="dot"></span>Foco do Personagem</div>
+      <div class="nav-item" data-view="energia"><span class="dot"></span>Energia &amp; Estresse 📌</div>
     </div>
     <div class="nav-group">
       <div class="nav-group-titulo">Atuação</div>
@@ -1171,6 +1172,69 @@ window._fmtMoeda = function(v){
           <div class="equipe-nivel"><div class="equipe-nivel-num">Negociação — 36/50</div><div class="membro-prod-bar"><div class="membro-prod-fill" style="width:72%"></div></div></div>
         </div>
         <div style="padding:0 1.1rem 1rem;font-size:.68rem;color:var(--text-faint)">Dados reais de Camila Duarte (mesma escala /50 da tela Habilidades).</div>
+      </section>
+
+    </div>
+
+    <div class="view" data-view-content="energia" hidden>
+
+      <section class="capa">
+        <div class="capa-kicker">CARREIRA · DUARTE &amp; VASCONCELOS ADVOGADOS</div>
+        <div class="capa-body">
+          <div>
+            <h1 class="capa-nome" style="font-size:1.5rem">⏱️ Energia &amp; Estresse</h1>
+          </div>
+        </div>
+      </section>
+
+      <div class="painel" style="border-color:var(--bronze);padding:.8rem 1.1rem;margin:-.2rem 0 1rem">
+        <div style="font-size:.72rem;color:var(--text);line-height:1.6">
+          <b style="color:var(--bronze-bright)">📌 Proposta completa — não existe no jogo real.</b>
+          Hoje Energia é uma barra que regenera (<code>getEnergiaTotal</code>, referenciada em 23 arquivos do jogo).
+          Esta tela testa um modelo alternativo (GDD v6.0, inspirado no Popmundo): Energia vira um <b>orçamento de horas do mês</b>
+          que você aloca por categoria via slider, e Estresse (0–100) passa a ser o único medidor de longo prazo, no lugar da
+          barra atual. Nada aqui grava em lugar nenhum — é só pra você sentir a interação antes de decidirmos se vira real.
+        </div>
+      </div>
+
+      <div class="stat-row" style="grid-template-columns:repeat(4,1fr)">
+        <div class="stat">
+          <div class="stat-label">Horas disponíveis</div>
+          <div class="stat-value" id="en-horas-base">200 <small>h</small></div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Horas alocadas</div>
+          <div class="stat-value" id="en-horas-alocadas" style="color:var(--amber)">0 <small>h</small></div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Estresse</div>
+          <div class="stat-value" id="en-estresse-val">22 <small>/100</small></div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Fôlego em audiência</div>
+          <div class="stat-value" id="en-folego-val">9 <small>/10</small></div>
+        </div>
+      </div>
+
+      <section class="painel" style="margin-top:1.1rem">
+        <div class="painel-head">
+          <span class="painel-titulo">Alocação de horas do mês</span>
+          <span class="painel-link" id="en-total-label" style="color:var(--text-faint)">0h / 200h</span>
+        </div>
+        <div id="en-sliders" style="padding:.9rem 1.1rem 1.1rem"></div>
+      </section>
+
+      <section class="painel" style="margin-top:1.1rem">
+        <div class="painel-head"><span class="painel-titulo">Efeito do Estresse (por faixa)</span></div>
+        <div style="padding:.5rem 1.1rem 1rem">
+          <div class="perf-row"><span style="color:var(--verde)">0–39</span><b style="font-weight:400">Normal.</b></div>
+          <div class="perf-row"><span style="color:var(--amber)">40–69</span><b style="font-weight:400">−5% em toda nota efetiva; irritabilidade em diálogos.</b></div>
+          <div class="perf-row"><span style="color:var(--perigo-text)">70–89</span><b style="font-weight:400">−12% nota efetiva; −20% ganho de estudo; risco 10%/mês de evento de saúde.</b></div>
+          <div class="perf-row"><span style="color:var(--perigo)">90–100</span><b style="font-weight:400">Burnout: licença médica compulsória de 1 mês, carteira roda a 70%, estratégicos auto-resolvem.</b></div>
+        </div>
+        <div style="padding:0 1.1rem 1rem;font-size:.68rem;color:var(--text-faint)">
+          Fôlego em audiência = 10 − ⌊Estresse/20⌋ — liga esse macro ao minigame de Julgamento: advogado esgotado joga pior mecanicamente.
+        </div>
       </section>
 
     </div>
@@ -3838,6 +3902,23 @@ window._fmtMoeda = function(v){
     </div>
     </div>
 
+    <div class="view" data-view-content="energia" hidden>
+    <div>
+      <div class="aside-bloco-titulo">Categorias</div>
+      <div class="perf-row"><span>Estratégicos</span><b style="font-weight:400;color:var(--text-faint)">20–40h/caso</b></div>
+      <div class="perf-row"><span>Supervisão</span><b style="font-weight:400;color:var(--text-faint)">0,85×→1,15× carteira</b></div>
+      <div class="perf-row"><span>Estudo</span><b style="font-weight:400;color:var(--text-faint)">alimenta Foco</b></div>
+      <div class="perf-row"><span>Gestão/Captação</span><b style="font-weight:400;color:var(--text-faint)">leads, networking</b></div>
+      <div class="perf-row"><span>Vida pessoal</span><b style="font-weight:400;color:var(--text-faint)">−estresse</b></div>
+      <div class="perf-row"><span>Descanso</span><b style="font-weight:400;color:var(--text-faint)">−estresse (taxa maior)</b></div>
+    </div>
+    <div class="dica-dia">
+      <div class="dica-dia-aspas">"</div>
+      <p>Hora extra acima de 200h: +0,5 de Estresse por hora.</p>
+      <span>— GDD v6.0 §3.1</span>
+    </div>
+    </div>
+
     <div class="view" data-view-content="escritorio" hidden>
     <div>
       <div class="aside-bloco-titulo">Cronologia do jogo</div>
@@ -6424,6 +6505,68 @@ window._dgConfirmarDepartamentos = function(){
     ? `✅ Gestores de departamento definidos para ${Object.values(porResp).flat().length} setor(es), entre ${n} advogado(s).`
     : `✅ Todos os setores continuam sob sua gestão direta.`;
 };
+</script>
+
+<script>
+// Mockup GDD v6.0 §3 — Energia como orçamento de horas. Estado local, não grava
+// nada, só pra sentir a interação antes de decidir se vira mecânica real.
+window._EN_CATS = [
+  { id:'estrategicos', label:'Processos Estratégicos', desc:'Preparo dos casos jogados ativamente (~20–40h/caso/mês).' },
+  { id:'supervisao',   label:'Supervisão da Carteira',  desc:'Multiplica a qualidade do trabalho dos associados (0,85×–1,15×).' },
+  { id:'estudo',       label:'Estudo',                  desc:'Alimenta o Foco mensal.' },
+  { id:'gestao',       label:'Gestão/Captação',         desc:'Leads de clientes, networking, administração.' },
+  { id:'pessoal',      label:'Vida pessoal',            desc:'Relacionamento, filhos, hobbies — reduz Estresse.' },
+  { id:'descanso',     label:'Descanso',                desc:'Reduz Estresse (taxa maior que vida pessoal, sem bônus sociais).' },
+];
+window._EN_VALS = { estrategicos:40, supervisao:30, estudo:20, gestao:30, pessoal:30, descanso:30 };
+
+window._enRender = function(){
+  const wrap = document.getElementById('en-sliders');
+  if (!wrap) return;
+  wrap.innerHTML = window._EN_CATS.map(c => `
+    <div style="margin-bottom:1.1rem">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:.78rem;margin-bottom:.3rem">
+        <span>${c.label}</span>
+        <span style="font-family:var(--font-mono)"><b id="en-val-${c.id}">${window._EN_VALS[c.id]}</b><small style="color:var(--text-faint)">h</small></span>
+      </div>
+      <input type="range" min="0" max="200" step="5" value="${window._EN_VALS[c.id]}" id="en-slide-${c.id}"
+        oninput="window._enUpdate('${c.id}', this.value)" style="width:100%;accent-color:var(--selo)">
+      <div style="font-size:.66rem;color:var(--text-faint);margin-top:.15rem">${c.desc}</div>
+    </div>
+  `).join('');
+  window._enRecalc();
+};
+
+window._enUpdate = function(id, v){
+  window._EN_VALS[id] = Number(v);
+  const el = document.getElementById('en-val-' + id);
+  if (el) el.textContent = v;
+  window._enRecalc();
+};
+
+window._enRecalc = function(){
+  const total = Object.values(window._EN_VALS).reduce((a, b) => a + b, 0);
+  const horaExtra = Math.max(0, total - 200);
+  const descanso  = window._EN_VALS.descanso || 0;
+  const pessoal   = window._EN_VALS.pessoal || 0;
+  // baseline 22 (mesmo ponto de partida do stat-row do Foco) — só pra ilustrar a direção da fórmula do §3.2.
+  const estresse = Math.max(0, Math.min(100, Math.round(22 + horaExtra * 0.5 - Math.floor(descanso / 10) - Math.floor(pessoal / 15))));
+  const folego   = Math.max(0, 10 - Math.floor(estresse / 20));
+
+  const totalLbl = document.getElementById('en-total-label');
+  if (totalLbl) {
+    totalLbl.textContent = total + 'h / 200h' + (horaExtra > 0 ? ' · +' + horaExtra + 'h extra' : '');
+    totalLbl.style.color = horaExtra > 0 ? 'var(--perigo-text)' : 'var(--text-faint)';
+  }
+  const al = document.getElementById('en-horas-alocadas');
+  if (al) al.innerHTML = total + ' <small>h</small>';
+  const est = document.getElementById('en-estresse-val');
+  if (est) { est.innerHTML = estresse + ' <small>/100</small>'; est.style.color = estresse >= 70 ? 'var(--perigo)' : (estresse >= 40 ? 'var(--amber)' : 'var(--verde)'); }
+  const fol = document.getElementById('en-folego-val');
+  if (fol) fol.innerHTML = folego + ' <small>/10</small>';
+};
+
+window._enRender();
 </script>
 
 <script>

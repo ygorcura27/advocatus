@@ -16,6 +16,7 @@ import {
 } from './relacionamento_dados.js';
 import { relColecaoAtual, filhosColecaoAtual, relDocAtual, filhoDocAtual }
   from './personagens.js';
+import { MORADIAS, CARROS } from './patrimonio.js';
 
 // ════════════════════════════════════════════════════════
 // NPCs GLOBAIS — LOCK DE EXCLUSIVIDADE
@@ -1188,8 +1189,72 @@ const REPUTACAO_HERANCA_PCT = 0.4;   // quanto da reputação do doador o herdei
 const DINHEIRO_HERANCA_PCT_MAX = 0.3; // teto de quanto dinheiro dá pra transferir de uma vez
 const BONUS_SKILLS_HERDEIRO = 10;     // pontos livres de Habilidades Gerais na criação
 
+// ════════════════════════════════════════════════════════
+// ITCMD — imposto sobre a doação/herança (GDD v6.0 §9.3)
+// Incide sobre dinheiro + valor de imóvel/carro cedidos. Reduzido por
+// planejamento sucessório feito ANTES da doação (holding familiar,
+// reserva de usufruto na própria doação, testamento pronto) — quem não
+// planeja paga a alíquota cheia. Sempre sobra um mínimo (cap 85% de
+// redução) pra não virar isenção total, que descolaria do real.
+// ════════════════════════════════════════════════════════
+const ITCMD_ALIQUOTA_BASE = 0.06;
+const ITCMD_REDUCAO_HOLDING   = 0.55; // holding familiar já criada
+const ITCMD_REDUCAO_USUFRUTO  = 0.20; // doação com reserva de usufruto (escolhida nesta doação)
+const ITCMD_REDUCAO_TESTAMENTO= 0.10; // testamento pronto (inventário extrajudicial mais barato/rápido)
+const ITCMD_REDUCAO_CAP       = 0.85;
+
+export function calcularITCMD(valorBase, { holding = false, usufruto = false, testamento = false } = {}) {
+  const reducao = Math.min(
+    ITCMD_REDUCAO_CAP,
+    (holding ? ITCMD_REDUCAO_HOLDING : 0) + (usufruto ? ITCMD_REDUCAO_USUFRUTO : 0) + (testamento ? ITCMD_REDUCAO_TESTAMENTO : 0)
+  );
+  const aliquotaEfetiva = ITCMD_ALIQUOTA_BASE * (1 - reducao);
+  return { valorBase, aliquotaEfetiva, reducao, imposto: Math.round(valorBase * aliquotaEfetiva) };
+}
+window.calcularITCMD = calcularITCMD;
+
+// Custo pra montar uma holding familiar — abate patrimônio líquido, não é
+// só burocracia de graça. Real: escritura + registro + honorários.
+const HOLDING_CUSTO_PCT = 0.03; // 3% do patrimônio total (dinheiro+imóveis+carros) na criação
+const HOLDING_CUSTO_MIN = 8000;
+const TESTAMENTO_CUSTO  = 4000; // tabelionato + honorários — flat, independe do patrimônio
+
+window.criarHoldingFamiliar = async function() {
+  const j = window.JOGADOR;
+  const uid = j?.uid || window.JOGADOR_UID;
+  if (!uid) return;
+  if (j.holding_familiar) { toast('Você já tem uma holding familiar.', 'ko'); return; }
+
+  const valorImoveis = Object.keys(j.moradias_compradas||{}).reduce((s,id)=> s + (MORADIAS.find(m=>m.id===id)?.v||0), 0);
+  const valorCarros  = Object.keys(j.carros_comprados||{}).filter(id=>id!=='onibus').reduce((s,id)=> s + (CARROS.find(c=>c.id===id)?.v||0), 0);
+  const patrimonioTotal = (j.dinheiro||0) + valorImoveis + valorCarros;
+  const custo = Math.max(HOLDING_CUSTO_MIN, Math.round(patrimonioTotal * HOLDING_CUSTO_PCT));
+
+  if ((j.dinheiro||0) < custo) { toast(`Precisa de R$ ${custo.toLocaleString('pt-BR')} pra montar a holding.`, 'ko'); return; }
+  if (!confirm(`Montar holding familiar por R$ ${custo.toLocaleString('pt-BR')}? Reduz o ITCMD em futuras doações/herança em ${Math.round(ITCMD_REDUCAO_HOLDING*100)}%.`)) return;
+
+  await updateDoc(doc(db,'jogadores',uid), { dinheiro: (j.dinheiro||0) - custo, holding_familiar: true, holding_criada_em: new Date().toISOString() });
+  j.dinheiro = (j.dinheiro||0) - custo; j.holding_familiar = true; window.JOGADOR = j;
+  toast('🏛️ Holding familiar criada.', 'ok', 5000);
+  if (window.navTo) window.navTo('carreira', null);
+};
+
+window.redigirTestamento = async function() {
+  const j = window.JOGADOR;
+  const uid = j?.uid || window.JOGADOR_UID;
+  if (!uid) return;
+  if (j.testamento_pronto) { toast('Você já tem testamento redigido.', 'ko'); return; }
+  if ((j.dinheiro||0) < TESTAMENTO_CUSTO) { toast(`Precisa de R$ ${TESTAMENTO_CUSTO.toLocaleString('pt-BR')} pra redigir o testamento.`, 'ko'); return; }
+  if (!confirm(`Redigir testamento por R$ ${TESTAMENTO_CUSTO.toLocaleString('pt-BR')}? Reduz o ITCMD em futuras doações/herança em ${Math.round(ITCMD_REDUCAO_TESTAMENTO*100)}%.`)) return;
+
+  await updateDoc(doc(db,'jogadores',uid), { dinheiro: (j.dinheiro||0) - TESTAMENTO_CUSTO, testamento_pronto: true, testamento_redigido_em: new Date().toISOString() });
+  j.dinheiro = (j.dinheiro||0) - TESTAMENTO_CUSTO; j.testamento_pronto = true; window.JOGADOR = j;
+  toast('📜 Testamento redigido.', 'ok', 5000);
+  if (window.navTo) window.navTo('carreira', null);
+};
+
 window.assumirHerdeiro = async function(filhoId, opts) {
-  const { dinheiroTransferido = 0, moradiaId = null, carroId = null, bonusSkills = {} } = opts || {};
+  const { dinheiroTransferido = 0, moradiaId = null, carroId = null, bonusSkills = {}, usarUsufruto = false } = opts || {};
 
   const j   = window.JOGADOR;
   const uid = j?.uid || window.JOGADOR_UID;
@@ -1221,7 +1286,22 @@ window.assumirHerdeiro = async function(filhoId, opts) {
     if (financEmAberto) { toast('Esse carro ainda tem financiamento em aberto — quite antes de transferir.', 'ko'); return; }
   }
 
-  if (!confirm(`Dar controle de ${f.nome} agora? Ele vira um personagem separado, selecionável no trocador do topbar a qualquer momento.`)) return;
+  const valorImovel     = moradiaId ? (MORADIAS.find(m => m.id === moradiaId)?.v || 0) : 0;
+  const valorCarroCedido= carroId   ? (CARROS.find(c => c.id === carroId)?.v || 0)   : 0;
+  const { imposto: itcmd, aliquotaEfetiva, reducao } = calcularITCMD(
+    dinheiro + valorImovel + valorCarroCedido,
+    { holding: !!j.holding_familiar, usufruto: usarUsufruto, testamento: !!j.testamento_pronto }
+  );
+  const dinheiroLiquido = Math.max(0, dinheiro - itcmd);
+  const itcmdDoBolso    = Math.max(0, itcmd - dinheiro); // parte do ITCMD que não coube no dinheiro cedido — sai do resto do saldo do doador
+  if (itcmdDoBolso > (dinheiroDoador - dinheiro)) {
+    toast(`ITCMD de R$ ${itcmd.toLocaleString('pt-BR')} é maior que seu saldo disponível. Ceda menos, monte uma holding familiar ou redija um testamento antes pra reduzir a alíquota.`, 'ko');
+    return;
+  }
+
+  if (!confirm(
+    `Dar controle de ${f.nome} agora?\n\nITCMD (${Math.round(aliquotaEfetiva*10000)/100}% efetivo${reducao>0 ? `, ${Math.round(reducao*100)}% de redução por planejamento` : ''}): R$ ${itcmd.toLocaleString('pt-BR')}\n${f.nome} recebe R$ ${dinheiroLiquido.toLocaleString('pt-BR')} em dinheiro líquido${itcmdDoBolso>0 ? ` (+ R$ ${itcmdDoBolso.toLocaleString('pt-BR')} de imposto saindo do seu próprio saldo)` : ''}.\n\nEle vira um personagem separado, selecionável no trocador do topbar a qualquer momento.`
+  )) return;
 
   const novoId       = doc(collection(db, 'jogadores', uid, 'personagens')).id;
   const jogadorRef   = doc(db, 'jogadores', uid);
@@ -1257,6 +1337,7 @@ window.assumirHerdeiro = async function(filhoId, opts) {
       const jogadorSnap = await tx.get(jogadorRef);
       if (!jogadorSnap.exists()) throw new Error('Personagem não encontrado.');
       const jd = jogadorSnap.data();
+      if ((jd.dinheiro||0) < dinheiro + itcmdDoBolso) throw new Error('Saldo mudou — não cobre mais dinheiro cedido + ITCMD.');
 
       // Ficha nova — mesma base de um personagem recém-criado, só com os
       // recursos escolhidos pelo doador por cima.
@@ -1269,7 +1350,8 @@ window.assumirHerdeiro = async function(filhoId, opts) {
         networking: 5, saude_mental: 80, disposicao: 80,
         prestigio_academico: 0, energia: 100, energia_usada_mes: 0,
         skills,
-        dinheiro, meses_negativo: 0, meses_positivo_streak: 0, no_serasa: false,
+        dinheiro: dinheiroLiquido, itcmd_pago: itcmd, recebido_com_usufruto: usarUsufruto,
+        meses_negativo: 0, meses_positivo_streak: 0, no_serasa: false,
         renda_calculada: 0, despesas_calculadas: 0,
         pat: {
           moradia: moradiaId || 'pais',
@@ -1291,9 +1373,10 @@ window.assumirHerdeiro = async function(filhoId, opts) {
         criado_em: new Date().toISOString(),
       });
 
-      // Doador perde só o que foi explicitamente transferido.
+      // Doador perde o que foi explicitamente transferido + a parte do
+      // ITCMD que não coube no dinheiro cedido (imposto sai do próprio bolso).
       tx.update(jogadorRef, {
-        dinheiro: dinheiroDoador - dinheiro,
+        dinheiro: dinheiroDoador - dinheiro - itcmdDoBolso,
         moradias_compradas: moradiasDoador,
         carros_comprados: carrosDoador,
         pat: patDoador,
@@ -1305,7 +1388,7 @@ window.assumirHerdeiro = async function(filhoId, opts) {
     await addDoc(collection(db,'jogadores',uid,'inbox'), {
       de:'sistema', para_uid:uid,
       assunto: '🎓 Novo herdeiro jogável',
-      corpo: `${f.nome} assumiu o controle e agora tem sua própria carreira — acesse pelo trocador de personagem no topo da tela.${dinheiro>0?` Recebeu ${dinheiro.toLocaleString('pt-BR')} em dinheiro.`:''}`,
+      corpo: `${f.nome} assumiu o controle e agora tem sua própria carreira — acesse pelo trocador de personagem no topo da tela.${dinheiroLiquido>0?` Recebeu R$ ${dinheiroLiquido.toLocaleString('pt-BR')} em dinheiro líquido.`:''}${itcmd>0?` ITCMD pago: R$ ${itcmd.toLocaleString('pt-BR')}.`:''}`,
       tipo:'sistema', tipo_noticia:'positivo', lida:false, criado_em:new Date().toISOString(),
     });
 
