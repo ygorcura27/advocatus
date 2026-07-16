@@ -1224,6 +1224,14 @@ window._fmtMoeda = function(v){
         <div id="en-sliders" style="padding:.9rem 1.1rem 1.1rem"></div>
       </section>
 
+      <section class="painel" style="margin-top:1.1rem;border-color:var(--bronze)">
+        <div class="painel-head">
+          <span class="painel-titulo">📊 Projeção do Mês</span>
+          <span class="painel-link" style="color:var(--text-faint)">recalcula ao vivo — nada aqui é gravado</span>
+        </div>
+        <div id="en-projecao" style="padding:.3rem 1.1rem 1rem"></div>
+      </section>
+
       <section class="painel" style="margin-top:1.1rem">
         <div class="painel-head"><span class="painel-titulo">Efeito do Estresse (por faixa)</span></div>
         <div style="padding:.5rem 1.1rem 1rem">
@@ -6564,6 +6572,61 @@ window._enRecalc = function(){
   if (est) { est.innerHTML = estresse + ' <small>/100</small>'; est.style.color = estresse >= 70 ? 'var(--perigo)' : (estresse >= 40 ? 'var(--amber)' : 'var(--verde)'); }
   const fol = document.getElementById('en-folego-val');
   if (fol) fol.innerHTML = folego + ' <small>/10</small>';
+
+  window._enRenderProjecao(estresse, folego);
+};
+
+// Projeção do mês — traduz as horas alocadas em "e daí?" pra cada
+// categoria, usando as fórmulas do próprio GDD v6.0 (ou a mais próxima
+// regra real já existente, ex. ganho de estudo). Tudo aqui é ilustrativo
+// (personagem de exemplo, não o seu save) — o objetivo é dar noção de
+// ordem de grandeza antes de decidir se a mecânica vira real.
+window._enRenderProjecao = function(estresse, folego){
+  const wrap = document.getElementById('en-projecao');
+  if (!wrap) return;
+  const V = window._EN_VALS;
+
+  // Supervisão: 0h → 0,85× | 40h+ → 1,15× (interpolação linear, GDD §7.4)
+  const modSupervisao = Math.min(1.15, 0.85 + (V.supervisao / 40) * 0.30);
+
+  // mod_estresse do §4.1 — usado tanto pra estudo quanto pra nota efetiva
+  const modEstresse = estresse >= 70 ? 0.8 : estresse >= 40 ? 0.9 : 1.0;
+
+  // Estudo: regra real de hoje é flat +3/mês em 1 skill (js/patrimonio.js);
+  // aqui escalamos proporcional às horas alocadas (40h = 1 "unidade" de
+  // estudo) e aplicamos o mod_estresse, só pra dar sentido de proporção.
+  const ganhoEstudo = Math.max(0, (V.estudo / 40) * 3 * modEstresse);
+
+  // Gestão/Captação: leads_mensais já é uma fórmula real (reputação × mkt
+  // × renome × obras) — aqui só a fatia que as horas alocadas explicam.
+  const leadsGestao = Math.round((V.gestao / 40) * 4);
+
+  // Processos Estratégicos: 20-40h/caso (média 30h) — quantos cabem nesse
+  // orçamento, e a banda de resultado (-15% a +20%) some se não sobrar
+  // fôlego (estresse alto = joga pior o minigame, GDD §3.3).
+  const casosEstrategicos = Math.floor(V.estrategicos / 30);
+  const bandaMin = folego >= 8 ? -15 : folego >= 5 ? -20 : -30;
+  const bandaMax = folego >= 8 ?  20 : folego >= 5 ?  12 :   5;
+
+  const linha = (label, valor, desc) => `
+    <div class="perf-row">
+      <span>${label}</span>
+      <b style="font-weight:600;color:var(--text)">${valor}</b>
+    </div>
+    <div style="font-size:.66rem;color:var(--text-faint);margin:-.15rem 0 .55rem">${desc}</div>`;
+
+  wrap.innerHTML = `
+    ${linha('⚖️ Qualidade da Carteira (automática)', (modSupervisao*100).toFixed(0)+'%',
+      `Supervisão ${V.supervisao}h → multiplicador ${modSupervisao.toFixed(2)}× sobre o resultado de todos os casos de carteira do mês (0,85×–1,15×).`)}
+    ${linha('📚 Ganho de Estudo', '+' + ganhoEstudo.toFixed(1) + ' pontos',
+      `Estudo ${V.estudo}h, com Estresse em ${estresse} aplicando ${(modEstresse*100).toFixed(0)}% do ganho normal.`)}
+    ${linha('🤝 Leads de Captação', '+' + leadsGestao + ' estimados',
+      `Gestão/Captação ${V.gestao}h — fatia explicada pelas horas; o resto da fórmula real depende de reputação/marketing/renome.`)}
+    ${linha('🗂️ Processos Estratégicos jogáveis', casosEstrategicos + ' caso(s)',
+      `${V.estrategicos}h ÷ ~30h/caso. Banda de resultado ao jogar ativamente: ${bandaMin}% a +${bandaMax}% sobre a base${folego<8?' (reduzida — fôlego baixo)':''}.`)}
+    ${linha('😮‍💨 Vida pessoal + Descanso', V.pessoal + V.descanso + 'h',
+      `Principal alavanca pra baixar Estresse (${estresse}/100 agora) — sem isso as 4 linhas acima pioram todo mês.`)}
+  `;
 };
 
 window._enRender();
