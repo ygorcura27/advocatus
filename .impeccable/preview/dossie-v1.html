@@ -993,6 +993,28 @@ window._fmtMoeda = function(v){
       ⚠️ Disposição cai −2/mês por padrão (frequentar a academia soma +2); abaixo de 20, tira −20⚡ do orçamento do mês seguinte. Saúde Mental cai −5/mês se você gastar &gt;70⚡ (ou os dois recuperam +3/mês se gastar &lt;30⚡) e agora também multiplica a força das peças de investigação (±10% conforme a faixa, −25% em burnout) — implementado no backend nesta sessão, não é só mockup.
     </div>
 
+    <section class="painel" style="border-color:var(--bronze)">
+      <div class="painel-head">
+        <span class="painel-titulo">🗺️ Território</span>
+        <span class="painel-link" style="color:var(--text-faint)">📌 proposta — GDD v6.0 §8, hoje reputação é 1 número só, geral</span>
+      </div>
+      <div style="padding:.7rem 1.1rem 1rem">
+        <div class="perf-row"><span>📍 Rio de Janeiro <em style="color:var(--text-faint);font-style:normal">(base)</em></span><b style="color:var(--verde)">62/100</b></div>
+        <div class="membro-prod-bar" style="margin-bottom:.6rem"><div class="membro-prod-fill" style="width:62%;background:var(--verde)"></div></div>
+        <div class="perf-row"><span>📍 São Paulo</span><b style="color:var(--amber)">18/100</b></div>
+        <div class="membro-prod-bar" style="margin-bottom:.6rem"><div class="membro-prod-fill" style="width:18%;background:var(--amber)"></div></div>
+        <div class="perf-row"><span>📍 Interior (Campos, Niterói)</span><b style="color:var(--amber)">9/100</b></div>
+        <div class="membro-prod-bar" style="margin-bottom:.6rem"><div class="membro-prod-fill" style="width:9%;background:var(--amber)"></div></div>
+        <div class="perf-row"><span>🏛️ Brasília (STJ/STF) <em style="color:var(--text-faint);font-style:normal">— endgame territorial</em></span><b style="color:var(--text-faint)">0/100 — sem atuação</b></div>
+        <div class="membro-prod-bar"><div class="membro-prod-fill" style="width:0%;background:var(--perigo)"></div></div>
+      </div>
+      <div style="padding:0 1.1rem 1rem;font-size:.68rem;color:var(--text-faint);line-height:1.6">
+        Cresce com vitórias locais; expandir = abrir filial ou contratar correspondente (§7.5) numa comarca nova. Sustentações
+        no STJ/STF seriam as "turnês mundiais" do jogo — caras, estressantes (Fôlego alto exigido), renome altíssimo. Hoje só
+        existe um número de reputação geral (<code>j.reputacao</code>), sem quebra por comarca nenhuma.
+      </div>
+    </section>
+
     <section class="painel">
       <div class="painel-head"><span class="painel-titulo">Minha Carreira</span></div>
       <div class="carreira-escada">
@@ -1031,6 +1053,39 @@ window._fmtMoeda = function(v){
         <span class="req-label">Tempo no cargo <small>(ou 2 recursos vencidos STJ/STF)</small></span>
         <div class="membro-prod-bar" style="flex:1"><div class="membro-prod-fill" style="width:83%;background:var(--amber)"></div></div>
         <span class="req-val pendente">1a 8m / 2a</span>
+      </div>
+    </section>
+
+    <section class="painel" style="border-color:var(--bronze)">
+      <div class="painel-head">
+        <span class="painel-titulo">⭐ Converter XP</span>
+        <span class="painel-link" style="color:var(--text-faint)">📌 proposta — GDD v6.0 §11</span>
+      </div>
+      <div style="padding:.7rem 1.1rem 0;font-size:.72rem;color:var(--text-muted);line-height:1.6">
+        Hoje XP só serve pra promoção (barra acima). A regra Popmundo é dar uma escolha: guardar tudo pra subir de cargo mais
+        rápido, ou gastar parte agora num efeito imediato. Com 410 acumulado:
+      </div>
+      <div style="padding:.8rem 1.1rem 1rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.6rem">
+        <div class="card" style="text-align:center">
+          <div style="font-size:1.1rem">😌</div>
+          <div style="font-weight:600;font-size:.76rem;color:var(--text);margin:.3rem 0">−15 Estresse</div>
+          <div style="font-size:.66rem;color:var(--text-faint)">custa 80 XP</div>
+        </div>
+        <div class="card" style="text-align:center">
+          <div style="font-size:1.1rem">📖</div>
+          <div style="font-weight:600;font-size:.76rem;color:var(--text);margin:.3rem 0">+1 boost no Foco do mês</div>
+          <div style="font-size:.66rem;color:var(--text-faint)">custa 100 XP</div>
+        </div>
+        <div class="card" style="text-align:center">
+          <div style="font-size:1.1rem">⚖️</div>
+          <div style="font-weight:600;font-size:.76rem;color:var(--text);margin:.3rem 0">+10% num caso estratégico específico</div>
+          <div style="font-size:.66rem;color:var(--text-faint)">custa 120 XP</div>
+        </div>
+        <div class="card" style="text-align:center;border-color:var(--verde)">
+          <div style="font-size:1.1rem">🔒</div>
+          <div style="font-weight:600;font-size:.76rem;color:var(--verde)">Guardar (recomendado)</div>
+          <div style="font-size:.66rem;color:var(--text-faint)">falta 170 pra Advogada Plena</div>
+        </div>
       </div>
     </section>
 
@@ -1296,6 +1351,65 @@ window._fmtMoeda = function(v){
           <div class="stat-value">$ 61.800,00 <small>cota 65%</small></div>
         </div>
       </div>
+
+      <section class="painel" style="border-color:var(--bronze)">
+        <div class="painel-head">
+          <span class="painel-titulo">🃏 Eventos deste Mês</span>
+          <span class="painel-link" style="color:var(--text-faint)">📌 proposta — GDD v6.0 §10, baralho sorteado mensalmente</span>
+        </div>
+        <div style="padding:.7rem 1.1rem 1rem;display:flex;flex-direction:column;gap:.5rem">
+          <div class="card" style="display:flex;gap:.7rem;align-items:flex-start;border-color:var(--verde)">
+            <span style="font-size:1.3rem">💼</span>
+            <div>
+              <div style="font-weight:600;font-size:.8rem;color:var(--text)">Crise econômica regional</div>
+              <div style="font-size:.7rem;color:var(--text-faint);margin-top:.15rem">↑ volume trabalhista e recuperações judiciais este mês em toda a comarca do Rio.</div>
+            </div>
+          </div>
+          <div class="card" style="display:flex;gap:.7rem;align-items:flex-start;border-color:var(--perigo)">
+            <span style="font-size:1.3rem">📜</span>
+            <div>
+              <div style="font-weight:600;font-size:.8rem;color:var(--text)">Súmula nova — Tema Repetitivo 1.187</div>
+              <div style="font-size:.7rem;color:var(--text-faint);margin-top:.15rem">Teses de Responsabilidade Civil em vias de entrega perdem 30% de Atualização% no Banco de Teses (ligado ao sistema real de Banco de Teses).</div>
+            </div>
+          </div>
+          <div class="card" style="display:flex;gap:.7rem;align-items:flex-start;border-color:var(--bronze)">
+            <span style="font-size:1.3rem">🏖️</span>
+            <div>
+              <div style="font-weight:600;font-size:.8rem;color:var(--text)">Recesso forense parcial (mês 7)</div>
+              <div style="font-size:.7rem;color:var(--text-faint);margin-top:.15rem">Carteira desacelera 60%, prazos suspensos — mês bom pra Estudo/Vida Pessoal.</div>
+            </div>
+          </div>
+        </div>
+        <div style="padding:0 1.1rem 1rem;font-size:.68rem;color:var(--text-faint)">
+          Categorias do baralho (GDD): mudança de jurisprudência, lei nova, greve/recesso, fiscalização OAB, cliente célebre,
+          escândalo (já existem eventos de repercussão soltos no jogo real), crise econômica. Aqui viram sorteio mensal
+          formal + deslocam o "Entendimento da Comarca" (ver Investigação) — nenhum dos dois existe hoje como sistema.
+        </div>
+      </section>
+
+      <section class="painel">
+        <div class="painel-head">
+          <span class="painel-titulo">▸ Pipeline da Virada de Mês</span>
+          <span class="painel-link" style="color:var(--text-faint)">GDD v6.0 §12 — como o avancar_mes.js real já roda, reorganizado nas fases do doc</span>
+        </div>
+        <div style="padding:.5rem 1.1rem 1rem">
+          <div class="perf-row"><span>1. Financeiro</span><b style="color:var(--verde)">real</b></div>
+          <div class="perf-row"><span>2. Estudo</span><b style="color:var(--verde)">real</b></div>
+          <div class="perf-row"><span>3. Teses (decaimento Atualização%)</span><b style="color:var(--verde)">real — implementado nesta sessão</b></div>
+          <div class="perf-row"><span>4. Carteira (resolver processos em fase decisória)</span><b style="color:var(--verde)">real</b></div>
+          <div class="perf-row"><span>5. Estratégicos não jogados → auto-resolve</span><b style="color:var(--verde)">real</b></div>
+          <div class="perf-row"><span>6. Eventos (baralho mensal + entendimento por comarca)</span><b style="color:var(--bronze-bright)">proposta</b></div>
+          <div class="perf-row"><span>7. Pessoal (Estresse, relações, filhos, envelhecimento)</span><b style="color:var(--verde)">real</b></div>
+          <div class="perf-row"><span>8. Envelhecimento + checagens de aposentadoria/sucessão</span><b style="color:var(--verde)">real</b></div>
+          <div class="perf-row"><span>9. Rankings (recalcular charts, distribuir XP)</span><b style="color:var(--verde)">real</b></div>
+          <div class="perf-row"><span>10. Notificações (resumo do mês)</span><b style="color:var(--verde)">real — inbox</b></div>
+        </div>
+        <div style="padding:0 1.1rem 1rem;font-size:.68rem;color:var(--text-faint)">
+          9 de 10 fases já existem de verdade em <code>functions/avancar_mes.js</code> — o GDD não pede pipeline novo,
+          só documentar essa ordem explicitamente (idempotente por <code>mesProcessado</code>) e encaixar a fase 6, que
+          é a única realmente ausente.
+        </div>
+      </section>
 
       <section class="painel" style="border-color:var(--bronze);animation:rise .5s .15s cubic-bezier(.22,1,.36,1) both">
         <div class="painel-head">
@@ -2489,6 +2603,7 @@ window._fmtMoeda = function(v){
             <span class="inv-hud-item">Dia <b>12</b></span>
             <span class="inv-hud-item">Tarde</span>
             <span class="inv-hud-item inv-hud-turnos">3/6 turnos restantes</span>
+            <span class="inv-hud-item" style="color:var(--bronze-bright)" title="📌 proposta — GDD v6.0 §3.3, liga Estresse ao minigame de Julgamento">🫁 Fôlego <b>9/10</b></span>
           </div>
         </div>
       </section>
@@ -2570,6 +2685,27 @@ window._fmtMoeda = function(v){
           <div class="inv-dossie-item"><div class="inv-dossie-num" style="color:var(--perigo)">0</div><div class="inv-dossie-lbl">⚖️ Contradições</div></div>
           <div class="inv-dossie-item"><div class="inv-dossie-num" style="color:var(--verde)">2</div><div class="inv-dossie-lbl">🛡️ Pontos fortes</div></div>
         </div>
+      </section>
+
+      <section class="painel" style="border-color:var(--bronze)">
+        <div class="painel-head">
+          <span class="painel-titulo">⚖️ Entendimento da Comarca</span>
+          <span class="painel-link" style="color:var(--text-faint)">📌 proposta — GDD v6.0 §6.3, Justiça Estadual · Rio de Janeiro</span>
+        </div>
+        <div style="padding:.7rem 1.1rem 0;font-size:.72rem;color:var(--text-muted);line-height:1.6">
+          "Meta" jurídico por tema e comarca (1-10, como a severidade penal por cidade do Popmundo) — desloca com eventos
+          nacionais mensais (tema repetitivo, súmula, lei nova). Hoje o único modificador de resultado por localização é o
+          <code>perfil_oculto</code> do juiz individual do caso; não existe esse "clima" agregado por comarca/tema.
+        </div>
+        <div style="padding:.8rem 1.1rem 1rem">
+          <div class="perf-row"><span>Responsabilidade civil objetiva</span><b style="color:var(--verde)">8/10 — favorável ao autor</b></div>
+          <div class="membro-prod-bar" style="margin-bottom:.6rem"><div class="membro-prod-fill" style="width:80%;background:var(--verde)"></div></div>
+          <div class="perf-row"><span>Cláusulas de exclusão de responsabilidade</span><b style="color:var(--amber)">5/10 — neutro</b></div>
+          <div class="membro-prod-bar" style="margin-bottom:.6rem"><div class="membro-prod-fill" style="width:50%;background:var(--amber)"></div></div>
+          <div class="perf-row"><span>Litigância de má-fé (pedidos genéricos)</span><b style="color:var(--perigo-text)">3/10 — desfavorável</b></div>
+          <div class="membro-prod-bar"><div class="membro-prod-fill" style="width:30%;background:var(--perigo)"></div></div>
+        </div>
+        <div style="padding:0 1.1rem 1rem;font-size:.66rem;color:var(--text-faint)">🔥 Evento deste mês: nenhum tema em alta nesta comarca — sliders estáveis.</div>
       </section>
 
       <section class="painel">
@@ -2660,6 +2796,20 @@ window._fmtMoeda = function(v){
           <b style="color:var(--text-muted)">recalibrado no backend nesta sessão</b> (nova escala de força + limiar em 45), mas o
           sistema de adversário com dificuldade escalando continua proposta, não implementado.
         </div>
+
+        <section class="painel" style="border-color:var(--bronze);margin-top:.8rem">
+          <div class="painel-head">
+            <span class="painel-titulo">🫁 Fôlego na Audiência</span>
+            <span class="painel-link" style="color:var(--text-faint)">📌 proposta — GDD v6.0 §3.3</span>
+          </div>
+          <div style="padding:.7rem 1.1rem 1rem;font-size:.74rem;color:var(--text-muted);line-height:1.6">
+            Fôlego = 10 − ⌊Estresse/20⌋. Com Estresse em 22 (valor atual de Camila), isso dá <b style="color:var(--text)">9/10</b>.
+            Cada rodada de Julgamento (defender/aceitar favor/deixar cair uma peça) custaria 1 ponto — zerar o Fôlego antes de
+            resolver todas as peças forçaria "deixar cair" o resto sem escolha. É o elo que faltava entre o macro (gestão do mês)
+            e o minigame: advogado esgotado joga pior <em>mecanicamente</em>, não só numa penalidade abstrata de nota.
+            Hoje o Julgamento (<code>executarRodadaJulgamento</code>) não lê Estresse pra nada — cada rodada tem fôlego infinito.
+          </div>
+        </section>
 
         <button class="btn-avancar" id="mont-confirmar">Confirmar Mão (2)</button>
       </div>
