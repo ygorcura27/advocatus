@@ -92,6 +92,30 @@ service cloud.firestore {
     }
 
     // ══════════════════════════════════════════════════════
+    // CONTADORES (js/processos.js::_proximoNumeroProcesso) — contador
+    // atômico global do número de processo (doc contadores/processos,
+    // campo seq), escrito direto pelo cliente via transaction. Nunca teve
+    // regra própria desde que o contador foi introduzido — toda tentativa
+    // de criar processo (inclusive assumir caso do pool) batia em
+    // "Missing or insufficient permissions" nesse tx.get()/tx.set(), sem
+    // nenhum outro sintoma visível além do processo nunca ser criado.
+    // Não é dado sensível (só um sequencial cosmético), então a única
+    // exigência real é impedir que outro campo seja gravado no lugar e que
+    // o valor só suba.
+    // ══════════════════════════════════════════════════════
+    match /contadores/{id} {
+      allow read: if isAuth();
+      allow create: if isAuth()
+        && request.resource.data.keys().hasOnly(['seq'])
+        && request.resource.data.seq is int && request.resource.data.seq > 0;
+      allow update: if isAuth()
+        && request.resource.data.keys().hasOnly(['seq'])
+        && request.resource.data.seq is int
+        && request.resource.data.seq > resource.data.seq;
+      allow delete: if false;
+    }
+
+    // ══════════════════════════════════════════════════════
     // JOGADORES
     // ══════════════════════════════════════════════════════
     match /jogadores/{uid} {
