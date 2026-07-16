@@ -2450,38 +2450,95 @@ window._fmtMoeda = function(v){
 
       <section class="painel" style="margin-top:1rem;border-color:var(--bronze)">
         <div class="painel-head">
-          <span class="painel-titulo">🗂️ Estratégia Padrão por Processo</span>
-          <span class="painel-link" style="color:var(--text-faint)">📌 proposta — GDD v6.0 §1.2/§6.1 "standing orders"</span>
+          <span class="painel-titulo">🎭 Estratégia Padrão — modelo "show" (Popmundo)</span>
+          <span class="painel-link" style="color:var(--text-faint)">📌 proposta — unifica 1ª/2ª instância, GDD v6.0 §1.2/§5/§6.1</span>
         </div>
-        <div style="padding:.5rem 1.1rem 1rem">
-          <div style="font-size:.72rem;color:var(--text-faint);margin-bottom:.7rem">
-            Filosofia anti-login-diário: cada processo de carteira roda sozinho na virada do mês usando a estratégia
-            configurada aqui — você não precisa estar online pro caso avançar, só não ganha o bônus de jogar ativo.
-          </div>
-          <div class="painel" style="border-color:var(--borda2, rgba(255,255,255,.08));margin-bottom:.6rem">
-            <div style="padding:.7rem .9rem">
-              <div style="font-weight:600;font-size:.8rem;color:var(--text);margin-bottom:.5rem">Ação de Cobrança · Mercadinho Bom Preço</div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem .9rem">
-                <div>
-                  <label style="font-size:.66rem;color:var(--text-faint)">Tese preferida (Banco de Teses)</label>
-                  <select style="width:100%;margin-top:.2rem"><option>Responsabilidade civil objetiva — nota 78, atual. 64%</option><option>Boa-fé objetiva — nota 52, atual. 40%</option><option>(nenhuma — auto-resolve sem tese)</option></select>
-                </div>
-                <div>
-                  <label style="font-size:.66rem;color:var(--text-faint)">Postura</label>
-                  <select style="width:100%;margin-top:.2rem"><option>Agressiva</option><option selected>Conservadora</option><option>Conciliatória</option></select>
-                </div>
+        <div style="padding:.5rem 1.1rem 1rem;font-size:.72rem;color:var(--text-faint);line-height:1.6">
+          Todo processo — 1ª instância ou recurso, seu ou da carteira — passa a ter uma <b style="color:var(--text)">data de
+          resolução</b> e uma <b style="color:var(--text)">Tese salva</b>. Na virada do mês ele resolve sozinho com essa
+          Tese, exatamente como um show toca a setlist salva sem você precisar estar online. Jogar ativamente
+          (Investigação → Julgamento) antes da data é <em>opcional</em> — troca o auto-resolve pela banda −15%/+20%.
+          <b style="color:var(--bronze-bright)">Isso substitui o Setlist legado</b> que hoje ainda resolve recurso
+          sozinho, num motor diferente da Investigação que resolve 1ª instância — os 2 cards abaixo usam o MESMO
+          componente, só a instância muda.
+        </div>
+
+        <div class="painel" style="border-color:var(--borda2, rgba(255,255,255,.08));margin:0 1.1rem .6rem">
+          <div style="padding:.7rem .9rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:.6rem;margin-bottom:.5rem">
+              <div style="font-weight:600;font-size:.8rem;color:var(--text)">Ação de Cobrança · Mercadinho Bom Preço <span style="color:var(--text-faint);font-weight:400">— 1ª instância</span></div>
+              <span class="pill pill-cargo">📅 resolve em 08 Mai</span>
+            </div>
+
+            <div class="card" style="margin-bottom:.6rem">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
+                <div style="font-weight:600;font-size:.78rem;color:var(--text)">📜 Tese: Responsabilidade civil objetiva</div>
+                <span class="pill-estilo estilo-jurisprudencial">Jurisprudencial</span>
               </div>
-              <div style="margin-top:.6rem">
+              <div class="peca-nota" style="margin:.2rem 0"><b>84</b><span>/100</span> <small>teto 91</small></div>
+              <div class="inv-dossie-grid" style="border-top:none;margin:.4rem 0;width:auto">
+                <div class="inv-dossie-item"><div class="inv-dossie-num">58</div><div class="inv-dossie-lbl">Fundamento<br>(Cível 44/50)</div></div>
+                <div class="inv-dossie-item"><div class="inv-dossie-num">22</div><div class="inv-dossie-lbl">Redação<br>(Legal Drafting 38/50)</div></div>
+                <div class="inv-dossie-item"><div class="inv-dossie-num">+3</div><div class="inv-dossie-lbl">Pesquisa<br>(Legal Research 34/50)</div></div>
+                <div class="inv-dossie-item"><div class="inv-dossie-num">×1,05</div><div class="inv-dossie-lbl">Tipo doc.<br>(Inicial 32/50)</div></div>
+                <div class="inv-dossie-item"><div class="inv-dossie-num">×1,15</div><div class="inv-dossie-lbl">Prática de Área<br>mastery</div></div>
+                <div class="inv-dossie-item"><div class="inv-dossie-num" style="color:var(--verde)">+10%</div><div class="inv-dossie-lbl">🌟 Original<br>(ninguém usou em 2 meses)</div></div>
+              </div>
+              <div class="peca-metro">
+                <div class="peca-metro-head"><span>Fama</span><span>62/100</span></div>
+                <div class="membro-prod-bar"><div class="membro-prod-fill" style="width:62%;background:var(--bronze-bright)"></div></div>
+              </div>
+              <div class="peca-metro">
+                <div class="peca-metro-head"><span>Popularidade</span><span style="color:var(--verde)">ESTABELECIDA</span></div>
+                <div class="membro-prod-bar"><div class="membro-prod-fill" style="width:58%;background:var(--verde)"></div></div>
+              </div>
+              <div style="font-size:.64rem;color:var(--text-faint);margin-top:.4rem">Atualização% 64 · decai 3%/mês (Cível) — mantida com Supervisão/Pesquisa no Banco de Teses.</div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem .9rem">
+              <div>
+                <label style="font-size:.66rem;color:var(--text-faint)">Postura</label>
+                <select style="width:100%;margin-top:.2rem"><option>Agressiva</option><option selected>Conservadora</option><option>Conciliatória</option></select>
+              </div>
+              <div>
                 <label style="font-size:.66rem;color:var(--text-faint)">Teto de acordo autorizado</label>
-                <input type="range" min="0" max="100" value="60" style="width:100%;accent-color:var(--bronze)">
-                <div style="text-align:right;font-size:.68rem;color:var(--text-faint)">Aceita acordo até 60% do valor pedido</div>
+                <input type="range" min="0" max="100" value="60" style="width:100%;margin-top:.5rem;accent-color:var(--bronze)">
               </div>
             </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.7rem">
+              <span style="font-size:.68rem;color:var(--text-faint)">Sem ação sua: resolve em 08 Mai com essa Tese, na base.</span>
+              <button class="btn-sair" style="padding:.4rem .8rem;font-size:.72rem">🎮 Jogar agora (opcional, banda −15%/+20%)</button>
+            </div>
           </div>
-          <div style="font-size:.68rem;color:var(--text-faint)">
-            Configurável em lote por filtro (ex.: "todos os consumidores até $ 50k: postura conservadora, acordo ≥ 60%") —
-            aqui só o exemplo por processo individual pra ilustrar o campo.
+        </div>
+
+        <div class="painel" style="border-color:var(--borda2, rgba(255,255,255,.08));margin:0 1.1rem .6rem">
+          <div style="padding:.7rem .9rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:.6rem;margin-bottom:.5rem">
+              <div style="font-weight:600;font-size:.8rem;color:var(--text)">Apelação Cível · Construtora Ágil <span style="color:var(--text-faint);font-weight:400">— 2ª instância (TJRJ)</span></div>
+              <span class="pill" style="background:rgba(193,64,46,.12);color:var(--perigo-text);border:1px solid rgba(193,64,46,.3)">📅 resolve em 8 dias úteis</span>
+            </div>
+            <div style="font-size:.72rem;color:var(--text-faint);margin-bottom:.6rem">
+              Mesmíssimo componente do card acima — só troca o tribunal e reusa a Tese já salva pro caso (nota recalculada com a
+              Atualização% atual). Hoje esse card seria "Montar Setlist" de novo, do zero, num sistema totalmente diferente.
+            </div>
+            <div class="card" style="margin-bottom:.6rem;display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div style="font-weight:600;font-size:.78rem;color:var(--text)">📜 Mesma Tese: Responsabilidade civil objetiva</div>
+                <div style="font-size:.68rem;color:var(--text-faint)">Nota recalculada pro TJ: 79/100 (atualização caiu pra 61% desde a 1ª instância)</div>
+              </div>
+              <span class="pill-estilo estilo-jurisprudencial">Jurisprudencial</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:.68rem;color:var(--text-faint)">Sem ação sua: resolve sozinho na base, mesma lógica da 1ª instância.</span>
+              <button class="btn-sair" style="padding:.4rem .8rem;font-size:.72rem">🎮 Jogar agora (opcional)</button>
+            </div>
           </div>
+        </div>
+
+        <div style="padding:0 1.1rem;font-size:.68rem;color:var(--text-faint)">
+          Configurável em lote por filtro (ex.: "todos os consumidores até $ 50k: postura conservadora, acordo ≥ 60%") —
+          aqui só os 2 exemplos individuais pra ilustrar o campo.
         </div>
       </section>
 
@@ -2834,6 +2891,18 @@ window._fmtMoeda = function(v){
           <button class="btn-avancar">+ Confeccionar Nova Petição</button>
         </div>
       </section>
+
+      <div class="painel" style="border-color:var(--bronze);padding:.8rem 1.1rem;margin-bottom:1rem">
+        <div style="font-size:.72rem;color:var(--text)">
+          <b style="color:var(--bronze-bright)">🔀 Proposta GDD v6.0 §0/§5 — este sistema se funde no Banco de Teses do escritório.</b>
+          A tabela de tradução do doc mapeia "Repertório da banda" direto pra "Banco de Teses", não como sistema paralelo.
+          Nota herdaria as 6 dimensões daqui (Legal Drafting, Legal Research, Tipo de Documento, Prática de Área,
+          Originalidade/Tese Central, estilo de escrita) + fama/popularidade — ver exemplo enriquecido em
+          <span style="color:var(--bronze-bright)">Escritório → Gestão de Processos → Estratégia Padrão</span>.
+          Hoje é o único sistema do jogo real 100% desconectado de resultado de caso (confirmado por grep — zero
+          referência a <code>peticao_id</code> em <code>investigacao.js</code>); a fusão resolve isso de vez.
+        </div>
+      </div>
 
       <section class="painel">
         <div class="painel-head">
