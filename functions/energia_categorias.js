@@ -1,5 +1,7 @@
 'use strict';
 
+const { bonusEnergiaConstituicao } = require('./atributos');
+
 /**
  * ENERGIA POR CATEGORIA — GDD v6.0 §3.1, decisão "B" (reforma completa).
  *
@@ -9,10 +11,10 @@
  * Vida Pessoal, Descanso.
  *
  * Escala continua em pontos (0-100+bônus, mesma de sempre) e NÃO migra pro
- * literal 200-260h do GDD — essa conversão de unidade depende de
- * Constituição (§4.4), atributo RPG que ainda não existe no jogo real (só
- * mockup), e forçaria retunar ~35 custos de energia já calibrados em todo
- * o jogo. Decisão registrada, não é gap esquecido.
+ * literal 200-260h do GDD — essa conversão de unidade forçaria retunar ~35
+ * custos de energia já calibrados em todo o jogo. Constituição (§4.4) já é
+ * real agora (functions/atributos.js) — dá um bônus de PONTOS nessa mesma
+ * escala (calcularEnergiaTotal abaixo), não uma migração de unidade.
  *
  * MIGRAÇÃO SEM QUEBRAR CONTAS ANTIGAS: enquanto o jogador não tiver
  * `energia_alocada` definido (ele só existe depois que a tela nova salva
@@ -39,13 +41,14 @@ function bonusEnergiaDisposicao(disposicao) {
   return -20;
 }
 
-/** Porta de js/relacionamento_dados.js::getEnergiaTotal — mesma fórmula, agora disponível no backend. */
+/** Porta de js/relacionamento_dados.js::getEnergiaTotal — mesma fórmula, agora disponível no backend, + bônus de Constituição (GDD v6.0 §4.4). */
 function calcularEnergiaTotal(j) {
   if (!j) return ENERGIA_TOTAL;
   const bonus = j.academia_ativa ? (j.academia_bonus_energia || 0) : 0;
   const dispBonus = bonusEnergiaDisposicao(j.disposicao);
   const pen = j.penalidade_energia_val || 0;
-  return Math.max(10, ENERGIA_TOTAL + bonus + dispBonus - pen);
+  const bonusConstituicao = bonusEnergiaConstituicao(j);
+  return Math.max(10, ENERGIA_TOTAL + bonus + dispBonus + bonusConstituicao - pen);
 }
 
 /**

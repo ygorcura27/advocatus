@@ -33,6 +33,12 @@ test('penalidade de exaustão reduz o teto, piso em 10', () => {
   assert.equal(calcularEnergiaTotal({ disposicao: 60, penalidade_energia_val: 200 }), 10);
 });
 
+test('Constituição (GDD v6.0 §4.4) soma bônus de pontos ao teto de energia — base (11) neutro', () => {
+  assert.equal(calcularEnergiaTotal({ disposicao: 60, atributos: { constituicao: 11 } }), 100);
+  assert.equal(calcularEnergiaTotal({ disposicao: 60, atributos: { constituicao: 21 } }), 115);
+  assert.equal(calcularEnergiaTotal({ disposicao: 60, atributos: { constituicao: 1 } }), 85);
+});
+
 test('academia só conta bônus se academia_ativa=true', () => {
   assert.equal(calcularEnergiaTotal({ disposicao: 60, academia_bonus_energia: 20, academia_ativa: false }), 100);
   assert.equal(calcularEnergiaTotal({ disposicao: 60, academia_bonus_energia: 20, academia_ativa: true }), 120);

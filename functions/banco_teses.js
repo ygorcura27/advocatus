@@ -21,6 +21,7 @@ const { getFirestore } = require('firebase-admin/firestore');
 const { normalizarSkillsJur } = require('./skills');
 const { debitarEnergiaCategoria } = require('./energia_categorias');
 const { multiplicadorNota } = require('./estresse');
+const { bonusTetoTeseRaciocinio } = require('./atributos');
 
 // Decaimento mensal de Atualização% por matéria (GDD v6.0 §5.2) — tributário
 // decai mais rápido de propósito (reforma tributária como feature de jogo).
@@ -52,9 +53,11 @@ const GANHO_ATUALIZACAO_MANTER = 12; // por ação de manutenção, respeitando 
 // numa matéria travada em 50% de atualização (LIMIAR_VITORIA_BASE = 45).
 const FORCA_TESE_MAX = 50;
 
-function tetoAtualizacao(mediaSkillMateria) {
+// `bonusRaciocinio` opcional (GDD v6.0 §4.4 — atributo Raciocínio Jurídico,
+// "teto das Teses") — quem faz a manutenção eleva o teto pessoalmente.
+function tetoAtualizacao(mediaSkillMateria, bonusRaciocinio = 0) {
   // GDD v6.0 §5.2: 50% + 10% × (skill/10) — skill 0-50 numa escala /10 vira 0-5, +0 a +50.
-  return Math.min(100, 50 + 10 * (Math.max(0, mediaSkillMateria) / 10));
+  return Math.min(100, 50 + 10 * (Math.max(0, mediaSkillMateria) / 10) + bonusRaciocinio);
 }
 
 // `estresseJogador` opcional (GDD v6.0 §3.2) — aplica o mesmo multiplicador
@@ -149,7 +152,7 @@ exports.manterTese = onCall({ region: 'southamerica-east1' }, async (request) =>
   const energiaPatch = debitarEnergiaCategoria(j, 'processos', CUSTO_ENERGIA_MANTER, 'manutenção de tese');
 
   const mediaSkill = await mediaSkillMateriaEquipe(db, escritorio_id, tese.materia);
-  const teto = tetoAtualizacao(mediaSkill);
+  const teto = tetoAtualizacao(mediaSkill, bonusTetoTeseRaciocinio(j));
   const novaAtualizacao = Math.min(teto, (tese.atualizacao_pct || 0) + GANHO_ATUALIZACAO_MANTER);
 
   await teseRef.update({ atualizacao_pct: novaAtualizacao });

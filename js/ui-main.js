@@ -252,6 +252,40 @@ function _painelNivelCarreira(j, cap, repPct) {
     </section>`;
 }
 
+// GDD v6.0 §4.4 — Atributos RPG. Espelho de functions/atributos.js só pra
+// display (mesmo default lazy, base 11, escala 1-21). Só Constituição e
+// Raciocínio Jurídico têm efeito mecânico real hoje (energia total e teto
+// de Tese, respectivamente) — os outros 4 são o hint do GDD sem hook ainda
+// (documentado, não fingido): tocar cada um exigiria mexer num sistema
+// separado (captação, velocidade de estudo, Julgamento, ganhos de mídia).
+const ATRIBUTOS_RPG_INFO = [
+  { k: 'charm', icone: '💬', l: 'Charm', hint: 'captação, negociação, júri', ativo: false },
+  { k: 'inteligencia', icone: '🧠', l: 'Inteligência', hint: 'aprendizado, teto de Redação', ativo: false },
+  { k: 'retorica', icone: '🎤', l: 'Retórica', hint: 'audiências, sustentação oral', ativo: false },
+  { k: 'raciocinio_juridico', icone: '⚖️', l: 'Raciocínio Jurídico', hint: 'teto das Teses', ativo: true },
+  { k: 'aparencia', icone: '✨', l: 'Aparência', hint: 'clientes, mídia', ativo: false },
+  { k: 'constituicao', icone: '💪', l: 'Constituição', hint: 'energia total', ativo: true },
+];
+function _painelAtributosRPG(j) {
+  const atrs = j.atributos || {};
+  return `
+    <div style="margin-bottom:1.2rem;padding:.75rem;background:var(--surface2);border:var(--borda-sub);border-radius:var(--r)">
+      <div style="font-size:.68rem;color:var(--txt3);margin-bottom:.5rem">🎭 Atributos (GDD v6.0 §4.4) <span style="color:var(--txt4)">— só ⚖️ e 💪 afetam o jogo hoje, resto é só perfil</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.5rem">
+        ${ATRIBUTOS_RPG_INFO.map(a => {
+          const v = Number.isFinite(atrs[a.k]) ? Math.max(1, Math.min(21, atrs[a.k])) : 11;
+          return `
+          <div style="padding:.4rem .5rem;background:var(--bg2);border-radius:6px${a.ativo?';border:1px solid rgba(46,139,87,.35)':''}">
+            <div style="display:flex;justify-content:space-between;font-size:.7rem;color:var(--txt)">
+              <span>${a.icone} ${a.l}</span><b style="font-family:var(--font-mono,monospace)">${v}<small style="color:var(--txt4)">/21</small></b>
+            </div>
+            <div style="font-size:.6rem;color:var(--txt4);margin-top:.1rem">${a.hint}${a.ativo?' ✓':''}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
 function renderPerfil(j, el) {
   const cap    = window.REP_CAP[j.cargo_id] || 55;
   const label  = window.CARGO_LABEL[j.cargo_id] || j.cargo_id;
@@ -358,6 +392,8 @@ function renderPerfil(j, el) {
           ${_miniStatCard('🌐','Networking', j.networking||10, '')}
           ${_miniStatCard('🎓','Prestígio Acad.', j.prestigio_academico||0, '')}
         </div>
+
+        ${_painelAtributosRPG(j)}
 
         <!-- Energia do mês — detalhamento de custos -->
         <div style="margin-bottom:1rem;padding:.75rem;background:var(--surface2);border:var(--borda-sub);border-radius:var(--r)">
