@@ -953,6 +953,63 @@ async function _verificarAssedioBancaRivalCF(db, escRef, uid, fSnap) {
   if (logs.length)  await Promise.all(logs);
 }
 
+// ════════════════════════════════════════════════════════
+// AUTO-RESOLVE DE JULGAMENTOS PENDENTES (GDD v6.0 §1.2 — fatia reduzida do
+// "modelo show"; decisão do usuário: só dar um fim, sem Tese salva/2 níveis
+// completos do mockup original)
+// ════════════════════════════════════════════════════════
+// Só resolve casos onde o jogador já jogou tudo (pecas_restantes vazio) mas
+// nunca clicou Finalizar Julgamento nem Aceitar Sentença — encadeia as 2
+// Cloud Functions que já fazem isso manualmente (_finalizarJulgamentoCore,
+// investigacao.js; _aceitarDecisaoSentenca, processar_sentenca.js), sem
+// duplicar a lógica de honorários/reputação/XP. NÃO mexe em investigação/
+// montagem ainda em andamento — não rouba trabalho não terminado.
+async function _autoResolverJulgamentosPendentesCF(db, uid, j) {
+  const { _finalizarJulgamentoCore } = require('./investigacao');
+  const { _aceitarDecisaoSentenca } = require('./processar_sentenca');
+
+  const snap = await db.collection('processos')
+    .where('advogado_uid', '==', uid)
+    .where('status', '==', 'andamento')
+    .get();
+  if (snap.empty) return;
+
+  const personagemAtivo = j.personagem_ativo_id || null;
+
+  for (const procDoc of snap.docs) {
+    const p = procDoc.data();
+    if ((p.personagem_id || null) !== personagemAtivo) continue; // outro personagem da mesma conta
+    const julg = p.investigacao?.julgamento;
+    if (!julg || julg.veredito || julg.pecas_restantes?.length > 0) continue;
+
+    try {
+      const jogadorRef = db.collection('jogadores').doc(uid);
+      const jSnapAtual = await jogadorRef.get();
+      const jAtual = jSnapAtual.exists ? jSnapAtual.data() : j;
+
+      const r = await _finalizarJulgamentoCore(db, uid, procDoc.ref, jogadorRef, p, jAtual);
+      if (r.jaResolvido) continue;
+
+      // Encadeia direto pra "aceitar sentença" — sem isso o caso só trocava
+      // de trava (de "Julgamento parado" pra "aguardando_decisao_sentenca"
+      // parado), mesmo limbo um passo depois.
+      await _aceitarDecisaoSentenca(db, procDoc.ref, jogadorRef, r.pAtualizado, r.jAtualizado, true);
+
+      const VEREDITO_LABEL = { procedente: 'Procedente', parcial: 'Parcialmente procedente', improcedente: 'Improcedente' };
+      await db.collection('jogadores').doc(uid).collection('inbox').add({
+        de: 'sistema',
+        assunto: `⚖️ Julgamento resolvido automaticamente: ${p.titulo || p.tipo || 'processo'}`,
+        corpo: `Você já tinha reunido todas as peças mas não finalizou — resolvemos sozinho na virada do mês.\nResultado: ${VEREDITO_LABEL[r.veredito] || r.veredito}.`,
+        tipo: 'auto_resolve_julgamento', lida: false, criado_em: new Date().toISOString(),
+      });
+
+      logger.info(`[AUTO-RESOLVE JULGAMENTO] ${uid} — processo ${procDoc.id}: ${r.veredito}`);
+    } catch (e) {
+      logger.warn(`[AUTO-RESOLVE JULGAMENTO] Falhou pro processo ${procDoc.id}:`, e.message);
+    }
+  }
+}
+
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
@@ -1760,6 +1817,19 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
     } catch (e) {
       logger.warn('Erro ao verificar prazos recursais do pool:', e.message);
     }
+  }
+
+  // ── AUTO-RESOLVE DE JULGAMENTOS TRAVADOS (GDD v6.0 §1.2, fatia reduzida
+  // do "modelo show" — casos assumidos pessoalmente que o jogador já jogou
+  // por completo (peças resolvidas) mas nunca clicou "Finalizar"/"Aceitar
+  // Sentença", travados pra sempre porque avancar_mes.js explicitamente
+  // pulava tudo com assumido_uid/advogado_uid, sem timeout nem prazo). Só
+  // fecha o que já está pronto — não mexe em investigação/montagem ainda
+  // em andamento (não rouba trabalho não terminado do jogador). ──
+  try {
+    await _autoResolverJulgamentosPendentesCF(db, uid, j);
+  } catch (e) {
+    logger.warn('Erro no auto-resolve de julgamentos pendentes:', e.message);
   }
 
   // ── EVOLUÇÃO DE SKILLS DE COMPOSIÇÃO JURÍDICA (GDD v4.1 — Etapa 3) ──

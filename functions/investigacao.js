@@ -725,25 +725,17 @@ exports.executarRodadaJulgamento = onCall({ region: 'southamerica-east1' }, asyn
 });
 
 // ─── 8. Finalizar julgamento — veredito, honorários, XP, reputação ─────────
-
-exports.finalizarJulgamento = onCall({ region: 'southamerica-east1' }, async (request) => {
-  if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
-  const uid = request.auth.uid;
-  const { processo_id } = request.data || {};
-  if (!processo_id) throw new HttpsError('invalid-argument', 'processo_id obrigatório.');
-
-  const db = getFirestore();
-  const processoRef = db.collection('processos').doc(processo_id);
-  const jogadorRef   = db.collection('jogadores').doc(uid);
-  const [pSnap, jSnap] = await Promise.all([processoRef.get(), jogadorRef.get()]);
-  if (!pSnap.exists || !jSnap.exists) throw new HttpsError('not-found', 'Processo ou jogador não encontrado.');
-  const p = pSnap.data(), j = jSnap.data();
-  if (!(await autorizadoParaProcessar(db, p, uid, j))) throw new HttpsError('permission-denied', 'Este processo não é seu.');
-
+//
+// Núcleo extraído em _finalizarJulgamentoCore pra ser reaproveitado pelo
+// auto-resolve mensal de casos assumidos pessoalmente e travados
+// (GDD v6.0 §1.2, "modelo show" — fatia reduzida, ver avancar_mes.js::
+// _autoResolverJulgamentosPendentesCF). uid só usado pra aplicarXpPracticeArea
+// (o resto já opera em cima de processoRef/jogadorRef/p/j diretamente).
+async function _finalizarJulgamentoCore(db, uid, processoRef, jogadorRef, p, j) {
   const investigacao = p.investigacao;
   if (!investigacao?.julgamento) throw new HttpsError('failed-precondition', 'Julgamento não foi iniciado.');
   const julg = investigacao.julgamento;
-  if (julg.veredito) return { veredito: julg.veredito }; // idempotente
+  if (julg.veredito) return { jaResolvido: true, veredito: julg.veredito }; // idempotente
   if (julg.pecas_restantes.length > 0) throw new HttpsError('failed-precondition', 'Ainda há peças a resolver.');
 
   const skJur = normalizarSkillsJur(j.skills_jur);
@@ -780,7 +772,7 @@ exports.finalizarJulgamento = onCall({ region: 'southamerica-east1' }, async (re
   const scoreEquiv = resultado === 'procedente' ? 85 : resultado === 'parcial' ? 65 : 35;
   const xpGanho = banco.xpPorDecisao('1grau', scoreEquiv);
 
-  await jogadorRef.update({
+  const jUpdates = {
     reputacao: Math.max(0, Math.min(cap, rep + repDelta)),
     // GDD v6.0 §8 — Território: reputação da comarca onde o jogador atua
     // hoje espelha o mesmo delta da reputação global desta vitória/derrota.
@@ -796,7 +788,8 @@ exports.finalizarJulgamento = onCall({ region: 'southamerica-east1' }, async (re
     ...(favoravelAoJogador && valorBase >= CASO_GRANDE_VALOR_MIN
       ? { popularidade_pessoal: (j.popularidade_pessoal || 0) + CASO_GRANDE_POP_BONUS }
       : {}),
-  });
+  };
+  await jogadorRef.update(jUpdates);
 
   const areaBrutaJulg = p.area || p.tipo || 'civil';
   try { await aplicarXpPracticeArea(db, uid, AREA_PARA_TAG_VADEMECUM[areaBrutaJulg] || areaBrutaJulg, resultado); }
@@ -809,7 +802,7 @@ exports.finalizarJulgamento = onCall({ region: 'southamerica-east1' }, async (re
   // (decidirRecursoSentenca em processar_sentenca.js), reaproveitado sem
   // duplicar a lógica de honorários/recurso: `setlist: []` sinaliza o
   // caminho "isSetlistFlow" daquele arquivo.
-  await processoRef.update({
+  const pUpdates = {
     investigacao,
     status: 'aguardando_decisao_sentenca',
     setlist: [],
@@ -818,10 +811,35 @@ exports.finalizarJulgamento = onCall({ region: 'southamerica-east1' }, async (re
     nota_final: scoreEquiv,
     repDelta,
     encerrado_mes: null,
-  });
+  };
+  await processoRef.update(pUpdates);
 
-  return { veredito: resultado, forca_total: julg.forca_total, limiar, hon_pendente: honPotencial, repDelta, xpGanho };
+  return {
+    jaResolvido: false, veredito: resultado, forca_total: julg.forca_total, limiar,
+    hon_pendente: honPotencial, repDelta, xpGanho,
+    pAtualizado: { ...p, ...pUpdates }, jAtualizado: { ...j, ...jUpdates },
+  };
+}
+
+exports.finalizarJulgamento = onCall({ region: 'southamerica-east1' }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
+  const uid = request.auth.uid;
+  const { processo_id } = request.data || {};
+  if (!processo_id) throw new HttpsError('invalid-argument', 'processo_id obrigatório.');
+
+  const db = getFirestore();
+  const processoRef = db.collection('processos').doc(processo_id);
+  const jogadorRef   = db.collection('jogadores').doc(uid);
+  const [pSnap, jSnap] = await Promise.all([processoRef.get(), jogadorRef.get()]);
+  if (!pSnap.exists || !jSnap.exists) throw new HttpsError('not-found', 'Processo ou jogador não encontrado.');
+  const p = pSnap.data(), j = jSnap.data();
+  if (!(await autorizadoParaProcessar(db, p, uid, j))) throw new HttpsError('permission-denied', 'Este processo não é seu.');
+
+  const r = await _finalizarJulgamentoCore(db, uid, processoRef, jogadorRef, p, j);
+  return { veredito: r.veredito, forca_total: r.forca_total, limiar: r.limiar, hon_pendente: r.hon_pendente, repDelta: r.repDelta, xpGanho: r.xpGanho };
 });
+
+exports._finalizarJulgamentoCore = _finalizarJulgamentoCore;
 
 // ─── Apodrecimento de favores (Parte IV.2) — chamado por tick_mensal.js ────
 
@@ -852,5 +870,6 @@ module.exports = {
   aplicarTeseVademecum: exports.aplicarTeseVademecum,
   executarRodadaJulgamento: exports.executarRodadaJulgamento,
   finalizarJulgamento: exports.finalizarJulgamento,
+  _finalizarJulgamentoCore: exports._finalizarJulgamentoCore,
   processarApodrecimentoFavores,
 };
