@@ -11,6 +11,7 @@
 
 const { logger } = require('firebase-functions');
 const { _aceitarDecisaoSentenca } = require('./processar_sentenca');
+const { dentroDoTetoAcordo, chanceAceiteComPostura } = require('./estrategia_padrao');
 
 // "Tomar decisões estratégicas" — auto-ACEITA sentenças pendentes (nunca
 // auto-recorre: recorrer abre uma fase de sustentação recursal interativa
@@ -53,7 +54,12 @@ async function processarAcordosGestorCF(db, escId, j) {
     try {
       const p  = procDoc.data();
       const cv = p.convencimento || 38;
-      const aceito = Math.random() < (cv / 120 + 0.25);
+      // GDD v6.0 §1.2 item 3 — Estratégia Padrão: só autoriza o gestor a
+      // decidir acordo sozinho se o caso estiver dentro do teto configurado
+      // pelo jogador (cv <= teto — caso não favorável o bastante pra valer
+      // o risco de julgamento). Acima do teto, pula — fica pro jogador.
+      if (!dentroDoTetoAcordo(cv, j.estrategia_padrao)) continue;
+      const aceito = Math.random() < chanceAceiteComPostura(cv, j.estrategia_padrao);
       if (!aceito) continue;
 
       const suc = Math.floor((p.valor || 0) * 0.10);

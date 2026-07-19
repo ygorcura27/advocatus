@@ -212,6 +212,7 @@ window.renderGestaoProcessos = async function(j, el) {
       <button class="btn btn-ghost btn-sm" onclick="window.navTo('equipe',null)">👤 Gestão de Pessoas →</button>
     </div>` : ''}
     ${podeGerenciar ? _renderRegrasCaptacao(esc, escId) : ''}
+    ${_renderEstrategiaPadrao(j)}
     <div id="gestao-processos-pool"></div>`;
 
   const elPool = document.getElementById('gestao-processos-pool');
@@ -247,6 +248,62 @@ function _renderRegrasCaptacao(esc, escId) {
       <button class="btn btn-prim btn-sm" onclick="window._salvarRegrasCaptacao('${escId}')">💾 Salvar regras</button>
     </div>`;
 }
+
+// ─── Estratégia Padrão (GDD v6.0 §1.2 item 3) — postura + teto de acordo ─────
+// Escopo menor que o mockup "🎭 Estratégia Padrão — modelo show" de
+// propósito: aqui só afeta a decisão AUTOMÁTICA de acordo do gestor
+// delegado (functions/gestor_decisoes.js::processarAcordosGestorCF) — o
+// "modelo show" completo (Tese salva + resolução automática de todo
+// processo) ainda não existe no jogo real. É config do JOGADOR (não do
+// escritório), por isso lê/grava em jogadores/{uid}, não escritorios/{id}.
+const POSTURA_LABEL_EP = { conservadora: '⚖️ Conservadora', agressiva: '🔥 Agressiva', conciliatoria: '🤝 Conciliatória' };
+
+function _renderEstrategiaPadrao(j) {
+  const e = j.estrategia_padrao || { postura: 'conservadora', teto_acordo_pct: 50 };
+  const opcoes = Object.entries(POSTURA_LABEL_EP).map(([k, label]) =>
+    `<option value="${k}" ${e.postura === k ? 'selected' : ''}>${label}</option>`).join('');
+
+  return `
+    <div class="card" style="margin-bottom:1rem;padding:.8rem .9rem">
+      <div style="font-weight:600;font-size:.82rem;color:var(--txt);margin-bottom:.4rem">🎭 Estratégia Padrão</div>
+      <div style="font-size:.66rem;color:var(--txt4);margin-bottom:.55rem">
+        GDD v6.0 §1.2 — vale só pra decisão automática de acordo do gestor delegado ("Firmar acordos" em Gestão de Pessoas),
+        quando você não está por perto. Não afeta quando você mesmo tenta acordo manualmente.
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:.8rem;align-items:center;margin-bottom:.6rem">
+        <div>
+          <label style="font-size:.7rem;color:var(--txt3);display:block;margin-bottom:.2rem">Postura</label>
+          <select id="ep-postura" style="padding:.3rem .5rem;font-size:.75rem;border-radius:4px;border:1px solid var(--navy-light);background:var(--bg2);color:var(--txt)">
+            ${opcoes}
+          </select>
+        </div>
+        <div>
+          <label style="font-size:.7rem;color:var(--txt3);display:block;margin-bottom:.2rem">Teto de convencimento pra acordar sozinho</label>
+          <input type="range" id="ep-teto" min="0" max="100" value="${e.teto_acordo_pct}" style="width:160px" oninput="document.getElementById('ep-teto-val').textContent=this.value">
+          <span id="ep-teto-val" style="font-family:var(--font-mono,monospace);font-size:.75rem;color:var(--amber);margin-left:.3rem">${e.teto_acordo_pct}</span>
+        </div>
+      </div>
+      <div style="font-size:.62rem;color:var(--txt4);margin-bottom:.55rem">Casos com convencimento até esse valor: gestor pode acordar sozinho (caso fraco, vale garantir algo). Acima: só você decide.</div>
+      <button class="btn btn-prim btn-sm" onclick="window._salvarEstrategiaPadrao()">💾 Salvar estratégia</button>
+    </div>`;
+}
+
+window._salvarEstrategiaPadrao = async function() {
+  const j = window.JOGADOR;
+  const uid = j?.uid || window.JOGADOR_UID;
+  const postura = document.getElementById('ep-postura')?.value || 'conservadora';
+  const teto_acordo_pct = parseInt(document.getElementById('ep-teto')?.value, 10) || 0;
+
+  try {
+    const estrategia_padrao = { postura, teto_acordo_pct };
+    await updateDoc(doc(db, 'jogadores', uid), { estrategia_padrao });
+    if (j) { j.estrategia_padrao = estrategia_padrao; window.JOGADOR = j; }
+    toast('🎭 Estratégia padrão salva.', 'ok');
+  } catch (e) {
+    console.error('[ESTRATEGIA PADRAO]', e);
+    toast('Erro ao salvar estratégia padrão.', 'ko');
+  }
+};
 
 window._salvarRegrasCaptacao = async function(escId) {
   const ativo = document.getElementById('rc-ativo')?.checked || false;
