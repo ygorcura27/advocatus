@@ -270,7 +270,7 @@ const ATRIBUTOS_RPG_INFO = [
 function _painelAtributosRPG(j) {
   const atrs = j.atributos || {};
   return `
-    <div style="margin-bottom:1.2rem;padding:.75rem;background:var(--surface2);border:var(--borda-sub);border-radius:var(--r)">
+    <div id="perfil-atributos-secao" style="margin-bottom:1.2rem;padding:.75rem;background:var(--surface2);border:var(--borda-sub);border-radius:var(--r)">
       <div style="font-size:.68rem;color:var(--txt3);margin-bottom:.5rem">🎭 Atributos (GDD v6.0 §4.4) <span style="color:var(--txt4)">— só ⚖️ e 💪 afetam o jogo hoje, resto é só perfil</span></div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.5rem">
         ${ATRIBUTOS_RPG_INFO.map(a => {
