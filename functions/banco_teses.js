@@ -20,6 +20,7 @@ const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getFirestore } = require('firebase-admin/firestore');
 const { normalizarSkillsJur } = require('./skills');
 const { debitarEnergiaCategoria } = require('./energia_categorias');
+const { multiplicadorNota } = require('./estresse');
 
 // Decaimento mensal de Atualização% por matéria (GDD v6.0 §5.2) — tributário
 // decai mais rápido de propósito (reforma tributária como feature de jogo).
@@ -56,9 +57,12 @@ function tetoAtualizacao(mediaSkillMateria) {
   return Math.min(100, 50 + 10 * (Math.max(0, mediaSkillMateria) / 10));
 }
 
-function forcaDaTese(tese) {
+// `estresseJogador` opcional (GDD v6.0 §3.2) — aplica o mesmo multiplicador
+// de nota por faixa de estresse que o Julgamento usa (functions/estresse.js).
+function forcaDaTese(tese, estresseJogador = 0) {
   if (!tese) return 0;
-  return Math.round((Math.max(0, tese.nota || 0) / 100) * (Math.max(0, tese.atualizacao_pct ?? 0) / 100) * FORCA_TESE_MAX);
+  const base = (Math.max(0, tese.nota || 0) / 100) * (Math.max(0, tese.atualizacao_pct ?? 0) / 100) * FORCA_TESE_MAX;
+  return Math.round(base * multiplicadorNota(estresseJogador));
 }
 
 async function membroDoEscritorio(uid, j, escritorioId) {

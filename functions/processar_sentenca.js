@@ -22,6 +22,7 @@ const { logger }             = require('firebase-functions');
 const banco = require('./shared/banco_juridico.js');
 const { aplicarXpPracticeArea } = require('./skills');
 const { atualizarFama }         = require('./peticoes');
+const { multiplicadorNota }     = require('./estresse');
 
 // Evento "caso de grande repercussão" — vitória (procedente/parcial) num
 // caso de valor alto (mesmo piso do tier S de honorários, functions/
@@ -256,7 +257,10 @@ async function autorizadoParaProcessar(db, p, uid, j) {
 // ── RECÁLCULO DO CONVENCIMENTO — reproduz EXATAMENTE a mesma fórmula do
 // frontend (ver responderAudiencia em processos.js), mas a partir do
 // histórico bruto, nunca do valor já calculado e salvo pelo cliente.
-function recalcularConvencimento(p) {
+// `estresseJogador` (GDD v6.0 §3.2, opcional) é aplicado só aqui no final —
+// diverge de propósito do espelho no frontend (que é display/legado, nunca
+// autoritativo; motor a ser unificado com investigacao.js no futuro).
+function recalcularConvencimento(p, estresseJogador = 0) {
   const historico = p.historico_respostas_audiencia || [];
   let cv = p.dificuldade_extra ? 28 : 38;
 
@@ -284,7 +288,7 @@ function recalcularConvencimento(p) {
 
     cv = Math.max(5, Math.min(95, cv + d));
   }
-  return cv;
+  return Math.round(cv * multiplicadorNota(estresseJogador));
 }
 
 async function _finalizarProcessoDefinitivo(db, processoRef, jogadorRef, p, j, score, favoravelAoJogador, honPotencial, mesAtual, repDelta, logger) {
@@ -394,7 +398,9 @@ async function _processarSentencaSetlist(db, processoRef, jogadorRef, p, j, uid,
 
   // Modificador de estilo de escrita × reações do julgador (GDD v5.1 §2.1)
   const modEstilo = modificadorEstilo(p.estilo_principal || null, p.juiz || null);
-  const notaComEstilo = Math.max(1, Math.min(26, nota + modEstilo));
+  // Estresse (GDD v6.0 §3.2) aplicado por último, mesma faixa/multiplicador
+  // do Julgamento novo (investigacao.js) e da Tese (banco_teses.js).
+  const notaComEstilo = Math.max(1, Math.min(26, Math.round((nota + modEstilo) * multiplicadorNota(j.estresse))));
 
   const { resultado, valor_pct } = determinarSentencaSetlist(notaComEstilo, posicao, p.juiz || null, impactoEv, ctx);
 
@@ -450,8 +456,10 @@ async function _processarSentencaSetlist(db, processoRef, jogadorRef, p, j, uid,
   if (favoravelAoJogador && valorBase >= CASO_GRANDE_VALOR_MIN) {
     updJog.popularidade_pessoal = (j.popularidade_pessoal || 0) + CASO_GRANDE_POP_BONUS;
   }
+  // derrotas_mes — GDD v6.0 §3.2 (Estresse), contador mensal (zerado no
+  // reset de avancar_mes.js junto com energia).
   if (favoravelAoJogador) { updJog.wins = (j.wins||0)+1; updJog.wins_ano = (j.wins_ano||0)+1; }
-  else { updJog.losses = (j.losses||0)+1; updJog.losses_ano = (j.losses_ano||0)+1; }
+  else { updJog.losses = (j.losses||0)+1; updJog.losses_ano = (j.losses_ano||0)+1; updJog.derrotas_mes = (j.derrotas_mes||0)+1; }
 
   await jogadorRef.update(updJog);
 
@@ -523,7 +531,7 @@ exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (requ
   if ((p.rodada_audiencia || 0) < 3) throw new HttpsError('failed-precondition', 'Audiência ainda não foi concluída (3 rodadas).');
 
   // ── RECALCULA o score — esta é a única fonte de verdade do resultado.
-  const score = recalcularConvencimento(p);
+  const score = recalcularConvencimento(p, j.estresse);
   const souReu = p.meu_lado === 'reu';
   const favoravelAoJogador = score >= 58;
   const mesAtual = j.mes_global_pessoal || mesTotalPessoal(j);
@@ -563,8 +571,10 @@ exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (requ
     xp: (j.xp || 0) + xpGanho,
     derrotas_consecutivas: favoravelAoJogador ? 0 : dc,
   };
+  // derrotas_mes — GDD v6.0 §3.2 (Estresse), contador mensal (zerado no
+  // reset de avancar_mes.js junto com energia).
   if (favoravelAoJogador) { updatesJogador.wins = (j.wins||0)+1; updatesJogador.wins_ano = (j.wins_ano||0)+1; }
-  else { updatesJogador.losses = (j.losses||0)+1; updatesJogador.losses_ano = (j.losses_ano||0)+1; }
+  else { updatesJogador.losses = (j.losses||0)+1; updatesJogador.losses_ano = (j.losses_ano||0)+1; updatesJogador.derrotas_mes = (j.derrotas_mes||0)+1; }
   if (demitido) {
     updatesJogador.escritorio_id = 'solo';
     updatesJogador.escritorio_empregado_id = null;

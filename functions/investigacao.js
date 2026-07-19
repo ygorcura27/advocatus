@@ -22,6 +22,7 @@ const { aplicarXpPracticeArea, normalizarSkillsJur } = require('./skills');
 const { modEstadoJogador } = require('./peticoes');
 const sk = require('./investigacao_skills');
 const { forcaDaTese, registrarUsoTese } = require('./banco_teses');
+const { multiplicadorNota } = require('./estresse');
 
 // Áreas reais de processo (js/escritorio_painel.js::TODAS_AREAS) são em
 // português; tags do Vade Mecum e as skills area_* (functions/skills.js)
@@ -560,7 +561,7 @@ exports.confirmarMontagem = onCall({ region: 'southamerica-east1' }, async (requ
     return { no_id: id, forca: no.peca.forca, suja: no.peca.suja, pilar: no.peca.pilar, exposta: false };
   });
   const pecaTese = teseUsada
-    ? [{ no_id: `tese:${teseUsada.id}`, forca: forcaDaTese(teseUsada), suja: false, pilar: false, exposta: false, tese: true }]
+    ? [{ no_id: `tese:${teseUsada.id}`, forca: forcaDaTese(teseUsada, j.estresse), suja: false, pilar: false, exposta: false, tese: true }]
     : [];
   investigacao.julgamento = {
     rodada_atual: 0,
@@ -749,9 +750,13 @@ exports.finalizarJulgamento = onCall({ region: 'southamerica-east1' }, async (re
   const bonusProcessual = sk.reducaoLimiarDireitoProcessual(skJur.procedure);
   const limiar = LIMIAR_VITORIA_BASE - bonusTese - bonusProcessual;
 
+  // GDD v6.0 §3.2 — Estresse alto reduz a força efetiva do Julgamento
+  // (mesmo multiplicador aplicado à Tese em forcaDaTese acima).
+  const forcaEfetiva = julg.forca_total * multiplicadorNota(j.estresse);
+
   let resultado;
-  if (julg.forca_total >= limiar) resultado = 'procedente';
-  else if (julg.forca_total >= limiar - 6) resultado = 'parcial';
+  if (forcaEfetiva >= limiar) resultado = 'procedente';
+  else if (forcaEfetiva >= limiar - 6) resultado = 'parcial';
   else resultado = 'improcedente';
 
   const favoravelAoJogador = resultado !== 'improcedente';
@@ -779,8 +784,11 @@ exports.finalizarJulgamento = onCall({ region: 'southamerica-east1' }, async (re
     xp: (j.xp || 0) + xpGanho,
     processos_concluidos: (j.processos_concluidos || 0) + 1,
     derrotas_consecutivas: favoravelAoJogador ? 0 : (j.derrotas_consecutivas || 0) + 1,
+    // derrotas_mes — GDD v6.0 §3.2 (Estresse), contador mensal (zerado no
+    // reset de avancar_mes.js junto com energia), separado de
+    // derrotas_consecutivas (streak, não tem fronteira de mês).
     ...(favoravelAoJogador ? { wins: (j.wins||0)+1, wins_ano: (j.wins_ano||0)+1 }
-                           : { losses: (j.losses||0)+1, losses_ano: (j.losses_ano||0)+1 }),
+                           : { losses: (j.losses||0)+1, losses_ano: (j.losses_ano||0)+1, derrotas_mes: (j.derrotas_mes||0)+1 }),
     ...(favoravelAoJogador && valorBase >= CASO_GRANDE_VALOR_MIN
       ? { popularidade_pessoal: (j.popularidade_pessoal || 0) + CASO_GRANDE_POP_BONUS }
       : {}),

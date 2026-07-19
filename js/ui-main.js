@@ -337,6 +337,15 @@ function renderPerfil(j, el) {
             <div class="stat-value" style="color:var(--amber)">${j.disposicao||80} <small>/ 100</small></div>
             <div class="stat-bar"><div class="stat-bar-fill" style="width:${j.disposicao||80}%;background:var(--amber)"></div></div>
           </div>
+          <div class="stat" title="GDD v6.0 §3.2 — 40+ reduz nota, 70+ reduz nota e estudo, 90+ é burnout">
+            <div class="stat-label">😰 Estresse</div>
+            <div class="stat-value" style="color:${(j.estresse||0)>=70?'var(--verm2)':(j.estresse||0)>=40?'var(--amber)':'var(--verde2)'}">${j.estresse||0} <small>/ 100</small></div>
+            <div class="stat-bar"><div class="stat-bar-fill" style="width:${j.estresse||0}%;background:${(j.estresse||0)>=70?'var(--verm2)':'var(--amber)'}"></div></div>
+          </div>
+          <div class="stat" title="Fôlego = 10 - Estresse/20 (GDD v6.0 §3.3)">
+            <div class="stat-label">🫁 Fôlego</div>
+            <div class="stat-value">${Math.max(0,10-Math.floor((j.estresse||0)/20))} <small>/ 10</small></div>
+          </div>
           <div class="stat">
             <div class="stat-label">Casos no total</div>
             <div class="stat-value">${total} <small>${aprov}% aprov.</small></div>

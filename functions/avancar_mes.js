@@ -30,6 +30,7 @@ const { processarRoyaltiesLivros, processarCitacoesNPCMensal } = require('./arti
 const { determinarSentencaSetlist, AREA_PT_PARA_EN } = require('./processar_sentenca');
 const { processarDecaimentoMensal: processarDecaimentoTesesMensal } = require('./banco_teses');
 const { resetEnergiaMensal } = require('./energia_categorias');
+const _estresse = require('./estresse');
 
 const ENERGIA_TOTAL        = 100;
 
@@ -1021,6 +1022,13 @@ async function _verificarPrazosRecursaisPoolCF(db, escId, uid, updates, novoMes,
     // -2 reputação do jogador (acumulado em updates para o _commit)
     const repAtual = updates.reputacao ?? 30;
     updates.reputacao = Math.max(0, repAtual - 2);
+
+    // GDD v6.0 §3.2 — prazo perdido soma +10 estresse. Roda depois do
+    // cálculo principal de Estresse (que já escreveu updates.estresse mais
+    // acima em avancarMes), por isso acumula em cima do que já está lá,
+    // mesmo padrão de updates.reputacao ?? 30 logo acima.
+    const estresseAtual = updates.estresse ?? 0;
+    updates.estresse = Math.min(100, estresseAtual + 10);
   }
 
   if (proms.length) await Promise.all(proms);
@@ -1073,6 +1081,9 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
   // sliders de energia_alocada); resetEnergiaMensal decide qual dos dois
   // aplicar por conta.
   Object.assign(updates, resetEnergiaMensal(j));
+  // GDD v6.0 §3.2 — contador mensal de derrotas usado no cálculo de
+  // Estresse abaixo; zera junto com energia pro próximo mês.
+  updates.derrotas_mes = 0;
 
   // idade_inicial existe pra personagens criados via assumirHerdeiro
   // (podem começar com mais de 22 anos, ver js/relacionamento.js) — ausente
@@ -1118,17 +1129,23 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
   const pendentes  = studyQueue.filter(s2 => s2.mes_conclusao > mesGlobal);
   const newSkills    = { ...(j.skills || {}) };
   const newSkillsJur = _skillsJur.normalizarSkillsJur(j.skills_jur);
+  // GDD v6.0 §3.2 — Estresse 70+ reduz ganho de estudo em 20%. Usa
+  // `j.estresse` (o valor com que o mês começou, não o que só será
+  // calculado mais abaixo nesta função) — o estudo concluído reflete o
+  // estado de estresse acumulado ATÉ aqui, não o deste mesmo avanço.
+  const multEstudo = _estresse.multiplicadorEstudo(j.estresse);
   for (const est of prontos) {
+    const ganhoEfetivo = Math.max(0, Math.round(est.ganho * multEstudo));
     if (est.tipo === 'skills_jur') {
       // Teto de skill 0-50, estendido por bonus de pós-graduação (GDD v5.1 §20)
       const bonusPosGrad = j.posgrad_bonus_skill || 0;
       const capSkillJur  = Math.round(50 * (1 + bonusPosGrad));
-      newSkillsJur[est.skill] = Math.max(0, Math.min(capSkillJur, (newSkillsJur[est.skill] || 0) + est.ganho));
+      newSkillsJur[est.skill] = Math.max(0, Math.min(capSkillJur, (newSkillsJur[est.skill] || 0) + ganhoEfetivo));
     } else {
       const cap = REP_CAP[j.cargo_id] || 55;
-      newSkills[est.skill] = Math.min(cap, (newSkills[est.skill] || 0) + est.ganho);
+      newSkills[est.skill] = Math.min(cap, (newSkills[est.skill] || 0) + ganhoEfetivo);
     }
-    mensagens.push({ assunto:`📚 Estudo concluído: ${est.skill_label}`, corpo:`+${est.ganho} em ${est.skill_label}.`, tipo:'positivo' });
+    mensagens.push({ assunto:`📚 Estudo concluído: ${est.skill_label}`, corpo:`+${ganhoEfetivo} em ${est.skill_label}.`, tipo:'positivo' });
   }
   if (prontos.length > 0) {
     updates.skills      = newSkills;
@@ -1394,6 +1411,23 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
   let saudeMental    = j.saude_mental ?? 80;
   let disposicao     = j.disposicao   ?? 80;
 
+  // ── ESTRESSE (GDD v6.0 §3.2) — calculado cedo porque o bloco de burnout
+  // logo abaixo já usa updates.estresse como segundo gatilho aditivo. Só
+  // quem já configurou os baldes de energia (energia_alocada) desconta
+  // Descanso/Vida Pessoal — conta legado (pool único) não tem como saber
+  // quantas horas foram gastas em cada categoria, então não desconta nada
+  // aqui (incentivo indireto a configurar os sliders na tela de Energia).
+  {
+    const usoCategorias = j.energia_alocada ? (j.energia_usada || {}) : {};
+    const deltaEstresse = _estresse.calcularDeltaEstresseMensal({
+      derrotasNoMes:  j.derrotas_mes || 0,
+      horasDescanso:  usoCategorias.descanso || 0,
+      horasPessoal:   usoCategorias.pessoal || 0,
+      teveRecesso:    isJaneiro,
+    });
+    updates.estresse = _estresse.aplicarDeltaEstresse(j.estresse, deltaEstresse);
+  }
+
   if (energiaGasta > 70)       { saudeMental = Math.max(0, saudeMental - 5); }
   else if (energiaGasta < 30)  { saudeMental = Math.min(100, saudeMental + 3); disposicao = Math.min(100, disposicao + 3); }
   disposicao = Math.max(0, disposicao - 2);
@@ -1517,6 +1551,20 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
       }
     } else {
       updates.meses_baixa_energia = 0;
+    }
+
+    // GDD v6.0 §3.2 — segundo gatilho de burnout, ADITIVO ao já existente
+    // acima (energia crítica por 3 meses): estresse>=90 também entra em
+    // burnout na hora, sem esperar 3 meses. Não substitui nem reseta o
+    // contador de energia — só mais um caminho pro mesmo estado.
+    if (!updates.em_burnout && _estresse.emBurnoutPorEstresse(updates.estresse)) {
+      updates.em_burnout        = true;
+      updates.meses_recuperacao = 0;
+      mensagens.push({
+        assunto: '🔴 Burnout Total',
+        corpo: 'Seu Estresse chegou a 90+. Você entrou em burnout. Precisa de 3 meses com energia saudável (ou Estresse abaixo de 90) pra se recuperar.',
+        tipo: 'urgente',
+      });
     }
   } else {
     // Em burnout — verificar recuperação (3 meses consecutivos com >10 restantes)
