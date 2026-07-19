@@ -196,7 +196,7 @@ window.renderEquipePainel = async function(j, escId, el) {
       const temProc = !!func.processo_id;
       const emBurnout = !!func.burnout_npc;
       const npcUsado  = func.energia_npc_usada_mes || 0;
-      const npcDisp   = (window.NPC_ENERGIA_MES || 100) - npcUsado;
+      const npcDisp   = Math.max(0, (window.NPC_ENERGIA_MES || 100) - npcUsado);
       const sobrecarregado = !emBurnout && npcDisp < (window.NPC_OVERLOAD_TH || 20);
       const energiaBadge = window._npcEnergiaBadge ? window._npcEnergiaBadge(func) : '';
 
@@ -489,7 +489,7 @@ window._mostrarDelegacaoPicker = async function(escId, opId, valor, containerId)
       const recebe = Math.round(valor * pct);
       const ok     = energiaDisp >= eng;
       const npcUsado = f.energia_npc_usada_mes || 0;
-      const npcDisp  = NPC_TOT - npcUsado;
+      const npcDisp  = Math.max(0, NPC_TOT - npcUsado);
       const sobrecarg = npcDisp < NPC_OVL;
       const sobLabel  = sobrecarg ? `<span style="font-size:.58rem;color:var(--amber)"> ⚠️</span>` : '';
       return `
@@ -631,7 +631,7 @@ window._abrirPerfilFuncionario = async function(escId, funcId) {
   const cargo     = CARGO_INFO[f.cargo_id]?.l || f.cargo_id || '—';
   const esp       = ESP_LABEL[f.especialidade] || f.especialidade || '—';
   const emBurnout = !!f.burnout_npc;
-  const npcDisp   = (window.NPC_ENERGIA_MES || 100) - (f.energia_npc_usada_mes || 0);
+  const npcDisp   = Math.max(0, (window.NPC_ENERGIA_MES || 100) - (f.energia_npc_usada_mes || 0));
   const avatarSrc = _avatarSrc(f);
 
   // Se for o jogador atual, pega skills_jur do documento do jogador

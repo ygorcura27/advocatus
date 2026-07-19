@@ -176,7 +176,7 @@ function _npcEnergiaBadge(func) {
     return `<span class="npc-badge npc-burnout" title="Em burnout — ${func.burnout_npc_restante || 0} mês(es) restantes">🔴 Burnout</span>`;
   }
   const usado = func.energia_npc_usada_mes || 0;
-  const disp  = NPC_ENERGIA_MES - usado;
+  const disp  = Math.max(0, NPC_ENERGIA_MES - usado);
   if (disp < NPC_OVERLOAD_TH) {
     return `<span class="npc-badge npc-sobrecarregado" title="Sobrecarregado este mês (${disp}⚡ restantes)">⚠️ Sobrecarregado</span>`;
   }
@@ -1102,7 +1102,7 @@ window._designarProcessoPicker = async function(escId, procId, containerId) {
       const podeMane  = _podeManejar(f.cargo_id, procTier);
       const aviso     = !podeMane ? `<span style="font-size:.6rem;color:var(--amber)">⚠️ acima do cargo</span>` : '';
       const npcUsado  = f.energia_npc_usada_mes || 0;
-      const npcDisp   = NPC_ENERGIA_MES - npcUsado;
+      const npcDisp   = Math.max(0, NPC_ENERGIA_MES - npcUsado);
       const sobrecarg = npcDisp < NPC_OVERLOAD_TH;
       const sobLabel  = sobrecarg ? `<span style="font-size:.58rem;color:var(--amber)"> ⚠️ sobrecarregado</span>` : '';
       const efic      = _calcEficiencia(f);
