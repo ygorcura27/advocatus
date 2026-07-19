@@ -274,7 +274,68 @@ export const ESCRITORIOS_NPC = [
   { id:'prev_t5_a', nome:'Kertzman Previdência',                tier:5, esp:'previdenciario', bairro:'Leblon',         zona:'sul',      prestigio_base:90, sal_base:36000, vagas:['advogado_palestrante','socio_associado'] },
   { id:'prev_t5_b', nome:'Goes & Zuanazzi',                     tier:5, esp:'previdenciario', bairro:'São Conrado',    zona:'sul',      prestigio_base:92, sal_base:42000, vagas:['socio_associado'] },
   { id:'prev_t5_c', nome:'Rocha Previdência Nacional',          tier:5, esp:'previdenciario', bairro:'Barra da Tijuca',zona:'sudoeste', prestigio_base:94, sal_base:46000, vagas:['socio_associado'] },
+
+  // ══════════════════════════════
+  // TERRITÓRIO (GDD v6.0 §8) — 1 escritório por especialidade em cada
+  // comarca nova, pra nenhuma especialidade ficar sem vaga nenhuma fora do
+  // Rio. Catálogo bem menor que o do Rio (que é a "capital", 90 entradas) —
+  // essas são praças secundárias/em expansão, não espelham o Rio 1:1.
+  // Todo escritório SEM campo `comarca` é do Rio (ver comarcaDoEscritorio
+  // abaixo) — os 90 acima nunca precisaram ganhar o campo retroativamente.
+  // ══════════════════════════════
+
+  // São Paulo — maior mercado jurídico do país, tiers 2-4 (mercado grande,
+  // mas não é onde fica o endgame — isso é Brasília, ver abaixo)
+  { id:'sp_civ_a',  nome:'Perissinotto & Andrade Cível',   tier:2, esp:'civil',          bairro:'Pinheiros',    zona:'sao_paulo', comarca:'sao_paulo',    prestigio_base:42, sal_base:4600,  vagas:['advogado_peticionante','advogado_contencioso','advogado_consultor'] },
+  { id:'sp_crim_a', nome:'Bittar Criminalistas',           tier:2, esp:'criminal',       bairro:'Brooklin',     zona:'sao_paulo', comarca:'sao_paulo',    prestigio_base:43, sal_base:4300,  vagas:['advogado_contencioso','advogado_audiencista'] },
+  { id:'sp_emp_a',  nome:'Faria Lima Corporate',           tier:4, esp:'empresarial',    bairro:'Faria Lima',   zona:'sao_paulo', comarca:'sao_paulo',    prestigio_base:80, sal_base:19500, vagas:['advogado_parecerista','advogado_palestrante','socio_associado'] },
+  { id:'sp_prev_a', nome:'Damasceno Previdenciário SP',    tier:2, esp:'previdenciario', bairro:'Jardins',      zona:'sao_paulo', comarca:'sao_paulo',    prestigio_base:41, sal_base:4100,  vagas:['advogado_peticionante','advogado_consultor'] },
+  { id:'sp_trab_a', nome:'Vila Olímpia Trabalhista',       tier:3, esp:'trabalhista',    bairro:'Itaim Bibi',   zona:'sao_paulo', comarca:'sao_paulo',    prestigio_base:64, sal_base:9600,  vagas:['advogado_consultor','advogado_parecerista'] },
+  { id:'sp_tri_a',  nome:'Bela Vista Tributário',          tier:3, esp:'tributario',     bairro:'Vila Olímpia', zona:'sao_paulo', comarca:'sao_paulo',    prestigio_base:66, sal_base:9900,  vagas:['advogado_consultor','advogado_parecerista','advogado_contencioso'] },
+
+  // Brasília — "endgame territorial" do GDD (STJ/STF, caro/estressante,
+  // renome altíssimo) — tiers 3-5 só, sem porta de entrada tier 1, de propósito.
+  { id:'df_civ_a',  nome:'Asa Sul Advocacia Cível',        tier:3, esp:'civil',          bairro:'Asa Sul',      zona:'brasilia',  comarca:'brasilia',     prestigio_base:65, sal_base:9200,  vagas:['advogado_consultor','advogado_contencioso'] },
+  { id:'df_crim_a', nome:'Asa Norte Criminalistas',        tier:3, esp:'criminal',       bairro:'Asa Norte',    zona:'brasilia',  comarca:'brasilia',     prestigio_base:66, sal_base:9400,  vagas:['advogado_contencioso','advogado_audiencista'] },
+  { id:'df_emp_a',  nome:'Sudoeste Corporate Brasília',    tier:4, esp:'empresarial',    bairro:'Sudoeste',     zona:'brasilia',  comarca:'brasilia',     prestigio_base:79, sal_base:18800, vagas:['advogado_parecerista','advogado_palestrante','socio_associado'] },
+  { id:'df_prev_a', nome:'SCS Previdência Federal',        tier:3, esp:'previdenciario', bairro:'SCS',          zona:'brasilia',  comarca:'brasilia',     prestigio_base:67, sal_base:9700,  vagas:['advogado_consultor','advogado_parecerista'] },
+  { id:'df_trab_a', nome:'Lago Sul Trabalhista',           tier:4, esp:'trabalhista',    bairro:'Lago Sul',     zona:'brasilia',  comarca:'brasilia',     prestigio_base:81, sal_base:19200, vagas:['advogado_parecerista','socio_associado'] },
+  { id:'df_tri_a',  nome:'Brasília Tributário Federal',    tier:5, esp:'tributario',     bairro:'Asa Sul',      zona:'brasilia',  comarca:'brasilia',     prestigio_base:95, sal_base:43000, vagas:['advogado_palestrante','socio_associado'] },
+
+  // Interior (2-3 comarcas do GDD) — Petrópolis e Volta Redonda, praças
+  // pequenas, só tier 1-2 (porta de entrada, sem mercado pra escritório
+  // grande — Volta Redonda puxado por trabalhista/previdenciário, cidade
+  // industrial/CSN).
+  { id:'pet_civ_a',  nome:'Valparaíso Advocacia',          tier:1, esp:'civil',          bairro:'Valparaíso', zona:'petropolis',    comarca:'petropolis',    prestigio_base:20, sal_base:1700, vagas:['estagiario_pesquisa','advogado_peticionante'] },
+  { id:'pet_crim_a', nome:'Retiro Criminalistas',          tier:1, esp:'criminal',       bairro:'Retiro',     zona:'petropolis',    comarca:'petropolis',    prestigio_base:21, sal_base:1750, vagas:['estagiario_pesquisa','advogado_contencioso'] },
+  { id:'pet_emp_a',  nome:'Centro Empresarial Petrópolis', tier:2, esp:'empresarial',    bairro:'Centro',     zona:'petropolis',    comarca:'petropolis',    prestigio_base:40, sal_base:4200, vagas:['advogado_peticionante','advogado_consultor'] },
+  { id:'pet_prev_a', nome:'Quitandinha Previdência',       tier:1, esp:'previdenciario', bairro:'Valparaíso', zona:'petropolis',    comarca:'petropolis',    prestigio_base:20, sal_base:1700, vagas:['estagiario_pesquisa','advogado_peticionante'] },
+  { id:'pet_trab_a', nome:'Centro Trabalhista Serrano',    tier:2, esp:'trabalhista',    bairro:'Centro',     zona:'petropolis',    comarca:'petropolis',    prestigio_base:41, sal_base:4400, vagas:['advogado_peticionante','advogado_contencioso'] },
+  { id:'pet_tri_a',  nome:'Retiro Tributário',             tier:1, esp:'tributario',     bairro:'Retiro',     zona:'petropolis',    comarca:'petropolis',    prestigio_base:22, sal_base:1800, vagas:['estagiario_pesquisa','advogado_peticionante'] },
+
+  { id:'vr_civ_a',  nome:'Aterrado Advocacia Cível',       tier:1, esp:'civil',          bairro:'Aterrado',           zona:'volta_redonda', comarca:'volta_redonda', prestigio_base:20, sal_base:1700, vagas:['estagiario_pesquisa','advogado_peticionante'] },
+  { id:'vr_crim_a', nome:'Santa Cecília Criminalistas',    tier:2, esp:'criminal',       bairro:'Vila Santa Cecília', zona:'volta_redonda', comarca:'volta_redonda', prestigio_base:40, sal_base:4300, vagas:['advogado_peticionante','advogado_contencioso'] },
+  { id:'vr_emp_a',  nome:'Jardim Paraíba Empresarial',     tier:1, esp:'empresarial',    bairro:'Jardim Paraíba',     zona:'volta_redonda', comarca:'volta_redonda', prestigio_base:21, sal_base:1800, vagas:['estagiario_pesquisa','advogado_peticionante'] },
+  { id:'vr_prev_a', nome:'Aterrado Previdência do Trabalhador', tier:2, esp:'previdenciario', bairro:'Aterrado',     zona:'volta_redonda', comarca:'volta_redonda', prestigio_base:42, sal_base:4100, vagas:['advogado_peticionante','advogado_consultor'] },
+  { id:'vr_trab_a', nome:'CSN Trabalhista Associados',     tier:2, esp:'trabalhista',    bairro:'Vila Santa Cecília', zona:'volta_redonda', comarca:'volta_redonda', prestigio_base:44, sal_base:4600, vagas:['advogado_peticionante','advogado_contencioso','advogado_consultor'] },
+  { id:'vr_tri_a',  nome:'Jardim Paraíba Tributário',      tier:1, esp:'tributario',     bairro:'Jardim Paraíba',     zona:'volta_redonda', comarca:'volta_redonda', prestigio_base:22, sal_base:1750, vagas:['estagiario_pesquisa','advogado_peticionante'] },
 ];
+
+// ════════════════════════════════════════════════════════
+// COMARCAS (GDD v6.0 §8 — Território)
+// ════════════════════════════════════════════════════════
+export const COMARCAS = [
+  { id:'rio',           nome:'Rio de Janeiro', capital:true,  endgame:false },
+  { id:'sao_paulo',     nome:'São Paulo',      capital:false, endgame:false },
+  { id:'brasilia',      nome:'Brasília',       capital:false, endgame:true  },
+  { id:'petropolis',    nome:'Petrópolis',     capital:false, endgame:false },
+  { id:'volta_redonda', nome:'Volta Redonda',  capital:false, endgame:false },
+];
+
+/** Todo escritório dos 90 originais do Rio nunca ganhou o campo `comarca` — default lazy, mesmo padrão do resto do jogo (`?? valor`). */
+export function comarcaDoEscritorio(esc) {
+  return esc?.comarca || 'rio';
+}
 
 // ════════════════════════════════════════════════════════
 // HELPERS

@@ -23,6 +23,7 @@ const banco = require('./shared/banco_juridico.js');
 const { aplicarXpPracticeArea } = require('./skills');
 const { atualizarFama }         = require('./peticoes');
 const { multiplicadorNota }     = require('./estresse');
+const { comarcaAtual, aplicarDeltaRepComarca } = require('./territorio');
 
 // Evento "caso de grande repercussão" — vitória (procedente/parcial) num
 // caso de valor alto (mesmo piso do tier S de honorários, functions/
@@ -466,6 +467,8 @@ async function _processarSentencaSetlist(db, processoRef, jogadorRef, p, j, uid,
   // Atualizar jogador
   const updJog = {
     reputacao:            Math.max(0, Math.min(cap, rep + repDelta)),
+    // GDD v6.0 §8 — Território: espelha o delta de reputação global.
+    reputacao_comarcas:   aplicarDeltaRepComarca(j.reputacao_comarcas, comarcaAtual(j), repDelta),
     xp:                   (j.xp || 0) + xpGanho,
     processos_concluidos: (j.processos_concluidos || 0) + 1,
     derrotas_consecutivas: favoravelAoJogador ? 0 : (j.derrotas_consecutivas || 0) + 1,
@@ -586,6 +589,8 @@ exports.processarSentenca = onCall({ region: 'southamerica-east1' }, async (requ
 
   const updatesJogador = {
     reputacao: Math.max(0, Math.min(cap, rep + repDelta)),
+    // GDD v6.0 §8 — Território: espelha o delta de reputação global.
+    reputacao_comarcas: aplicarDeltaRepComarca(j.reputacao_comarcas, comarcaAtual(j), repDelta),
     xp: (j.xp || 0) + xpGanho,
     derrotas_consecutivas: favoravelAoJogador ? 0 : dc,
   };

@@ -23,6 +23,7 @@ const { modEstadoJogador } = require('./peticoes');
 const sk = require('./investigacao_skills');
 const { forcaDaTese, registrarUsoTese } = require('./banco_teses');
 const { multiplicadorNota } = require('./estresse');
+const { comarcaAtual, aplicarDeltaRepComarca } = require('./territorio');
 
 // Áreas reais de processo (js/escritorio_painel.js::TODAS_AREAS) são em
 // português; tags do Vade Mecum e as skills area_* (functions/skills.js)
@@ -781,6 +782,9 @@ exports.finalizarJulgamento = onCall({ region: 'southamerica-east1' }, async (re
 
   await jogadorRef.update({
     reputacao: Math.max(0, Math.min(cap, rep + repDelta)),
+    // GDD v6.0 §8 — Território: reputação da comarca onde o jogador atua
+    // hoje espelha o mesmo delta da reputação global desta vitória/derrota.
+    reputacao_comarcas: aplicarDeltaRepComarca(j.reputacao_comarcas, comarcaAtual(j), repDelta),
     xp: (j.xp || 0) + xpGanho,
     processos_concluidos: (j.processos_concluidos || 0) + 1,
     derrotas_consecutivas: favoravelAoJogador ? 0 : (j.derrotas_consecutivas || 0) + 1,

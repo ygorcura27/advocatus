@@ -13,6 +13,7 @@ import { db } from './firebase-init.js';
 import { icon } from './icons.js';
 import { renderAvatarJogador } from './avatar_svg.js';
 import { ehDoPersonagemAtivo } from './personagens.js';
+import { COMARCAS } from './escritorios_npc.js';
 
 // ── Painel ativo ──
 let _painelAtivo = 'perfil';
@@ -286,6 +287,31 @@ function _painelAtributosRPG(j) {
     </div>`;
 }
 
+// GDD v6.0 §8 — Território: reputação por comarca, "cresce com vitórias
+// locais". Comarca atual do jogador (js/vagas.js grava escritorio_comarca
+// na contratação) some marcada — é onde qualquer vitória nova é creditada.
+function _painelTerritorio(j) {
+  const rc = j.reputacao_comarcas || {};
+  const atual = j.escritorio_comarca || 'rio';
+  return `
+    <div style="margin-bottom:1.2rem;padding:.75rem;background:var(--surface2);border:var(--borda-sub);border-radius:var(--r)">
+      <div style="font-size:.68rem;color:var(--txt3);margin-bottom:.5rem">🗺️ Território (GDD v6.0 §8) <span style="color:var(--txt4)">— reputação por comarca, cresce com vitórias locais</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.5rem">
+        ${COMARCAS.map(c => {
+          const v = Math.max(0, Math.min(100, rc[c.id] || 0));
+          const éAtual = c.id === atual;
+          return `
+          <div style="padding:.4rem .5rem;background:var(--bg2);border-radius:6px${éAtual?';border:1px solid var(--ouro,#D9B573)':''}">
+            <div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--txt)">
+              <span>${c.endgame?'👑 ':éAtual?'📍 ':''}${c.nome}</span><b style="font-family:var(--font-mono,monospace)">${v}</b>
+            </div>
+            <div class="stat-bar" style="height:4px;margin-top:.2rem"><div class="stat-bar-fill" style="width:${v}%;background:${c.endgame?'var(--ouro,#D9B573)':'var(--navy3)'}"></div></div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
 function renderPerfil(j, el) {
   const cap    = window.REP_CAP[j.cargo_id] || 55;
   const label  = window.CARGO_LABEL[j.cargo_id] || j.cargo_id;
@@ -394,6 +420,7 @@ function renderPerfil(j, el) {
         </div>
 
         ${_painelAtributosRPG(j)}
+        ${_painelTerritorio(j)}
 
         <!-- Energia do mês — detalhamento de custos -->
         <div style="margin-bottom:1rem;padding:.75rem;background:var(--surface2);border:var(--borda-sub);border-radius:var(--r)">

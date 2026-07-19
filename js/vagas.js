@@ -10,9 +10,14 @@ import { httpsCallable }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
 import { db } from './firebase-init.js';
 import {
-  ESCRITORIOS_NPC, TIPOS_VAGA, TIER_BONUS, VAGA_FREQ,
-  escritoriosCompativeis, calcSalarioVaga, temVagaAberta, prestigioNoTier
+  ESCRITORIOS_NPC, TIPOS_VAGA, TIER_BONUS, VAGA_FREQ, COMARCAS,
+  escritoriosCompativeis, calcSalarioVaga, temVagaAberta, prestigioNoTier, comarcaDoEscritorio
 } from './escritorios_npc.js';
+
+function _comarcaLabel(escOuComarcaId) {
+  const id = typeof escOuComarcaId === 'string' ? escOuComarcaId : comarcaDoEscritorio(escOuComarcaId);
+  return (COMARCAS.find(c => c.id === id) || {}).nome || 'Rio de Janeiro';
+}
 import { personagemDocRef } from './personagens.js';
 
 // Salário fixo por cargo pra vagas do catálogo NPC (a skill do candidato só
@@ -182,7 +187,7 @@ function _cardEscritorio(esc, j) {
         <div style="flex:1">
           <div style="font-weight:700;font-size:.9rem;color:var(--txt);margin-bottom:.15rem">${esc.nome}</div>
           <div style="font-size:.7rem;color:var(--txt3);margin-bottom:.4rem">
-            📍 ${esc.bairro} · Tier ${esc.tier} · ${_espLabel(esc.esp)}
+            📍 ${esc.bairro} (${_comarcaLabel(esc)}) · Tier ${esc.tier} · ${_espLabel(esc.esp)}
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.5rem">
             ${bonus.rep_passivo > 0 ? `<span style="font-size:.62rem;padding:.1rem .4rem;background:var(--verde-bg);color:var(--verde);border-radius:2px;font-weight:600">+${bonus.rep_passivo} rep/mês</span>` : ''}
@@ -293,7 +298,7 @@ window.candidatarVaga = async function(escId, vagaId) {
         </div>
       </div>
       <div style="margin-top:.8rem;font-size:.72rem;color:var(--txt3)">
-        📍 ${esc.bairro} — ${_espLabel(esc.esp)} — Tier ${esc.tier}
+        📍 ${esc.bairro}, ${_comarcaLabel(esc)} — ${_espLabel(esc.esp)} — Tier ${esc.tier}
       </div>
     </div>`,
     `<button class="btn btn-ghost" onclick="fecharModal()">Cancelar</button>
@@ -439,6 +444,7 @@ window.aceitarConviteEscritorio = async function(msgId) {
       escritorio_tier:         esc.tier || 1,
       escritorio_esp:          esc.especialidade_principal || null,
       escritorio_bairro:       esc.bairro || null,
+      escritorio_comarca:      esc.comarca || 'rio',
       cargo_id:                c.cargo_id,
       sal_base_escritorio:     sal,
       derrotas_consecutivas:   0,
@@ -566,6 +572,7 @@ window._confirmarCandidatura = async function(escId, vagaId, sal) {
       escritorio_tier:        esc.tier,
       escritorio_esp:         esc.esp,
       escritorio_bairro:      esc.bairro,
+      escritorio_comarca:     comarcaDoEscritorio(esc),
       cargo_id:               vaga.cargo,
       vaga_tipo:              vagaId,
       sal_base_escritorio:    sal,
