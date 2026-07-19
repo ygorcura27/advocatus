@@ -32,6 +32,7 @@ const { processarDecaimentoMensal: processarDecaimentoTesesMensal } = require('.
 const { resetEnergiaMensal, calcularModSupervisaoSocio } = require('./energia_categorias');
 const _estresse = require('./estresse');
 const { filtrarOportunidadesElegiveis } = require('./regras_captacao');
+const _assedio = require('./assedio_banca_rival');
 
 const ENERGIA_TOTAL        = 100;
 
@@ -896,6 +897,54 @@ async function _verificarTurnoverNPCsCF(db, escRef, uid, fSnap) {
       upd.saiu_em     = new Date().toISOString();
       upd.motivo_saida = 'estresse_extremo';
       logs.push(_logEquipeCF(escRef, `🚪 ${f.nome} saiu do escritório devido a estresse extremo prolongado.`));
+    }
+    proms.push(fd.ref.update(upd));
+  }
+  if (proms.length) await Promise.all(proms);
+  if (logs.length)  await Promise.all(logs);
+}
+
+// ════════════════════════════════════════════════════════
+// PROCESSAMENTO MENSAL: ASSÉDIO DE BANCA RIVAL (GDD v6.0 §7.2)
+// ════════════════════════════════════════════════════════
+// Gatilho independente de _verificarTurnoverNPCsCF acima — por reputacao_interna
+// baixa (satisfação com o escritório), não estresse. Mesmo padrão de "aviso
+// antes de sair", 2 meses de sinal antes de disparar a oferta da rival.
+async function _verificarAssedioBancaRivalCF(db, escRef, uid, fSnap) {
+  const proms = [], logs = [];
+  for (const fd of fSnap.docs) {
+    const f = fd.data();
+
+    // Assédio já pendente do mês passado e o jogador não fez contraproposta —
+    // o NPC aceita a oferta da rival e sai.
+    if (f.assedio_pendente) {
+      proms.push(fd.ref.update({
+        ativo: false, saiu_em: new Date().toISOString(), motivo_saida: 'assediado_banca_rival',
+        assedio_pendente: null,
+      }));
+      logs.push(_logEquipeCF(escRef, `🚪 ${f.nome} aceitou a oferta de ${f.assedio_pendente.rival_nome} e saiu do escritório.`));
+      continue;
+    }
+
+    if (f.tipo !== 'npc' || f.ativo === false) continue;
+
+    const repBaixa = (f.reputacao_interna ?? 50) <= _assedio.REPUTACAO_INTERNA_RISCO;
+    const novosMesesRepBaixa = repBaixa ? (f.meses_rep_baixa || 0) + 1 : 0;
+    const upd = { meses_rep_baixa: novosMesesRepBaixa };
+
+    if (novosMesesRepBaixa >= _assedio.MESES_ATE_DISPARAR) {
+      const oferta = _assedio.gerarOfertaRival();
+      const salarioAtual = CARGO_SAL_MIN[f.cargo_id] || 3000;
+      const custoRetencao = Math.round(salarioAtual * 3 * oferta.oferta_mult);
+      upd.assedio_pendente = { rival_nome: oferta.nome, oferta_mult: oferta.oferta_mult, custo_retencao: custoRetencao };
+      upd.meses_rep_baixa  = 0;
+      logs.push(_logEquipeCF(escRef, `🎯 ${f.nome} recebeu uma oferta de ${oferta.nome} — risco real de sair este mês.`));
+      proms.push(db.collection('jogadores').doc(uid).collection('inbox').add({
+        de: 'sistema',
+        assunto: `🎯 Assédio de banca rival: ${f.nome}`,
+        corpo: `${f.nome} (${(f.cargo_id || '').toUpperCase()}) recebeu uma proposta de ${oferta.nome}, ${Math.round((oferta.oferta_mult - 1) * 100)}% acima do salário atual.\nFaça uma contraproposta em Gestão de Pessoas antes do próximo mês, ou ele(a) sai.`,
+        tipo: 'assedio_rival', lida: false, criado_em: new Date().toISOString(),
+      }));
     }
     proms.push(fd.ref.update(upd));
   }
@@ -2486,6 +2535,7 @@ async function _processarServicosMensalCF(db, uid, j) {
     await _processarConflitosNPCsCF(db, escRef, fSnapFresh, esc.mes_global || 0, uid, esc.gestor_id);
     await _processarFeriasNPCsCF(db, escRef, fSnapFresh, esc.mes_global || 0, uid);
     await _verificarTurnoverNPCsCF(db, escRef, uid, fSnapFresh);
+    await _verificarAssedioBancaRivalCF(db, escRef, uid, fSnapFresh);
 
     // Gestor auto-delegações
     if (esc.gestor_id) {

@@ -593,6 +593,16 @@ function _cardFuncionario(f, escId, energiaDisp, procCount = {}, mesGlobal = 0) 
       </div>
       ${skillsHtml}
       ${statusStack}
+      ${f.assedio_pendente ? `
+      <div style="margin:.4rem 0;padding:.5rem .6rem;background:rgba(200,80,80,.1);border:1px solid rgba(200,80,80,.35);border-radius:6px">
+        <div style="font-size:.68rem;color:var(--verm2);font-weight:600;margin-bottom:.25rem">🎯 Assédio de banca rival</div>
+        <div style="font-size:.65rem;color:var(--txt3);margin-bottom:.4rem">
+          ${f.assedio_pendente.rival_nome} ofereceu +${Math.round((f.assedio_pendente.oferta_mult-1)*100)}%. Sem contraproposta este mês, ${(f.nome||'').split(' ')[0]} sai.
+        </div>
+        <button class="btn btn-sm btn-prim" onclick="window.contrapropostaSalarial('${f.id}','${escId}')">
+          💰 Contraproposta (R$ ${(f.assedio_pendente.custo_retencao||0).toLocaleString('pt-BR')})
+        </button>
+      </div>` : ''}
       <div class="func-card-footer">
         <span class="func-salario">R$ ${ci.sal.toLocaleString('pt-BR')}/mês${ci.hon_pct > 0 ? ` · ${ci.hon_pct*100}% hon.` : ''}</span>
         <button class="btn btn-sm btn-prim" ${!podeCoordenar?'disabled':''}
@@ -1404,6 +1414,46 @@ window.demitirFuncionario = async function(funcId, escId, nome) {
   await deleteDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId));
   toast(`${nome} foi demitido(a). Rescisão: R$ ${ci.sal.toLocaleString('pt-BR')}`, 'neutro', 4000);
   setTimeout(() => window.navTo && window.navTo('equipe', null), 500);
+};
+
+// ════════════════════════════════════════════════════════
+// CONTRAPROPOSTA SALARIAL (GDD v6.0 §7.2 — Assédio de Banca Rival)
+// ════════════════════════════════════════════════════════
+// Não cria override permanente de salário por NPC (o jogo não tem esse
+// grau de liberdade hoje, salário é tabela fixa por cargo) — é um custo
+// único de retenção pago pelo dono, que reseta o risco e recupera
+// reputação interna. Ver functions/assedio_banca_rival.js pro porquê.
+window.contrapropostaSalarial = async function(funcId, escId) {
+  const j = window.JOGADOR;
+  const uid = j?.uid || window.JOGADOR_UID;
+
+  const fSnap = await getDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId));
+  if (!fSnap.exists()) return;
+  const f = fSnap.data();
+  const assedio = f.assedio_pendente;
+  if (!assedio) { toast('Não há assédio pendente pra este funcionário.', 'ko'); return; }
+
+  const custo = assedio.custo_retencao || 0;
+  if ((j.dinheiro||0) < custo) { toast(`Saldo insuficiente. Contraproposta custa R$ ${custo.toLocaleString('pt-BR')}.`, 'ko'); return; }
+  if (!confirm(`Fazer contraproposta pra reter ${f.nome}?\nCusto: R$ ${custo.toLocaleString('pt-BR')}`)) return;
+
+  try {
+    await updateDoc(doc(db, 'jogadores', uid), { dinheiro: (j.dinheiro||0) - custo });
+    await updateDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId), {
+      assedio_pendente: null,
+      meses_rep_baixa: 0,
+      reputacao_interna: Math.min(100, (f.reputacao_interna||50) + 30),
+    });
+    await addDoc(collection(db, 'escritorios', escId, 'log_equipe'), {
+      texto: `💰 ${f.nome} recebeu contraproposta e decidiu ficar.`,
+      criado_em: new Date().toISOString(),
+    });
+    toast(`✅ ${f.nome} ficou! -R$ ${custo.toLocaleString('pt-BR')}`, 'ok', 4000);
+    setTimeout(() => window.navTo && window.navTo('equipe', null), 500);
+  } catch (e) {
+    console.error('[CONTRAPROPOSTA]', e);
+    toast('Erro ao fazer contraproposta.', 'ko');
+  }
 };
 
 // ════════════════════════════════════════════════════════
