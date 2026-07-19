@@ -1016,12 +1016,34 @@ window.renderSetlistBuilder = async function(processoId, j, containerEl) {
   const proc    = procSnap.data();
   const tier    = proc.tier || 'D';
   const maxSlots = { D:4, C:5, B:6, A:7, S:8 }[tier] || 4;
+
+  // Petição só serve pra processo da MESMA área (civil não vale pra
+  // tributário etc.) — proc.area vem em PT (civil/tributario/...),
+  // peticao.practice_area vem em EN (civil/tax/...). Sem esta tradução E
+  // filtro, o builder deixava usar qualquer petição pronta em qualquer
+  // processo. Espelho de functions/processar_sentenca.js::AREA_PT_PARA_EN.
+  const AREA_PROC_PARA_PRACTICE = {
+    civil:'civil', consumidor:'civil', familia:'civil', imobiliario:'civil',
+    contencioso:'civil', ambiental:'civil',
+    tributario:'tax',
+    trabalhista:'employment',
+    empresarial:'corporate', societario:'corporate', administrativo:'corporate',
+    criminal:'criminal',
+  };
+  const areaProcesso = AREA_PROC_PARA_PRACTICE[proc.area] || proc.area || 'civil';
+  const AREA_LABEL_PT = {
+    civil:'Cível', tax:'Tributário', employment:'Trabalhista',
+    corporate:'Empresarial', criminal:'Criminal',
+    immigration:'Imigração', bankruptcy:'Rec. Judicial',
+  };
+
   // Mesmo bug de renderPeticoes/renderMercadoPeticoes — obras acadêmicas
   // (livro/artigo/dissertação/tese) vivem na mesma coleção e podem bater
   // status:'pronta', mas não são peças de setlist utilizáveis.
   const peticoes = petSnap.docs
     .map(d => ({ id: d.id, ...d.data() }))
-    .filter(p => p.document_type !== 'book' && p.document_type !== 'academic_article');
+    .filter(p => p.document_type !== 'book' && p.document_type !== 'academic_article')
+    .filter(p => !p.practice_area || p.practice_area === areaProcesso);
 
   // Estado local do setlist
   const slots = Array.from({ length: maxSlots }, (_, i) => ({
@@ -1069,9 +1091,9 @@ window.renderSetlistBuilder = async function(processoId, j, containerEl) {
         <div class="setlist-slot setlist-slot-vazio">
           <div class="setlist-slot-num">${i+1}</div>
           <div class="setlist-slot-corpo">
-            <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.4rem">Escolha uma petição:</div>
+            <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.4rem">Escolha uma petição de ${AREA_LABEL_PT[areaProcesso]||areaProcesso}:</div>
             ${peticoes.length === 0
-              ? `<div style="font-size:.7rem;color:var(--txt4)">Nenhuma petição disponível.</div>`
+              ? `<div style="font-size:.7rem;color:var(--txt4)">Nenhuma petição de ${AREA_LABEL_PT[areaProcesso]||areaProcesso} disponível.</div>`
               : `<div style="display:flex;flex-direction:column;gap:.25rem;max-height:220px;overflow-y:auto">
                   ${peticoes.map(p => `
                     <button class="btn btn-sm btn-ghost" style="text-align:left;justify-content:flex-start"
