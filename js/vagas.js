@@ -450,24 +450,34 @@ window.aceitarConviteEscritorio = async function(msgId) {
       derrotas_consecutivas:   0,
     });
 
-    // Registrar o personagem como FUNCIONÁRIO no escritório (aparece pro dono na Equipe)
-    await addDoc(collection(db, 'escritorios', c.esc_id, 'funcionarios'), {
-      nome: alvoData.nome_personagem || 'Advogado', cargo_id: c.cargo_id,
-      tipo: 'jogador', jogador_uid: uid, personagem_id: c.personagem_id || null,
-      skills: alvoData.skills || {}, sexo: alvoData.sexo || 'm',
-      ativo: true, acoes_mes_usadas: 0, acao_atual: null,
-      criado_em: new Date().toISOString(),
-    });
+    // Registrar o personagem como FUNCIONÁRIO no escritório (aparece pro dono
+    // na Equipe) — só se ainda não houver registro ativo dele aqui. Sem essa
+    // checagem, clicar "Aceitar" mais de uma vez (duplo clique, ou o modal
+    // reabrindo antes do status virar 'aceito') criava um funcionário
+    // duplicado a cada clique, todos com o mesmo nome.
+    const fSnapJaRegistrado = await getDocs(query(
+      collection(db, 'escritorios', c.esc_id, 'funcionarios'),
+      where('jogador_uid', '==', uid), where('ativo', '==', true)
+    ));
+    if (fSnapJaRegistrado.empty) {
+      await addDoc(collection(db, 'escritorios', c.esc_id, 'funcionarios'), {
+        nome: alvoData.nome_personagem || 'Advogado', cargo_id: c.cargo_id,
+        tipo: 'jogador', jogador_uid: uid, personagem_id: c.personagem_id || null,
+        skills: alvoData.skills || {}, sexo: alvoData.sexo || 'm',
+        ativo: true, acoes_mes_usadas: 0, acao_atual: null,
+        criado_em: new Date().toISOString(),
+      });
 
-    // Atualiza o contador agregado de vagas ocupadas E a lista pública de
-    // UIDs de funcionários ativos (funcionarios_uids) no doc do escritório.
-    // Essa lista é o que permite às Firestore Rules liberar leitura/escrita
-    // dos casos do POOL COLABORATIVO para este funcionário (não dá pra fazer
-    // "where jogador_uid==uid" dentro de uma Rule, daí a lista redundante).
-    await updateDoc(doc(db, 'escritorios', c.esc_id), {
-      [`vagas_ocupadas.${grupo}`]: ocupadas + 1,
-      funcionarios_uids: arrayUnion(uid),
-    });
+      // Atualiza o contador agregado de vagas ocupadas E a lista pública de
+      // UIDs de funcionários ativos (funcionarios_uids) no doc do escritório.
+      // Essa lista é o que permite às Firestore Rules liberar leitura/escrita
+      // dos casos do POOL COLABORATIVO para este funcionário (não dá pra fazer
+      // "where jogador_uid==uid" dentro de uma Rule, daí a lista redundante).
+      await updateDoc(doc(db, 'escritorios', c.esc_id), {
+        [`vagas_ocupadas.${grupo}`]: ocupadas + 1,
+        funcionarios_uids: arrayUnion(uid),
+      });
+    }
 
     await updateDoc(doc(db, 'jogadores', uid, 'inbox', msgId), { status: 'aceito', lida: true });
     if (éAtivo) window.JOGADOR = { ...j, escritorio_id: c.esc_id, escritorio_empregado_id: c.esc_id, cargo_id: c.cargo_id };
@@ -592,17 +602,26 @@ window._confirmarCandidatura = async function(escId, vagaId, sal) {
         await updateDoc(doc(db, 'escritorios', escId, 'funcionarios', fDoc.id), { cargo_id: vaga.cargo });
       }
     } else {
-      await addDoc(collection(db, 'escritorios', escId, 'funcionarios'), {
-        nome: j.nome_personagem || 'Advogado', cargo_id: vaga.cargo,
-        tipo: 'jogador', jogador_uid: uid,
-        skills: j.skills || {}, sexo: j.sexo || 'm',
-        ativo: true, acoes_mes_usadas: 0, acao_atual: null,
-        criado_em: new Date().toISOString(),
-      });
-      await updateDoc(doc(db, 'escritorios', escId), {
-        [`vagas_ocupadas.${grupo}`]: (ocupadasMap[grupo]||0) + 1,
-        funcionarios_uids: arrayUnion(uid),
-      });
+      // Sem essa checagem, clicar "Confirmar" mais de uma vez (duplo clique,
+      // retry por lentidão de rede) criava um funcionário duplicado a cada
+      // clique — mesmo nome, mesmo cargo, várias vezes na lista da Equipe.
+      const fSnapJaRegistrado = await getDocs(query(
+        collection(db, 'escritorios', escId, 'funcionarios'),
+        where('jogador_uid', '==', uid), where('ativo', '==', true)
+      ));
+      if (fSnapJaRegistrado.empty) {
+        await addDoc(collection(db, 'escritorios', escId, 'funcionarios'), {
+          nome: j.nome_personagem || 'Advogado', cargo_id: vaga.cargo,
+          tipo: 'jogador', jogador_uid: uid,
+          skills: j.skills || {}, sexo: j.sexo || 'm',
+          ativo: true, acoes_mes_usadas: 0, acao_atual: null,
+          criado_em: new Date().toISOString(),
+        });
+        await updateDoc(doc(db, 'escritorios', escId), {
+          [`vagas_ocupadas.${grupo}`]: (ocupadasMap[grupo]||0) + 1,
+          funcionarios_uids: arrayUnion(uid),
+        });
+      }
     }
 
     fecharModal();
