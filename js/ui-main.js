@@ -79,7 +79,7 @@ function _navLateralPadrao(painel) {
       <div class="nav-item${ativo('energia')}" onclick="navTo('energia',this)"><span class="ni-icon">⚡</span> Energia</div>
       <div class="nav-item${ativo('foco')}" onclick="navTo('foco',this)"><span class="ni-icon">${icon('oportunidades')}</span> Foco</div>
       <div class="nav-item${ativo('escritorio')}" onclick="navTo('escritorio',this)"><span class="ni-icon">${icon('escritorio')}</span> Escritório</div>
-      <div class="nav-item${ativo('investigacao')}" onclick="navTo('investigacao',this)"><span class="ni-icon">${icon('investigacao')}</span> Investigação</div>
+      <div class="nav-item${ativo('processos')}" onclick="navTo('processos',this)" title="Investigação virou parte do fluxo de Processos — clicar aqui já abre por lá"><span class="ni-icon">${icon('investigacao')}</span> Investigação</div>
       <div class="nav-item${ativo('progressao')}" onclick="navTo('progressao',this)"><span class="ni-icon">${icon('progressao')}</span> Progressão</div>
     </div>
     <div class="nav-grupo">
