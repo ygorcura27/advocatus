@@ -213,6 +213,9 @@ window.renderEquipe = async function(j, el) {
               <div class="equipe-hero-badge">
                 <span class="l">Folha de pagamento</span><span class="v verm">-${_fmtK(totalSalarios + cap.custo_fixo)}<small>/mês</small></span>
               </div>
+              <div class="equipe-hero-badge" style="cursor:pointer" onclick="window.navTo('energia',null)" title="GDD v6.0 §7.4 — horas alocadas em Supervisão (tela Energia) multiplicam a carteira automática">
+                <span class="l">🎯 Supervisão do Sócio</span><span class="v" style="color:var(--verde2)">${(window.calcularModSupervisaoSocio ? window.calcularModSupervisaoSocio(j) : 1.0).toFixed(2)}x</span>
+              </div>
             </div>
           </div>
         </div>

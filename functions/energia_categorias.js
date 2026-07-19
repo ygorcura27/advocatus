@@ -119,6 +119,33 @@ function creditarEnergiaCategoria(j, categoria, valor) {
   return { energia_usada: novoUsado };
 }
 
+/**
+ * GDD v6.0 §7.4 — "Supervisão do Sócio": horas do dono alocadas na
+ * categoria Supervisão multiplicam a produção de TODA a carteira automática
+ * (NPCs do pool), 0,85x a 1,15x. Lê a ALOCAÇÃO (o compromisso de horas),
+ * não o uso/restante — gastar ações pontuais de coordenar/designar/mediar
+ * dentro desse mesmo balde não devia punir o multiplicador; a tensão do
+ * GDD é "advogar vs. administrar" (alocar em supervisão vs. outras
+ * categorias), não "usar vs. não usar" dentro da categoria já escolhida.
+ *
+ * Conta legado (sem `energia_alocada`) não sofre efeito nenhum (1.0,
+ * neutro) até configurar os baldes — mesmo princípio de migração sem
+ * quebra do resto deste módulo.
+ *
+ * Teto de referência: mockup usava 40h de um total de ~200h no GDD literal
+ * (20%) — aqui é proporcional ao teto real em pontos (calcularEnergiaTotal),
+ * não o número "40" copiado, já que a escala de energia deste jogo ficou em
+ * pontos 0-100+bônus (decisão de não migrar unidade pro literal do GDD).
+ */
+function calcularModSupervisaoSocio(j) {
+  if (!j || !j.energia_alocada) return 1.0;
+  const alocado = j.energia_alocada.supervisao || 0;
+  const total = calcularEnergiaTotal(j);
+  const tetoReferencia = total * 0.2;
+  const pct = tetoReferencia > 0 ? Math.min(1, alocado / tetoReferencia) : 0;
+  return Math.min(1.15, 0.85 + pct * 0.30);
+}
+
 /** Reset mensal — chamado por avancar_mes.js e tick_mensal.js. Zera uso, mantém a alocação (sliders) que o jogador já tinha configurado. */
 function resetEnergiaMensal(j) {
   const patch = { energia: calcularEnergiaTotal(j), energia_usada_mes: 0 };
@@ -136,4 +163,5 @@ module.exports = {
   debitarEnergiaCategoria,
   creditarEnergiaCategoria,
   resetEnergiaMensal,
+  calcularModSupervisaoSocio,
 };

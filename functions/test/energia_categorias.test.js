@@ -13,6 +13,7 @@ const {
   creditarEnergiaCategoria,
   resetEnergiaMensal,
   categoriasVazias,
+  calcularModSupervisaoSocio,
 } = require('../energia_categorias');
 
 test('calcularEnergiaTotal replica a fórmula do frontend (base 100 + bônus academia + disposição - penalidade, piso 10)', () => {
@@ -90,6 +91,30 @@ test('creditarEnergiaCategoria: conta configurada devolve só no balde da catego
   };
   const patch = creditarEnergiaCategoria(j, 'estudo', 5);
   assert.equal(patch.energia_usada.estudo, 0);
+});
+
+test('calcularModSupervisaoSocio: conta legado (sem energia_alocada) fica neutra em 1.0', () => {
+  assert.equal(calcularModSupervisaoSocio({ disposicao: 60 }), 1.0);
+  assert.equal(calcularModSupervisaoSocio(null), 1.0);
+});
+
+test('calcularModSupervisaoSocio: 0 alocado em supervisao = piso 0.85x', () => {
+  const j = { disposicao: 60, energia_alocada: { processos: 100, supervisao: 0, estudo: 0, captacao: 0, pessoal: 0, descanso: 0 } };
+  assert.equal(calcularModSupervisaoSocio(j), 0.85);
+});
+
+test('calcularModSupervisaoSocio: 20% do teto alocado (ou mais) = teto 1.15x', () => {
+  // total = 100 (disposicao 60 -> bônus 0), 20% = 20
+  const j20 = { disposicao: 60, energia_alocada: { processos: 0, supervisao: 20, estudo: 0, captacao: 0, pessoal: 0, descanso: 0 } };
+  assert.equal(calcularModSupervisaoSocio(j20), 1.15);
+  const jAcima = { disposicao: 60, energia_alocada: { processos: 0, supervisao: 80, estudo: 0, captacao: 0, pessoal: 0, descanso: 0 } };
+  assert.equal(calcularModSupervisaoSocio(jAcima), 1.15); // não passa do teto
+});
+
+test('calcularModSupervisaoSocio: interpola linear entre 0.85 e 1.15', () => {
+  // metade do teto de referência (10 de 20) -> metade do caminho (0.85 + 0.15 = 1.0)
+  const j = { disposicao: 60, energia_alocada: { processos: 0, supervisao: 10, estudo: 0, captacao: 0, pessoal: 0, descanso: 0 } };
+  assert.equal(calcularModSupervisaoSocio(j), 1.0);
 });
 
 test('resetEnergiaMensal: conta configurada zera os 6 baldes de uso, mantém a alocação intocada (não faz parte do patch)', () => {

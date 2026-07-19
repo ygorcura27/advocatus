@@ -29,7 +29,7 @@ const _perfis                = require('./perfis');
 const { processarRoyaltiesLivros, processarCitacoesNPCMensal } = require('./artigos_livros');
 const { determinarSentencaSetlist, AREA_PT_PARA_EN } = require('./processar_sentenca');
 const { processarDecaimentoMensal: processarDecaimentoTesesMensal } = require('./banco_teses');
-const { resetEnergiaMensal } = require('./energia_categorias');
+const { resetEnergiaMensal, calcularModSupervisaoSocio } = require('./energia_categorias');
 const _estresse = require('./estresse');
 
 const ENERGIA_TOTAL        = 100;
@@ -188,7 +188,11 @@ function _notaDeForcaNPC(forca) {
   return Math.max(1, Math.min(26, Math.round(1 + (forca / 50) * 25)));
 }
 
-async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid, esc) {
+async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid, esc, jDono) {
+  // GDD v6.0 §7.4 — Supervisão do Sócio: horas do dono alocadas em
+  // Supervisão multiplicam a carteira toda (0,85x-1,15x). jDono pode faltar
+  // em chamadas antigas/testes — sem ele, cai no neutro (1.0) igual conta legado.
+  const modSupervisaoSocio = jDono ? calcularModSupervisaoSocio(jDono) : 1.0;
   // Benefícios ativos: soma dos efeitos (com diminishing returns por ordem
   // de ativação — ver BENEFICIOS_MULT_STACK acima), cobertura em bloco pra
   // todos os NPCs. bonus_perform não entra em benefCustoPorFunc porque é
@@ -265,7 +269,10 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid, esc) {
         const apoio = p.apoio_func_id ? npcMap[p.apoio_func_id] : null;
         if (apoio) forcaBase += _forcaNPC(apoio) * BONUS_FORCA_APOIO;
         const mult        = MULT_FORCA_POR_ACUMULO[Math.min(numAtivos, MULT_FORCA_POR_ACUMULO.length - 1)] ?? .25;
-        const nota        = _notaDeForcaNPC(forcaBase * mult);
+        // GDD v6.0 §7.4 — Supervisão do Sócio aplicada por último, multiplica
+        // a força final do NPC (não a base, pra não compor com a penalidade
+        // de acúmulo de forma estranha).
+        const nota        = _notaDeForcaNPC(forcaBase * mult * modSupervisaoSocio);
         const tipoCaso    = AREA_PT_PARA_EN[p.area] || p.area || 'civil';
         const ctxSentenca = { processos_concluidos: npc.casos_resolvidos_total || 0, supervisao_ativa: false, tipo_caso: tipoCaso, alta_originalidade: false };
         // Mesma curva de convencimento (TABELA_SENTENCA) usada na sentença do
@@ -2469,7 +2476,7 @@ async function _processarServicosMensalCF(db, uid, j) {
   const esc  = escSnap.data();
   const tier = esc.tier || 1;
 
-  await _processarProgressoNPCsCF(db, escRef, esc.mes_global || 0, uid, esc);
+  await _processarProgressoNPCsCF(db, escRef, esc.mes_global || 0, uid, esc, j);
 
   try {
     const fSnapFresh = await escRef.collection('funcionarios').get();

@@ -70,6 +70,21 @@ window.energiaDisponivelCategoria = function(j, categoria) {
   return Math.max(0, alocado - usado);
 };
 
+/**
+ * GDD v6.0 §7.4 — "Supervisão do Sócio": espelho frontend de
+ * functions/energia_categorias.js::calcularModSupervisaoSocio, só pra
+ * mostrar o multiplicador atual na tela de Energia (o cálculo que vale de
+ * verdade roda no backend, em avancar_mes.js).
+ */
+window.calcularModSupervisaoSocio = function(j) {
+  if (!j || !j.energia_alocada) return 1.0;
+  const alocado = j.energia_alocada.supervisao || 0;
+  const total = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
+  const tetoReferencia = total * 0.2;
+  const pct = tetoReferencia > 0 ? Math.min(1, alocado / tetoReferencia) : 0;
+  return Math.min(1.15, 0.85 + pct * 0.30);
+};
+
 /** Devolve energia gasta (ex: docência energiza). Sempre floor em 0. */
 window.creditarEnergiaCategoriaPatch = function(j, categoria, valor) {
   if (!j.energia_alocada) {

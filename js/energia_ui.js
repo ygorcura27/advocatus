@@ -65,6 +65,11 @@ window.renderEnergia = function(j, el) {
       <div style="margin-top:.4rem;font-size:.64rem;color:var(--txt4)">Usado este mês: ${usado}/${val}</div>
       <div class="stat-bar" style="height:5px;margin-top:.15rem"><div class="stat-bar-fill" style="width:${pctUso}%;background:${pctUso>=100?'var(--verm2)':'var(--amber)'}"></div></div>
       ` : ''}
+      ${cat === 'supervisao' ? `
+      <div style="margin-top:.5rem;font-size:.66rem;color:var(--txt3);border-top:1px dashed var(--txt5,rgba(255,255,255,.1));padding-top:.4rem">
+        🎯 <b>Supervisão do Sócio</b> (GDD §7.4): horas alocadas aqui multiplicam a produção de toda a carteira automática (NPCs).
+        Modificador atual: <b id="energia-mod-supervisao" style="color:var(--verde2)">${window.calcularModSupervisaoSocio({ energia_alocada: alocacao, disposicao: j.disposicao }).toFixed(2)}x</b>
+      </div>` : ''}
     </div>`;
   }).join('');
 
@@ -115,6 +120,17 @@ window._energiaSliderMudou = function(cat) {
   const lbl = document.getElementById(`energia-val-${cat}`);
   if (inp && lbl) lbl.textContent = inp.value;
   window._atualizarTotalEnergiaAlocada();
+
+  if (cat === 'supervisao') {
+    const modEl = document.getElementById('energia-mod-supervisao');
+    const supervisaoInp = document.getElementById('energia-slider-supervisao');
+    if (modEl && supervisaoInp) {
+      const j = window.JOGADOR || {};
+      const alocSimulada = { supervisao: parseInt(supervisaoInp.value, 10) || 0 };
+      const mod = window.calcularModSupervisaoSocio({ energia_alocada: alocSimulada, disposicao: j.disposicao });
+      modEl.textContent = `${mod.toFixed(2)}x`;
+    }
+  }
 };
 
 window._salvarEnergiaAlocada = async function() {
