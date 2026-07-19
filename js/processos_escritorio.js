@@ -27,6 +27,14 @@ const NPC_ENERGIA_MES = 100;
 const NPC_CUSTO_PROC  = 25;   // energia NPC por processo designado — pool único (processo/demanda/mentoria/estudo)
 const NPC_OVERLOAD_TH = 20;   // abaixo disso, aviso de sobrecarga
 
+// ─── Regras de Captação (GDD v6.0 §1.2) ──────────────────────────────────────
+// Mesmos 5 tipos de serviço de js/servicos_dados.js::TIPOS_SERVICO (label
+// local pra não puxar import cruzado só por isso).
+const TIPO_SERVICO_LABEL_RC = {
+  consulta: '💬 Consulta', parecer: '📄 Parecer', contrato: '📝 Contrato',
+  notificacao: '✉️ Notificação', cobranca: '💰 Cobrança',
+};
+
 // ─── Refresh do widget de processos ──────────────────────────────────────────
 // O mesmo renderProcessosPool() é montado em dois containers diferentes
 // dependendo da tela: 'esc-processos-bloco' no dashboard do escritório, ou
@@ -203,10 +211,57 @@ window.renderGestaoProcessos = async function(j, el) {
       <span>Delegação de gestão foi pra Gestão de Pessoas — junto com contratação e equipe.</span>
       <button class="btn btn-ghost btn-sm" onclick="window.navTo('equipe',null)">👤 Gestão de Pessoas →</button>
     </div>` : ''}
+    ${podeGerenciar ? _renderRegrasCaptacao(esc, escId) : ''}
     <div id="gestao-processos-pool"></div>`;
 
   const elPool = document.getElementById('gestao-processos-pool');
   if (elPool) window.renderProcessosPool(j, escId, elPool);
+};
+
+// ─── Regras de Captação (GDD v6.0 §1.2) — filtro do auto-aceite mensal ───────
+function _renderRegrasCaptacao(esc, escId) {
+  const r = esc.regras_captacao || { ativo: false, tipos: [], valor_minimo: 0 };
+  const tiposMarcados = new Set(r.tipos || []);
+  const chips = Object.entries(TIPO_SERVICO_LABEL_RC).map(([tipo, label]) => `
+    <label style="display:inline-flex;align-items:center;gap:.3rem;padding:.3rem .55rem;border-radius:6px;border:1px solid var(--navy-light);font-size:.72rem;cursor:pointer;margin:.15rem .25rem .15rem 0">
+      <input type="checkbox" id="rc-tipo-${tipo}" ${tiposMarcados.has(tipo) ? 'checked' : ''}> ${label}
+    </label>`).join('');
+
+  return `
+    <div class="card" style="margin-bottom:1rem;padding:.8rem .9rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
+        <div style="font-weight:600;font-size:.82rem;color:var(--txt)">🤖 Regras de Captação</div>
+        <label style="display:flex;align-items:center;gap:.4rem;font-size:.72rem;cursor:pointer">
+          <input type="checkbox" id="rc-ativo" ${r.ativo ? 'checked' : ''}> ativo
+        </label>
+      </div>
+      <div style="font-size:.66rem;color:var(--txt4);margin-bottom:.55rem">
+        GDD v6.0 §1.2 — filtra quais oportunidades entram no auto-aceite mensal (fora do filtro fica disponível pra você decidir manualmente, como hoje). Sem regra ativa, continua aceitando tudo automaticamente dentro da capacidade da equipe, igual sempre foi.
+      </div>
+      <div style="margin-bottom:.55rem">${chips}<div style="font-size:.62rem;color:var(--txt5,var(--txt4));margin-top:.15rem">nenhum tipo marcado = aceita qualquer tipo</div></div>
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem">
+        <label style="font-size:.72rem;color:var(--txt3)">Valor mínimo da causa:</label>
+        <input type="number" id="rc-valor-minimo" value="${r.valor_minimo || 0}" min="0" step="100"
+          style="width:110px;padding:.25rem .4rem;font-size:.75rem;border-radius:4px;border:1px solid var(--navy-light);background:var(--bg2);color:var(--txt)">
+      </div>
+      <button class="btn btn-prim btn-sm" onclick="window._salvarRegrasCaptacao('${escId}')">💾 Salvar regras</button>
+    </div>`;
+}
+
+window._salvarRegrasCaptacao = async function(escId) {
+  const ativo = document.getElementById('rc-ativo')?.checked || false;
+  const valorMinimo = parseInt(document.getElementById('rc-valor-minimo')?.value, 10) || 0;
+  const tipos = Object.keys(TIPO_SERVICO_LABEL_RC).filter(t => document.getElementById(`rc-tipo-${t}`)?.checked);
+
+  try {
+    await updateDoc(doc(db, 'escritorios', escId), {
+      regras_captacao: { ativo, tipos, valor_minimo: valorMinimo },
+    });
+    toast('🤖 Regras de captação salvas.', 'ok');
+  } catch (e) {
+    console.error('[REGRAS CAPTACAO]', e);
+    toast('Erro ao salvar regras de captação.', 'ko');
+  }
 };
 
 // ─── RENDER principal — 3 colunas ────────────────────────────────────────────

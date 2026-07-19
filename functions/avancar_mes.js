@@ -31,6 +31,7 @@ const { determinarSentencaSetlist, AREA_PT_PARA_EN } = require('./processar_sent
 const { processarDecaimentoMensal: processarDecaimentoTesesMensal } = require('./banco_teses');
 const { resetEnergiaMensal, calcularModSupervisaoSocio } = require('./energia_categorias');
 const _estresse = require('./estresse');
+const { filtrarOportunidadesElegiveis } = require('./regras_captacao');
 
 const ENERGIA_TOTAL        = 100;
 
@@ -2594,11 +2595,20 @@ async function _processarAutogestaoOportunidadesCF(db, escRef, esc) {
 
   const opSnap = await escRef.collection('oportunidades').where('status','==','disponivel').get();
 
+  // GDD v6.0 §1.2 — Regras de Captação: filtra quais oportunidades entram
+  // na fila de auto-aceite. Sem regra configurada (ativo=false/ausente),
+  // comportamento idêntico ao de sempre — aceita tudo cego, dentro da
+  // capacidade. Doc completo do porquê "matéria"→tipo e "comarca" ficou de
+  // fora em functions/regras_captacao.js.
+  const docsElegiveis = filtrarOportunidadesElegiveis(
+    opSnap.docs.map(d => ({ ref: d.ref, ...d.data() })),
+    esc.regras_captacao,
+  );
+
   let caixaGanho = 0;
   let resolvidas = 0;
 
-  for (const opDoc of opSnap.docs) {
-    const op = opDoc.data();
+  for (const op of docsElegiveis) {
     const capacidadeTotal = advogadosAtivos.length * 2;
     if (resolvidas >= capacidadeTotal) break;
 
@@ -2608,7 +2618,7 @@ async function _processarAutogestaoOportunidadesCF(db, escRef, esc) {
     caixaGanho += valorRecebido;
     resolvidas++;
 
-    await opDoc.ref.update({
+    await op.ref.update({
       status:'concluido', valor_recebido:valorRecebido, executor:advogadorResolvedor.nome+' (autogestão)',
     });
 
