@@ -284,9 +284,18 @@ async function processarRoyaltiesLivros(db, uid, mesGlobal) {
   for (const doc of snap.docs) {
     const p = doc.data();
 
-    // Encerrar livro expirado
+    // Encerrar livro expirado (24 meses de vigência, GDD v5.1 §33). Sem
+    // aviso, o jogador só descobria ao ver o botão "Publicar no Mercado"
+    // reaparecer numa obra que já tinha publicado — parecia bug, era vigência
+    // vencida em silêncio. Agora avisa e marca por quê no próprio doc.
     if (p.mes_vigencia_fim && mesGlobal > p.mes_vigencia_fim) {
       proms.push(doc.ref.update({ no_mercado: false, vigencia_encerrada_em: new Date().toISOString() }));
+      proms.push(db.collection('jogadores').doc(uid).collection('inbox').add({
+        de: 'sistema',
+        assunto: `📗 Vigência de mercado encerrada — ${p.titulo || 'seu livro'}`,
+        corpo: `"${p.titulo || 'Seu livro'}" completou 24 meses no Mercado e saiu de circulação (royalties totais: R$ ${(p.royalties_pagos_total || 0).toLocaleString('pt-BR')}). Publique de novo em Artigos & Livros se quiser continuar vendendo.`,
+        tipo: 'livro_vigencia_encerrada', lida: false, criado_em: new Date().toISOString(),
+      }));
       continue;
     }
 

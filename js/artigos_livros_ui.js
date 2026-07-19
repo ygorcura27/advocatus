@@ -54,7 +54,8 @@ window.renderArtigosLivros = async function(j, el) {
         <span class="badge" style="background:${emComposicao?'var(--amber-bg)':'var(--verde-bg)'};color:${emComposicao?'var(--amber)':'var(--verde2)'}">${emComposicao ? '⏳ em composição' : `nota ${o.nota_teto}/26`}</span>
       </div>
       ${!emComposicao ? `<div style="font-size:.68rem;color:var(--txt3);margin-top:.4rem">📈 ${o.citacoes||0} citações${o.categoria==='livro'?` · 💰 R$ ${(o.royalties_pagos_total||0).toLocaleString('pt-BR')} em royalties`:''}</div>` : ''}
-      ${(!emComposicao && o.categoria === 'livro' && !o.no_mercado) ? `<button class="btn btn-prim btn-sm" style="margin-top:.5rem" onclick="window._alPublicarLivro('${o.id}')">Publicar no Mercado</button>` : ''}
+      ${o.vigencia_encerrada_em && !o.no_mercado ? `<div style="font-size:.65rem;color:var(--amber);margin-top:.4rem">⏳ Vigência de 24 meses encerrada — saiu do mercado, pode republicar</div>` : ''}
+      ${(!emComposicao && o.categoria === 'livro' && !o.no_mercado) ? `<button class="btn btn-prim btn-sm" style="margin-top:.5rem" onclick="window._alPublicarLivro('${o.id}')">${o.vigencia_encerrada_em ? 'Republicar no Mercado' : 'Publicar no Mercado'}</button>` : ''}
       ${o.no_mercado ? `<div style="font-size:.65rem;color:var(--verde2);margin-top:.4rem">✅ no mercado — R$ ${o.preco_mercado}/cópia</div>` : ''}
     </div>`;
   }).join('') : `<div class="card" style="color:var(--txt4);text-align:center">Nenhuma obra ainda.</div>`;

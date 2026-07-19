@@ -584,9 +584,15 @@ window.estudarSkill = async function(sk, skLabel) {
   if (!rEstudo.ok) { toast(`⚡ ${rEstudo.mensagemErro}`, 'ko'); return; }
   const novaFila = [...(j.study_queue||[]), { skill:sk, skill_label:skLabel, ganho:3, mes_conclusao:(window.SERVER?.mes_global||1)+1 }];
   await _salvar(uid, { dinheiro:(j.dinheiro||0) - 500, study_queue:novaFila, ...rEstudo.patch });
+  // j.study_queue precisa refletir a fila NOVA antes do próximo clique nesta
+  // mesma sessão — sem isso, estudar uma 2ª skill lia o study_queue antigo
+  // (sem a 1ª) e regravava por cima, apagando a 1ª do Firestore (bug real:
+  // "estudei 2, só uma fica com ampulheta" — a outra tinha sido sobrescrita).
+  j.study_queue = novaFila;
   Object.assign(j, rEstudo.patch);
   window.JOGADOR = j;
   toast(`📖 Estudando ${skLabel} — resultado em 1 mês!`, 'ok');
+  window.navTo && window.navTo('habilidades', null);
 };
 
 window.estudarSkillJur = async function(sk, skLabel) {
@@ -604,9 +610,11 @@ window.estudarSkillJur = async function(sk, skLabel) {
     mes_conclusao: (window.SERVER?.mes_global || 1) + 1,
   }];
   await _salvar(uid, { dinheiro:(j.dinheiro||0) - 500, study_queue: novaFila, ...rEstudo.patch });
+  j.study_queue = novaFila; // ver comentário em estudarSkill acima
   Object.assign(j, rEstudo.patch);
   window.JOGADOR = j;
   toast(`📖 Estudando ${skLabel} — resultado em 1 mês!`, 'ok');
+  window.navTo && window.navTo('habilidades', null);
 };
 
 // ════════════════════════════════════════════════════════
