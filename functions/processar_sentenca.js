@@ -181,12 +181,30 @@ function determinarSentencaSetlist(nota, posicao, julgador, impactoEvento, ctx) 
     base.improc  /= soma;
   }
 
-  // Modificador de perfil do julgador — GDD Seção 36.2
+  // Modificador de perfil do julgador — GDD Seção 36.2 / GDD v6.0 §6.3
+  // (5 arquétipos nomeados: legalista≈formalista real, garantista,
+  // produtivista, conciliador, imprevisível — 'conservador' é um 6º valor
+  // já existente no sorteio real, mantido por compat com processos já
+  // criados). Bug corrigido de passagem: checava `julgador.perfil`
+  // (sempre undefined — campo real é `perfil_oculto`) e um valor 'fiscal'
+  // que nunca era sorteado em lugar nenhum — todo este bloco era morto
+  // antes desta correção, mesmo pros 3 perfis que já existiam.
   if (julgador) {
     let modJ = 0;
-    if (julgador.perfil === 'formalista' && ctx.alta_originalidade)   modJ += 0.05;
-    if (julgador.perfil === 'fiscal'     && ctx.tipo_caso === 'tax')   modJ -= 0.08;
-    if (julgador.perfil === 'garantista' && ctx.tipo_caso === 'criminal') modJ += 0.06;
+    let parcialBoost = 0;
+    const perfil = julgador.perfil_oculto;
+    if (perfil === 'formalista'   && ctx.alta_originalidade)      modJ += 0.05;
+    if (perfil === 'garantista'   && ctx.tipo_caso === 'criminal') modJ += 0.06;
+    if (perfil === 'conservador'  && ctx.alta_originalidade)      modJ -= 0.05;
+    // Produtivista: prefere resolver rápido, empurra pra decisão parcial
+    // (meio-termo) em vez de extremos.
+    if (perfil === 'produtivista') parcialBoost += 0.06;
+    // Conciliador: ainda mais inclinado a dividir a diferença.
+    if (perfil === 'conciliador')  parcialBoost += 0.10;
+    // Imprevisível: sem direção fixa — ruído aleatório a cada julgamento.
+    if (perfil === 'imprevisivel') modJ += (Math.random() * 0.20 - 0.10);
+
+    base.parcial = Math.max(0.01, base.parcial + parcialBoost);
     base.total  = Math.max(0.01, base.total  + modJ);
     base.improc = Math.max(0.01, base.improc - modJ);
     const soma = base.total + base.parcial + base.improc;

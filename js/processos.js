@@ -1316,7 +1316,36 @@ const PERFIL_HINT = {
   formalista: 'Magistrado conhecido pelo rigor técnico e apego à letra da lei — valoriza fundamentação precisa.',
   garantista: 'Magistrado com histórico de decisões favoráveis à parte mais vulnerável da relação processual.',
   conservador: 'Magistrado cauteloso, pouco receptivo a teses inovadoras ou argumentação mais agressiva.',
+  // GDD v6.0 §6.3 — 3 arquétipos novos (formalista já cobre "legalista" do GDD).
+  produtivista: 'Magistrado focado em desafogar a pauta — tende a empurrar as partes pra um meio-termo em vez de decisões extremas.',
+  conciliador:  'Magistrado que valoriza acordo entre as partes acima de tudo — decisões parciais são a norma, não a exceção.',
+  imprevisivel: 'Magistrado sem padrão de decisão conhecido — cada julgamento é uma incógnita, mesmo pra advogados experientes.',
 };
+
+// Perfil do juiz (perfil_oculto) → reações por estilo de escrita da peça
+// (GDD v5.1 §2.1, functions/processar_sentenca.js::ESTILO_REACAO_MAP /
+// modificadorEstilo). Cada perfil valoriza um tipo de fundamentação —
+// nunca existia antes desta correção (campo `reacoes` não era criado em
+// lugar nenhum do código, bug que deixava modificadorEstilo sempre 0).
+const PERFIL_REACOES = {
+  formalista:   { fatual: 10, jurisprudencial: 5, doutrinário: 3, constitucional: 2 },
+  garantista:   { constitucional: 10, doutrinário: 6, jurisprudencial: 5, fatual: 3 },
+  conservador:  { jurisprudencial: 10, fatual: 6, doutrinário: 2, constitucional: 3 },
+  produtivista: { fatual: 8, jurisprudencial: 8, doutrinário: 3, constitucional: 3 },
+  conciliador:  { doutrinário: 7, jurisprudencial: 6, fatual: 5, constitucional: 5 },
+};
+function _reacoesParaPerfil(perfil) {
+  if (perfil === 'imprevisivel') {
+    // Sem padrão fixo — sorteia pesos aleatórios a cada juiz criado.
+    return {
+      doutrinário: Math.round(Math.random() * 10),
+      jurisprudencial: Math.round(Math.random() * 10),
+      fatual: Math.round(Math.random() * 10),
+      constitucional: Math.round(Math.random() * 10),
+    };
+  }
+  return PERFIL_REACOES[perfil] || PERFIL_REACOES.formalista;
+}
 
 // Dicionário fato → frase narrativa, cobrindo os fatos_possiveis das 3 áreas do BANCO.
 const FATO_FRASE = {
@@ -1585,11 +1614,15 @@ function gerarTextoLocal(PROC) {
   // gerarProcesso via competencia_dificil) — aqui só reforçamos o perfil do
   // magistrado pra coerência: réu enfrenta juiz mais "formalista/conservador"
   // com maior frequência, refletindo a dificuldade extra combinada.
+  // GDD v6.0 §6.3 — 5 arquétipos nomeados (legalista≈formalista já real,
+  // garantista já real, + produtivista/conciliador/imprevisível novos).
+  // 'conservador' segue no pool por compat com processos já criados antes
+  // desta expansão (não é um dos 5 nomeados do GDD, mas já era real).
   const perfis = meuLado === 'reu'
-    ? ['formalista', 'formalista', 'conservador', 'garantista']
-    : ['formalista', 'garantista', 'conservador'];
+    ? ['formalista', 'formalista', 'conservador', 'garantista', 'produtivista', 'conciliador', 'imprevisivel']
+    : ['formalista', 'garantista', 'conservador', 'produtivista', 'conciliador', 'imprevisivel'];
   const perfil = sortear(perfis);
-  const juiz = { nome: sortear(NOMES_JUIZ), perfil_oculto: perfil, hint: PERFIL_HINT[perfil] };
+  const juiz = { nome: sortear(NOMES_JUIZ), perfil_oculto: perfil, hint: PERFIL_HINT[perfil], reacoes: _reacoesParaPerfil(perfil) };
 
   const tesesDisponiveis = PROC.teses || [];
   const tipos = ['tecnica','agressiva','passiva'];
