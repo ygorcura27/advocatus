@@ -671,6 +671,43 @@ exports.adminAction = onCall({ region: 'southamerica-east1' }, async (request) =
       };
     }
 
+    // ════════════════════════════════════════════════════
+    // MANUTENÇÃO — dedup de funcionário duplicado (bug de duplo-clique em
+    // aceitar convite/candidatura, corrigido em js/vagas.js). Mantém o
+    // registro mais antigo (criado_em) e apaga o resto.
+    // ════════════════════════════════════════════════════
+
+    case 'funcionario_dedup': {
+      const { jogador_uid, esc_id } = payload || {};
+      if (!jogador_uid) throw new HttpsError('invalid-argument', 'jogador_uid obrigatório.');
+
+      let escId = esc_id;
+      if (!escId) {
+        const jSnap = await db.collection('jogadores').doc(jogador_uid).get();
+        const jd = jSnap.exists ? jSnap.data() : {};
+        escId = jd.escritorio_empregado_id || jd.escritorio_proprio_id;
+      }
+      if (!escId) throw new HttpsError('failed-precondition', 'Não achei o escritório desse jogador — informe esc_id.');
+
+      const fSnap = await db.collection('escritorios').doc(escId).collection('funcionarios')
+        .where('jogador_uid', '==', jogador_uid).get();
+
+      if (fSnap.empty) return { ok: true, msg: 'Nenhum registro encontrado.', esc_id: escId, removidos: 0 };
+
+      const docs = fSnap.docs.slice().sort((a, b) => (a.data().criado_em || '').localeCompare(b.data().criado_em || ''));
+      const manter  = docs[0];
+      const remover = docs.slice(1);
+
+      await Promise.all(remover.map(d => d.ref.delete()));
+
+      logger.info(`[ADMIN] funcionario_dedup: esc=${escId} uid=${jogador_uid} mantido=${manter.id} removidos=${remover.length}`);
+      return {
+        ok: true,
+        msg: `Mantido 1 (${manter.id}), removidos ${remover.length}.`,
+        esc_id: escId, mantido: manter.id, removidos: remover.map(d => d.id),
+      };
+    }
+
     default:
       throw new HttpsError('invalid-argument', `Ação desconhecida: ${acao}`);
   }
