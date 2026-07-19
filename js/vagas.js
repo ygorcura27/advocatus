@@ -400,13 +400,44 @@ window.aceitarConviteEscritorio = async function(msgId) {
       alvoData = alvoSnap.data();
     }
 
+    // Se o personagem-alvo já estava empregado em OUTRO escritório, desliga
+    // o registro de funcionário de lá antes de entrar no novo — mesma
+    // limpeza que window._confirmarCandidatura (convite de escritório NPC)
+    // já fazia; faltava aqui (convite direto de sócio, escritório de
+    // jogador real), deixando um funcionário fantasma ocupando vaga no
+    // escritório antigo pra sempre (nunca desativado, vaga nunca liberada).
+    if (alvoData.escritorio_empregado_id && alvoData.escritorio_empregado_id !== c.esc_id && alvoData.escritorio_empregado_id !== 'solo') {
+      try {
+        const escIdAntigo = alvoData.escritorio_empregado_id;
+        const cargoAntigo = alvoData.cargo_id;
+        const fSnapAntigo = await getDocs(query(
+          collection(db, 'escritorios', escIdAntigo, 'funcionarios'),
+          where('jogador_uid', '==', uid)
+        ));
+        for (const fDoc of fSnapAntigo.docs) {
+          await updateDoc(doc(db, 'escritorios', escIdAntigo, 'funcionarios', fDoc.id), { ativo: false, saiu_em: new Date().toISOString() });
+        }
+        if (fSnapAntigo.docs.length > 0 && cargoAntigo) {
+          const grupoAntigo = cargoAntigo==='est' ? 'est' : cargoAntigo==='ass' ? 'ass' : 'adv';
+          const escAntigoSnap = await getDoc(doc(db, 'escritorios', escIdAntigo));
+          if (escAntigoSnap.exists()) {
+            const atual = (escAntigoSnap.data().vagas_ocupadas || {})[grupoAntigo] || 0;
+            await updateDoc(doc(db, 'escritorios', escIdAntigo), {
+              [`vagas_ocupadas.${grupoAntigo}`]: Math.max(0, atual - 1),
+              funcionarios_uids: arrayRemove(uid),
+            });
+          }
+        }
+      } catch (e) { /* escritório antigo sem subcoleção populada — ignora */ }
+    }
+
     await updateDoc(alvoRef, {
       escritorio_id:           c.esc_id,
       escritorio_empregado_id: c.esc_id,
       escritorio_proprio_id:   null,
       escritorio_nome:         esc.nome,
       escritorio_tier:         esc.tier || 1,
-      escritorio_esp:          esc.especialidade || null,
+      escritorio_esp:          esc.especialidade_principal || null,
       escritorio_bairro:       esc.bairro || null,
       cargo_id:                c.cargo_id,
       sal_base_escritorio:     sal,

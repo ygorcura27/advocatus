@@ -7,9 +7,29 @@
  * js/energia_categorias.js::checarEnergiaCategoria — ver comentário lá.
  */
 
-import { doc, updateDoc }
+import { doc, updateDoc, getDoc }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { db } from './firebase-init.js';
+
+// Supervisão da Carteira só tem efeito pra quem gerencia o escritório (dono/
+// sócio/associado) — coordenar/designar/mediar (as ações que gastam dessa
+// categoria) já são bloqueadas pra empregado comum em js/equipe.js:154
+// ("autogestão"). Sem essa checagem, um estagiário via Harvey podia alocar
+// energia numa categoria que não tem NENHUM botão disponível pra ele gastar.
+async function _podeGerenciarEscritorio(j) {
+  const escId = j.escritorio_proprio_id || (j.escritorio_empregado_id !== 'solo' ? j.escritorio_empregado_id : null);
+  if (!escId) return false;
+  if (j.escritorio_proprio_id) return true; // dono
+  try {
+    const escSnap = await getDoc(doc(db, 'escritorios', escId));
+    if (!escSnap.exists()) return false;
+    const esc = escSnap.data();
+    const uid = j.uid || window.JOGADOR_UID;
+    const ehDono = esc.dono_uid === uid || esc.fundador_uid === uid;
+    const ehSocio = (esc.socios || []).some(s => s.uid === uid);
+    return ehDono || ehSocio;
+  } catch (e) { return false; }
+}
 
 const LABEL = {
   processos:  { icone: '⚖️', l: 'Processos Estratégicos', desc: 'Assumir casos, sentenças, recursos, serviços avulsos.' },
@@ -40,32 +60,47 @@ function _distribuicaoSugerida(total) {
   return out;
 }
 
-window.renderEnergia = function(j, el) {
+window.renderEnergia = async function(j, el) {
   const total = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
+  const podeGerenciar = await _podeGerenciarEscritorio(j);
   const configurado = !!j.energia_alocada;
   const alocacao = configurado ? { ...j.energia_alocada } : _distribuicaoSugerida(total);
+  if (!podeGerenciar) {
+    // Sem escritório pra gerenciar, a alocação em Supervisão não tem
+    // nenhuma ação real pra gastar — libera pra Processos em vez de
+    // sugerir um balde morto.
+    alocacao.processos = (alocacao.processos || 0) + (alocacao.supervisao || 0);
+    alocacao.supervisao = 0;
+  }
   const uso = j.energia_usada || (window.categoriaEnergiaVazia ? window.categoriaEnergiaVazia() : {});
 
   const linhas = ORDEM.map(cat => {
     const info = LABEL[cat];
-    const val = alocacao[cat] || 0;
+    const bloqueado = cat === 'supervisao' && !podeGerenciar;
+    const val = bloqueado ? 0 : (alocacao[cat] || 0);
     const usado = uso[cat] || 0;
     const pctUso = val > 0 ? Math.min(100, Math.round(usado / val * 100)) : 0;
     return `
-    <div class="card" style="margin-bottom:.6rem;padding:.8rem .9rem">
+    <div class="card" style="margin-bottom:.6rem;padding:.8rem .9rem${bloqueado ? ';opacity:.55' : ''}">
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.3rem">
-        <div style="font-weight:600;font-size:.82rem;color:var(--txt)">${info.icone} ${info.l}</div>
+        <div style="font-weight:600;font-size:.82rem;color:var(--txt)">${info.icone} ${info.l}${bloqueado ? ' 🔒' : ''}</div>
         <div style="font-family:var(--font-mono,monospace);font-size:.78rem;color:var(--amber)"><span id="energia-val-${cat}">${val}</span>⚡</div>
       </div>
       <div style="font-size:.66rem;color:var(--txt4);margin-bottom:.5rem">${info.desc}</div>
       <input type="range" min="0" max="${total}" value="${val}" step="1"
-        id="energia-slider-${cat}" style="width:100%"
+        id="energia-slider-${cat}" style="width:100%" ${bloqueado ? 'disabled' : ''}
         oninput="window._energiaSliderMudou('${cat}')">
-      ${configurado ? `
+      ${bloqueado ? `
+      <div style="margin-top:.4rem;font-size:.66rem;color:var(--txt3)">
+        🔒 Você não gerencia processos neste escritório (não é dono, sócio ou associado) — coordenar/designar/mediar
+        conflito não estão disponíveis pra você, então esta categoria não tem nenhuma ação pra gastar. Energia
+        liberada pras outras 5.
+      </div>` : ''}
+      ${configurado && !bloqueado ? `
       <div style="margin-top:.4rem;font-size:.64rem;color:var(--txt4)">Usado este mês: ${usado}/${val}</div>
       <div class="stat-bar" style="height:5px;margin-top:.15rem"><div class="stat-bar-fill" style="width:${pctUso}%;background:${pctUso>=100?'var(--verm2)':'var(--amber)'}"></div></div>
       ` : ''}
-      ${cat === 'supervisao' ? `
+      ${cat === 'supervisao' && !bloqueado ? `
       <div style="margin-top:.5rem;font-size:.66rem;color:var(--txt3);border-top:1px dashed var(--txt5,rgba(255,255,255,.1));padding-top:.4rem">
         🎯 <b>Supervisão do Sócio</b> (GDD §7.4): horas alocadas aqui multiplicam a produção de toda a carteira automática (NPCs).
         Modificador atual: <b id="energia-mod-supervisao" style="color:var(--verde2)">${window.calcularModSupervisaoSocio({ energia_alocada: alocacao, disposicao: j.disposicao }).toFixed(2)}x</b>

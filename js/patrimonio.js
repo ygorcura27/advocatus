@@ -567,6 +567,12 @@ window.venderItem = async function(id) {
 // ════════════════════════════════════════════════════════
 // ESTUDAR SKILL
 // ════════════════════════════════════════════════════════
+// GDD v6.0 §3.1 — categoria Estudo. Bug real: esse botão só checava dinheiro
+// e "1 estudo por skill" — como skills DIFERENTES não competiam entre si,
+// dava pra enfileirar quantas quisesse no mesmo mês, sem nenhum teto real
+// (relatado: "24 alocados em estudo, clico ilimitado mesmo assim").
+const ENERGIA_ESTUDAR_SKILL = 5;
+
 window.estudarSkill = async function(sk, skLabel) {
   const j   = window.JOGADOR;
   const uid = j.uid || window.JOGADOR_UID;
@@ -574,8 +580,12 @@ window.estudarSkill = async function(sk, skLabel) {
   if ((j.skills?.[sk]||0) >= cap) { toast(`${skLabel} já está no máximo (${cap}).`, 'ko'); return; }
   if ((j.dinheiro||0) < 500) { toast('Saldo insuficiente. Estudar custa R$500.','ko'); return; }
   if ((j.study_queue||[]).some(s => s.skill === sk)) { toast('Já há um estudo desta skill em andamento.','ko'); return; }
+  const rEstudo = window.checarEnergiaCategoria(j, 'estudo', ENERGIA_ESTUDAR_SKILL, `estudar ${skLabel}`);
+  if (!rEstudo.ok) { toast(`⚡ ${rEstudo.mensagemErro}`, 'ko'); return; }
   const novaFila = [...(j.study_queue||[]), { skill:sk, skill_label:skLabel, ganho:3, mes_conclusao:(window.SERVER?.mes_global||1)+1 }];
-  await _salvar(uid, { dinheiro:(j.dinheiro||0) - 500, study_queue:novaFila });
+  await _salvar(uid, { dinheiro:(j.dinheiro||0) - 500, study_queue:novaFila, ...rEstudo.patch });
+  Object.assign(j, rEstudo.patch);
+  window.JOGADOR = j;
   toast(`📖 Estudando ${skLabel} — resultado em 1 mês!`, 'ok');
 };
 
@@ -586,12 +596,16 @@ window.estudarSkillJur = async function(sk, skLabel) {
   if ((j.skills_jur?.[sk]||0) >= capJur) { toast(`${skLabel} já está no máximo (${capJur}).`, 'ko'); return; }
   if ((j.dinheiro||0) < 500) { toast('Saldo insuficiente. Estudar custa R$500.','ko'); return; }
   if ((j.study_queue||[]).some(s => s.skill === sk)) { toast('Já há um estudo desta skill em andamento.','ko'); return; }
+  const rEstudo = window.checarEnergiaCategoria(j, 'estudo', ENERGIA_ESTUDAR_SKILL, `estudar ${skLabel}`);
+  if (!rEstudo.ok) { toast(`⚡ ${rEstudo.mensagemErro}`, 'ko'); return; }
   const novaFila = [...(j.study_queue||[]), {
     skill: sk, skill_label: skLabel, ganho: 3,
     tipo: 'skills_jur',
     mes_conclusao: (window.SERVER?.mes_global || 1) + 1,
   }];
-  await _salvar(uid, { dinheiro:(j.dinheiro||0) - 500, study_queue: novaFila });
+  await _salvar(uid, { dinheiro:(j.dinheiro||0) - 500, study_queue: novaFila, ...rEstudo.patch });
+  Object.assign(j, rEstudo.patch);
+  window.JOGADOR = j;
   toast(`📖 Estudando ${skLabel} — resultado em 1 mês!`, 'ok');
 };
 
