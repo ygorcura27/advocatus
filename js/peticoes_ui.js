@@ -100,7 +100,14 @@ window.renderPeticoes = async function(j, el) {
         orderBy('criada_em', 'desc'))
     );
 
-    const peticoes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Livros/artigos/dissertações/teses vivem na MESMA coleção `peticoes`
+    // (functions/artigos_livros.js::novaObra, document_type 'book'/
+    // 'academic_article') — sem esse filtro, toda obra acadêmica do
+    // jogador aparecia misturada em "Minhas Petições" (bug relatado).
+    // Elas têm tela própria (Artigos & Livros, js/artigos_livros_ui.js).
+    const peticoes = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(p => p.document_type !== 'book' && p.document_type !== 'academic_article');
     const emComposicao = peticoes.filter(p => p.status === 'em_composicao');
     const prontasParaAdicionar = peticoes.filter(p => p.status === 'pronta' && !p.no_repertorio);
     const temEscritorio = !!(j.escritorio_proprio_id || j.escritorio_empregado_id);
@@ -231,8 +238,13 @@ window.renderMercadoPeticoes = async function(j, el) {
         orderBy('criada_em', 'desc'))
     );
 
+    // Mesmo bug de peticoes_ui.js::renderPeticoes — `no_mercado` é reusado
+    // pelas obras acadêmicas (functions/artigos_livros.js, publicação pro
+    // Mercado de royalties/citações), campo diferente de "vender petição
+    // pra outro jogador comprar" que é o que esta tela faz de verdade.
     const peticoes = snap.docs
       .map(d => ({ id: d.id, ...d.data() }))
+      .filter(p => p.document_type !== 'book' && p.document_type !== 'academic_article')
       .filter(p => p.jogador_uid !== j.uid); // não comprar as próprias
 
     el.innerHTML = `
@@ -1004,7 +1016,12 @@ window.renderSetlistBuilder = async function(processoId, j, containerEl) {
   const proc    = procSnap.data();
   const tier    = proc.tier || 'D';
   const maxSlots = { D:4, C:5, B:6, A:7, S:8 }[tier] || 4;
-  const peticoes = petSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  // Mesmo bug de renderPeticoes/renderMercadoPeticoes — obras acadêmicas
+  // (livro/artigo/dissertação/tese) vivem na mesma coleção e podem bater
+  // status:'pronta', mas não são peças de setlist utilizáveis.
+  const peticoes = petSnap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .filter(p => p.document_type !== 'book' && p.document_type !== 'academic_article');
 
   // Estado local do setlist
   const slots = Array.from({ length: maxSlots }, (_, i) => ({
