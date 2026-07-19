@@ -61,6 +61,12 @@ exports.criarEscritorio = onCall({ region: 'southamerica-east1' }, async (reques
     areas_atuacao:           [ especialidade_principal || j.especialidade || 'civil' ],
     bairro_sede:           bairro_sede || 'Centro',
     zona_sede:             zona_sede   || 'centro',
+    // GDD v6.0 §8 — Território: criação de escritório só aceita bairros do
+    // Rio hoje (sem tela de "escolher comarca"), então grava explícito em
+    // vez de confiar só no default preguiçoso (comarcaDoEscritorio,
+    // js/escritorios_npc.js) que os outros lugares usam pra escritórios
+    // antigos sem o campo.
+    comarca:               'rio',
     equipe:                [],
     estagiarios:           [],
     clientes:              [],
