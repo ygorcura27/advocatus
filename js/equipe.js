@@ -166,7 +166,7 @@ window.renderEquipe = async function(j, el) {
   if (!ehSocioOuAssociado) {
     // Visão de autogestão para empregado comum (sênior pra baixo, sem sociedade)
     const fSnap2 = await getDocs(collection(db, 'escritorios', escId, 'funcionarios'));
-    const totalFuncs = fSnap2.size;
+    const totalFuncs = fSnap2.docs.filter(d => d.data().ativo !== false).length;
     el.innerHTML = `
       <div class="secao-header"><div class="secao-titulo">👥 Equipe — ${esc.nome}</div></div>
       <div class="card" style="text-align:center;padding:1.6rem;color:var(--txt3)">
@@ -182,12 +182,15 @@ window.renderEquipe = async function(j, el) {
   const tier = esc.tier || 1;
   const cap  = TIER_CAPACIDADE[tier] || TIER_CAPACIDADE[1];
 
-  // Buscar funcionários ativos
+  // Buscar funcionários ativos — o comentário já dizia "ativos" mas o filtro
+  // nunca existia aqui (só em outras telas do arquivo): quem saiu (demitido,
+  // turnover por estresse, assédio de banca rival — todos gravam ativo:false)
+  // continuava aparecendo normal na lista, contando na folha e nas vagas.
   const fSnap = await getDocs(query(
     collection(db, 'escritorios', escId, 'funcionarios'),
     orderBy('criado_em', 'asc')
   ));
-  const funcs = fSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const funcs = fSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(f => f.ativo !== false);
 
   // Contar processos ativos por NPC (para exibir capacidade usada/total)
   const procCountEquipe = {};
@@ -1511,6 +1514,7 @@ export async function calcularCustoEquipe(escId, tier) {
     const snap = await getDocs(collection(db, 'escritorios', escId, 'funcionarios'));
     snap.docs.forEach(d => {
       const fd = d.data();
+      if (fd.ativo === false) return; // quem já saiu não entra mais na folha projetada
       total += fd.salario ?? calcSalarioMercado(fd.cargo_id, tier);
     });
   } catch(e) { /* sem funcionários ainda */ }
@@ -1795,7 +1799,7 @@ window.abrirModalMentoria = async function(mentorId, escId) {
   const fSnap = await getDocs(collection(db, 'escritorios', escId, 'funcionarios'));
   const aprendizElegiveis = fSnap.docs
     .map(d => ({ id: d.id, ...d.data() }))
-    .filter(f => f.tipo === 'npc' && _CARGO_APRENDIZ_EQ.has(f.cargo_id) && !f.mentor_id && !f.burnout_npc && !f.em_ferias && f.id !== mentorId);
+    .filter(f => f.ativo !== false && f.tipo === 'npc' && _CARGO_APRENDIZ_EQ.has(f.cargo_id) && !f.mentor_id && !f.burnout_npc && !f.em_ferias && f.id !== mentorId);
 
   if (!aprendizElegiveis.length) {
     toast('Não há aprendizes disponíveis (est/ass/jnr sem mentor ativo).', 'ko', 4000);
