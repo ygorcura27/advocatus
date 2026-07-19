@@ -101,24 +101,24 @@ function _iniciarCountdownFerias(bloqueadoAte, container, j) {
 // ════════════════════════════════════════════════════════
 // GASTAR ENERGIA (chamado pelos módulos de ação)
 // ════════════════════════════════════════════════════════
-window.gastarEnergia = async function(custo, descricao) {
+// GDD v6.0 §3.1 — `categoria` default 'processos' porque hoje nenhum
+// chamador real passa uma (helper genérico, sem callers no momento desta
+// migração — mantido category-aware pra não virar pool único de novo se
+// algum módulo futuro passar a usá-lo).
+window.gastarEnergia = async function(custo, descricao, categoria = 'processos') {
   const j   = window.JOGADOR;
   if (!j)   return false;
   const uid = j.uid || window.JOGADOR_UID;
-  const energiaTotal = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
-  const usado = j.energia_usada_mes || 0;
-  const disponivel = Math.max(0, energiaTotal - usado);
 
-  if (disponivel < custo) {
-    toast(`⚡ Energia insuficiente. Restam ${disponivel} ⚡, ação requer ${custo} ⚡.`, 'ko');
+  const r = window.checarEnergiaCategoria(j, categoria, custo, descricao);
+  if (!r.ok) {
+    toast(`⚡ ${r.mensagemErro}`, 'ko');
     return false;
   }
 
   try {
-    await updateDoc(doc(db, 'jogadores', uid), {
-      energia_usada_mes: usado + custo,
-    });
-    toast(`⚡ -${custo} energia (${descricao}). Restam ${disponivel - custo} ⚡.`, 'neutro', 2000);
+    await updateDoc(doc(db, 'jogadores', uid), r.patch);
+    toast(`⚡ -${custo} energia (${descricao}).`, 'neutro', 2000);
     return true;
   } catch (err) {
     toast('Erro ao gastar energia.', 'ko');

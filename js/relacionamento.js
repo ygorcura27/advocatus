@@ -381,11 +381,11 @@ window.tentarReatar = async function(relId, nome) {
 
   if (r.tentou_reatar_mes) { toast('Você já tentou reatar este mês. Aguarde o próximo.', 'ko'); return; }
 
-  const usado = j.energia_usada_mes || 0;
-  const disp  = Math.max(0, (j.energia_total || 100) - usado);
-  if (disp < 10) { toast('⚡ Energia insuficiente para tentar reatar.', 'ko'); return; }
+  // GDD v6.0 §3.1 — categoria Vida Pessoal.
+  const rReatar = window.checarEnergiaCategoria(j, 'pessoal', 10, 'tentar reatar');
+  if (!rReatar.ok) { toast(`⚡ ${rReatar.mensagemErro}`, 'ko'); return; }
 
-  await updateDoc(doc(db,'jogadores',uid), { energia_usada_mes: usado + 10 });
+  await updateDoc(doc(db,'jogadores',uid), rReatar.patch);
 
   const sucesso = Math.random() < 0.10;
 
@@ -446,11 +446,11 @@ window.irParaLocal = async function(localKey) {
   const local = LOCAIS_CONHECER[localKey];
   if (!local) return;
 
-  const usado = j.energia_usada_mes || 0;
-  const disp  = Math.max(0, (j.energia_total||100) - usado);
-  if (disp < local.energia) { toast(`⚡ Energia insuficiente (requer ${local.energia}).`, 'ko'); return; }
+  // GDD v6.0 §3.1 — categoria Vida Pessoal.
+  const rLocal = window.checarEnergiaCategoria(j, 'pessoal', local.energia, `ir para ${local.l || 'o local'}`);
+  if (!rLocal.ok) { toast(`⚡ ${rLocal.mensagemErro}`, 'ko'); return; }
 
-  await updateDoc(doc(db, 'jogadores', uid), { energia_usada_mes: usado + local.energia });
+  await updateDoc(doc(db, 'jogadores', uid), rLocal.patch);
 
   // Verificar relacionamentos ativos (máx 1 namorada+ mas pode ter affairs)
   const relSnap = await getDocs(query(relColecaoAtual(uid, j), where('ativo','==',true)));
@@ -594,9 +594,9 @@ window.interagirRelacionamento = async function(relId, interacaoKey) {
   const inter = INTERACOES[interacaoKey];
   if (!inter) return;
 
-  const usado = j.energia_usada_mes || 0;
-  const disp  = Math.max(0, (j.energia_total||100) - usado);
-  if (disp < inter.energia) { toast(`⚡ Energia insuficiente.`, 'ko'); return; }
+  // GDD v6.0 §3.1 — categoria Vida Pessoal.
+  const rInter = window.checarEnergiaCategoria(j, 'pessoal', inter.energia, 'interagir');
+  if (!rInter.ok) { toast(`⚡ ${rInter.mensagemErro}`, 'ko'); return; }
 
   const relRef  = relDocAtual(uid, j, relId);
   const relSnap = await getDoc(relRef);
@@ -656,7 +656,7 @@ window.interagirRelacionamento = async function(relId, interacaoKey) {
   }
 
   await updateDoc(relRef, updates);
-  await updateDoc(doc(db,'jogadores',uid), { energia_usada_mes: usado + inter.energia,
+  await updateDoc(doc(db,'jogadores',uid), { ...rInter.patch,
     ...(smGanho ? { saude_mental: Math.min(100, (j.saude_mental||80) + smGanho) } : {}) });
 
   // Registrar na timeline do relacionamento — usado pela tela de perfil
@@ -971,14 +971,13 @@ window.aderirAcademia = async function() {
 window.frequentarAcademia = async function() {
   const j   = window.JOGADOR;
   const uid = j?.uid || window.JOGADOR_UID;
-  const usado = j.energia_usada_mes||0;
-  const disp  = Math.max(0,(j.energia_total||100)-usado);
-
-  if (disp < ACADEMIA.energia_uso) { toast('⚡ Energia insuficiente.','ko'); return; }
+  // GDD v6.0 §3.1 — categoria Descanso.
+  const rAcademia = window.checarEnergiaCategoria(j, 'descanso', ACADEMIA.energia_uso, 'frequentar a academia');
+  if (!rAcademia.ok) { toast(`⚡ ${rAcademia.mensagemErro}`,'ko'); return; }
   if (j.academia_usada_mes) { toast('Você já compareceu este mês.','ko'); return; }
 
   await updateDoc(doc(db,'jogadores',uid), {
-    energia_usada_mes: usado + ACADEMIA.energia_uso,
+    ...rAcademia.patch,
     academia_usada_mes: true,
   });
   toast('💪 Comparecimento registrado! Bônus de energia será aplicado no próximo mês.', 'ok', 4000);

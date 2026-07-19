@@ -75,6 +75,7 @@ function _navLateralPadrao(painel) {
     <div class="nav-grupo">
       <div class="nav-grupo-titulo">Carreira</div>
       <div class="nav-item${ativo('perfil')}" onclick="navTo('perfil',this)"><span class="ni-icon">${icon('perfil')}</span> Meu Perfil</div>
+      <div class="nav-item${ativo('energia')}" onclick="navTo('energia',this)"><span class="ni-icon">⚡</span> Energia</div>
       <div class="nav-item${ativo('foco')}" onclick="navTo('foco',this)"><span class="ni-icon">${icon('oportunidades')}</span> Foco</div>
       <div class="nav-item${ativo('escritorio')}" onclick="navTo('escritorio',this)"><span class="ni-icon">${icon('escritorio')}</span> Escritório</div>
       <div class="nav-item${ativo('investigacao')}" onclick="navTo('investigacao',this)"><span class="ni-icon">${icon('investigacao')}</span> Investigação</div>
@@ -134,6 +135,10 @@ function _renderizar() {
 
   switch (_painelAtivo) {
     case 'perfil':       renderPerfil(j, main);       break;
+    case 'energia':
+      if (window.renderEnergia) window.renderEnergia(j, main);
+      else main.innerHTML = '<div class="card" style="color:var(--txt3)">Carregando energia...</div>';
+      break;
     case 'processos':    window.renderGestaoProcessos(j, main); break;
     case 'escritorio':   renderEscritorio(j, main);    break;
     case 'equipe':
@@ -261,8 +266,12 @@ function renderPerfil(j, el) {
     ? `<img src="${fotoUrl}" class="profile-photo" alt="${j.nome_personagem||'Perfil'}" style="object-fit:cover;border-radius:50%;width:80px;height:80px;border:2px solid var(--ouro)">`
     : `<div class="profile-photo" style="width:80px;height:80px;border-radius:50%;overflow:hidden;border:2px solid var(--ouro)">${renderAvatarJogador(j, { size: 80 })}</div>`;
 
-  const energiaUsada = j.energia_usada_mes||0;
-  const energiaDisp  = Math.max(0, 100 - energiaUsada);
+  // GDD v6.0 §3.1 — teto real (com bônus de academia/disposição), não mais
+  // fixo em 100 (bug antigo: card sempre mostrava "/100" mesmo com bônus ativo).
+  const energiaTotalReal = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
+  const energiaDisp  = j.energia_alocada
+    ? window.CATEGORIAS_ENERGIA.reduce((s,c) => s + window.energiaDisponivelCategoria(j, c), 0)
+    : Math.max(0, energiaTotalReal - (j.energia_usada_mes||0));
   const repPct = Math.min(100, Math.round((j.reputacao||0)/cap*100));
 
   el.innerHTML = `
@@ -313,10 +322,10 @@ function renderPerfil(j, el) {
             <div class="stat-label">Meu saldo</div>
             <div class="stat-value up">${_fmtExt(j.dinheiro||0)}</div>
           </div>
-          <div class="stat">
-            <div class="stat-label">Energia do mês</div>
-            <div class="stat-value">${energiaDisp} <small>/ 100</small></div>
-            <div class="stat-bar"><div class="stat-bar-fill" style="width:${energiaDisp}%;background:var(--amber)"></div></div>
+          <div class="stat" style="cursor:pointer" onclick="window.navTo('energia',null)" title="Ver alocação por categoria">
+            <div class="stat-label">⚡ Energia do mês</div>
+            <div class="stat-value">${energiaDisp} <small>/ ${energiaTotalReal}</small></div>
+            <div class="stat-bar"><div class="stat-bar-fill" style="width:${Math.min(100,Math.round(energiaDisp/energiaTotalReal*100))}%;background:var(--amber)"></div></div>
           </div>
           <div class="stat">
             <div class="stat-label">😌 Saúde Mental</div>

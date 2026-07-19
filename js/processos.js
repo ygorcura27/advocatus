@@ -2121,7 +2121,8 @@ function _renderModalProcesso(id, p) {
   const prog = p.progresso || 0;
   const cvColor = cv >= 58 ? 'var(--verde2)' : cv >= 38 ? 'var(--amber)' : 'var(--verm2)';
   const isSolo = !j.escritorio_empregado_id || j.escritorio_id === 'solo';
-  const energiaDisp = Math.max(0, (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - (j.energia_usada_mes || 0));
+  // GDD v6.0 §3.1 — recurso/sustentação/acordo nesta tela gastam de Processos Estratégicos.
+  const energiaDisp = window.energiaDisponivelCategoria(j, 'processos');
   const honInfo = isSolo
     ? `Solo: 30% causa + 10% sucumbência (1ª inst.)`
     : `Escritório: 10% da sucumbência`;
@@ -3075,7 +3076,8 @@ window.novoProcesso = async function() {
   const j = window.JOGADOR;
   if (!j) return;
   const uid = j.uid || window.JOGADOR_UID;
-  const energiaDisp = Math.max(0, (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - (j.energia_usada_mes||0));
+  // GDD v6.0 §3.1 — captar caso é categoria Gestão/Captação.
+  const energiaDisp = window.energiaDisponivelCategoria(j, 'captacao');
   if (j.em_burnout) { toast('🔴 Em burnout. Descanse antes de novos casos.', 'ko'); return; }
 
   // Dono de escritório: capta pro pool do PRÓPRIO escritório, com limite por Tier.
@@ -3115,9 +3117,10 @@ window.novoProcessoPoolEmpregado = async function() {
     return;
   }
 
-  const energiaDisp = Math.max(0, (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - (j.energia_usada_mes||0));
-  if (energiaDisp < ENERGIA_CAPTAR_CASO_POOL) {
-    toast(`⚡ Energia insuficiente para captar caso (requer ${ENERGIA_CAPTAR_CASO_POOL}⚡).`, 'ko');
+  // GDD v6.0 §3.1 — captar caso é categoria Gestão/Captação.
+  const rCaptar = window.checarEnergiaCategoria(j, 'captacao', ENERGIA_CAPTAR_CASO_POOL, 'captar caso');
+  if (!rCaptar.ok) {
+    toast(`⚡ ${rCaptar.mensagemErro}`, 'ko');
     return;
   }
 
@@ -3163,7 +3166,7 @@ window.novoProcessoPoolEmpregado = async function() {
     await addDoc(collection(db, 'processos'), proc);
     await updateDoc(doc(db, 'jogadores', uid), {
       processos_novos_mes: usados + 1,
-      energia_usada_mes: (j.energia_usada_mes||0) + ENERGIA_CAPTAR_CASO_POOL,
+      ...rCaptar.patch,
     });
     toast(`📁 Caso captado: ${AREA_PROC_LABEL[areaEscolhida]||areaEscolhida} — ${proc.tipo} (${usados+1}/${limite} este mês)`, 'ok', 4000);
     setTimeout(() => window.navTo && window.navTo('processos', null), 400);
@@ -3176,9 +3179,10 @@ window.novoProcessoPool = async function() {
   const uid = j.uid || window.JOGADOR_UID;
   if (j.em_burnout) { toast('🔴 Em burnout. Descanse antes de captar novos casos.', 'ko'); return; }
 
-  const energiaDisp = Math.max(0, (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - (j.energia_usada_mes||0));
-  if (energiaDisp < ENERGIA_CAPTAR_CASO_POOL) {
-    toast(`⚡ Energia insuficiente para captar caso (requer ${ENERGIA_CAPTAR_CASO_POOL}⚡).`, 'ko');
+  // GDD v6.0 §3.1 — captar caso é categoria Gestão/Captação.
+  const rCaptarPool = window.checarEnergiaCategoria(j, 'captacao', ENERGIA_CAPTAR_CASO_POOL, 'captar caso');
+  if (!rCaptarPool.ok) {
+    toast(`⚡ ${rCaptarPool.mensagemErro}`, 'ko');
     return;
   }
 
@@ -3235,7 +3239,7 @@ window.novoProcessoPool = async function() {
   try {
     await addDoc(collection(db, 'processos'), proc);
     await updateDoc(doc(db, 'escritorios', j.escritorio_proprio_id), { pool_casos_criados_mes: usadosMes + 1 });
-    await updateDoc(doc(db, 'jogadores', uid), { energia_usada_mes: (j.energia_usada_mes||0) + ENERGIA_CAPTAR_CASO_POOL });
+    await updateDoc(doc(db, 'jogadores', uid), rCaptarPool.patch);
     toast(`📁 Caso captado: ${AREA_PROC_LABEL[areaEscolhida]||areaEscolhida} — ${proc.tipo} (${usadosMes+1}/${limiteMes} este mês)`, 'ok', 4000);
     setTimeout(() => window.navTo && window.navTo('processos', null), 400);
   } catch (err) { toast('Erro ao captar caso para o escritório.', 'ko'); console.error(err); }
@@ -3265,13 +3269,14 @@ async function _registrarContribuinte(procId, p, j) {
   await updateDoc(doc(db, 'processos', procId), { contribuintes: novos });
 }
 
-async function _gastarEnergia(custo, desc) {
+// GDD v6.0 §3.1 — todo chamador hoje é trabalho de processo (recurso,
+// sustentação, acordo), por isso a categoria default é 'processos'.
+async function _gastarEnergia(custo, desc, categoria = 'processos') {
   const j = window.JOGADOR;
   const uid = j?.uid || window.JOGADOR_UID;
-  const usado = j?.energia_usada_mes || 0;
-  const disp = Math.max(0, (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - usado);
-  if (disp < custo) { toast(`⚡ Energia insuficiente (${disp} restantes, requer ${custo}).`, 'ko'); return false; }
-  try { await updateDoc(doc(db,'jogadores',uid), { energia_usada_mes: usado + custo }); return true; }
+  const r = window.checarEnergiaCategoria(j || {}, categoria, custo, desc);
+  if (!r.ok) { toast(`⚡ ${r.mensagemErro}`, 'ko'); return false; }
+  try { await updateDoc(doc(db,'jogadores',uid), r.patch); return true; }
   catch (err) { toast('Erro ao gastar energia.', 'ko'); return false; }
 }
 

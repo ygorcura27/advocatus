@@ -195,7 +195,8 @@ window.renderEquipe = async function(j, el) {
   const advogados   = funcs.filter(f => ['jnr','pln','snr'].includes(f.cargo_id));
 
   const totalSalarios = funcs.reduce((s,f) => s + (CARGO_INFO[f.cargo_id]?.sal || 0), 0);
-  const energiaDisp   = Math.max(0, 100 - (j.energia_usada_mes || 0));
+  // GDD v6.0 §3.1 — coordenar funcionário gasta da categoria Supervisão.
+  const energiaDisp   = window.energiaDisponivelCategoria(j, 'supervisao');
 
   const totalVagas = cap.estagiarios + cap.assistentes + cap.advogados;
   el.innerHTML = `
@@ -1309,17 +1310,11 @@ window._confirmarDesignar = async function(funcId, procId, escId) {
   }
 
 
-  // Gastar energia do dono
-  const usado = j.energia_usada_mes || 0;
-  const disp  = Math.max(0, (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - usado);
-  if (disp < ci.custo_coord) {
-    toast(`⚡ Energia insuficiente (requer ${ci.custo_coord}).`, 'ko');
-    return;
-  }
+  // Gastar energia do dono — GDD v6.0 §3.1, categoria Supervisão da Carteira.
+  const rCoord = window.checarEnergiaCategoria(j, 'supervisao', ci.custo_coord, 'coordenar o funcionário');
+  if (!rCoord.ok) { toast(`⚡ ${rCoord.mensagemErro}`, 'ko'); return; }
 
-  await updateDoc(doc(db, 'jogadores', uid), {
-    energia_usada_mes: usado + ci.custo_coord,
-  });
+  await updateDoc(doc(db, 'jogadores', uid), rCoord.patch);
 
   // Simular ação do funcionário
   const skills  = f.skills || {};
@@ -1949,10 +1944,11 @@ window._executarMediacao = async function(funcId, conflitoIdx, escId) {
 
   const jSnap = await getDoc(doc(db, 'jogadores', uid));
   const jData = jSnap.data() || {};
-  const energiaAtual = Math.max(0, 100 - (jData.energia_usada_mes || 0));
-  if (energiaAtual < custoEnergia) {
+  // GDD v6.0 §3.1 — categoria Supervisão da Carteira.
+  const rMediacao = window.checarEnergiaCategoria(jData, 'supervisao', custoEnergia, 'mediar o conflito');
+  if (!rMediacao.ok) {
     fecharModal();
-    toast(`Energia insuficiente (precisa de ${custoEnergia}, tem ${energiaAtual}).`, 'ko', 4000);
+    toast(rMediacao.mensagemErro, 'ko', 4000);
     return;
   }
 
@@ -1976,9 +1972,7 @@ window._executarMediacao = async function(funcId, conflitoIdx, escId) {
   }
 
   // Debitar energia e caixa
-  await updateDoc(doc(db, 'jogadores', uid), {
-    energia_usada_mes: (jData.energia_usada_mes || 0) + custoEnergia,
-  });
+  await updateDoc(doc(db, 'jogadores', uid), rMediacao.patch);
   if (custoFinanceiro > 0) {
     await updateDoc(doc(db, 'escritorios', escId), {
       caixa: Math.max(0, (escData.caixa || 0) - custoFinanceiro),

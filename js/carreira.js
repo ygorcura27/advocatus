@@ -901,9 +901,9 @@ window.frequentarAula = async function(id) {
   const mesAtualTotal = mesTotalPessoal(j);
   if (m.ultimo_mes_frequentado===mesAtualTotal) { toast('Você já frequentou a aula este mês.','ko'); return; }
 
-  const usado = j.energia_usada_mes||0;
-  const disp  = Math.max(0,(window.getEnergiaTotal?window.getEnergiaTotal(j):100)-usado);
-  if (disp < ENERGIA_FREQUENTAR_AULA) { toast(`⚡ Energia insuficiente (requer ${ENERGIA_FREQUENTAR_AULA}).`,'ko'); return; }
+  // GDD v6.0 §3.1 — categoria Estudo.
+  const r = window.checarEnergiaCategoria(j, 'estudo', ENERGIA_FREQUENTAR_AULA, 'frequentar a aula');
+  if (!r.ok) { toast(`⚡ ${r.mensagemErro}`,'ko'); return; }
 
   m.presencas = (m.presencas||0)+1;
   m.ultimo_mes_frequentado = mesAtualTotal;
@@ -911,7 +911,7 @@ window.frequentarAula = async function(id) {
 
   await updateDoc(doc(db,'jogadores',uid),{
     cursos_matriculas: matriculas,
-    energia_usada_mes: usado+ENERGIA_FREQUENTAR_AULA,
+    ...r.patch,
   });
   toast(`📖 Aula frequentada! Presença: ${m.presencas}/${_mesesDesdeMatricula(j,m)+1} meses.`,'ok',3000);
   setTimeout(()=>window.navTo&&window.navTo('cursos',null),500);

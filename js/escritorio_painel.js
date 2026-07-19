@@ -350,9 +350,9 @@ window.renderOportunidadesPainel = async function(j, escId, el) {
       cobranca:    'var(--verm2)',
     };
 
-    const energiaUsada = j.energia_usada_mes || 0;
+    // GDD v6.0 §3.1 — categoria Processos Estratégicos (serviço aceito pessoalmente).
     const energiaTotal = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
-    const energiaDisp  = Math.max(0, energiaTotal - energiaUsada);
+    const energiaDisp  = window.energiaDisponivelCategoria(j, 'processos');
 
     const rows = top5.map(op => {
       const valor    = op.valor_estimado || op.valor || 0;
@@ -418,10 +418,10 @@ window._aceitarOpPessoalmente = async function(escId, opId, valor) {
   const j   = window.JOGADOR;
   const uid = j.uid || window.JOGADOR_UID;
 
-  const energiaUsada = j.energia_usada_mes || 0;
-  const energiaTotal = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
-  if (Math.max(0, energiaTotal - energiaUsada) < ACEITAR_ENERGIA) {
-    toast(`⚡ Energia insuficiente (requer ${ACEITAR_ENERGIA}).`, 'ko');
+  // GDD v6.0 §3.1 — categoria Processos Estratégicos.
+  const rAceitar = window.checarEnergiaCategoria(j, 'processos', ACEITAR_ENERGIA, 'aceitar a oportunidade pessoalmente');
+  if (!rAceitar.ok) {
+    toast(`⚡ ${rAceitar.mensagemErro}`, 'ko');
     return;
   }
 
@@ -432,15 +432,14 @@ window._aceitarOpPessoalmente = async function(escId, opId, valor) {
     const { db: fDb } = await import('./firebase-init.js');
 
     await Promise.all([
-      fUpd(fDoc(fDb, 'jogadores', uid),
-        { energia_usada_mes: energiaUsada + ACEITAR_ENERGIA }),
+      fUpd(fDoc(fDb, 'jogadores', uid), rAceitar.patch),
       fUpd(fDoc(fDb, 'escritorios', escId),
         { caixa: fInc(valor), faturamento_mes_atual: fInc(valor), faturamento_honorarios_mes: fInc(valor) }),
       fUpd(fDoc(fDb, 'escritorios', escId, 'oportunidades', opId),
         { status: 'aceita', aceito_por: 'dono', valor_recebido: valor, aceito_em: new Date().toISOString() }),
     ]);
 
-    j.energia_usada_mes = energiaUsada + ACEITAR_ENERGIA;
+    Object.assign(j, rAceitar.patch);
     window.JOGADOR = j;
     toast(`✅ +${_fmt(valor)} no caixa do escritório!`, 'ok');
 
@@ -462,8 +461,7 @@ window._mostrarDelegacaoPicker = async function(escId, opId, valor, containerId)
   if (existente) { existente.remove(); return; }
 
   const j = window.JOGADOR;
-  const energiaDisp = Math.max(0,
-    (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - (j.energia_usada_mes || 0));
+  const energiaDisp = window.energiaDisponivelCategoria(j, 'processos');
 
   let funcs = [];
   try {
@@ -531,10 +529,10 @@ window._confirmarDelegacao = async function(escId, opId, valor, funcId, cargoId,
   const j   = window.JOGADOR;
   const uid = j.uid || window.JOGADOR_UID;
 
-  const energiaUsada = j.energia_usada_mes || 0;
-  const energiaTotal = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
-  if (Math.max(0, energiaTotal - energiaUsada) < eng) {
-    toast(`⚡ Energia insuficiente (requer ${eng}).`, 'ko');
+  // GDD v6.0 §3.1 — categoria Supervisão da Carteira (delegar/supervisionar NPC).
+  const rDelegar = window.checarEnergiaCategoria(j, 'supervisao', eng, 'delegar a oportunidade');
+  if (!rDelegar.ok) {
+    toast(`⚡ ${rDelegar.mensagemErro}`, 'ko');
     return;
   }
 
@@ -562,8 +560,7 @@ window._confirmarDelegacao = async function(escId, opId, valor, funcId, cargoId,
       : 0;
 
     await Promise.all([
-      fUpd(fDoc(fDb, 'jogadores', uid),
-        { energia_usada_mes: energiaUsada + eng }),
+      fUpd(fDoc(fDb, 'jogadores', uid), rDelegar.patch),
       fUpd(fDoc(fDb, 'escritorios', escId),
         { caixa: fInc(recebe), faturamento_mes_atual: fInc(recebe), faturamento_honorarios_mes: fInc(recebe) }),
       fUpd(fDoc(fDb, 'escritorios', escId, 'oportunidades', opId),
@@ -573,7 +570,7 @@ window._confirmarDelegacao = async function(escId, opId, valor, funcId, cargoId,
         { energia_npc_usada_mes: npcNova, meses_sobrecarregado: novosMeses }),
     ]);
 
-    j.energia_usada_mes = energiaUsada + eng;
+    Object.assign(j, rDelegar.patch);
     window.JOGADOR = j;
 
     const pctLabel = Math.round((DELEGAR_PCT[cargoId] || .20) * 100);

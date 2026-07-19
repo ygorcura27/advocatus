@@ -401,8 +401,9 @@ function _faseInvestigacaoLabel(inv, podeContinuar) {
 
 function _renderColPool(disponiveis, emAndamento, aguardSent, j, escId, investigMap) {
   const uid = j.uid || window.JOGADOR_UID;
-  const energiaDisp = Math.max(0,
-    (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - (j.energia_usada_mes || 0));
+  // GDD v6.0 §3.1 — assumir/sentença gastam de Processos Estratégicos,
+  // designar gasta de Supervisão da Carteira (funções diferentes, baldes diferentes).
+  const energiaDisp = window.energiaDisponivelCategoria(j, 'processos');
 
   const CUSTO_ASSUMIR = 25;
   const CUSTO_DESIGN  = 5;
@@ -660,10 +661,10 @@ window._assumirCasoPool = async function(escId, procId, containerId) {
   const uid = j.uid || window.JOGADOR_UID;
   const CUSTO = 25;
 
-  const energiaUsada = j.energia_usada_mes || 0;
-  const energiaTotal = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
-  if (Math.max(0, energiaTotal - energiaUsada) < CUSTO) {
-    toast(`⚡ Energia insuficiente (requer ${CUSTO}).`, 'ko');
+  // GDD v6.0 §3.1 — categoria Processos Estratégicos (assumir o caso pessoalmente).
+  const rAssumir = window.checarEnergiaCategoria(j, 'processos', CUSTO, 'assumir o processo pessoalmente');
+  if (!rAssumir.ok) {
+    toast(`⚡ ${rAssumir.mensagemErro}`, 'ko');
     return;
   }
 
@@ -674,8 +675,8 @@ window._assumirCasoPool = async function(escId, procId, containerId) {
     const poolProc = poolSnap.data();
 
     // Descontar energia imediatamente
-    await updateDoc(doc(db, 'jogadores', uid), { energia_usada_mes: energiaUsada + CUSTO });
-    j.energia_usada_mes = energiaUsada + CUSTO;
+    await updateDoc(doc(db, 'jogadores', uid), rAssumir.patch);
+    Object.assign(j, rAssumir.patch);
     window.JOGADOR = j;
 
     // Marcar o pool como em andamento pelo jogador (sem progresso = 100)
@@ -753,8 +754,8 @@ window._abrirDesignarParaFunc = async function(escId, funcId, cargoId, container
   if (existente) { existente.remove(); return; }
 
   const j = window.JOGADOR;
-  const energiaDisp = Math.max(0,
-    (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - (j.energia_usada_mes || 0));
+  // GDD v6.0 §3.1 — designar funcionário gasta da categoria Supervisão da Carteira.
+  const energiaDisp = window.energiaDisponivelCategoria(j, 'supervisao');
 
   // Verificar energia NPC
   let func = null;
@@ -827,8 +828,8 @@ window._designarProcessoPicker = async function(escId, procId, containerId) {
   if (existente) { existente.remove(); return; }
 
   const j = window.JOGADOR;
-  const energiaDisp = Math.max(0,
-    (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - (j.energia_usada_mes || 0));
+  // GDD v6.0 §3.1 — designar gasta da categoria Supervisão da Carteira.
+  const energiaDisp = window.energiaDisponivelCategoria(j, 'supervisao');
 
   let funcs = [];
   try {
@@ -900,10 +901,10 @@ window._confirmarDesignar = async function(escId, procId, funcId, cargoId, nomeF
   const uid = j.uid || window.JOGADOR_UID;
   const CUSTO_DONO = 5;
 
-  const energiaUsada = j.energia_usada_mes || 0;
-  const energiaTotal = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
-  if (Math.max(0, energiaTotal - energiaUsada) < CUSTO_DONO) {
-    toast('⚡ Energia insuficiente para designar.', 'ko');
+  // GDD v6.0 §3.1 — categoria Supervisão da Carteira.
+  const rDesignar = window.checarEnergiaCategoria(j, 'supervisao', CUSTO_DONO, 'designar o processo');
+  if (!rDesignar.ok) {
+    toast(`⚡ ${rDesignar.mensagemErro}`, 'ko');
     return;
   }
 
@@ -923,7 +924,7 @@ window._confirmarDesignar = async function(escId, procId, funcId, cargoId, nomeF
       : 0;
 
     await Promise.all([
-      updateDoc(doc(db, 'jogadores', uid), { energia_usada_mes: energiaUsada + CUSTO_DONO }),
+      updateDoc(doc(db, 'jogadores', uid), rDesignar.patch),
       updateDoc(doc(db, 'escritorios', escId, 'processos_pool', procId), {
         status: 'em_andamento',
         func_id: funcId, func_cargo: cargoId, func_nome: nomeFunc,
@@ -937,7 +938,7 @@ window._confirmarDesignar = async function(escId, procId, funcId, cargoId, nomeF
       }),
     ]);
 
-    j.energia_usada_mes = energiaUsada + CUSTO_DONO;
+    Object.assign(j, rDesignar.patch);
     window.JOGADOR = j;
     toast(`📋 ${nomeFunc} designado para o processo. ⚡-${CUSTO_DONO}`, 'ok');
 
@@ -1027,10 +1028,10 @@ window._processarSentenca = async function(escId, procId, uid) {
   }
 
   const CUSTO_SENT = 10;
-  const energiaUsada = j.energia_usada_mes || 0;
-  const energiaTotal = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
-  if (Math.max(0, energiaTotal - energiaUsada) < CUSTO_SENT) {
-    toast(`⚡ Energia insuficiente (requer ${CUSTO_SENT}).`, 'ko');
+  // GDD v6.0 §3.1 — categoria Processos Estratégicos.
+  const rSent = window.checarEnergiaCategoria(j, 'processos', CUSTO_SENT, 'processar a sentença');
+  if (!rSent.ok) {
+    toast(`⚡ ${rSent.mensagemErro}`, 'ko');
     return;
   }
 
@@ -1050,7 +1051,7 @@ window._processarSentenca = async function(escId, procId, uid) {
     const quemAtuou = proc.func_nome || 'A equipe';
     try {
       await Promise.all([
-        updateDoc(doc(db, 'jogadores', uid), { energia_usada_mes: energiaUsada + CUSTO_SENT }),
+        updateDoc(doc(db, 'jogadores', uid), rSent.patch),
         updateDoc(doc(db, 'escritorios', escId), {
           caixa: increment(valorRecebido),
           faturamento_mes_atual: increment(valorRecebido),
@@ -1068,7 +1069,7 @@ window._processarSentenca = async function(escId, procId, uid) {
           criado_em: new Date().toISOString(),
         }),
       ]);
-      j.energia_usada_mes = energiaUsada + CUSTO_SENT;
+      Object.assign(j, rSent.patch);
       window.JOGADOR = j;
       toast(`✅ Procedente! +${_fmtP(valorRecebido)} no caixa.`, 'ok');
       _refreshProcessosPool(j, escId);
@@ -1085,7 +1086,7 @@ window._processarSentenca = async function(escId, procId, uid) {
   // Para parcial: chance do adversário recorrer (~65% — equivalente ao manual para score ~65)
   const opponentAppealed = isParcial && (Math.random() < 0.65);
 
-  _sentencaPoolCtx = { escId, procId, uid, proc, resultado, valorRecebido, energiaUsada, custo: CUSTO_SENT, j };
+  _sentencaPoolCtx = { escId, procId, uid, proc, resultado, valorRecebido, energiaPatch: rSent.patch, j };
 
   const resultadoLabel = isParcial ? '🟡 Parcialmente Procedente' : '❌ Improcedente';
   const resultadoCor   = isParcial ? 'var(--amber)' : 'var(--verm2)';
@@ -1140,7 +1141,7 @@ window._poolModalAceitar = async function() {
   const ico = ctx.resultado === 'parcial' ? '🟡' : '❌';
   try {
     await Promise.all([
-      updateDoc(doc(db, 'jogadores', ctx.uid), { energia_usada_mes: ctx.energiaUsada + ctx.custo }),
+      updateDoc(doc(db, 'jogadores', ctx.uid), ctx.energiaPatch),
       updateDoc(doc(db, 'escritorios', ctx.escId), {
         caixa: increment(ctx.valorRecebido),
         faturamento_mes_atual: increment(ctx.valorRecebido),
@@ -1158,7 +1159,7 @@ window._poolModalAceitar = async function() {
         criado_em: new Date().toISOString(),
       }),
     ]);
-    ctx.j.energia_usada_mes = ctx.energiaUsada + ctx.custo;
+    Object.assign(ctx.j, ctx.energiaPatch);
     window.JOGADOR = ctx.j;
     fecharModal();
     toast(`${ico} Sentença aceita. +${_fmtP(ctx.valorRecebido)} no caixa.`, ctx.resultado === 'parcial' ? 'neutro' : 'ko');
@@ -1211,7 +1212,7 @@ window._poolModalRecorrer = async function() {
   try {
     const newProcId = await _criarProcessoRecursalPool(ctx, 'jogador');
     await Promise.all([
-      updateDoc(doc(db, 'jogadores', ctx.uid), { energia_usada_mes: ctx.energiaUsada + ctx.custo }),
+      updateDoc(doc(db, 'jogadores', ctx.uid), ctx.energiaPatch),
       updateDoc(doc(db, 'escritorios', ctx.escId), {
         caixa: increment(ctx.valorRecebido),
         faturamento_mes_atual: increment(ctx.valorRecebido),
@@ -1229,7 +1230,7 @@ window._poolModalRecorrer = async function() {
         criado_em: new Date().toISOString(),
       }),
     ]);
-    ctx.j.energia_usada_mes = ctx.energiaUsada + ctx.custo;
+    Object.assign(ctx.j, ctx.energiaPatch);
     window.JOGADOR = ctx.j;
     fecharModal();
     toast('⚖️ Recurso protocolado. Acompanhe na aba Fase Recursal.', 'ok', 4000);
@@ -1247,7 +1248,7 @@ window._poolModalRecorrerContrario = async function() {
   try {
     const newProcId = await _criarProcessoRecursalPool(ctx, 'parte_contraria');
     await Promise.all([
-      updateDoc(doc(db, 'jogadores', ctx.uid), { energia_usada_mes: ctx.energiaUsada + ctx.custo }),
+      updateDoc(doc(db, 'jogadores', ctx.uid), ctx.energiaPatch),
       updateDoc(doc(db, 'escritorios', ctx.escId), {
         caixa: increment(ctx.valorRecebido),
         faturamento_mes_atual: increment(ctx.valorRecebido),
@@ -1265,7 +1266,7 @@ window._poolModalRecorrerContrario = async function() {
         criado_em: new Date().toISOString(),
       }),
     ]);
-    ctx.j.energia_usada_mes = ctx.energiaUsada + ctx.custo;
+    Object.assign(ctx.j, ctx.energiaPatch);
     window.JOGADOR = ctx.j;
     fecharModal();
     toast('⚠️ Parte contrária recorreu. Processo na Fase Recursal.', 'neutro', 4000);

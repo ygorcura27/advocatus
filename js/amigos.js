@@ -179,9 +179,11 @@ window._amigoInteragir = async function(amigoId, tipoKey) {
   const uid = window.JOGADOR?.uid || window.JOGADOR_UID;
   const j = window.JOGADOR || {};
   const cfg = _AMIGOS_INTERACOES[tipoKey];
-  const energiaTotal = (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100);
-  const energiaUsada = j.energia_usada_mes || 0;
-  if (energiaUsada + cfg.energia > energiaTotal) {
+  // GDD v6.0 §3.1 — interação com bônus de networking é Gestão/Captação;
+  // as demais (bater-papo, happy hour social) são Vida Pessoal.
+  const categoriaAmigo = cfg.bonus_networking ? 'captacao' : 'pessoal';
+  const rAmigo = window.checarEnergiaCategoria(j, categoriaAmigo, cfg.energia, 'interagir com o amigo');
+  if (!rAmigo.ok) {
     window.toast('Energia insuficiente este mês.', 'ko');
     return;
   }
@@ -202,7 +204,7 @@ window._amigoInteragir = async function(amigoId, tipoKey) {
       ultima_interacao_mes: _mesTotalJogador(j),
     });
 
-    const updJogador = { energia_usada_mes: energiaUsada + cfg.energia };
+    const updJogador = { ...rAmigo.patch };
     if (cfg.bonus_sm) updJogador.saude_mental = Math.min(100, (j.saude_mental ?? 80) + cfg.bonus_sm);
     if (cfg.bonus_networking) updJogador.networking = (j.networking || 0) + cfg.bonus_networking;
     await updateDoc(doc(db, 'jogadores', uid), updJogador);

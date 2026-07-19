@@ -184,7 +184,8 @@ window.renderClientes = async function(j, el) {
 
 function _cardOportunidade(o, j, tier) {
   const tipo = TIPOS_SERVICO[o.tipo] || TIPOS_SERVICO.consulta;
-  const energiaDisp = Math.max(0, (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - (j.energia_usada_mes||0));
+  // GDD v6.0 §3.1 — serviço avulso ao cliente é categoria Processos Estratégicos.
+  const energiaDisp = window.energiaDisponivelCategoria(j, 'processos');
   const podeAceitar = energiaDisp >= o.energia;
 
   return `
@@ -265,11 +266,11 @@ window.aceitarOportunidade = async function(opId) {
   if (!opSnap.exists()) return;
   const o = opSnap.data();
 
-  const usado = j.energia_usada_mes || 0;
-  const disp  = Math.max(0, (window.getEnergiaTotal?window.getEnergiaTotal(j):100) - usado);
-  if (disp < o.energia) { toast('⚡ Energia insuficiente.', 'ko'); return; }
+  // GDD v6.0 §3.1 — categoria Processos Estratégicos.
+  const rServico = window.checarEnergiaCategoria(j, 'processos', o.energia, 'aceitar o serviço');
+  if (!rServico.ok) { toast(`⚡ ${rServico.mensagemErro}`, 'ko'); return; }
 
-  await updateDoc(doc(db,'jogadores',uid), { energia_usada_mes: usado + o.energia });
+  await updateDoc(doc(db,'jogadores',uid), rServico.patch);
 
   // 100% da receita (jogador executou pessoalmente)
   await _processarServicoConcluido(uid, escId, o, opId, 1.0);
@@ -323,15 +324,15 @@ window.delegarServico = async function(opId, funcId, escId) {
   const f = fSnap.data();
   const custoCoord = ['jnr','pln','snr'].includes(f.cargo_id) ? 10 : 5;
 
-  const usado = j.energia_usada_mes || 0;
-  const disp  = Math.max(0, (window.getEnergiaTotal?window.getEnergiaTotal(j):100) - usado);
-  if (disp < custoCoord) { toast('⚡ Energia insuficiente para coordenar.', 'ko'); return; }
+  // GDD v6.0 §3.1 — categoria Supervisão da Carteira.
+  const rCoordServ = window.checarEnergiaCategoria(j, 'supervisao', custoCoord, 'coordenar o serviço');
+  if (!rCoordServ.ok) { toast(`⚡ ${rCoordServ.mensagemErro}`, 'ko'); return; }
 
   const opSnap = await getDoc(doc(db, 'escritorios', escId, 'oportunidades', opId));
   if (!opSnap.exists()) return;
   const o = opSnap.data();
 
-  await updateDoc(doc(db,'jogadores',uid), { energia_usada_mes: usado + custoCoord });
+  await updateDoc(doc(db,'jogadores',uid), rCoordServ.patch);
 
   const produtividade = PRODUTIVIDADE_CARGO[f.cargo_id] || 0.5;
   fecharModal();
