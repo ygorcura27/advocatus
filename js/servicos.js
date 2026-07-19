@@ -284,28 +284,40 @@ window.abrirModalDelegarServico = async function(opId) {
   const escId = j.escritorio_proprio_id;
 
   const fSnap = await getDocs(collection(db, 'escritorios', escId, 'funcionarios'));
-  const funcs = fSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const todosFuncs = fSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(f => f.ativo !== false);
 
-  if (funcs.length === 0) {
+  if (todosFuncs.length === 0) {
     toast('Você não tem funcionários contratados. Vá em Equipe para contratar.', 'ko');
     return;
   }
+
+  // Energia NPC (não a sua) — sem isso não dá pra saber quem já tá no limite
+  // antes de decidir quem recebe o serviço (mesma checagem que já existia no
+  // picker de Oportunidades do painel de Escritório, faltava aqui).
+  const NPC_TOT = window.NPC_ENERGIA_MES || 100;
+  const NPC_OVL = window.NPC_OVERLOAD_TH || 20;
+  const funcs = todosFuncs.filter(f => !f.burnout_npc);
+  const emBurnout = todosFuncs.filter(f => f.burnout_npc);
 
   abrirModal('👥 Delegar Serviço',
     `<div style="font-size:.75rem;color:var(--txt3);margin-bottom:.8rem">
       O escritório recebe uma fração da receita conforme a produtividade do funcionário.
       Você gasta apenas energia de coordenação.
     </div>
+    ${emBurnout.length ? `<div style="font-size:.63rem;color:var(--txt4);margin-bottom:.5rem">🔴 ${emBurnout.length} funcionário(s) em burnout não listado(s).</div>` : ''}
     <div style="display:flex;flex-direction:column;gap:.4rem">
       ${funcs.map(f => {
         const pct = Math.round((PRODUTIVIDADE_CARGO[f.cargo_id]||0.5)*100);
         const custoCoord = ['jnr','pln','snr'].includes(f.cargo_id) ? 10 : 5;
+        const npcUsado  = f.energia_npc_usada_mes || 0;
+        const npcDisp   = Math.max(0, NPC_TOT - npcUsado);
+        const sobrecarg = npcDisp < NPC_OVL;
         return `<button class="btn btn-ghost btn-block" style="text-align:left;padding:.6rem .8rem"
-          onclick="window.delegarServico('${opId}','${f.id}','${escId}')">
+          onclick="${sobrecarg ? `if(confirm('⚠️ ${f.nome.replace(/'/g,"\\'")} está sobrecarregado este mês (NPC⚡ ${npcDisp} restante). Delegar assim mesmo pode causar burnout. Continuar?'))` : ''}window.delegarServico('${opId}','${f.id}','${escId}')">
           <div style="display:flex;justify-content:space-between">
             <div>
-              <div style="font-weight:600;color:var(--txt);font-size:.8rem">${f.nome}</div>
-              <div style="font-size:.65rem;color:var(--txt3)">Produtividade: ${pct}% da receita</div>
+              <div style="font-weight:600;color:var(--txt);font-size:.8rem">${f.nome}${sobrecarg?' <span style="color:var(--amber)">⚠️</span>':''}</div>
+              <div style="font-size:.65rem;color:var(--txt3)">Produtividade: ${pct}% da receita · NPC⚡ ${npcDisp} disponível</div>
             </div>
             <div style="font-size:.68rem;color:var(--amber)">-${custoCoord}⚡ coord.</div>
           </div>
