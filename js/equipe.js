@@ -22,13 +22,25 @@ let _equipeGestorId = null;
 // ════════════════════════════════════════════════════════
 const CARGO_IDX = { est:0, ass:1, jnr:2, pln:3, snr:4, asc:5, soc:6 };
 
-const CARGO_INFO = {
+export const CARGO_INFO = {
   est: { l:'Estagiário',         sal:1700,  hon_pct:0,    acoes_mes:1, custo_coord:5,  bonus_chance:2  },
   ass: { l:'Assistente Jurídico',sal:2500,  hon_pct:0,    acoes_mes:1, custo_coord:5,  bonus_chance:4  },
   jnr: { l:'Advogado Júnior',    sal:3500,  hon_pct:0.10, acoes_mes:2, custo_coord:10, bonus_chance:6  },
   pln: { l:'Advogado Pleno',     sal:5500,  hon_pct:0.10, acoes_mes:2, custo_coord:10, bonus_chance:9  },
   snr: { l:'Advogado Sênior',    sal:9000,  hon_pct:0.10, acoes_mes:2, custo_coord:10, bonus_chance:12 },
 };
+
+// Salário de mercado escala com o porte (tier) do escritório — antes era
+// fixo por cargo, sem relação nenhuma com o tamanho da banca. sal do
+// CARGO_INFO acima é a base do Tier 1; multiplicador cresce por tier.
+export const TIER_SAL_MULT = { 1:1.0, 2:1.35, 3:1.70, 4:2.05, 5:2.50 };
+
+/** Salário de mercado atual pro cargo, escalado pelo porte do escritório. */
+export function calcSalarioMercado(cargoId, tier) {
+  const base = (CARGO_INFO[cargoId] || CARGO_INFO.est).sal;
+  const mult = TIER_SAL_MULT[tier] || 1.0;
+  return Math.round(base * mult / 100) * 100;
+}
 
 // Avatares cartoon dos NPCs — arquivos em img/npcs cartoon/, gerados por
 // avatar_generator.html com os mesmos 40 specs (H001-H020, M001-M020).
@@ -350,8 +362,6 @@ const _CARGO_BON_EQ = { est:0,  ass:5,  jnr:10, pln:15, snr:20, asc:25, soc:30  
 const _CARGO_MENTOR_EQ   = new Set(['pln','snr','asc','soc']);
 const _CARGO_APRENDIZ_EQ = new Set(['est','ass','jnr']);
 const _CARGO_PROX_EQ     = { est:'ass', ass:'jnr', jnr:'pln', pln:'snr', snr:'asc', asc:'soc' };
-const _CARGO_SAL_MIN_EQ  = { est:1700, ass:2500, jnr:3500, pln:5750, snr:9000, asc:18000, soc:35000 };
-const _CARGO_SAL_MAX_EQ  = { est:1700, ass:3500, jnr:6500, pln:11000, snr:20000, asc:35000, soc:65000 };
 const _SKILL_FULL_LBL    = {
   pesquisa:'Pesquisa', escrita:'Escrita', escrita_juridica:'Escrita Jur.',
   argumentacao:'Argumentação', oratoria:'Oratória', persuasao:'Persuasão',
@@ -554,6 +564,10 @@ function _cardFuncionario(f, escId, energiaDisp, procCount = {}, mesGlobal = 0) 
       <div style="font-size:.65rem;color:var(--verm2);font-weight:700">
         🚨 Risco de saída — estresse crítico!
       </div>` : ''}
+    ${f.tipo === 'npc' && (f.meses_salario_defasado||0) > 0 ? `
+      <div style="font-size:.65rem;color:var(--amber)">
+        💸 Salário defasado há ${f.meses_salario_defasado} mês(es) — aumenta estresse
+      </div>` : ''}
   </div>`;
 
   // Ações secundárias vivem no menu "⋯" — só "Designar" fica sempre visível no rodapé.
@@ -563,6 +577,10 @@ function _cardFuncionario(f, escId, energiaDisp, procCount = {}, mesGlobal = 0) 
   }
   if (f.tipo === 'npc' && (_elegibilidadePromocao(f)||{}).elegivel) {
     menuItens.push(`<button onclick="window.abrirModalPromover('${f.id}','${escId}')">✨ Promover</button>`);
+  }
+  if (f.tipo === 'npc') {
+    menuItens.push(`<button onclick="window.abrirModalAumentoSalario('${f.id}','${escId}')">💰 Aumentar salário</button>`);
+    menuItens.push(`<button onclick="window.abrirModalBonus('${f.id}','${escId}')">🎁 Conceder bônus</button>`);
   }
   if (f.tipo === 'npc' && !f.em_ferias && mesGlobal - (f.ultimas_ferias_mes_total ?? 0) >= 12 && (f.meses_no_cargo||0) >= 12) {
     menuItens.push(`<button onclick="window.concederFerias('${f.id}','${escId}','${nomeEsc}')">🏖️ Férias</button>`);
@@ -604,7 +622,7 @@ function _cardFuncionario(f, escId, energiaDisp, procCount = {}, mesGlobal = 0) 
         </button>
       </div>` : ''}
       <div class="func-card-footer">
-        <span class="func-salario">R$ ${ci.sal.toLocaleString('pt-BR')}/mês${ci.hon_pct > 0 ? ` · ${ci.hon_pct*100}% hon.` : ''}</span>
+        <span class="func-salario">R$ ${(f.salario ?? ci.sal).toLocaleString('pt-BR')}/mês${ci.hon_pct > 0 ? ` · ${ci.hon_pct*100}% hon.` : ''}</span>
         <button class="btn btn-sm btn-prim" ${!podeCoordenar?'disabled':''}
           onclick="window.abrirModalDesignar('${f.id}','${escId}')"
           title="${!podeCoordenar?'Energia insuficiente':'Designar processo'}">
@@ -820,7 +838,7 @@ window.renderContratacao = async function(j, el) {
       <div>
         <div class="oport-kicker">${icone} ${label.toUpperCase()}</div>
         <div class="oport-titulo">${vagas>0?`${vagas} vaga${vagas===1?'':'s'} disponível${vagas===1?'':'eis'}`:`Sem vagas — capacidade cheia (${atual}/${capMax})`}</div>
-        <div class="oport-desc">Salário fixo por cargo · sem custo de contratação — só +2 Gestão pra você.</div>
+        <div class="oport-desc">Salário escala com o porte do escritório (Tier ${tier}) · sem custo de contratação — só +2 Gestão pra você.</div>
       </div>
       <div class="oport-valor"><div class="oport-preco" style="font-size:.8rem">${salLabel}</div></div>
       <div class="oport-acoes">
@@ -840,9 +858,9 @@ window.renderContratacao = async function(j, el) {
     </div>
     <div class="esc-card-bloco">
       <div class="secao-header" style="margin-bottom:.6rem"><div class="secao-titulo">Vagas Abertas</div></div>
-      ${linha('🎓','Estagiário', nEst, cap.estagiarios, vagasEst, 'est', `R$ ${CARGO_INFO.est.sal.toLocaleString('pt-BR')}/mês`)}
-      ${linha('📋','Assistente Jurídico', nAss, cap.assistentes, vagasAss, 'ass', `R$ ${CARGO_INFO.ass.sal.toLocaleString('pt-BR')}/mês`)}
-      ${linha('⚖️','Advogado', nAdv, cap.advogados, vagasAdv, 'jnr', `R$ ${CARGO_INFO.jnr.sal.toLocaleString('pt-BR')}–${CARGO_INFO.snr.sal.toLocaleString('pt-BR')}/mês`)}
+      ${linha('🎓','Estagiário', nEst, cap.estagiarios, vagasEst, 'est', `R$ ${calcSalarioMercado('est',tier).toLocaleString('pt-BR')}/mês`)}
+      ${linha('📋','Assistente Jurídico', nAss, cap.assistentes, vagasAss, 'ass', `R$ ${calcSalarioMercado('ass',tier).toLocaleString('pt-BR')}/mês`)}
+      ${linha('⚖️','Advogado', nAdv, cap.advogados, vagasAdv, 'jnr', `R$ ${calcSalarioMercado('jnr',tier).toLocaleString('pt-BR')}–${calcSalarioMercado('snr',tier).toLocaleString('pt-BR')}/mês`)}
     </div>`;
 };
 
@@ -1056,6 +1074,10 @@ window._contratarNPC = async function(cargo_min, escId) {
   const CARGOS_DISPONIVEIS = { est: ['est'], ass: ['ass'], jnr: ['jnr','pln','snr'] };
   const cargos = CARGOS_DISPONIVEIS[cargo_min] || ['est'];
 
+  const escSnap = await getDoc(doc(db, 'escritorios', escId));
+  const tier = (escSnap.exists() ? escSnap.data().tier : 1) || 1;
+  window._eqCandidatosTier = tier;
+
   let fotosUsadas = new Set();
   try {
     const fSnap = await getDocs(collection(db, 'escritorios', escId, 'funcionarios'));
@@ -1070,12 +1092,13 @@ window._contratarNPC = async function(cargo_min, escId) {
   window._eqCandidatosEscId = escId;
 
   const cardHtml = candidatos.map((c, i) => {
-    const ci = CARGO_INFO[c.cargo_id];
+    const ci  = CARGO_INFO[c.cargo_id];
+    const sal = calcSalarioMercado(c.cargo_id, tier);
     return `<div class="card" style="margin-bottom:.5rem">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div>
           <div style="font-weight:600;font-size:.82rem;color:var(--txt)">${c.nome}</div>
-          <div style="font-size:.68rem;color:var(--txt3)">${ci.l} · skill média ${c.mediaGeral} · R$ ${ci.sal.toLocaleString('pt-BR')}/mês</div>
+          <div style="font-size:.68rem;color:var(--txt3)">${ci.l} · skill média ${c.mediaGeral} · R$ ${sal.toLocaleString('pt-BR')}/mês</div>
         </div>
         <button class="btn btn-prim btn-sm" onclick="window._finalizarContratacaoNPC(${i})">Contratar</button>
       </div>
@@ -1083,7 +1106,7 @@ window._contratarNPC = async function(cargo_min, escId) {
   }).join('');
 
   abrirModal('👤 Escolher Candidato',
-    `<div style="font-size:.72rem;color:var(--txt3);margin-bottom:.8rem">Salário é o mesmo fixo do cargo — só a skill varia entre candidatos.</div>
+    `<div style="font-size:.72rem;color:var(--txt3);margin-bottom:.8rem">Salário escala com o porte do escritório (Tier ${tier}) — só a skill varia entre candidatos.</div>
      ${cardHtml}`);
 };
 
@@ -1091,9 +1114,11 @@ window._finalizarContratacaoNPC = async function(idx) {
   const j     = window.JOGADOR;
   const uid   = j?.uid || window.JOGADOR_UID;
   const escId = window._eqCandidatosEscId;
+  const tier  = window._eqCandidatosTier || 1;
   const c     = (window._eqCandidatos || [])[idx];
   if (!c) return;
-  const ci = CARGO_INFO[c.cargo_id];
+  const ci  = CARGO_INFO[c.cargo_id];
+  const sal = calcSalarioMercado(c.cargo_id, tier);
 
   const funcionario = {
     nome: c.nome, cargo_id: c.cargo_id, skills: c.skills, skills_jur: c.skills_jur, sexo: c.sexo,
@@ -1105,6 +1130,8 @@ window._finalizarContratacaoNPC = async function(idx) {
     acoes_mes_usadas: 0,
     acao_atual: null,
     criado_em:  new Date().toISOString(),
+    salario:               sal,
+    meses_salario_defasado: 0,
     // Dinâmica de equipe (etapas 1-4)
     estresse:              0,
     afinidade_com_npcs:    {},
@@ -1132,7 +1159,7 @@ window._finalizarContratacaoNPC = async function(idx) {
     });
     if (window.JOGADOR?.skills) window.JOGADOR.skills.gestao = Math.min(50, gestaoAtual + 2);
     fecharModal();
-    toast(`✅ ${c.nome} (${ci.l}) contratado! Salário: R$ ${ci.sal.toLocaleString('pt-BR')}/mês · +2 Gestão`, 'ok', 5000);
+    toast(`✅ ${c.nome} (${ci.l}) contratado! Salário: R$ ${sal.toLocaleString('pt-BR')}/mês · +2 Gestão`, 'ok', 5000);
     setTimeout(() => window.navTo && window.navTo('equipe', null), 600);
   } catch(err) {
     toast('Erro ao contratar: ' + err.message, 'ko');
@@ -1140,6 +1167,7 @@ window._finalizarContratacaoNPC = async function(idx) {
   } finally {
     window._eqCandidatos = null;
     window._eqCandidatosEscId = null;
+    window._eqCandidatosTier = null;
   }
 };
 
@@ -1403,16 +1431,17 @@ window.demitirFuncionario = async function(funcId, escId, nome) {
   if (!fSnap.exists()) return;
   const f  = fSnap.data();
   const ci = CARGO_INFO[f.cargo_id] || CARGO_INFO.est;
+  const salRescisao = f.salario ?? ci.sal;
   const j  = window.JOGADOR;
   const uid = j?.uid || window.JOGADOR_UID;
 
   // Cobrar rescisão (1 salário)
   await updateDoc(doc(db, 'jogadores', uid), {
-    dinheiro: Math.max(0, (j.dinheiro||0) - ci.sal),
+    dinheiro: Math.max(0, (j.dinheiro||0) - salRescisao),
   });
 
   await deleteDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId));
-  toast(`${nome} foi demitido(a). Rescisão: R$ ${ci.sal.toLocaleString('pt-BR')}`, 'neutro', 4000);
+  toast(`${nome} foi demitido(a). Rescisão: R$ ${salRescisao.toLocaleString('pt-BR')}`, 'neutro', 4000);
   setTimeout(() => window.navTo && window.navTo('equipe', null), 500);
 };
 
@@ -1481,8 +1510,8 @@ export async function calcularCustoEquipe(escId, tier) {
   try {
     const snap = await getDocs(collection(db, 'escritorios', escId, 'funcionarios'));
     snap.docs.forEach(d => {
-      const ci = CARGO_INFO[d.data().cargo_id];
-      if (ci) total += ci.sal;
+      const fd = d.data();
+      total += fd.salario ?? calcSalarioMercado(fd.cargo_id, tier);
     });
   } catch(e) { /* sem funcionários ainda */ }
   return total;
@@ -1845,9 +1874,12 @@ window.abrirModalPromover = async function(funcId, escId) {
   const promo = _elegibilidadePromocao(f);
   if (!promo) return;
 
+  const escSnap  = await getDoc(doc(db, 'escritorios', escId));
+  const tier     = (escSnap.exists() ? escSnap.data().tier : 1) || 1;
   const proxCi   = CARGO_INFO[promo.prox] || {};
-  const salMin   = _CARGO_SAL_MIN_EQ[promo.prox] || 1700;
-  const salMax   = _CARGO_SAL_MAX_EQ[promo.prox] || 5000;
+  const mercado  = calcSalarioMercado(promo.prox, tier);
+  const salMin   = mercado;
+  const salMax   = Math.round(mercado * 1.3 / 100) * 100;
   const tick = c => c ? '✅' : '❌';
 
   abrirModal('✨ Promover Funcionário',
@@ -1886,7 +1918,10 @@ window._confirmarPromocao = async function(funcId, escId, proxCargo) {
   if (!snap.exists()) return;
   const f = snap.data();
 
-  const salMax     = _CARGO_SAL_MAX_EQ[proxCargo] || salario;
+  const escSnap    = await getDoc(doc(db, 'escritorios', escId));
+  const tier       = (escSnap.exists() ? escSnap.data().tier : 1) || 1;
+  const mercado    = calcSalarioMercado(proxCargo, tier);
+  const salMax     = Math.round(mercado * 1.3 / 100) * 100;
   const repInterna = f.reputacao_interna || 50;
   const aceita     = salario >= salMax * 0.7 || repInterna >= 60;
 
@@ -1904,6 +1939,8 @@ window._confirmarPromocao = async function(funcId, escId, proxCargo) {
   await updateDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId), {
     cargo_id:      proxCargo,
     meses_no_cargo: 0,
+    salario:       salario,
+    meses_salario_defasado: 0,
     estresse:      novoStress,
     aviso_saida:   false,
     meses_stress_alto: 0,
@@ -1916,6 +1953,153 @@ window._confirmarPromocao = async function(funcId, escId, proxCargo) {
 
   fecharModal();
   toast(`🎉 ${f.nome} aceita! Promovido(a) para ${(CARGO_INFO[proxCargo]||{}).l||proxCargo}.`, 'ok', 5000);
+  setTimeout(() => window.navTo && window.navTo('equipe', null), 600);
+};
+
+// ════════════════════════════════════════════════════════
+// AUMENTO DE SALÁRIO (mesmo cargo) — roll de aceitar/recusar igual à
+// promoção, mas sem trocar de cargo. Existe pra corrigir defasagem
+// (salário abaixo do mercado escalado por tier — ver TIER_SAL_MULT).
+// ════════════════════════════════════════════════════════
+window.abrirModalAumentoSalario = async function(funcId, escId) {
+  const snap = await getDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId));
+  if (!snap.exists()) return;
+  const f = { id: snap.id, ...snap.data() };
+
+  const escSnap  = await getDoc(doc(db, 'escritorios', escId));
+  const tier     = (escSnap.exists() ? escSnap.data().tier : 1) || 1;
+  const ci       = CARGO_INFO[f.cargo_id] || CARGO_INFO.est;
+  const mercado  = calcSalarioMercado(f.cargo_id, tier);
+  const salAtual = f.salario ?? ci.sal;
+  const salMin   = salAtual;
+  const salMax   = Math.max(mercado, salAtual) * 1.3;
+
+  abrirModal('💰 Aumentar Salário',
+    `<div style="font-size:.78rem;margin-bottom:.8rem">
+      Novo salário pra <b>${f.nome}</b> (${ci.l}) — atual: R$ ${salAtual.toLocaleString('pt-BR')}
+      ${(f.meses_salario_defasado||0) > 0 ? `<br><span style="color:var(--amber)">💸 Defasado há ${f.meses_salario_defasado} mês(es) — mercado do tier ${tier}: R$ ${mercado.toLocaleString('pt-BR')}</span>` : ''}
+    </div>
+    <div class="campo">
+      <label>Salário proposto: <b id="aum-sal-label">R$ ${Math.round(salMin).toLocaleString('pt-BR')}</b></label>
+      <input type="range" id="aum-sal" min="${Math.round(salMin)}" max="${Math.round(salMax)}" step="100" value="${Math.round(salMin)}"
+        oninput="document.getElementById('aum-sal-label').textContent='R$ '+parseInt(this.value).toLocaleString('pt-BR')">
+      <div style="display:flex;justify-content:space-between;font-size:.65rem;color:var(--txt4)">
+        <span>R$ ${Math.round(salMin).toLocaleString('pt-BR')}</span><span>R$ ${Math.round(salMax).toLocaleString('pt-BR')}</span>
+      </div>
+    </div>
+    <div style="font-size:.65rem;color:var(--txt3);margin-bottom:.5rem">
+      NPC aceita se: oferta ≥ R$ ${Math.round(mercado*0.85).toLocaleString('pt-BR')} (85% do mercado) OU reputação interna ≥ 60
+    </div>
+    <div style="display:flex;gap:.5rem;margin-top:.8rem">
+      <button class="btn btn-ghost" style="flex:1" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-prim" style="flex:1" onclick="window._confirmarAumentoSalario('${funcId}','${escId}')">Oferecer →</button>
+    </div>`
+  );
+};
+
+window._confirmarAumentoSalario = async function(funcId, escId) {
+  const salario = parseInt(document.getElementById('aum-sal')?.value || '0');
+  const { updateDoc } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+
+  const snap = await getDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId));
+  if (!snap.exists()) return;
+  const f = snap.data();
+
+  const escSnap    = await getDoc(doc(db, 'escritorios', escId));
+  const tier       = (escSnap.exists() ? escSnap.data().tier : 1) || 1;
+  const mercado    = calcSalarioMercado(f.cargo_id, tier);
+  const repInterna = f.reputacao_interna || 50;
+  const aceita     = salario >= mercado * 0.85 || repInterna >= 60;
+
+  if (!aceita) {
+    await updateDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId), {
+      estresse:          Math.min(100, (f.estresse || 0) + 5),
+      reputacao_interna: Math.max(0, repInterna - 10),
+    });
+    fecharModal();
+    toast(`${f.nome} recusou — achou o aumento insuficiente.`, 'ko', 4000);
+    return;
+  }
+
+  await updateDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId), {
+    salario:                salario,
+    meses_salario_defasado: 0,
+    estresse:               Math.max(0, (f.estresse || 0) - 15),
+    aviso_saida:            false,
+  });
+
+  await addDoc(collection(db, 'escritorios', escId, 'log_equipe'), {
+    texto: `💰 ${f.nome} aceitou aumento de salário para R$ ${salario.toLocaleString('pt-BR')}.`,
+    criado_em: new Date().toISOString(),
+  });
+
+  fecharModal();
+  toast(`🎉 ${f.nome} aceitou o aumento!`, 'ok', 5000);
+  setTimeout(() => window.navTo && window.navTo('equipe', null), 600);
+};
+
+// ════════════════════════════════════════════════════════
+// BÔNUS PONTUAL — presente do mês, sai do caixa do escritório. Sem roll:
+// é doação, o NPC sempre aceita. Não altera o salário fixo.
+// ════════════════════════════════════════════════════════
+window.abrirModalBonus = async function(funcId, escId) {
+  const snap = await getDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId));
+  if (!snap.exists()) return;
+  const f  = { id: snap.id, ...snap.data() };
+  const ci = CARGO_INFO[f.cargo_id] || CARGO_INFO.est;
+  const salAtual  = f.salario ?? ci.sal;
+  const sugestao  = Math.round(salAtual * 0.1 / 10) * 10;
+
+  const escSnap = await getDoc(doc(db, 'escritorios', escId));
+  const caixa   = (escSnap.exists() ? escSnap.data().caixa : 0) || 0;
+
+  abrirModal('🎁 Conceder Bônus',
+    `<div style="font-size:.78rem;margin-bottom:.8rem">
+      Bônus pontual pra <b>${f.nome}</b> (${ci.l}) — caixa disponível: R$ ${caixa.toLocaleString('pt-BR')}
+    </div>
+    <div class="campo">
+      <label>Valor do bônus</label>
+      <input type="number" id="bonus-valor" min="50" step="50" value="${sugestao}" style="width:100%">
+    </div>
+    <div style="font-size:.65rem;color:var(--txt3);margin-bottom:.5rem">
+      -10 estresse · +8 reputação interna. Descontado do caixa do escritório.
+    </div>
+    <div style="display:flex;gap:.5rem;margin-top:.8rem">
+      <button class="btn btn-ghost" style="flex:1" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-prim" style="flex:1" onclick="window._confirmarBonus('${funcId}','${escId}')">Conceder →</button>
+    </div>`
+  );
+};
+
+window._confirmarBonus = async function(funcId, escId) {
+  const valor = parseInt(document.getElementById('bonus-valor')?.value || '0');
+  if (!valor || valor <= 0) { toast('Digite um valor válido.', 'ko'); return; }
+
+  const { updateDoc } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+
+  const escSnap = await getDoc(doc(db, 'escritorios', escId));
+  if (!escSnap.exists()) return;
+  const escData = escSnap.data();
+  const caixa   = escData.caixa || 0;
+  if (caixa < valor) { toast(`Caixa insuficiente. Disponível: R$ ${caixa.toLocaleString('pt-BR')}.`, 'ko'); return; }
+
+  const snap = await getDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId));
+  if (!snap.exists()) return;
+  const f = snap.data();
+
+  await updateDoc(doc(db, 'escritorios', escId), { caixa: caixa - valor });
+  await updateDoc(doc(db, 'escritorios', escId, 'funcionarios', funcId), {
+    estresse:          Math.max(0, (f.estresse || 0) - 10),
+    reputacao_interna: Math.min(100, (f.reputacao_interna || 50) + 8),
+  });
+
+  await addDoc(collection(db, 'escritorios', escId, 'log_equipe'), {
+    texto: `🎁 ${f.nome} recebeu bônus de R$ ${valor.toLocaleString('pt-BR')}.`,
+    criado_em: new Date().toISOString(),
+  });
+
+  fecharModal();
+  toast(`🎉 Bônus de R$ ${valor.toLocaleString('pt-BR')} concedido a ${f.nome}!`, 'ok', 5000);
   setTimeout(() => window.navTo && window.navTo('equipe', null), 600);
 };
 

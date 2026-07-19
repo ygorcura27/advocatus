@@ -65,6 +65,16 @@ const BENEFICIOS_CATALOGO = {
 const BENEFICIOS_MULT_STACK = [1, 0.8, 0.6, 0.4, 0.25];
 const CARGO_SAL_BENEF = { est:1700, ass:2500, jnr:3500, pln:5500, snr:9000, asc:12000, soc:15000 };
 
+// Salário de mercado escala com o porte (tier) do escritório — espelha
+// TIER_SAL_MULT de js/equipe.js (fonte real do salário pago, esc CF só
+// usa isso pra medir defasagem/estresse, não pra pagar folha).
+const TIER_SAL_MULT_NPC = { 1:1.0, 2:1.35, 3:1.70, 4:2.05, 5:2.50 };
+function _salarioMercadoNPC(cargoId, tier) {
+  const base = CARGO_SAL_BENEF[cargoId] || 1700;
+  const mult = TIER_SAL_MULT_NPC[tier] || 1.0;
+  return Math.round(base * mult / 100) * 100;
+}
+
 const REP_CAP = {
   est:20, ass:35, jnr:45, pln:55, snr:65, asc:80, soc:100, snm:100,
   jsub:55, jtit:70, dsb:85, mstj:100,
@@ -392,14 +402,26 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid, esc, jDono)
       novaRepInterna  = Math.max(0, Math.min(100, novaRepInterna + (efMed >= 1 ? 10 : efMed <= -1 ? -5 : 0)));
     }
 
-    // Estresse: conflitos + feedback ruim acumulado + sobrecarga
+    // Estresse: conflitos + feedback ruim acumulado + sobrecarga + salário defasado
     const feedbackBase     = f.feedback_ruim_acumulado || 0;
     const novoFeedbackRuim = Math.max(0, feedbackBase + (feedbackDelta[fd.id] || 0));
     const conflitosAtivos  = (f.conflitos_ativos || []).length;
+
+    // Defasagem salarial: compara o que o NPC ganha (f.salario, definido na
+    // contratação/promoção/aumento — sem o campo, cai no valor fixo antigo,
+    // que HOJE já está defasado em qualquer escritório tier 2+) contra o
+    // mercado atual escalado pelo tier. Some estresse enquanto persistir.
+    const tierEsc          = esc.tier || 1;
+    const mercadoAtual     = _salarioMercadoNPC(f.cargo_id, tierEsc);
+    const salarioAtualNpc  = f.salario ?? CARGO_SAL_BENEF[f.cargo_id] ?? 1700;
+    const salarioDefasado  = salarioAtualNpc < mercadoAtual * 0.85;
+    const novoMesesDefasado = salarioDefasado ? (f.meses_salario_defasado || 0) + 1 : 0;
+
     const novoEstresse = Math.min(100,
       (conflitosAtivos * 20) +
       (novoFeedbackRuim * 10) +
-      (sobrecarg ? 10 : 0)
+      (sobrecarg ? 10 : 0) +
+      Math.min(20, novoMesesDefasado * 5)
     );
 
     // Coletar para ranking mensal
@@ -421,6 +443,7 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid, esc, jDono)
       casos_resolvidos_mes:     0,
       casos_resolvidos_total:   (f.casos_resolvidos_total || 0) + nProcsMes,
       feedback_ruim_acumulado:  novoFeedbackRuim,
+      meses_salario_defasado:   novoMesesDefasado,
       feedback_media_acumulada: novaMediaAcum,
       feedback_media_estrelas:  novaMediaEst,
       reputacao_interna:        novaRepInterna,
@@ -456,7 +479,7 @@ async function _processarProgressoNPCsCF(db, escRef, mesGlobal, uid, esc, jDono)
     if (bonusPerformAtivo) {
       const cfgBonus = BENEFICIOS_CATALOGO.bonus_perform;
       for (const f of npcsAtivosBenef) {
-        const sal = CARGO_SAL_BENEF[f.cargo_id] || 3500;
+        const sal = f.salario ?? CARGO_SAL_BENEF[f.cargo_id] ?? 3500;
         const pct = cfgBonus.pct_min + (cfgBonus.pct_max - cfgBonus.pct_min) * _eficienciaNPC(f);
         custoTotal += Math.round(sal * pct);
       }
@@ -935,7 +958,7 @@ async function _verificarAssedioBancaRivalCF(db, escRef, uid, fSnap) {
 
     if (novosMesesRepBaixa >= _assedio.MESES_ATE_DISPARAR) {
       const oferta = _assedio.gerarOfertaRival();
-      const salarioAtual = CARGO_SAL_MIN[f.cargo_id] || 3000;
+      const salarioAtual = f.salario ?? CARGO_SAL_MIN[f.cargo_id] ?? 3000;
       const custoRetencao = Math.round(salarioAtual * 3 * oferta.oferta_mult);
       upd.assedio_pendente = { rival_nome: oferta.nome, oferta_mult: oferta.oferta_mult, custo_retencao: custoRetencao };
       upd.meses_rep_baixa  = 0;

@@ -14,6 +14,7 @@ import { httpsCallable }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
 import { db } from './firebase-init.js';
 import { rolarEventosDoMes } from './eventos_escritorio.js';
+import { calcSalarioMercado } from './equipe.js';
 import './upgrade_escritorio.js';
 
 export const MESES_TOLERANCIA_SALARIO = 3;
@@ -237,12 +238,15 @@ export async function processarFinancasEscritorioMensal(j) {
 
   // Buscar funcionários e calcular folha
   const fSnap = await getDocs(collection(db,'escritorios',escId,'funcionarios'));
-  const CARGO_SAL = { est:1700, ass:2500, jnr:3500, pln:5500, snr:9000 };
   const TIER_CUSTO_FIXO = { 1:3500, 2:8000, 3:18000, 4:35000, 5:70000 };
-  const custoFixo = TIER_CUSTO_FIXO[esc.tier||1] || 3500;
+  const tier = esc.tier || 1;
+  const custoFixo = TIER_CUSTO_FIXO[tier] || 3500;
 
   let folha = custoFixo;
-  fSnap.docs.forEach(d => { folha += CARGO_SAL[d.data().cargo_id] || 0; });
+  fSnap.docs.forEach(d => {
+    const fd = d.data();
+    folha += fd.salario ?? calcSalarioMercado(fd.cargo_id, tier);
+  });
 
   const escUpdates = {};
   let mesesSemPagar = esc.meses_sem_pagar_salario || 0;
