@@ -338,6 +338,24 @@ export function comarcaDoEscritorio(esc) {
 }
 
 // ════════════════════════════════════════════════════════
+// CORRESPONDENTES (GDD v6.0 §7.5) — B2B, contratar presença numa comarca
+// sem precisar abrir filial lá. Opção NPC "flagship" (a firma de maior
+// tier do catálogo daquela comarca, sempre disponível) — decisão híbrida
+// do usuário: NPC funciona desde o dia 1; a opção "jogador real" (outro
+// player oferecendo correspondência) fica pronta na estrutura de dados mas
+// só aparece quando existir alguém — hoje ninguém tem escritório fora do
+// Rio (criarEscritorio só aceita bairros do Rio, "abrir filial" é feature
+// separada ainda não construída), então o lado jogador nasce vazio.
+// Rio não entra — é onde todo mundo já começa, não faz sentido "contratar
+// correspondente" pra onde você já está.
+export const CORRESPONDENTE_NPC_POR_COMARCA = {
+  sao_paulo:     { nome: 'Faria Lima Corporate',        valor_mensal: 3000 },
+  brasilia:      { nome: 'Brasília Tributário Federal',  valor_mensal: 6000 },
+  petropolis:    { nome: 'Centro Empresarial Petrópolis', valor_mensal: 800 },
+  volta_redonda: { nome: 'CSN Trabalhista Associados',   valor_mensal: 800 },
+};
+
+// ════════════════════════════════════════════════════════
 // HELPERS
 // ════════════════════════════════════════════════════════
 

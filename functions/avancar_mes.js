@@ -33,6 +33,7 @@ const { resetEnergiaMensal, calcularModSupervisaoSocio } = require('./energia_ca
 const _estresse = require('./estresse');
 const { filtrarOportunidadesElegiveis } = require('./regras_captacao');
 const _assedio = require('./assedio_banca_rival');
+const _correspondentes = require('./correspondentes');
 
 const ENERGIA_TOTAL        = 100;
 
@@ -2581,6 +2582,7 @@ async function _processarServicosMensalCF(db, uid, j) {
   try { await _processarIndicacoesClientesCF(escRef, tier, prestigioPct); } catch(e) { /* silencioso */ }
 
   await _processarAutogestaoOportunidadesCF(db, escRef, esc);
+  await _processarCorrespondentesCF(db, escRef, esc, uid, j);
 
   // Geração automática de processos novos, todo mês, sem precisar clicar em
   // nada — mesmo cap por tier + chance por cliente que "Reunião com
@@ -2694,6 +2696,43 @@ async function _processarAutogestaoOportunidadesCF(db, escRef, esc) {
   if (caixaGanho > 0) {
     await escRef.update({ caixa: (esc.caixa||0) + caixaGanho });
   }
+}
+
+// ════════════════════════════════════════════════════════
+// PROCESSAMENTO MENSAL: CORRESPONDENTES (GDD v6.0 §7.5)
+// ════════════════════════════════════════════════════════
+async function _processarCorrespondentesCF(db, escRef, esc, uid, j) {
+  const contratos = esc.correspondentes || {};
+  const comarcaIds = Object.keys(contratos);
+  if (comarcaIds.length === 0) return;
+
+  let caixaAtual = esc.caixa || 0;
+  let reputacaoComarcas = j.reputacao_comarcas || {};
+  const novosContratos = { ...contratos };
+  const logs = [];
+
+  for (const comarcaId of comarcaIds) {
+    const contrato = contratos[comarcaId];
+    const r = _correspondentes.processarContratoMensal(caixaAtual, contrato, reputacaoComarcas);
+    if (!r) {
+      delete novosContratos[comarcaId];
+      logs.push(_logEquipeCF(escRef, `📍 Correspondente em ${comarcaId} cancelado — caixa insuficiente pra pagar a mensalidade.`));
+      continue;
+    }
+    caixaAtual = r.caixaNovo;
+    reputacaoComarcas = r.reputacaoComarcasNova;
+    if (r.creditoParaCorrespondente > 0 && contrato.escritorio_correspondente_id) {
+      try {
+        const corRef = db.collection('escritorios').doc(contrato.escritorio_correspondente_id);
+        const corSnap = await corRef.get();
+        if (corSnap.exists) await corRef.update({ caixa: (corSnap.data().caixa || 0) + r.creditoParaCorrespondente });
+      } catch (e) { /* correspondente pode ter fechado — não trava o próprio contrato */ }
+    }
+  }
+
+  await escRef.update({ caixa: caixaAtual, correspondentes: novosContratos });
+  await db.collection('jogadores').doc(uid).update({ reputacao_comarcas: reputacaoComarcas });
+  if (logs.length) await Promise.all(logs);
 }
 
 // ── GDD Seção 28-30: perfis de cliente e indicações automáticas ──────────────

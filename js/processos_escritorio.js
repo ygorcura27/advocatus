@@ -7,6 +7,7 @@ import { collection, query, where, orderBy, limit, getDocs, addDoc, doc, updateD
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { db } from './firebase-init.js';
 import { personagemIdAtual } from './personagens.js';
+import { COMARCAS, CORRESPONDENTE_NPC_POR_COMARCA, comarcaDoEscritorio } from './escritorios_npc.js';
 
 // ─── Constantes do pool de processos ─────────────────────────────────────────
 
@@ -213,7 +214,13 @@ window.renderGestaoProcessos = async function(j, el) {
     </div>` : ''}
     ${podeGerenciar ? _renderRegrasCaptacao(esc, escId) : ''}
     ${_renderEstrategiaPadrao(j)}
+    ${podeGerenciar ? `<div id="gestao-correspondentes"></div>` : ''}
     <div id="gestao-processos-pool"></div>`;
+
+  if (podeGerenciar) {
+    const elCorr = document.getElementById('gestao-correspondentes');
+    if (elCorr) _renderCorrespondentes(j, esc, escId, elCorr);
+  }
 
   const elPool = document.getElementById('gestao-processos-pool');
   if (elPool) window.renderProcessosPool(j, escId, elPool);
@@ -302,6 +309,125 @@ window._salvarEstrategiaPadrao = async function() {
   } catch (e) {
     console.error('[ESTRATEGIA PADRAO]', e);
     toast('Erro ao salvar estratégia padrão.', 'ko');
+  }
+};
+
+// ─── Correspondentes (GDD v6.0 §7.5) — presença numa comarca sem filial ──────
+async function _renderCorrespondentes(j, esc, escId, el) {
+  const minhaComarca = comarcaDoEscritorio(esc);
+  const contratos = esc.correspondentes || {};
+  const comarcasAlvo = COMARCAS.filter(c => c.id !== minhaComarca);
+
+  // Escritórios de outros jogadores oferecendo correspondência — 1 query
+  // por comarca-alvo; sem índice composto ainda, cai pra vazio (mesmo
+  // padrão de fallback usado no resto do arquivo).
+  const ofertasJogador = {};
+  for (const c of comarcasAlvo) {
+    try {
+      const snap = await getDocs(query(
+        collection(db, 'escritorios'),
+        where('comarca', '==', c.id),
+        where('oferece_correspondencia.ativo', '==', true),
+      ));
+      ofertasJogador[c.id] = snap.docs.filter(d => d.id !== escId).map(d => ({ id: d.id, ...d.data() }));
+    } catch (e) { ofertasJogador[c.id] = []; }
+  }
+
+  const oferta = esc.oferece_correspondencia || { ativo: false, valor_mensal: 1000 };
+
+  el.innerHTML = `
+    <div class="card" style="margin-bottom:1rem;padding:.8rem .9rem">
+      <div style="font-weight:600;font-size:.82rem;color:var(--txt);margin-bottom:.4rem">🤝 Correspondentes</div>
+      <div style="font-size:.66rem;color:var(--txt4);margin-bottom:.6rem">
+        GDD v6.0 §7.5 — presença "emprestada" numa comarca sem precisar abrir filial lá. Gera reputação territorial aos poucos, cobra mensalidade fixa do caixa.
+      </div>
+
+      ${comarcasAlvo.map(c => {
+        const contrato = contratos[c.id];
+        const npc = CORRESPONDENTE_NPC_POR_COMARCA[c.id];
+        const jogadores = ofertasJogador[c.id] || [];
+        return `
+        <div style="padding:.5rem .6rem;margin-bottom:.4rem;background:var(--bg2);border-radius:6px">
+          <div style="font-size:.74rem;font-weight:600;color:var(--txt);margin-bottom:.3rem">${c.endgame ? '👑 ' : ''}${c.nome}</div>
+          ${contrato ? `
+            <div style="font-size:.68rem;color:var(--verde2)">✓ Correspondente: ${contrato.nome} — R$ ${(contrato.valor_mensal||0).toLocaleString('pt-BR')}/mês</div>
+            <button class="btn btn-sm btn-ghost" style="margin-top:.3rem" onclick="window._cancelarCorrespondente('${escId}','${c.id}')">Cancelar contrato</button>
+          ` : `
+            <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+              ${npc ? `<button class="btn btn-sm btn-sec" onclick="window._contratarCorrespondente('${escId}','${c.id}','npc','${npc.nome.replace(/'/g,"\\'")}',${npc.valor_mensal},null)">
+                ${npc.nome} (NPC) — R$ ${npc.valor_mensal.toLocaleString('pt-BR')}/mês
+              </button>` : ''}
+              ${jogadores.map(esc2 => {
+                const v = (esc2.oferece_correspondencia||{}).valor_mensal || 1000;
+                return `<button class="btn btn-sm btn-prim" onclick="window._contratarCorrespondente('${escId}','${c.id}','jogador','${(esc2.nome||'Escritório').replace(/'/g,"\\'")}',${v},'${esc2.id}')">
+                  ${esc2.nome} (jogador) — R$ ${v.toLocaleString('pt-BR')}/mês
+                </button>`;
+              }).join('')}
+              ${jogadores.length === 0 ? `<span style="font-size:.62rem;color:var(--txt4)">Nenhum jogador oferecendo ali ainda.</span>` : ''}
+            </div>
+          `}
+        </div>`;
+      }).join('')}
+
+      <div style="margin-top:.6rem;padding-top:.6rem;border-top:1px dashed var(--txt5,rgba(255,255,255,.1))">
+        <label style="display:flex;align-items:center;gap:.4rem;font-size:.72rem;color:var(--txt3);margin-bottom:.4rem">
+          <input type="checkbox" id="corr-oferece-ativo" ${oferta.ativo ? 'checked' : ''}> Oferecer meu escritório como correspondente pra outros jogadores (em ${COMARCAS.find(c=>c.id===minhaComarca)?.nome || 'Rio de Janeiro'})
+        </label>
+        <div style="display:flex;align-items:center;gap:.5rem">
+          <label style="font-size:.7rem;color:var(--txt3)">Mensalidade:</label>
+          <input type="number" id="corr-oferece-valor" value="${oferta.valor_mensal||1000}" min="0" step="100"
+            style="width:100px;padding:.25rem .4rem;font-size:.75rem;border-radius:4px;border:1px solid var(--navy-light);background:var(--bg2);color:var(--txt)">
+          <button class="btn btn-sm btn-ghost" onclick="window._salvarOfertaCorrespondencia('${escId}')">💾 Salvar</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+window._contratarCorrespondente = async function(escId, comarcaId, tipo, nome, valorMensal, escritorioCorrespondenteId) {
+  if (!confirm(`Contratar ${nome} como correspondente em ${comarcaId}?\nMensalidade: R$ ${valorMensal.toLocaleString('pt-BR')}`)) return;
+  try {
+    const escSnap = await getDoc(doc(db, 'escritorios', escId));
+    const esc = escSnap.exists() ? escSnap.data() : {};
+    const correspondentes = { ...(esc.correspondentes || {}) };
+    correspondentes[comarcaId] = {
+      tipo, nome, valor_mensal: valorMensal,
+      escritorio_correspondente_id: escritorioCorrespondenteId || null,
+      contratado_em: new Date().toISOString(),
+    };
+    await updateDoc(doc(db, 'escritorios', escId), { correspondentes });
+    toast(`🤝 ${nome} contratado como correspondente.`, 'ok');
+    setTimeout(() => window.navTo && window.navTo('processos', null), 500);
+  } catch (e) {
+    console.error('[CORRESPONDENTE]', e);
+    toast('Erro ao contratar correspondente.', 'ko');
+  }
+};
+
+window._cancelarCorrespondente = async function(escId, comarcaId) {
+  if (!confirm('Cancelar este contrato de correspondente?')) return;
+  try {
+    const escSnap = await getDoc(doc(db, 'escritorios', escId));
+    const esc = escSnap.exists() ? escSnap.data() : {};
+    const correspondentes = { ...(esc.correspondentes || {}) };
+    delete correspondentes[comarcaId];
+    await updateDoc(doc(db, 'escritorios', escId), { correspondentes });
+    toast('Contrato cancelado.', 'neutro');
+    setTimeout(() => window.navTo && window.navTo('processos', null), 400);
+  } catch (e) {
+    console.error('[CORRESPONDENTE]', e);
+    toast('Erro ao cancelar.', 'ko');
+  }
+};
+
+window._salvarOfertaCorrespondencia = async function(escId) {
+  const ativo = document.getElementById('corr-oferece-ativo')?.checked || false;
+  const valor_mensal = parseInt(document.getElementById('corr-oferece-valor')?.value, 10) || 0;
+  try {
+    await updateDoc(doc(db, 'escritorios', escId), { oferece_correspondencia: { ativo, valor_mensal } });
+    toast('🤝 Oferta de correspondência salva.', 'ok');
+  } catch (e) {
+    console.error('[CORRESPONDENTE]', e);
+    toast('Erro ao salvar oferta.', 'ko');
   }
 };
 
