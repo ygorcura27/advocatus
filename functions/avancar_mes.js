@@ -29,6 +29,7 @@ const _perfis                = require('./perfis');
 const { processarRoyaltiesLivros, processarCitacoesNPCMensal } = require('./artigos_livros');
 const { determinarSentencaSetlist, AREA_PT_PARA_EN } = require('./processar_sentenca');
 const { processarDecaimentoMensal: processarDecaimentoTesesMensal } = require('./banco_teses');
+const { resetEnergiaMensal } = require('./energia_categorias');
 
 const ENERGIA_TOTAL        = 100;
 
@@ -1067,8 +1068,11 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
   updates.ano_pessoal        = novoAno;
   updates.mes_global_pessoal = mesGlobal;
   updates.ultimo_avanco      = new Date().toISOString();
-  updates.energia            = ENERGIA_TOTAL;
-  updates.energia_usada_mes  = 0;
+  // GDD v6.0 §3.1 — reset cobre tanto o pool único legado (contas antigas)
+  // quanto os 6 baldes por categoria (contas que já configuraram os
+  // sliders de energia_alocada); resetEnergiaMensal decide qual dos dois
+  // aplicar por conta.
+  Object.assign(updates, resetEnergiaMensal(j));
 
   // idade_inicial existe pra personagens criados via assumirHerdeiro
   // (podem começar com mais de 22 anos, ver js/relacionamento.js) — ausente

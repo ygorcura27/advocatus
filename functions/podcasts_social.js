@@ -21,6 +21,7 @@ const { logger } = require('firebase-functions');
 const { normalizarSkillsJur, capSkill, interpolate } = require('./skills');
 const { AREAS, CATALOGO_PODCASTS, getPodcastPorId } = require('./podcasts_catalogo');
 const { clampReputacao } = require('./shared/repCap');
+const { debitarEnergiaCategoria } = require('./energia_categorias');
 
 const ENERGIA_MIDIA = 6;
 
@@ -104,9 +105,8 @@ exports.responderConviteMidia = onCall({ region: 'southamerica-east1' }, async (
   if (!jogSnap.exists) throw new HttpsError('not-found', 'Advogado não encontrado.');
   const j = jogSnap.data();
 
-  if ((j.energia || 0) < ENERGIA_MIDIA) {
-    throw new HttpsError('failed-precondition', `Energia insuficiente. Participar custa ${ENERGIA_MIDIA}⚡.`);
-  }
+  // GDD v6.0 §3.1 — categoria Gestão/Captação (aparição pública/marketing).
+  const energiaPatch = debitarEnergiaCategoria(j, 'captacao', ENERGIA_MIDIA, 'participar da aparição na mídia');
   const mesGlobal = j.mes_global_pessoal || 0;
   if (j.midia_ultimo_mes === mesGlobal) {
     throw new HttpsError('failed-precondition', 'Esse advogado já participou de uma aparição na mídia este mês.');
@@ -136,8 +136,7 @@ exports.responderConviteMidia = onCall({ region: 'southamerica-east1' }, async (
   const influenciaGanha = Math.round((views * novaComunicacao) / 50);
 
   await db.collection('jogadores').doc(advUid).update({
-    energia:              FieldValue.increment(-ENERGIA_MIDIA),
-    energia_usada_mes:    FieldValue.increment(ENERGIA_MIDIA),
+    ...energiaPatch,
     reputacao:            clampReputacao(j.reputacao, j.cargo_id, repGanho),
     popularidade_pessoal: FieldValue.increment(popGanho),
     dinheiro:             FieldValue.increment(honorarios),

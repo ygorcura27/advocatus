@@ -24,6 +24,7 @@ const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { logger } = require('firebase-functions');
 const { clampReputacao, repCapDoCargo } = require('./shared/repCap');
 const { aplicarXpPracticeArea } = require('./skills');
+const { debitarEnergiaCategoria } = require('./energia_categorias');
 
 // Áreas reais de processo são em português; Practice Area Mastery (area_*
 // em functions/skills.js) é em inglês. Espelho de functions/investigacao.js
@@ -55,9 +56,8 @@ exports.participarMootCourt = onCall({ region: 'southamerica-east1' }, async (re
   if (!snap.exists) throw new HttpsError('not-found', 'Jogador não encontrado.');
 
   const j = snap.data();
-  if ((j.energia || 0) < ENERGIA_MOOT) {
-    throw new HttpsError('failed-precondition', `Energia insuficiente. Moot Court custa ${ENERGIA_MOOT}⚡.`);
-  }
+  // GDD v6.0 §3.1 — categoria Gestão/Captação (vitrine pública, não estudo).
+  const energiaPatch = debitarEnergiaCategoria(j, 'captacao', ENERGIA_MOOT, 'participar do Moot Court');
 
   const mesGlobal = j.mes_global_pessoal || 0;
   if (j.moot_ultimo_mes === mesGlobal) {
@@ -75,8 +75,7 @@ exports.participarMootCourt = onCall({ region: 'southamerica-east1' }, async (re
   const premioDinheiro = vitoria ? Math.floor(Math.random() * 3000) + 2000 : 0;
 
   await db.collection('jogadores').doc(uid).update({
-    energia:           FieldValue.increment(-ENERGIA_MOOT),
-    energia_usada_mes: FieldValue.increment(ENERGIA_MOOT),
+    ...energiaPatch,
     xp:                FieldValue.increment(xpGanho),
     reputacao:         clampReputacao(j.reputacao, j.cargo_id, reputacao),
     dinheiro:          FieldValue.increment(premioDinheiro),
@@ -190,9 +189,8 @@ exports.gravarConteudoEducativo = onCall({ region: 'southamerica-east1' }, async
   if (!snap.exists) throw new HttpsError('not-found', 'Jogador não encontrado.');
 
   const j = snap.data();
-  if ((j.energia || 0) < ENERGIA_PODCAST) {
-    throw new HttpsError('failed-precondition', `Energia insuficiente. Gravar conteúdo custa ${ENERGIA_PODCAST}⚡.`);
-  }
+  // GDD v6.0 §3.1 — categoria Gestão/Captação (marketing pessoal).
+  const energiaPatch = debitarEnergiaCategoria(j, 'captacao', ENERGIA_PODCAST, 'gravar conteúdo educativo');
   const mesGlobal = j.mes_global_pessoal || 0;
   if (j.podcast_ultimo_mes === mesGlobal) {
     throw new HttpsError('failed-precondition', 'Você já gravou conteúdo este mês.');
@@ -213,8 +211,7 @@ exports.gravarConteudoEducativo = onCall({ region: 'southamerica-east1' }, async
   const novaOral = Math.min(50, oralAdvocacy + 1);
 
   await db.collection('jogadores').doc(uid).update({
-    energia:           FieldValue.increment(-ENERGIA_PODCAST),
-    energia_usada_mes: FieldValue.increment(ENERGIA_PODCAST),
+    ...energiaPatch,
     reputacao:         clampReputacao(j.reputacao, j.cargo_id, baseRep),
     popularidade_pessoal: FieldValue.increment(basePop),
     oral_advocacy:     novaOral,

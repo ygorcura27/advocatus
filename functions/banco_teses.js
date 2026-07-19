@@ -19,6 +19,7 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getFirestore } = require('firebase-admin/firestore');
 const { normalizarSkillsJur } = require('./skills');
+const { debitarEnergiaCategoria } = require('./energia_categorias');
 
 // Decaimento mensal de Atualização% por matéria (GDD v6.0 §5.2) — tributário
 // decai mais rápido de propósito (reforma tributária como feature de jogo).
@@ -92,10 +93,9 @@ exports.criarTese = onCall({ region: 'southamerica-east1' }, async (request) => 
   const j = jSnap.data();
   if (!(await membroDoEscritorio(uid, j, escritorio_id))) throw new HttpsError('permission-denied', 'Você não pertence a este escritório.');
 
-  const energiaDisp = 100 - (j.energia_usada_mes || 0);
-  if (energiaDisp < CUSTO_ENERGIA_CRIAR) {
-    throw new HttpsError('resource-exhausted', `Precisa de ${CUSTO_ENERGIA_CRIAR} de energia pra compor uma tese (tem ${energiaDisp}).`);
-  }
+  // GDD v6.0 §3.1 — categoria Processos Estratégicos: Tese alimenta
+  // Julgamento direto (mesmo papel que Petição tinha antes da unificação).
+  const energiaPatch = debitarEnergiaCategoria(j, 'processos', CUSTO_ENERGIA_CRIAR, 'compor uma tese');
 
   const skJur = normalizarSkillsJur(j.skills_jur);
   const areaKey = MATERIA_PARA_AREA_SKILL[materia] || 'area_civil';
@@ -119,7 +119,7 @@ exports.criarTese = onCall({ region: 'southamerica-east1' }, async (request) => 
     criada_em: new Date().toISOString(),
     historico_uso: [],
   });
-  await jRef.update({ energia_usada_mes: (j.energia_usada_mes || 0) + CUSTO_ENERGIA_CRIAR });
+  await jRef.update(energiaPatch);
 
   return { ok: true, tese_id: teseRef.id, nota, teto_fundamento: Math.round(tetoFundamento), teto_redacao: Math.round(tetoRedacao) };
 });
@@ -141,17 +141,15 @@ exports.manterTese = onCall({ region: 'southamerica-east1' }, async (request) =>
   const tese = teseSnap.data();
   if (!(await membroDoEscritorio(uid, j, escritorio_id))) throw new HttpsError('permission-denied', 'Você não pertence a este escritório.');
 
-  const energiaDisp = 100 - (j.energia_usada_mes || 0);
-  if (energiaDisp < CUSTO_ENERGIA_MANTER) {
-    throw new HttpsError('resource-exhausted', `Precisa de ${CUSTO_ENERGIA_MANTER} de energia pra manutenção (tem ${energiaDisp}).`);
-  }
+  // GDD v6.0 §3.1 — mesma categoria de criarTese (Processos Estratégicos).
+  const energiaPatch = debitarEnergiaCategoria(j, 'processos', CUSTO_ENERGIA_MANTER, 'manutenção de tese');
 
   const mediaSkill = await mediaSkillMateriaEquipe(db, escritorio_id, tese.materia);
   const teto = tetoAtualizacao(mediaSkill);
   const novaAtualizacao = Math.min(teto, (tese.atualizacao_pct || 0) + GANHO_ATUALIZACAO_MANTER);
 
   await teseRef.update({ atualizacao_pct: novaAtualizacao });
-  await jRef.update({ energia_usada_mes: (j.energia_usada_mes || 0) + CUSTO_ENERGIA_MANTER });
+  await jRef.update(energiaPatch);
 
   return { ok: true, atualizacao_pct: novaAtualizacao, teto: Math.round(teto) };
 });

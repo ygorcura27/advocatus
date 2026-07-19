@@ -30,6 +30,7 @@ const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { logger } = require('firebase-functions');
 const { clampReputacao } = require('./shared/repCap');
+const { debitarEnergiaCategoria, creditarEnergiaCategoria } = require('./energia_categorias');
 
 // ─── Configurações dos programas ──────────────────────────────────────────────
 
@@ -229,9 +230,8 @@ exports.compararecerAula = onCall({ region: 'southamerica-east1' }, async (reque
     throw new HttpsError('failed-precondition', 'Você não está cursando nenhum programa no momento.');
   }
   const cfgFreq = PROGRAMAS[j.posgrad_programa];
-  if ((j.energia || 0) < ENERGIA_AULA) {
-    throw new HttpsError('failed-precondition', `Energia insuficiente. Comparecer à aula custa ${ENERGIA_AULA}⚡.`);
-  }
+  // GDD v6.0 §3.1 — categoria Estudo.
+  const energiaPatch = debitarEnergiaCategoria(j, 'estudo', ENERGIA_AULA, 'comparecer à aula');
 
   // Trava só quando JÁ elegível pra concluir (tempo mínimo decorrido + 70%
   // de frequência) — nunca um teto de comparecimentos cru. Um teto cru
@@ -249,8 +249,7 @@ exports.compararecerAula = onCall({ region: 'southamerica-east1' }, async (reque
   }
 
   await db.collection('jogadores').doc(uid).update({
-    energia:              FieldValue.increment(-ENERGIA_AULA),
-    energia_usada_mes:    FieldValue.increment(ENERGIA_AULA),
+    ...energiaPatch,
     posgrad_frequencia:   FieldValue.increment(1),
     posgrad_ultima_aula:  mesGlobal,
   });
@@ -293,8 +292,11 @@ exports.darAula = onCall({ region: 'southamerica-east1' }, async (request) => {
   const xpGanho = 1;
   const novaDid = Math.min(50, didaticaAtual + xpGanho);
 
+  // Bônus — docência energiza (devolve o custo de comparecer_aula, GDD).
+  const energiaPatch = creditarEnergiaCategoria(j, 'estudo', ENERGIA_AULA);
+
   await db.collection('jogadores').doc(uid).update({
-    energia:                   FieldValue.increment(ENERGIA_AULA),  // Bônus — docência energiza
+    ...energiaPatch,
     dinheiro:                  FieldValue.increment(salario),
     honorarios_mes:            FieldValue.increment(salario),  // conta pra "Renda/mês" (renda_calculada) no fechamento do tick
     didatica_academica:        novaDid,

@@ -17,10 +17,11 @@
  */
 
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
-const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { getFirestore } = require('firebase-admin/firestore');
 const { logger } = require('firebase-functions');
 const { normalizarSkillsJur } = require('./skills');
 const { PROGRAMAS, concluirProgramaAoAprovar, elegibilidadeFrequencia } = require('./posgraduacao');
+const { debitarEnergiaCategoria } = require('./energia_categorias');
 
 const ENERGIA_DEFESA = 8;
 const N_PERGUNTAS = { mestrado: 3, doutorado: 4 };
@@ -80,9 +81,8 @@ exports.iniciarDefesaTCC = onCall({ region: 'southamerica-east1' }, async (reque
   if (p.defesa_banca && !p.defesa_banca.veredito) {
     throw new HttpsError('failed-precondition', 'Defesa já em andamento.');
   }
-  if ((j.energia || 0) < ENERGIA_DEFESA) {
-    throw new HttpsError('failed-precondition', `Energia insuficiente. Apresentar defesa custa ${ENERGIA_DEFESA}⚡.`);
-  }
+  // GDD v6.0 §3.1 — categoria Estudo (defesa é etapa de pós-graduação).
+  const energiaPatch = debitarEnergiaCategoria(j, 'estudo', ENERGIA_DEFESA, 'apresentar a defesa');
 
   const n = N_PERGUNTAS[j.posgrad_programa] || 3;
   const perguntas = _gerarPerguntas(n, p.nota_teto || 0, cfg.nota_min_peca);
@@ -97,10 +97,7 @@ exports.iniciarDefesaTCC = onCall({ region: 'southamerica-east1' }, async (reque
 
   await Promise.all([
     db.collection('peticoes').doc(peticao_id).update({ defesa_banca }),
-    db.collection('jogadores').doc(uid).update({
-      energia: FieldValue.increment(-ENERGIA_DEFESA),
-      energia_usada_mes: FieldValue.increment(ENERGIA_DEFESA),
-    }),
+    db.collection('jogadores').doc(uid).update(energiaPatch),
   ]);
 
   logger.info(`[DEFESA TCC] ${uid} iniciou defesa de ${peticao_id} (${j.posgrad_programa}, ${n} perguntas)`);
