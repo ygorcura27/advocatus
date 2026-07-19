@@ -109,6 +109,10 @@ function _navLateralPadrao(painel) {
         <span class="ni-icon">${icon('inbox')}</span> Mensagens
         <span class="ni-badge" id="badge-inbox-nav" style="display:none">0</span>
       </div>
+    </div>
+    <div class="nav-grupo">
+      <div class="nav-grupo-titulo">Ajuda</div>
+      <div class="nav-item${ativo('wiki')}" onclick="navTo('wiki',this)"><span class="ni-icon">❓</span> Wiki & Ajuda</div>
     </div>`;
 }
 
@@ -210,6 +214,10 @@ function _renderizar() {
     case 'financeiro':
       if (window.renderFinanceiroAvancado) window.renderFinanceiroAvancado(j, main);
       else main.innerHTML = '<div class="card" style="color:var(--txt3)">Carregando finanças...</div>';
+      break;
+    case 'wiki':
+      if (window.renderWiki) window.renderWiki(j, main);
+      else main.innerHTML = '<div class="card" style="color:var(--txt3)">Carregando ajuda...</div>';
       break;
     default:             renderPerfil(j, main);
   }
