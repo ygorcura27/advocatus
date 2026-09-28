@@ -120,7 +120,7 @@ window.renderAmigosSecao = async function(uid) {
 
   return `
     <div class="secao-header" style="margin-top:1.2rem">
-      <div class="secao-titulo">🧑‍🤝‍🧑 Amigos</div>
+      <div class="secao-titulo">Amigos</div>
       <button class="btn btn-sm btn-prim" ${amigos.length>=_AMIGOS_MAX_ATIVOS?'disabled':''} onclick="window._amigoAbrirConhecer()">+ Conhecer alguém</button>
     </div>
     ${amigos.length === 0

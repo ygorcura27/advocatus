@@ -73,6 +73,8 @@ const PATHS = {
   alerta:       `<path ${S} d="M12 3.5 21 19H3z"/><path ${S} d="M12 9.5v4.2M12 16.8h.01"/>`,
   menu:         `<path ${S} d="M4 6h16M4 12h16M4 18h16"/>`,
   cadeado:      `<rect ${S} x="5" y="10.5" width="14" height="9.5" rx="1.5"/><path ${S} d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>`,
+  energia:      `<rect ${S} x="3" y="7" width="16" height="10" rx="2"/><path ${S} d="M21 10.5v3"/><path ${S} d="M11.5 9 9 12.2h3.4L10 15.5"/>`,
+  ajuda:        `<circle ${S} cx="12" cy="12" r="8.5"/><path ${S} d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.7"/><path ${S} d="M12 17h.01"/>`,
 };
 
 /** Retorna o SVG (string) do ícone `nome`. `opts.size` default 20. */

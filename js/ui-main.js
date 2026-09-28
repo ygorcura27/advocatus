@@ -55,7 +55,9 @@ window.addEventListener('gamestate:ready', () => {
 // Sub-páginas do Escritório sem view própria no mockup (navegadas por
 // dentro da tela de Escritório, não têm item de sidebar próprio) — o
 // item "Escritório" continua marcado ativo enquanto o jogador está nelas.
-const ESC_SUBPAINEIS = new Set(['processos','balancete','equipe','clientes','repertorio','midia_convites','marketing','assembleia','contratacao','treinamento','beneficios']);
+// 'processos' fica de fora: ele já tem item próprio (Investigação), e
+// incluí-lo aqui acendia dois itens do menu ao mesmo tempo.
+const ESC_SUBPAINEIS = new Set(['balancete','equipe','clientes','repertorio','midia_convites','marketing','assembleia','contratacao','treinamento','beneficios']);
 
 function _navLateralPadrao(painel) {
   const ativo = (id) => (id === painel || (id === 'escritorio' && ESC_SUBPAINEIS.has(painel))) ? ' ativo' : '';
@@ -76,7 +78,7 @@ function _navLateralPadrao(painel) {
     <div class="nav-grupo">
       <div class="nav-grupo-titulo">Carreira</div>
       <div class="nav-item${ativo('perfil')}" onclick="navTo('perfil',this)"><span class="ni-icon">${icon('perfil')}</span> Meu Perfil</div>
-      <div class="nav-item${ativo('energia')}" onclick="navTo('energia',this)"><span class="ni-icon">⚡</span> Energia</div>
+      <div class="nav-item${ativo('energia')}" onclick="navTo('energia',this)"><span class="ni-icon">${icon('energia')}</span> Energia</div>
       <div class="nav-item${ativo('foco')}" onclick="navTo('foco',this)"><span class="ni-icon">${icon('oportunidades')}</span> Foco</div>
       <div class="nav-item${ativo('escritorio')}" onclick="navTo('escritorio',this)"><span class="ni-icon">${icon('escritorio')}</span> Escritório</div>
       <div class="nav-item${ativo('processos')}" onclick="navTo('processos',this)" title="Investigação virou parte do fluxo de Processos — clicar aqui já abre por lá"><span class="ni-icon">${icon('investigacao')}</span> Investigação</div>
@@ -112,7 +114,7 @@ function _navLateralPadrao(painel) {
     </div>
     <div class="nav-grupo">
       <div class="nav-grupo-titulo">Ajuda</div>
-      <div class="nav-item${ativo('wiki')}" onclick="navTo('wiki',this)"><span class="ni-icon">❓</span> Wiki & Ajuda</div>
+      <div class="nav-item${ativo('wiki')}" onclick="navTo('wiki',this)"><span class="ni-icon">${icon('ajuda')}</span> Wiki & Ajuda</div>
     </div>`;
 }
 
@@ -127,7 +129,33 @@ function _renderSidebarLateral(painel) {
   {
     nav.innerHTML = _navLateralPadrao(painel);
   }
+  _tornarFocavel(nav.querySelectorAll('.nav-item'));
 }
+
+// Itens de menu são <div onclick> — sem isso não dá pra chegar neles pelo
+// teclado (Tab) nem ativar com Enter/Espaço. O keydown é delegado no
+// document (ver abaixo), aqui só marca como focável e anuncia o item ativo.
+function _tornarFocavel(els, marcarAtivo = true) {
+  els.forEach(el => {
+    el.setAttribute('role', 'button');
+    el.setAttribute('tabindex', '0');
+    if (!marcarAtivo) return;
+    if (el.classList.contains('ativo')) el.setAttribute('aria-current', 'page');
+    else el.removeAttribute('aria-current');
+  });
+}
+// Bottom nav troca a classe .ativo em outro lugar — aqui só fica focável.
+_tornarFocavel(document.querySelectorAll('.bnav-item'), false);
+
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  if (e.defaultPrevented) return; // elemento já trata o próprio teclado (ex.: cards de Processos)
+  const el = e.target;
+  if (!(el instanceof HTMLElement) || el.getAttribute('role') !== 'button') return;
+  if (el.tagName === 'BUTTON' || el.tagName === 'A') return;
+  e.preventDefault();
+  el.click();
+});
 
 function _renderizar() {
   const j = window.JOGADOR;
@@ -279,7 +307,7 @@ function _painelAtributosRPG(j) {
   const atrs = j.atributos || {};
   return `
     <div id="perfil-atributos-secao" style="margin-bottom:1.2rem;padding:.75rem;background:var(--surface2);border:var(--borda-sub);border-radius:var(--r)">
-      <div style="font-size:.68rem;color:var(--txt3);margin-bottom:.5rem">🎭 Atributos (GDD v6.0 §4.4) <span style="color:var(--txt4)">— só ⚖️ e 💪 afetam o jogo hoje, resto é só perfil</span></div>
+      <div style="font-size:.68rem;color:var(--txt3);margin-bottom:.5rem">Atributos <span style="color:var(--txt4)">— traços do seu personagem</span></div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.5rem">
         ${ATRIBUTOS_RPG_INFO.map(a => {
           const v = Number.isFinite(atrs[a.k]) ? Math.max(1, Math.min(21, atrs[a.k])) : 11;
@@ -303,7 +331,7 @@ function _painelTerritorio(j) {
   const atual = j.escritorio_comarca || 'rio';
   return `
     <div style="margin-bottom:1.2rem;padding:.75rem;background:var(--surface2);border:var(--borda-sub);border-radius:var(--r)">
-      <div style="font-size:.68rem;color:var(--txt3);margin-bottom:.5rem">🗺️ Território (GDD v6.0 §8) <span style="color:var(--txt4)">— reputação por comarca, cresce com vitórias locais</span></div>
+      <div style="font-size:.68rem;color:var(--txt3);margin-bottom:.5rem">Território <span style="color:var(--txt4)">— reputação por comarca, cresce com vitórias locais</span></div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.5rem">
         ${COMARCAS.map(c => {
           const v = Math.max(0, Math.min(100, rc[c.id] || 0));
@@ -370,7 +398,7 @@ function renderPerfil(j, el) {
               <span style="cursor:pointer;color:var(--navy3);font-size:.68rem;margin-left:.4rem" onclick="window._perfilEditarDescricao()">✏️ editar</span>
             </div>
             <div class="profile-hero-meta">
-              <span class="meta-tag">📅 ${j.anos_carreira || 0} anos de carreira</span>
+              <span class="meta-tag">📅 ${j.anos_carreira || 0} ${(j.anos_carreira || 0) === 1 ? 'ano' : 'anos'} de carreira</span>
               <span class="meta-tag">✅ ${aprov}% de aproveitamento</span>
               <span class="meta-tag">🏢 ${escNome}</span>
               <span class="meta-tag">👤 ${j.idade || 22} anos · Geração ${j.geracao || 1}</span>
@@ -380,7 +408,7 @@ function renderPerfil(j, el) {
 
         ${_painelNivelCarreira(j, cap, repPct)}
 
-        <div class="stat-row">
+        <div class="stat-row stat-row-4">
           <div class="stat">
             <div class="stat-label">Reputação</div>
             <div class="stat-value">${j.reputacao||0} <small>/ ${cap} cap.</small></div>
@@ -405,12 +433,12 @@ function renderPerfil(j, el) {
             <div class="stat-value" style="color:var(--amber)">${j.disposicao||80} <small>/ 100</small></div>
             <div class="stat-bar"><div class="stat-bar-fill" style="width:${j.disposicao||80}%;background:var(--amber)"></div></div>
           </div>
-          <div class="stat" title="GDD v6.0 §3.2 — 40+ reduz nota, 70+ reduz nota e estudo, 90+ é burnout">
+          <div class="stat" title="40+ reduz nota, 70+ reduz nota e estudo, 90+ é burnout">
             <div class="stat-label">😰 Estresse</div>
             <div class="stat-value" style="color:${(j.estresse||0)>=70?'var(--verm2)':(j.estresse||0)>=40?'var(--amber)':'var(--verde2)'}">${j.estresse||0} <small>/ 100</small></div>
             <div class="stat-bar"><div class="stat-bar-fill" style="width:${j.estresse||0}%;background:${(j.estresse||0)>=70?'var(--verm2)':'var(--amber)'}"></div></div>
           </div>
-          <div class="stat" title="Fôlego = 10 - Estresse/20 (GDD v6.0 §3.3)">
+          <div class="stat" title="Fôlego = 10 - Estresse/20">
             <div class="stat-label">🫁 Fôlego</div>
             <div class="stat-value">${Math.max(0,10-Math.floor((j.estresse||0)/20))} <small>/ 10</small></div>
           </div>
@@ -440,7 +468,7 @@ function renderPerfil(j, el) {
 
         <!-- Feed de atividade recente -->
         <div class="secao-header" id="perfil-atividade-secao">
-          <div class="secao-titulo">📋 Atividade Recente</div>
+          <div class="secao-titulo">Atividade Recente</div>
           <span class="secao-badge">${_calJogador(j)}</span>
         </div>
         <div id="feed-atividade">
@@ -665,7 +693,7 @@ function renderEscritorio(j, el) {
   // Advocacia solo — sem escritório formal ainda
   el.innerHTML = `
     <div class="secao-header">
-      <div class="secao-titulo">🏢 Advocacia Solo</div>
+      <div class="secao-titulo">Advocacia Solo</div>
       <button class="btn btn-sm btn-prim" onclick="window.novoProcesso && window.novoProcesso()">+ Novo caso</button>
     </div>
     <div class="card" style="text-align:center;padding:1.2rem 2rem;margin-bottom:1rem">
@@ -685,7 +713,7 @@ function renderEscritorio(j, el) {
     ${j.oab ? `<div id="carteira-processual-solo"><div style="font-size:.78rem;color:var(--ardosia);padding:.5rem 0">Carregando carteira...</div></div>` : ''}
 
     <!-- Processos ativos -->
-    <div class="secao-header"><div class="secao-titulo">📁 Meus Processos</div></div>
+    <div class="secao-header"><div class="secao-titulo">Meus Processos</div></div>
     <div id="solo-processos-lista">
       <div style="font-size:.78rem;color:var(--ardosia);padding:.5rem 0">Carregando casos...</div>
     </div>`;
@@ -985,7 +1013,7 @@ function _renderWorkspacePainel(j, el) {
   el.innerHTML = `
     <div class="esc-card-bloco" style="margin-bottom:1.1rem">
       <div class="secao-header">
-        <div class="secao-titulo">💼 Espaço de Trabalho</div>
+        <div class="secao-titulo">Espaço de Trabalho</div>
       </div>
       ${!isSolo
         ? `<div style="font-size:.8rem;color:var(--verde);font-weight:600;padding:.5rem 0">
@@ -1132,7 +1160,7 @@ function _renderEscritorioNPC(j, el) {
     ${_escHero(j, null)}
 
     <div class="secao-header">
-      <div class="secao-titulo">🏢 Meu Escritório</div>
+      <div class="secao-titulo">Meu Escritório</div>
       <span class="secao-badge" style="background:${TIER_COR[tier]}20;color:${TIER_COR[tier]}">Tier ${tier}</span>
     </div>
 
@@ -1174,7 +1202,7 @@ function _renderEscritorioNPC(j, el) {
     </div>
 
     <div class="secao-header">
-      <div class="secao-titulo">📋 Ver outras oportunidades</div>
+      <div class="secao-titulo">Ver outras oportunidades</div>
     </div>
     <div class="card" style="text-align:center;padding:1.2rem;color:var(--txt3)">
       <div style="font-size:.85rem;margin-bottom:.5rem">Quer explorar outras vagas?</div>
@@ -1227,7 +1255,7 @@ function _escMarketingPreviewCard(escId) {
   return `
   <div class="esc-card-bloco" style="margin-bottom:1.1rem">
     <div class="secao-header" style="margin-bottom:.4rem">
-      <div class="secao-titulo">📣 Marketing</div>
+      <div class="secao-titulo">Marketing</div>
       <button class="painel-btn" onclick="window.navTo('marketing',null)">ver tudo →</button>
     </div>
     <div class="stat-row stat-row-4" id="esc-marketing-preview" style="margin-bottom:0">
@@ -1293,7 +1321,7 @@ function _escProcessosPreviewCard(escId) {
   return `
   <div class="esc-card-bloco" style="margin-bottom:1.1rem">
     <div class="secao-header" style="margin-bottom:.4rem">
-      <div class="secao-titulo">⚖️ Gestão de Processos</div>
+      <div class="secao-titulo">Gestão de Processos</div>
       <button class="painel-btn" onclick="window.navTo('processos',null)">gerenciar processos →</button>
     </div>
     <div id="esc-processos-preview" style="font-size:.78rem;color:var(--txt3);padding:.5rem 0">Carregando...</div>
@@ -1368,7 +1396,12 @@ function _escAtividadeCard() {
 // pillsHtml são os <span class="pill ...">, seloHtml é opcional
 // (círculo rotacionado — só quando faz sentido, ex: prestígio/OAB).
 // ════════════════════════════════════════════════════════
+// Emoji solto no início do título da página (ex.: "📚 Artigos & Livros")
+// destoava do resto da interface — o título da capa fica só com o texto.
+const _EMOJI_INICIAL = /^(?:[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\uFE0F\u200D\u20E3]\s*)+/u;
+
 function _capaHeader(kicker, nome, pillsHtml, seloHtml) {
+  nome = String(nome ?? '').replace(_EMOJI_INICIAL, '');
   return `
   <section class="capa">
     <div class="capa-kicker">${kicker}</div>
@@ -1619,7 +1652,7 @@ function _escTesesCard() {
   return `
   <div class="esc-card-bloco" style="margin-bottom:1.1rem">
     <div class="secao-header" style="margin-bottom:.8rem">
-      <div class="secao-titulo">📚 Banco de Teses</div>
+      <div class="secao-titulo">Banco de Teses</div>
     </div>
     <div id="esc-teses-embed">
       <div style="font-size:.78rem;color:var(--txt3);padding:.5rem 0">Carregando Banco de Teses...</div>
@@ -1751,7 +1784,7 @@ function renderEquipe(j, el) {
   const estagiarios = j.estagiarios || [];
   el.innerHTML = `
     <div class="secao-header">
-      <div class="secao-titulo">👔 Equipe</div>
+      <div class="secao-titulo">Equipe</div>
       <span class="secao-badge">${estagiarios.length} membro(s)</span>
       ${j.ci >= 3 ? `<button class="btn btn-sm btn-sec secao-acao" onclick="window.abrirContratacao && window.abrirContratacao()">+ Contratar</button>` : ''}
     </div>
@@ -2027,11 +2060,11 @@ window._lancarCampanha = async function(tier) {
 };
 
 async function renderMarketing(j, el) {
-  el.innerHTML = `<div class="secao-header"><div class="secao-titulo">📣 Marketing & Reputação</div></div><div class="card">Carregando...</div>`;
+  el.innerHTML = `<div class="secao-header"><div class="secao-titulo">Marketing & Reputação</div></div><div class="card">Carregando...</div>`;
 
   const escId = j.escritorio_id;
   if (!escId || escId === 'solo') {
-    el.innerHTML = `<div class="secao-header"><div class="secao-titulo">📣 Marketing & Reputação</div></div>
+    el.innerHTML = `<div class="secao-header"><div class="secao-titulo">Marketing & Reputação</div></div>
       <div class="card" style="color:var(--txt3)">Você precisa estar em um escritório pra ter reputação/prestígio de escritório.</div>`;
     return;
   }
@@ -2121,8 +2154,8 @@ window._mktRenderTab = async function(tab, escCached) {
     const ativas = esc.campanhas_ativas || [];
     el.innerHTML = `
       <div class="card" style="font-size:.7rem;color:var(--txt3);margin-bottom:.7rem">
-        Real: custo sai do caixa do escritório (${_fmtExt(caixa)} disponível), ganho de prestígio distribuído ao longo da
-        duração — prestígio multiplica geração de oportunidades (functions/avancar_mes.js:_multiplicadorPrestigioCF).
+        O custo sai do caixa do escritório (${_fmtExt(caixa)} disponível) e o prestígio chega aos poucos, ao longo da
+        campanha. Mais prestígio = mais oportunidades de casos a cada mês.
       </div>
       ${ativas.length > 0 ? `
       <div class="esc-card-bloco" style="margin-bottom:1rem">
@@ -2191,9 +2224,8 @@ window._mktRenderTab = async function(tab, escCached) {
           <div style="font-size:.78rem;color:var(--txt3);margin-top:.6rem">Prestígio: <b style="color:var(--txt)">${prestigio}/100</b></div>
         </div>
         <div class="card" style="font-size:.74rem;color:var(--txt3);line-height:1.6">
-          Reputação e Prestígio são reais — sobem com vitórias em processos, prestígio cai com derrotas
-          (functions/processar_sentenca.js). Sem histórico mensal salvo ainda, então não dá pra mostrar
-          evolução mês a mês nem distribuição por canal — isso seria proposta.
+          Reputação e Prestígio sobem com vitórias em processos; derrotas derrubam o prestígio.
+          Campanhas de marketing aceleram esse crescimento.
         </div>
       </div>`;
     return;
@@ -2324,9 +2356,9 @@ function renderHabilidades(j, el) {
   const emEstDid = queue.some(q => q.skill === 'didatica_academica');
 
   el.innerHTML = `
-    ${_capaHeader('FICHA DE QUALIFICAÇÃO · ADVOCATUS ONLINE', '⚡ Habilidades',
+    ${_capaHeader('FICHA DE QUALIFICAÇÃO · ADVOCATUS ONLINE', 'Habilidades',
       `<span class="pill pill-cargo">Cap geral ${cap}</span><span class="pill pill-oab">Vaga: ${_vagaLabel(vaga)}</span>`
-      + `<span class="pill pill-oab" title="GDD v6.0 §3.1 — cada 'Estudar' custa energia da categoria Estudo, aloque na tela Energia">⚡ Estudo: ${window.energiaDisponivelCategoria ? window.energiaDisponivelCategoria(j, 'estudo') : '—'}</span>`
+      + `<span class="pill pill-oab" title="Cada 'Estudar' custa energia da categoria Estudo, aloque na tela Energia">⚡ Estudo: ${window.energiaDisponivelCategoria ? window.energiaDisponivelCategoria(j, 'estudo') : '—'}</span>`
       + (capJur > 50 ? `<span class="pill pill-oab" title="Bônus de teto de skill do pós-graduação (Mestrado +10% / Doutorado +25%)">Teto Skills Jur. ${capJur} (bônus pós-grad)</span>` : ''))}
 
     <table class="skills-table">

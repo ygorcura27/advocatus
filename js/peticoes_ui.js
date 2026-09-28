@@ -249,7 +249,7 @@ window.renderMercadoPeticoes = async function(j, el) {
 
     el.innerHTML = `
       <div class="secao-header">
-        <div class="secao-titulo">🏪 Mercado de Petições</div>
+        <div class="secao-titulo">Mercado de Petições</div>
         <button class="btn btn-ghost btn-sm" onclick="window.renderPeticoes(window.JOGADOR, document.getElementById('main-content'))">← Minhas Petições</button>
       </div>
 
@@ -334,7 +334,7 @@ window.renderRepertorioEscritorio = async function(j, el) {
 
     el.innerHTML = `
       <div class="secao-header">
-        <div class="secao-titulo">📚 Repertório de Petições — Escritório</div>
+        <div class="secao-titulo">Repertório de Petições — Escritório</div>
         <button class="btn btn-ghost btn-sm" onclick="window.navTo('peticoes',null)">← Minhas Petições</button>
       </div>
 
@@ -547,7 +547,7 @@ window.renderPeticaoDetalhe = async function(peticaoId, j, el) {
 
       ${CATEGORIAS_ACADEMICAS.includes(p.categoria) ? `
       <div class="esc-card-bloco" style="margin-bottom:1.1rem">
-        <div class="secao-header" style="margin-bottom:.6rem"><div class="secao-titulo" style="font-size:.85rem">🎓 Obra Acadêmica</div></div>
+        <div class="secao-header" style="margin-bottom:.6rem"><div class="secao-titulo" style="font-size:.85rem">Obra Acadêmica</div></div>
         <div class="local-info-linha"><span class="local-info-label">Citações</span><span class="local-info-valor">${p.citacoes||0}</span></div>
         <div style="font-size:.68rem;color:var(--txt4);margin-top:.3rem">Obras acadêmicas não têm fama/popularidade (nunca entram em processo) — o que conta aqui é citação.</div>
       </div>` : `

@@ -196,7 +196,7 @@ window.renderGestaoProcessos = async function(j, el) {
     return;
   }
 
-  el.innerHTML = `<div class="secao-header"><div class="secao-titulo">⚖️ Gestão de Processos</div></div><div class="card">Carregando...</div>`;
+  el.innerHTML = `<div class="secao-header"><div class="secao-titulo">Gestão de Processos</div></div><div class="card">Carregando...</div>`;
 
   const escSnap = await getDoc(doc(db, 'escritorios', escId));
   const esc = escSnap.exists() ? escSnap.data() : {};
@@ -244,7 +244,7 @@ function _renderRegrasCaptacao(esc, escId) {
         </label>
       </div>
       <div style="font-size:.66rem;color:var(--txt4);margin-bottom:.55rem">
-        GDD v6.0 §1.2 — filtra quais oportunidades entram no auto-aceite mensal (fora do filtro fica disponível pra você decidir manualmente, como hoje). Sem regra ativa, continua aceitando tudo automaticamente dentro da capacidade da equipe, igual sempre foi.
+        Filtra quais oportunidades entram no auto-aceite mensal (fora do filtro fica disponível pra você decidir manualmente, como hoje). Sem regra ativa, continua aceitando tudo automaticamente dentro da capacidade da equipe, igual sempre foi.
       </div>
       <div style="margin-bottom:.55rem">${chips}<div style="font-size:.62rem;color:var(--txt5,var(--txt4));margin-top:.15rem">nenhum tipo marcado = aceita qualquer tipo</div></div>
       <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem">
@@ -274,7 +274,7 @@ function _renderEstrategiaPadrao(j) {
     <div class="card" style="margin-bottom:1rem;padding:.8rem .9rem">
       <div style="font-weight:600;font-size:.82rem;color:var(--txt);margin-bottom:.4rem">🎭 Estratégia Padrão</div>
       <div style="font-size:.66rem;color:var(--txt4);margin-bottom:.55rem">
-        GDD v6.0 §1.2 — vale só pra decisão automática de acordo do gestor delegado ("Firmar acordos" em Gestão de Pessoas),
+        Vale só pra decisão automática de acordo do gestor delegado ("Firmar acordos" em Gestão de Pessoas),
         quando você não está por perto. Não afeta quando você mesmo tenta acordo manualmente.
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:.8rem;align-items:center;margin-bottom:.6rem">
@@ -339,7 +339,7 @@ async function _renderCorrespondentes(j, esc, escId, el) {
     <div class="card" style="margin-bottom:1rem;padding:.8rem .9rem">
       <div style="font-weight:600;font-size:.82rem;color:var(--txt);margin-bottom:.4rem">🤝 Correspondentes</div>
       <div style="font-size:.66rem;color:var(--txt4);margin-bottom:.6rem">
-        GDD v6.0 §7.5 — presença "emprestada" numa comarca sem precisar abrir filial lá. Gera reputação territorial aos poucos, cobra mensalidade fixa do caixa.
+        Presença "emprestada" numa comarca sem precisar abrir filial lá. Gera reputação territorial aos poucos, cobra mensalidade fixa do caixa.
       </div>
 
       ${comarcasAlvo.map(c => {
@@ -588,7 +588,7 @@ window.renderProcessosPool = async function(j, escId, el) {
       <div class="esc-card-bloco" style="margin-bottom:1.1rem">
         <div class="secao-header">
           <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
-            <div class="secao-titulo">⚖️ Gestão de Processos</div>
+            <div class="secao-titulo">Gestão de Processos</div>
             ${gestorNome ? `<span style="font-size:.65rem;color:var(--verde2)">👤 Gestor: ${gestorNome}</span>` : ''}
           </div>
           <div style="display:flex;gap:.3rem;flex-shrink:0">
@@ -1754,7 +1754,7 @@ function _dgPillDominio(f) {
       return `<span style="font-size:.62rem;padding:.15rem .5rem;border-radius:99px;background:${fraco?'var(--verm-bg,rgba(214,90,60,.12))':'var(--verde-bg)'};color:${fraco?'var(--verm2)':'var(--verde2)'}">${fraco?'⚠️':'✓'} ${dep.l.replace(/^\S+\s/,'')} ${nivel}/50</span>`;
     }).join('')}
   </div>
-  <div style="font-size:.6rem;color:var(--txt4);margin-top:.4rem">⚠️ domínio fraco = processo futuro nesse ramo tem chance de vitória reduzida sob esse gestor (real — reduz a eficiência usada no roll de sentença em avancar_mes.js).</div>`;
+  <div style="font-size:.6rem;color:var(--txt4);margin-top:.4rem">⚠️ domínio fraco = processo futuro nesse ramo tem chance de vitória reduzida sob esse gestor .</div>`;
 }
 
 // Índice de Aptidão (1-10) — 50% gestão (skills.gestao/100, geral) + 50%

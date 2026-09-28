@@ -188,7 +188,7 @@ window.renderWiki = function(j, el) {
   el.innerHTML = `
     ${window._capaHeader ? window._capaHeader('AJUDA · ADVOCATUS ONLINE', '❓ Wiki & Ajuda',
       '<span class="pill pill-oab">Guia rápido, sem números nem fórmulas</span>')
-      : `<div class="secao-header"><div class="secao-titulo">❓ Wiki & Ajuda</div></div>`}
+      : `<div class="secao-header"><div class="secao-titulo">Wiki & Ajuda</div></div>`}
     <div class="card" style="margin-bottom:1rem;font-size:.74rem;color:var(--txt3);line-height:1.6">
       Guia rápido de cada sistema do jogo, em linguagem simples. Não entra em números exatos, fórmulas
       ou cálculos internos — só o suficiente pra você entender pra que serve cada tela e como usá-la.

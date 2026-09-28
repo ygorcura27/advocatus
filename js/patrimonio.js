@@ -185,8 +185,8 @@ window.renderPatrimonio = function(j, el) {
   const saldoLiq   = (j.renda_calculada||0) - despTotal - custoVida;
 
   el.innerHTML = `
-        ${window._capaHeader(`PATRIMÔNIO · ${(j.nome_personagem||'—').toUpperCase()}`, '🏛️ Patrimônio Pessoal',
-          `<span class="pill pill-oab">Rep de patrimônio: +${_calcRepPat(j)}</span>`)}
+        ${window._capaHeader(`PATRIMÔNIO · ${(j.nome_personagem||'—').toUpperCase()}`, 'Patrimônio Pessoal',
+          `<span class="pill pill-oab">Rep de patrimônio: ${_calcRepPat(j) >= 0 ? '+' : ''}${_calcRepPat(j)}</span>`)}
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-bottom:1.2rem">
           ${_card4('💰','Saldo',fmt(j.dinheiro||0),'money')}
           ${_card4('📈','Renda',fmt(j.renda_calculada||0),'money')}
@@ -198,7 +198,7 @@ window.renderPatrimonio = function(j, el) {
 
         <!-- MORADIA -->
         <div class="secao-header" id="pat-moradia-secao" style="margin-top:.5rem">
-          <div class="secao-titulo">🏠 Moradia</div>
+          <div class="secao-titulo">Moradia</div>
           <span class="secao-badge">${compradaMor?'Casa própria':morId==='pais'?'Com os pais':'Aluguel'}</span>
         </div>
         ${_moradiaInfoCard(mor, !!compradaMor, despAlug, deslocamento)}
@@ -227,7 +227,7 @@ window.renderPatrimonio = function(j, el) {
         </div>
 
         <!-- TRANSPORTE -->
-        <div class="secao-header" id="pat-transporte-secao"><div class="secao-titulo">🚗 Transporte</div></div>
+        <div class="secao-header" id="pat-transporte-secao"><div class="secao-titulo">Transporte</div></div>
         <div class="grid-cards" style="margin-bottom:1.2rem">
       ${CARROS.map(cr => {
         const isAt    = cr.id === carId;

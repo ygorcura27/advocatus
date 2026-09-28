@@ -65,9 +65,9 @@ async function _carregarRanking(tipo, j) {
 
     // Atualização
     const atuEl = document.getElementById('rank-atualizacao');
-    if (snap.exists() && atuEl) {
+    if (atuEl) {
       const s = window.SERVER || {};
-      atuEl.textContent = `${s.mes_nome||'Janeiro'}, Ano ${s.ano_jogo||1}`;
+      atuEl.textContent = snap.exists() ? `${s.mes_nome||'Janeiro'}, Ano ${s.ano_jogo||1}` : 'Aguardando 1ª apuração';
     }
 
     if (!snap.exists() || !snap.data()) {

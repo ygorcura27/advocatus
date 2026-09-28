@@ -115,7 +115,7 @@ window.renderCarreiraProgressao = function(j, el) {
   const repPct  = Math.min(100, Math.round((j.reputacao||0)/cap*100));
 
   el.innerHTML = `
-    <div class="secao-header"><div class="secao-titulo">📈 Progressão de Carreira</div></div>
+    <div class="secao-header"><div class="secao-titulo">Progressão de Carreira</div></div>
 
     <div class="card" style="text-align:center;padding:1.2rem;margin-bottom:1.2rem">
       <div style="font-size:.65rem;color:var(--ardosia);text-transform:uppercase;letter-spacing:.1em">Cargo atual</div>
@@ -123,7 +123,7 @@ window.renderCarreiraProgressao = function(j, el) {
       <div style="font-size:.78rem;color:var(--ardosia2)">${cargo.desc}</div>
       <div style="display:flex;justify-content:center;gap:1.5rem;margin-top:.8rem">
         <div><div style="font-weight:700;color:var(--ouro2)">${xp} XP</div><div style="font-size:.62rem;color:var(--ardosia)">Exp. total</div></div>
-        <div><div style="font-weight:700;color:var(--perg)">${j.anos_carreira||0} anos</div><div style="font-size:.62rem;color:var(--ardosia)">Carreira</div></div>
+        <div><div style="font-weight:700;color:var(--perg)">${j.anos_carreira||0} ${(j.anos_carreira||0) === 1 ? 'ano' : 'anos'}</div><div style="font-size:.62rem;color:var(--ardosia)">Carreira</div></div>
         <div><div style="font-weight:700;color:var(--ouro2)">${j.reputacao||0}/${cap}</div><div style="font-size:.62rem;color:var(--ardosia)">Reputação</div></div>
       </div>
     </div>
@@ -136,7 +136,7 @@ window.renderCarreiraProgressao = function(j, el) {
       const pronto = parseFloat(score) >= 20; // preview: sugere ir estudar se baixo
       return `
     <div class="card" style="border-color:rgba(176,138,78,.4)">
-      <div class="card-titulo">📋 Exame OAB <span style="font-size:.72rem;color:var(--ardosia2)">(GDD v4.1 — baseado em skills)</span></div>
+      <div class="card-titulo">📋 Exame OAB</div>
       <div class="card-sub" style="margin-bottom:.5rem">
         Score estimado: <b>${score}/50</b> · Aprovação: 32,5
       </div>
@@ -152,7 +152,7 @@ window.renderCarreiraProgressao = function(j, el) {
 
     <!-- Próxima promoção -->
     ${proximo ? `
-    <div class="secao-header" style="margin-top:.5rem"><div class="secao-titulo">🎯 Próxima promoção: ${proximo.l}</div></div>
+    <div class="secao-header" style="margin-top:.5rem"><div class="secao-titulo">Próxima promoção: ${proximo.l}</div></div>
     <div class="card">
       <div style="font-size:.78rem;color:var(--ardosia2);margin-bottom:.7rem">${proximo.desc}</div>
       <div style="display:flex;flex-direction:column;gap:.4rem;font-size:.75rem">
@@ -188,13 +188,13 @@ window.renderCarreiraProgressao = function(j, el) {
 
     <!-- Carreira pública -->
     ${j.oab && (j.anos_carreira||0) >= 3 && ['jnr','pln','snr','asc'].includes(j.cargo_id) ? `
-    <div class="secao-header" style="margin-top:.5rem"><div class="secao-titulo">🔨 Carreira Pública</div></div>
+    <div class="secao-header" style="margin-top:.5rem"><div class="secao-titulo">Carreira Pública</div></div>
     <div class="card">
       <div class="card-sub" style="margin-bottom:.7rem">Você tem OAB e 3+ anos de carreira. Pode prestar concurso público.</div>
       <button class="btn btn-sec" onclick="navTo('concurso',null)">Ver concursos disponíveis →</button>
     </div>` : ''}
 
-    <div class="secao-header" style="margin-top:.5rem"><div class="secao-titulo">🎓 Aposentadoria</div></div>
+    <div class="secao-header" style="margin-top:.5rem"><div class="secao-titulo">Aposentadoria</div></div>
     <div id="aposentadoria-bloco"><div class="card" style="color:var(--ardosia)">Carregando...</div></div>`;
 
   const elApos = el.querySelector('#aposentadoria-bloco');
@@ -247,7 +247,7 @@ async function _renderAposentadoriaBloco(j, el) {
     const ativoId = j.personagem_ativo_id || 'principal';
     const outros  = lista.filter(p => p.id !== ativoId && (p.idade||0) < 75);
     const htmlTransferir = outros.length === 0 ? '' : `
-      <div class="secao-header" style="margin-top:1.2rem"><div class="secao-titulo">💰 Enviar dinheiro pra outro personagem seu</div></div>
+      <div class="secao-header" style="margin-top:1.2rem"><div class="secao-titulo">Enviar dinheiro pra outro personagem seu</div></div>
       ${outros.map(p => `
         <div class="card" style="margin-bottom:.5rem;display:flex;justify-content:space-between;align-items:center;gap:.6rem">
           <div>
@@ -260,7 +260,7 @@ async function _renderAposentadoriaBloco(j, el) {
         </div>`).join('')}`;
 
     const htmlPlanejamento = `
-      <div class="secao-header" style="margin-top:1.2rem"><div class="secao-titulo">📜 Planejamento Sucessório</div></div>
+      <div class="secao-header" style="margin-top:1.2rem"><div class="secao-titulo">Planejamento Sucessório</div></div>
       <div style="font-size:.7rem;color:var(--ardosia2);margin-bottom:.6rem">
         Reduz o ITCMD (imposto sobre a doação/herança) cobrado quando você conceder controle a um herdeiro. Feito uma vez, vale pra sempre.
       </div>
