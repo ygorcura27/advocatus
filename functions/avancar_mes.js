@@ -20,7 +20,7 @@
  */
 
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
-const { getFirestore }       = require('firebase-admin/firestore');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { logger }             = require('firebase-functions');
 const _skillsJur             = require('./skills');
 const _peticoes              = require('./peticoes');
@@ -1175,9 +1175,45 @@ async function _verificarPrazosRecursaisPoolCF(db, escId, uid, updates, novoMes,
 // ════════════════════════════════════════════════════════
 // CALLABLE PRINCIPAL
 // ════════════════════════════════════════════════════════
+// Trava por jogador: sem isso, um duplo-clique em "Avançar mês" (ou duas
+// abas abertas) rodava dois avanços em paralelo sobre o MESMO snapshot —
+// tudo que é gravado fora do doc do jogador (escritório, funcionários,
+// processos, relacionamentos, inbox) era processado duas vezes. A trava
+// expira sozinha depois de AVANCO_LOCK_TTL_MS caso a function morra no meio.
+const AVANCO_LOCK_TTL_MS = 5 * 60 * 1000;
+
 exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
 
+  const db     = getFirestore();
+  const jRef   = db.collection('jogadores').doc(request.auth.uid);
+  const lockId = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(jRef);
+    if (!snap.exists) throw new HttpsError('not-found', 'Jogador não encontrado.');
+    const lock = snap.get('avanco_lock');
+    if (lock && Date.now() - (lock.em || 0) < AVANCO_LOCK_TTL_MS) {
+      throw new HttpsError('failed-precondition', 'O mês já está sendo avançado — aguarde alguns segundos.');
+    }
+    tx.update(jRef, { avanco_lock: { id: lockId, em: Date.now() } });
+  });
+
+  try {
+    return await _avancarMesCore(request);
+  } finally {
+    try {
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(jRef);
+        if (snap.get('avanco_lock.id') === lockId) tx.update(jRef, { avanco_lock: FieldValue.delete() });
+      });
+    } catch (e) {
+      logger.warn('[AVANÇAR] Falha ao liberar trava (expira sozinha):', e.message);
+    }
+  }
+});
+
+async function _avancarMesCore(request) {
   const uid = request.auth.uid;
   const db  = getFirestore();
 
@@ -1258,7 +1294,7 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
     // pra não travar quem ainda não tem nenhum filho jogável nessa idade.
     updates.aposentado_forcado_pendente = true;
     mensagens.push({ assunto:'🎓 Aposentadoria', corpo:'Você atingiu 75 anos. Escolha um herdeiro para continuar sua dinastia.', tipo:'sistema' });
-    await _commit(db, uid, updates, mensagens, novoMes, novoAno);
+    await _commit(db, uid, updates, mensagens, novoMes, novoAno, j);
     return { ok:true, mes:`${MESES[novoMes]}, Ano ${novoAno}`, aposentado:true };
   }
 
@@ -1317,7 +1353,10 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
       renda = Math.floor(salMin + (salMax - salMin) * repF * (j.sal_mult || 1.0));
     }
   } else {
-    renda = j.honorarios_mes || 0;
+    // Honorários de quem trabalha solo já caem no caixa na hora em que são
+    // ganhos (sentença, acordo, serviços, aula dada) — honorarios_mes é só
+    // o total do mês pra exibir. Somar de novo aqui pagava tudo em dobro.
+    renda = 0;
   }
 
   const morId    = j.pat?.moradia   || 'pais';
@@ -1340,6 +1379,9 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
     if (fin.parcelas_restantes > 0) despesas += fin.parcela_mensal || 0;
   }
   despesas += (j.estagiarios || []).length * 1700;
+  // Custo dos filhos: calculado todo mês em _processarRelacionamentosMensalCF
+  // (custo_filhos_mes), mas nunca era cobrado — entra na conta do mês seguinte.
+  despesas += j.custo_filhos_mes || 0;
   const CUSTO_BASE = {
     est:600, ass:700, jnr:900, pln:1400, snr:2200,
     asc:3000, soc:4500, snm:6000,
@@ -1351,7 +1393,7 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
 
   const saldoMes   = renda - despesas - custoVida;
   updates.dinheiro = (j.dinheiro || 0) + saldoMes;
-  updates.renda_calculada     = renda;
+  updates.renda_calculada     = isSoloRenda ? (j.honorarios_mes || 0) : renda;
   updates.honorarios_mes      = 0;
 
   if (j.escritorio_proprio_id) {
@@ -1440,10 +1482,10 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
   // ── Juros da linha de crédito (GDD Seção 32) ──
   const lc = j.linha_credito;
   if (lc && lc.saldo > 0) {
+    // Juros são pagos do caixa — o saldo devedor não cresce junto (antes
+    // fazia as duas coisas, cobrando 5%/mês em vez dos 2,5% anunciados).
     const juros = Math.ceil(lc.saldo * (lc.juros_pct || 0.025));
-    const novoSaldoLC = lc.saldo + juros;
-    updates.linha_credito = { ...lc, saldo: novoSaldoLC };
-    updates.dinheiro = (updates.dinheiro || j.dinheiro || 0) - juros;
+    updates.dinheiro = (updates.dinheiro ?? j.dinheiro ?? 0) - juros;
     if (juros > 0) mensagens.push({
       assunto: '💳 Juros Linha de Crédito',
       corpo: `Saldo devedor: R$${lc.saldo.toLocaleString('pt-BR')} · Juros 2,5%: -R$${juros.toLocaleString('pt-BR')}.`,
@@ -1545,7 +1587,13 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
     updates.prazo_sair_pais = 0;
   }
 
-  const energiaGasta = j.energia_usada_mes || 0;
+  // Quem configurou os baldes por categoria (energia_alocada) nunca mexe em
+  // energia_usada_mes — o gasto real está somado em energia_usada. Ler só o
+  // campo legado fazia essas contas parecerem sempre "descansadas" (+3 de
+  // saúde mental/disposição todo mês e burnout por energia impossível).
+  const energiaGasta = j.energia_alocada
+    ? Object.values(j.energia_usada || {}).reduce((soma, v) => soma + (Number(v) || 0), 0)
+    : (j.energia_usada_mes || 0);
   let saudeMental    = j.saude_mental ?? 80;
   let disposicao     = j.disposicao   ?? 80;
 
@@ -1642,9 +1690,11 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
     });
   }
 
-  if ((IMOVEL_PERIGO[morId] || 0) === 2 && Math.random() < 0.01) {
-    const perda = Math.floor((updates.dinheiro || 0) * 0.10);
-    updates.dinheiro = Math.max(0, (updates.dinheiro || 0) - perda);
+  // Só assalta quem tem saldo positivo — com saldo negativo, "10% do saldo"
+  // era um número negativo e o Math.max(0, ...) zerava a dívida inteira.
+  if ((IMOVEL_PERIGO[morId] || 0) === 2 && (updates.dinheiro ?? 0) > 0 && Math.random() < 0.01) {
+    const perda = Math.floor(updates.dinheiro * 0.10);
+    updates.dinheiro = updates.dinheiro - perda;
     mensagens.push({ assunto:'🚨 Assalto!', corpo:`Você foi assaltado. -R$ ${perda.toLocaleString('pt-BR')} (10% do saldo).`, tipo:'urgente' });
   }
 
@@ -1747,7 +1797,7 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
       else if (pct >= 80) { bonus = salM*2; descB = '80%+ → 2 salários!'; }
       else if (pct >= 70) { bonus = salM;   descB = '70%+ → 1 salário!'; }
       if (bonus > 0) {
-        updates.dinheiro = (updates.dinheiro || 0) + bonus;
+        updates.dinheiro = (updates.dinheiro ?? j.dinheiro ?? 0) + bonus;
         mensagens.push({ assunto:'🎉 Bônus Anual', corpo:`${descB} +R$ ${bonus.toLocaleString('pt-BR')}`, tipo:'positivo' });
       }
     }
@@ -1900,7 +1950,7 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
 
   // ── SEGURO MALPRACTICE — cobrança mensal (GDD v5.1 §28) ──
   if (j.malpractice_tier && j.malpractice_custo_mensal > 0) {
-    updates.dinheiro = (updates.dinheiro || (j.dinheiro || 0)) - j.malpractice_custo_mensal;
+    updates.dinheiro = (updates.dinheiro ?? j.dinheiro ?? 0) - j.malpractice_custo_mensal;
   }
 
   // ── INTERCÂMBIO — verificar conclusão (GDD v5.1 §26) ──
@@ -1958,7 +2008,7 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
     logger.warn('[CITACOES_NPC] Erro ao processar citações:', e.message);
   }
 
-  await _commit(db, uid, updates, mensagens, novoMes, novoAno);
+  await _commit(db, uid, updates, mensagens, novoMes, novoAno, j);
 
   // Personagens no banco (multi-personagem) avançam junto — ver
   // _processarPersonagensBancoCF. Isolado num try/catch próprio pra nunca
@@ -1984,7 +2034,7 @@ exports.avancarMes = onCall({ region: 'southamerica-east1' }, async (request) =>
       rep_patrimonio: deltaRepPat,
     }
   };
-});
+}
 
 // ════════════════════════════════════════════════════════
 // DISTRIBUIÇÃO MENSAL DE PROCESSOS — portado de
@@ -2163,28 +2213,69 @@ function _processarFinanceiro(j, novoDinheiro, saldoMes) {
 // ════════════════════════════════════════════════════════
 // HELPER: salvar + inbox
 // ════════════════════════════════════════════════════════
-async function _commit(db, uid, updates, mensagens, novoMes, novoAno) {
-  const batch = db.batch();
-  batch.update(db.collection('jogadores').doc(uid), {
-    ...updates,
-    ultimo_mes_processado: updates.mes_global_pessoal || 0,
-  });
-  for (const m of mensagens) {
-    const ref = db.collection('jogadores').doc(uid).collection('inbox').doc();
-    const MESES_CF = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
-                      'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-    batch.set(ref, {
-      de: 'sistema', para_uid: uid,
-      assunto: m.assunto || '—',
-      corpo:   m.corpo   || '',
-      tipo:    'sistema',
-      tipo_noticia: m.tipo || 'neutro',
-      lida:    false,
-      criado_em: new Date().toISOString(),
-      mes_jogo_label: MESES_CF[novoMes] + ', Ano ' + novoAno,
-    });
+// Campos numéricos que vivem em 0-100 — o rebase abaixo reaplica o clamp.
+const _CAMPOS_0_100 = new Set(['reputacao', 'saude_mental', 'disposicao', 'estresse']);
+
+/**
+ * `updates` foi calculado a partir de `base` (o doc lido no INÍCIO do
+ * avanço), mas no meio do caminho várias etapas gravam direto no doc do
+ * jogador (receita recorrente de clientes, royalties, julgamentos
+ * auto-resolvidos, cursos concluídos...). Gravar `updates` por cima
+ * apagava tudo isso. Aqui, todo número que mudou no doc durante o avanço
+ * recebe a MESMA variação que o avanço calculou (atual + (novo - base)),
+ * em vez de voltar pro valor calculado sobre o snapshot velho — igual a um
+ * merge de três vias. Mapas de skills fazem o mesmo por chave.
+ */
+function _rebasearSobreAtual(updates, base, atual) {
+  const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+  const out = { ...updates };
+  for (const [k, v] of Object.entries(updates)) {
+    if (typeof v === 'number' && Number.isFinite(v)) {
+      const a = atual[k];
+      if (typeof a === 'number' && a !== base[k]) {
+        let r = a + (v - num(base[k]));
+        if (_CAMPOS_0_100.has(k)) r = Math.max(0, Math.min(100, r));
+        out[k] = r;
+      }
+    } else if ((k === 'skills' || k === 'skills_jur') && v && typeof v === 'object') {
+      const bm = base[k] || {};
+      const am = atual[k] || {};
+      const m  = { ...am };
+      for (const [sk, sv] of Object.entries(v)) {
+        m[sk] = (typeof sv === 'number' && typeof am[sk] === 'number' && am[sk] !== bm[sk])
+          ? am[sk] + (sv - num(bm[sk]))
+          : sv;
+      }
+      out[k] = m;
+    }
   }
-  await batch.commit();
+  return out;
+}
+
+async function _commit(db, uid, updates, mensagens, novoMes, novoAno, base = {}) {
+  const jRef = db.collection('jogadores').doc(uid);
+  const MESES_CF = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                    'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  await db.runTransaction(async (tx) => {
+    const atualSnap = await tx.get(jRef);
+    const atual = atualSnap.exists ? atualSnap.data() : {};
+    tx.update(jRef, {
+      ..._rebasearSobreAtual(updates, base, atual),
+      ultimo_mes_processado: updates.mes_global_pessoal || 0,
+    });
+    for (const m of mensagens) {
+      tx.set(jRef.collection('inbox').doc(), {
+        de: 'sistema', para_uid: uid,
+        assunto: m.assunto || '—',
+        corpo:   m.corpo   || '',
+        tipo:    'sistema',
+        tipo_noticia: m.tipo || 'neutro',
+        lida:    false,
+        criado_em: new Date().toISOString(),
+        mes_jogo_label: MESES_CF[novoMes] + ', Ano ' + novoAno,
+      });
+    }
+  });
 }
 
 
@@ -3858,6 +3949,8 @@ async function _gerarFilhoCF(db, uid, j, relacionamento, nomeJogador) {
 // permitir testes funcionais locais (mock) de _processarRelacionamentosMensalCF
 // e dos helpers de lock, sem precisar emular o onCall completo.
 // ════════════════════════════════════════════════════════
+exports._rebasearSobreAtual = _rebasearSobreAtual;
+exports._commit = _commit;
 exports._processarRelacionamentosMensalCF = _processarRelacionamentosMensalCF;
 exports._processarCursosMensalCF = _processarCursosMensalCF;
 exports._processarServicosMensalCF = _processarServicosMensalCF;

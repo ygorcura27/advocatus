@@ -292,7 +292,7 @@ window._alternarTema = function() {
 _atualizarBotaoTema();
 
 // ── Avançar Mês (definido aqui para garantir disponibilidade antes dos módulos) ──
-window.avancarMes = async function(forcar) {
+const _avancarMesImpl = async function(forcar) {
   const j = window.JOGADOR;
   if (!j) { window.toast && window.toast('Carregando... tente novamente.', 'ko'); return; }
 
@@ -340,6 +340,22 @@ window.avancarMes = async function(forcar) {
     } else {
       window.toast ? window.toast('Erro: ' + msg.slice(0,100), 'ko') : alert(msg);
     }
+  }
+};
+
+// Um avanço por vez: o botão fica desabilitado até a resposta chegar — um
+// duplo-clique disparava dois avanços em paralelo (o servidor agora também
+// recusa o segundo, ver functions/avancar_mes.js:AVANCO_LOCK_TTL_MS).
+window.avancarMes = async function(forcar) {
+  if (window._avancandoMes) return;
+  window._avancandoMes = true;
+  const btns = [...document.querySelectorAll('#btn-avancar-topo, #btn-avancar-mobile')];
+  btns.forEach(b => { b.disabled = true; b.setAttribute('aria-busy', 'true'); });
+  try {
+    await _avancarMesImpl(forcar);
+  } finally {
+    window._avancandoMes = false;
+    btns.forEach(b => { b.disabled = false; b.removeAttribute('aria-busy'); });
   }
 };
 

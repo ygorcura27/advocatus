@@ -442,3 +442,6 @@ a:focus-visible, button:focus-visible, .btn:focus-visible, .nav-item:focus-visib
   .main-content > * { animation: none !important; }
   .nav-item:hover, .card:hover, .proc-card:hover, .stat-row .stat:hover, .btn:hover { transform: none !important; }
 }
+
+/* Avançar mês em andamento (jogo.html:window.avancarMes desabilita o botão) */
+.btn-avancar:disabled, .btn-avancar-mobile:disabled { opacity: .6; cursor: progress; transform: none; filter: saturate(.7); }
