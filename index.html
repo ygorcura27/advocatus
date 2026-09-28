@@ -4,8 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Advocatus Online</title>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:ital,wght@0,400;0,600;0,700;1,400;1,600&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,600&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700;800&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=JetBrains+Mono:wght@400;500;700&family=IBM+Plex+Serif:ital,wght@0,400;0,600;0,700;1,400;1,600&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,600&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/visual-v3.css">
 <style>
 /* ── Estilos específicos da tela de entrada ── */
 body { background: var(--couro); overflow: hidden; }
@@ -373,6 +376,119 @@ body { background: var(--couro); overflow: hidden; }
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   Tela de entrada — repaginada v3 (hero + destaques + cartão de login)
+   ═══════════════════════════════════════════════════════════ */
+body { background: #070B13; }
+.entrada-wrap { grid-template-columns: 1fr 480px; }
+.entrada-visual {
+  align-items: flex-start; justify-content: center; gap: 2.2rem;
+  padding: 4rem clamp(2rem, 6vw, 6rem);
+  background:
+    radial-gradient(900px 520px at 10% 0%, rgba(25,211,162,.16), transparent 60%),
+    radial-gradient(700px 500px at 90% 100%, rgba(226,189,116,.14), transparent 60%),
+    linear-gradient(160deg, #0E1627 0%, #070B13 100%);
+}
+.entrada-visual::before {
+  background-image:
+    linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse at 30% 40%, #000 20%, transparent 75%);
+          mask-image: radial-gradient(ellipse at 30% 40%, #000 20%, transparent 75%);
+}
+.entrada-visual::after {
+  content: ""; position: absolute; right: -120px; top: 50%; width: 520px; height: 520px;
+  transform: translateY(-50%); pointer-events: none; opacity: .07;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23E2BD74' stroke-width='.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v17M7 20h10M5 7h14M5 7l-2.5 6a3 3 0 0 0 5 0zM19 7l-2.5 6a3 3 0 0 0 5 0z'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+.entrada-visual > * { position: relative; z-index: 1; }
+.entrada-visual-logo { text-align: left; display: flex; align-items: center; gap: .9rem; flex-wrap: wrap; }
+.entrada-visual-logo .marca { font-size: 1.6rem; font-weight: 600; color: #fff; letter-spacing: -.01em; }
+.entrada-visual-logo .marca em { margin-left: .12em; background: var(--v3-grad-ouro); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.entrada-visual-logo .subtitulo {
+  margin: 0; font-size: .62rem; letter-spacing: .18em; color: var(--navy4);
+  padding: .3rem .7rem; border-radius: 999px; border: 1px solid rgba(25,211,162,.3); background: rgba(25,211,162,.08);
+}
+.entrada-hero { max-width: 620px; }
+.entrada-headline {
+  font-family: var(--font-serif); font-weight: 600; color: #fff;
+  font-size: clamp(2.4rem, 4.6vw, 4.2rem); line-height: 1.02; letter-spacing: -.035em;
+  margin: 0 0 1.1rem;
+}
+.entrada-headline span { background: var(--v3-grad-ouro); -webkit-background-clip: text; background-clip: text; color: transparent; font-style: italic; }
+.entrada-lead { font-size: 1.05rem; line-height: 1.65; color: var(--txt2); max-width: 540px; margin-bottom: 1.8rem; }
+.entrada-features { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; max-width: 600px; }
+.entrada-features li {
+  display: flex; align-items: center; gap: .8rem; padding: .85rem .95rem;
+  border-radius: 14px; border: 1px solid rgba(160,180,210,.12);
+  background: rgba(255,255,255,.03); backdrop-filter: blur(6px);
+  transition: transform .25s var(--v3-ease), border-color .25s, background .25s;
+}
+.entrada-features li:hover { transform: translateY(-2px); border-color: rgba(25,211,162,.35); background: rgba(25,211,162,.05); }
+.entrada-features b { display: block; font-size: .86rem; color: var(--txt); font-weight: 600; }
+.entrada-features small { display: block; font-size: .72rem; color: var(--txt3); margin-top: .1rem; }
+.ef-ic {
+  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(25,211,162,.1); border: 1px solid rgba(25,211,162,.25); color: var(--navy3);
+}
+.ef-ic svg, .login-selo svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.entrada-sep { margin: 0; width: 100%; max-width: 600px; background: linear-gradient(90deg, rgba(226,189,116,.35), transparent); }
+.entrada-taglines { text-align: left; max-width: 600px; }
+.tagline-item { font-family: var(--font-serif); font-size: 1.1rem; color: var(--txt2); }
+.entrada-stats { gap: .7rem; flex-wrap: wrap; }
+.est-stat {
+  text-align: left; padding: .8rem 1.1rem; border-radius: 14px; min-width: 140px;
+  border: 1px solid rgba(160,180,210,.12); background: rgba(255,255,255,.03);
+}
+.est-stat .val { font-size: 1.35rem; letter-spacing: -.02em; color: var(--ouro); }
+.est-stat .lbl { font-weight: 600; letter-spacing: .12em; }
+
+.entrada-painel {
+  background: rgba(10,15,26,.9); border-left: 1px solid rgba(160,180,210,.1);
+  box-shadow: -30px 0 80px -40px rgba(0,0,0,.9);
+}
+#tela-login { gap: 1.4rem; }
+.login-selo {
+  width: 64px; height: 64px; margin: 0 auto 1rem; border-radius: 18px;
+  display: flex; align-items: center; justify-content: center; color: #1B1406;
+  background: var(--v3-grad-ouro);
+  box-shadow: 0 14px 40px -12px rgba(226,189,116,.6), inset 0 1px 0 rgba(255,255,255,.4);
+}
+.login-selo svg { width: 32px; height: 32px; stroke-width: 1.6; }
+#tela-login h2 { font-family: var(--font-serif); font-size: 1.9rem; color: #fff; letter-spacing: -.02em; }
+#tela-login p { color: var(--txt3); font-size: .88rem; }
+.btn-google {
+  justify-content: center; border-radius: 12px; padding: .95rem 1.2rem; font-size: .92rem;
+  box-shadow: 0 10px 30px -12px rgba(0,0,0,.7);
+}
+.btn-google:hover { box-shadow: 0 14px 36px -10px rgba(25,211,162,.35); }
+.btn-prim { border-radius: 12px; background: var(--v3-grad-acento); color: #04241B; letter-spacing: .06em; box-shadow: var(--sombra-navy); }
+.btn-prim:hover { background: var(--v3-grad-acento); filter: brightness(1.06); }
+.btn-sec-criacao { border-radius: 12px; }
+.campo input, .campo select { border-radius: 10px; border-color: rgba(160,180,210,.18); color: var(--txt); }
+.carreira-card { border-radius: 14px; border-color: rgba(160,180,210,.14); }
+.carreira-card .nm { color: var(--txt); }
+.criacao-progresso-bar { height: 6px; border-radius: 999px; }
+.criacao-progresso-fill { background: var(--v3-grad-acento); border-radius: 999px; }
+#tela-criacao h2 { font-family: var(--font-serif); font-size: 1.6rem; color: #fff; letter-spacing: -.02em; }
+
+@media (max-width: 1100px) { .entrada-features { grid-template-columns: 1fr; } }
+/* No celular a capa volta (compacta) acima do login, em vez de sumir. */
+@media (max-width: 768px) {
+  body { overflow: auto; }
+  .entrada-wrap { grid-template-columns: 1fr; }
+  .entrada-visual { display: flex; padding: 2.2rem 1.25rem 1.5rem; gap: 1.2rem; }
+  .entrada-visual::after, .entrada-features, .entrada-sep, .entrada-taglines { display: none; }
+  .entrada-headline { font-size: 2.2rem; }
+  .entrada-lead { font-size: .92rem; margin-bottom: 0; }
+  .est-stat { min-width: 0; flex: 1; padding: .6rem .7rem; }
+  .est-stat .val { font-size: 1rem; }
+  .entrada-painel { box-shadow: none; border-top: 1px solid rgba(160,180,210,.1); }
+  #tela-login { padding: 2rem 1.25rem 2.5rem; }
+}
 </style>
 </head>
 <body>
@@ -391,6 +507,17 @@ body { background: var(--couro); overflow: hidden; }
     <div class="entrada-visual-logo">
       <div class="marca">Advocatus<em>Online</em></div>
       <div class="subtitulo">Simulador Jurídico Multiplayer</div>
+    </div>
+
+    <div class="entrada-hero">
+      <h1 class="entrada-headline">Do estágio ao <span>Sócio Nominal</span>.</h1>
+      <p class="entrada-lead">Aprove na OAB, vença causas do 1º grau ao STF, monte seu escritório e dispute o topo do ranking com outros advogados.</p>
+      <ul class="entrada-features">
+        <li><span class="ef-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v17M7 20h10M5 7h14M5 7l-2.5 6a3 3 0 0 0 5 0zM19 7l-2.5 6a3 3 0 0 0 5 0z"/></svg></span><div><b>Processos reais</b><small>Petições, provas, sentenças e recursos</small></div></li>
+        <li><span class="ef-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 21V9l8-5 8 5v12"/><path d="M9 21v-6h6v6"/></svg></span><div><b>Seu escritório</b><small>Contrate, capte clientes, cresça</small></div></li>
+        <li><span class="ef-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 19h18"/><path d="M6 19V11M11 19V6M16 19v-9M21 19V4"/></svg></span><div><b>Carreira e fortuna</b><small>Promoções, investimentos, patrimônio</small></div></li>
+        <li><span class="ef-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 5H5a3 3 0 0 0 3 4M16 5h3a3 3 0 0 1-3 4"/><path d="M12 13v3M9 20h6"/></svg></span><div><b>Multiplayer</b><small>Rankings, prêmios e rivais reais</small></div></li>
+      </ul>
     </div>
 
     <div class="entrada-sep"></div>
@@ -436,7 +563,7 @@ body { background: var(--couro); overflow: hidden; }
     <!-- Tela de login -->
     <div id="tela-login">
       <div style="text-align:center">
-        <div style="font-size:2rem;margin-bottom:.4rem">⚖️</div>
+        <div class="login-selo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v17M7 20h10M5 7h14M5 7l-2.5 6a3 3 0 0 0 5 0zM19 7l-2.5 6a3 3 0 0 0 5 0z"/></svg></div>
         <h2>Bem-vindo(a)</h2>
       </div>
       <p>Entre com sua conta Google para iniciar ou continuar sua carreira jurídica.</p>

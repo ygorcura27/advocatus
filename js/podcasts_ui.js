@@ -20,7 +20,7 @@ window.renderConvitesMidia = async function(j, el) {
 
   el.innerHTML = `
     <div class="secao-header">
-      <div class="secao-titulo">🎙️ Aparições na Internet</div>
+      <div class="secao-titulo">Aparições na Internet</div>
     </div>
     <div style="font-size:.78rem;color:var(--txt3);margin-bottom:1rem">
       Convites de podcasts e canais jurídicos — chegam ao escritório (o sócio/gestor escolhe quem vai)

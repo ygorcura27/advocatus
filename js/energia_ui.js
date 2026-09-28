@@ -102,7 +102,7 @@ window.renderEnergia = async function(j, el) {
       ` : ''}
       ${cat === 'supervisao' && !bloqueado ? `
       <div style="margin-top:.5rem;font-size:.66rem;color:var(--txt3);border-top:1px dashed var(--txt5,rgba(255,255,255,.1));padding-top:.4rem">
-        🎯 <b>Supervisão do Sócio</b> (GDD §7.4): horas alocadas aqui multiplicam a produção de toda a carteira automática (NPCs).
+        🎯 <b>Supervisão do Sócio</b>: horas alocadas aqui multiplicam a produção de toda a carteira automática (NPCs).
         Modificador atual: <b id="energia-mod-supervisao" style="color:var(--verde2)">${window.calcularModSupervisaoSocio({ energia_alocada: alocacao, disposicao: j.disposicao }).toFixed(2)}x</b>
       </div>` : ''}
     </div>`;
@@ -111,7 +111,7 @@ window.renderEnergia = async function(j, el) {
   el.innerHTML = `
     <div style="max-width:640px">
       <div style="margin-bottom:.8rem"><button class="btn btn-ghost btn-sm" onclick="window.navTo('perfil',null)">← Perfil</button></div>
-      <h2 style="font-family:var(--font-serif);font-size:1.3rem;margin-bottom:.3rem">⚡ Energia por Categoria</h2>
+      <h2 style="font-family:var(--font-serif);font-size:1.3rem;margin-bottom:.3rem">Energia por Categoria</h2>
       <div style="font-size:.74rem;color:var(--txt3);margin-bottom:1rem">
         ${configurado
           ? 'Ajuste como sua energia mensal se divide entre as 6 frentes. O total não pode passar do seu teto.'

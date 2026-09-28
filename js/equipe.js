@@ -129,7 +129,7 @@ window.renderEquipe = async function(j, el) {
   if (!j.escritorio_proprio_id && j.escritorio_empregado_id) {
     el.innerHTML = `
       <div style="margin-bottom:.8rem"><button class="btn btn-ghost btn-sm" onclick="window.navTo('escritorio',null)">← Escritório</button></div>
-      <div class="secao-header"><div class="secao-titulo">👥 Equipe — ${j.escritorio_nome||'Escritório'}</div></div>
+      <div class="secao-header"><div class="secao-titulo">Equipe — ${j.escritorio_nome||'Escritório'}</div></div>
       <div class="card" style="text-align:center;padding:1.6rem;color:var(--txt3)">
         🏢 Este escritório é <b>autogerenciado</b> pela própria estrutura (NPC).<br><br>
         Você atua como advogado contratado e não participa da gestão de contratações,
@@ -143,7 +143,7 @@ window.renderEquipe = async function(j, el) {
   const escId = j.escritorio_proprio_id || j.escritorio_empregado_id;
   if (!escId) {
     el.innerHTML = `
-      <div class="secao-header"><div class="secao-titulo">👥 Equipe</div></div>
+      <div class="secao-header"><div class="secao-titulo">Equipe</div></div>
       <div class="card" style="text-align:center;padding:2rem;color:var(--txt3)">
         Você precisa ter um escritório próprio para gerenciar contratações.<br>
         <span style="font-size:.72rem">Abra seu escritório em <b>Escritório → Criar Escritório</b>.</span>
@@ -168,7 +168,7 @@ window.renderEquipe = async function(j, el) {
     const fSnap2 = await getDocs(collection(db, 'escritorios', escId, 'funcionarios'));
     const totalFuncs = fSnap2.docs.filter(d => d.data().ativo !== false).length;
     el.innerHTML = `
-      <div class="secao-header"><div class="secao-titulo">👥 Equipe — ${esc.nome}</div></div>
+      <div class="secao-header"><div class="secao-titulo">Equipe — ${esc.nome}</div></div>
       <div class="card" style="text-align:center;padding:1.6rem;color:var(--txt3)">
         🏢 Este escritório é <b>autogerenciado</b>.<br><br>
         Você atua como advogado contratado e não participa da gestão de contratações,
@@ -228,7 +228,7 @@ window.renderEquipe = async function(j, el) {
               <div class="equipe-hero-badge">
                 <span class="l">Folha de pagamento</span><span class="v verm">-${_fmtK(totalSalarios + cap.custo_fixo)}<small>/mês</small></span>
               </div>
-              <div class="equipe-hero-badge" style="cursor:pointer" onclick="window.navTo('energia',null)" title="GDD v6.0 §7.4 — horas alocadas em Supervisão (tela Energia) multiplicam a carteira automática">
+              <div class="equipe-hero-badge" style="cursor:pointer" onclick="window.navTo('energia',null)" title="Horas alocadas em Supervisão (tela Energia) multiplicam a carteira automática">
                 <span class="l">🎯 Supervisão do Sócio</span><span class="v" style="color:var(--verde2)">${(window.calcularModSupervisaoSocio ? window.calcularModSupervisaoSocio(j) : 1.0).toFixed(2)}x</span>
               </div>
             </div>
@@ -936,7 +936,7 @@ window.renderTreinamento = async function(j, el) {
     </div>
     <div class="esc-card-bloco">
       <div class="secao-header" style="margin-bottom:.4rem">
-        <div class="secao-titulo">📖 Estudo Autônomo</div>
+        <div class="secao-titulo">Estudo Autônomo</div>
       </div>
       <div style="font-size:.68rem;color:var(--txt4);line-height:1.6;margin-bottom:.6rem">
         Todo NPC ativo estuda 1 skill por mês sozinho (-20⚡ NPC), cobrindo qualquer skill real — geral, jurídica,

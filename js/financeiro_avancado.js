@@ -137,12 +137,10 @@ window.renderFinanceiroAvancado = async function(j, el) {
   const count = (inv.renda_fixa||[]).length + (inv.fundos||[]).length + (inv.imovel_renda?1:0) + (inv.firma_npc||[]).length;
 
   el.innerHTML = `
-    ${window._capaHeader(`FINANCEIRO · ${(j.nome_personagem||'—').toUpperCase()}`, '📊 Investimentos', '')}
+    ${window._capaHeader(`FINANCEIRO · ${(j.nome_personagem||'—').toUpperCase()}`, 'Investimentos', '')}
     <div class="card" style="font-size:.7rem;color:var(--txt3);margin-bottom:1rem;line-height:1.6">
-      4 categorias reais (functions/financeiro.js, GDD Seção 32, rodam todo mês em avancar_mes.js): Renda Fixa, Fundos,
-      Imóvel para Renda, Firmas NPC. Ações (B3) e Criptomoedas (functions/investimentos_mercado.js) também são reais —
-      compra/venda persiste, preço sempre re-checado no servidor via API pública grátis (CoinGecko pra cripto,
-      brapi.dev pra ações — 3 tickers, único plano sem custo dessa API).
+      Faça seu dinheiro trabalhar: Renda Fixa, Fundos, Imóvel para Renda e participação em Firmas rendem a cada mês.
+      Em Ações (B3) e Criptomoedas você compra e vende com cotações reais do mercado.
     </div>
 
     <div class="stat-row">
@@ -262,8 +260,8 @@ window._invRenderTab = function(tab) {
           </div>
         </section>
         <section class="painel">
-          <div class="painel-head"><span class="painel-titulo">Evolução do Patrimônio</span><span class="painel-link">ilustrativo — sem histórico real salvo</span></div>
-          <div style="padding:1.5rem 1.1rem;font-size:.72rem;color:var(--txt4);text-align:center">Sem histórico de patrimônio salvo — o jogo real não guarda isso hoje.</div>
+          <div class="painel-head"><span class="painel-titulo">Evolução do Patrimônio</span></div>
+          <div style="padding:1.5rem 1.1rem;font-size:.72rem;color:var(--txt4);text-align:center">O histórico do seu patrimônio aparecerá aqui em breve.</div>
         </section>
       </div>
       <section class="painel" style="margin-top:1.1rem">

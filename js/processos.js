@@ -2472,7 +2472,7 @@ window.renderCarteiraProcessual = async function(el) {
   ];
 
   el.innerHTML = `
-    <div class="secao-header"><div class="secao-titulo">📁 Carteira Processual</div></div>
+    <div class="secao-header"><div class="secao-titulo">Carteira Processual</div></div>
     <div style="font-size:.72rem;color:var(--txt3);margin-bottom:1rem">Acompanhe processos aguardando sua decisão de recurso, recursos disponíveis para sustentar, e prazos.</div>
     ${procs.length === 0 ? '<div class="card" style="text-align:center;padding:2rem;color:var(--txt3)">Nenhum processo em fila de recurso.</div>' :
       procs.map(p => {
@@ -2558,7 +2558,7 @@ window.renderPoolEscritorio = async function(el) {
   const uid = j.uid || window.JOGADOR_UID;
 
   el.innerHTML = `
-    <div class="secao-header"><div class="secao-titulo">🏢 Pool do Escritório</div></div>
+    <div class="secao-header"><div class="secao-titulo">Pool do Escritório</div></div>
     <div style="font-size:.72rem;color:var(--txt3);margin-bottom:1rem">Casos colaborativos disponíveis para qualquer funcionário do escritório trabalhar.</div>
     ${casos.length === 0 ? '<div class="card" style="text-align:center;padding:2rem;color:var(--txt3)">Nenhum caso no pool no momento. Capte um novo caso para o escritório.</div>' :
       casos.map(p => {

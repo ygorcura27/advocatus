@@ -87,7 +87,7 @@ function renderBlocoUpgradeTier(esc, j) {
 
   return `
     <div class="secao-header" style="margin-top:1rem">
-      <div class="secao-titulo">⬆️ Upgrade — Tier ${tierAtual} → ${tierAtual+1}</div>
+      <div class="secao-titulo">Upgrade — Tier ${tierAtual} → ${tierAtual+1}</div>
     </div>
     <div class="card" style="background:var(--surface2)">
       ${linha('Capital', `R$ ${caixa.toLocaleString('pt-BR')}`, `R$ ${check.capitalNecessario.toLocaleString('pt-BR')}`, caixa>=check.capitalNecessario)}

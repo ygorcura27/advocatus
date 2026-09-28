@@ -30,7 +30,7 @@ const _AL_AREAS = [
 ];
 
 window.renderArtigosLivros = async function(j, el) {
-  el.innerHTML = `<div class="secao-header"><div class="secao-titulo">📚 Artigos & Livros</div></div><div class="card">Carregando...</div>`;
+  el.innerHTML = `<div class="secao-header"><div class="secao-titulo">Artigos & Livros</div></div><div class="card">Carregando...</div>`;
 
   const grau = j.posgrad_concluido;
   const podeArtigo = !!grau;

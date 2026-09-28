@@ -21,7 +21,7 @@ function _impTempo(iso) {
 }
 
 window.renderImprensa = async function(j, el) {
-  el.innerHTML = `<div class="secao-header"><div class="secao-titulo">📰 Imprensa Jurídica</div></div><div class="card">Carregando...</div>`;
+  el.innerHTML = `<div class="secao-header"><div class="secao-titulo">Imprensa Jurídica</div></div><div class="card">Carregando...</div>`;
 
   let noticias = [];
   try {
@@ -29,7 +29,7 @@ window.renderImprensa = async function(j, el) {
     const r = await fn({ limite: 30 });
     noticias = r.data.noticias || [];
   } catch (e) {
-    el.innerHTML = `<div class="secao-header"><div class="secao-titulo">📰 Imprensa Jurídica</div></div><div class="card" style="color:var(--txt4)">Erro ao carregar notícias.</div>`;
+    el.innerHTML = `<div class="secao-header"><div class="secao-titulo">Imprensa Jurídica</div></div><div class="card" style="color:var(--txt4)">Erro ao carregar notícias.</div>`;
     return;
   }
 

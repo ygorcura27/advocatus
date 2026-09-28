@@ -968,22 +968,24 @@ a:hover { color: var(--txt); }
 }
 
 /* Stat row — grade dividida (Perfil) */
+/* Flex com quebra (não grid fixo de 6 colunas): cada linha estica pra
+   ocupar a largura toda, então 4 ou 8 stats não deixam mais "buracos"
+   vazios no fim da grade. */
 .stat-row {
-  display: grid; grid-template-columns: repeat(6, 1fr); gap: 1px;
+  display: flex; flex-wrap: wrap; gap: 1px;
   background: var(--borda2); border: var(--borda2); border-radius: 3px;
   overflow: hidden; margin-bottom: 1.2rem;
 }
-.stat-row .stat { background: var(--surface); padding: .8rem .9rem; }
+.stat-row .stat { background: var(--surface); padding: .8rem .9rem; flex: 1 1 130px; min-width: 0; }
 .stat-row .stat-label { font-size: .62rem; color: var(--txt3); text-transform: uppercase; letter-spacing: .04em; margin-bottom: .3rem; }
 .stat-row .stat-value { font-family: var(--font-mono); font-size: 1.05rem; font-weight: 600; color: var(--txt); }
 .stat-row .stat-value small { font-size: .6rem; font-weight: 400; color: var(--txt4); }
 .stat-row .stat-value.up { color: var(--verde2); }
 .stat-row .stat-bar { height: 4px; background: var(--bg2); border-radius: 2px; overflow: hidden; margin-top: .45rem; }
 .stat-row .stat-bar-fill { height: 100%; border-radius: 2px; }
-@media (max-width: 720px) { .stat-row { grid-template-columns: repeat(3, 1fr); } .stat-row .stat:nth-child(n+4) { border-top: 1px solid var(--borda2); } }
-@media (max-width: 460px) { .stat-row { grid-template-columns: repeat(2, 1fr); } }
-.stat-row-4 { grid-template-columns: repeat(4, 1fr); }
-@media (max-width: 720px) { .stat-row-4 { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 460px) { .stat-row .stat { flex-basis: calc(50% - 1px); } }
+.stat-row-4 .stat { flex-basis: calc(25% - 1px); }
+@media (max-width: 720px) { .stat-row-4 .stat { flex-basis: calc(50% - 1px); } }
 
 .membro-prod-bar { height: 4px; background: var(--bg2); border-radius: 2px; overflow: hidden; }
 .membro-prod-fill { height: 100%; border-radius: 2px; }

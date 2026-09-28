@@ -142,7 +142,7 @@ window.renderVidaPessoal = async function(j, el) {
 
     <!-- Relacionamentos ativos -->
     <div class="secao-header" style="margin-top:1.2rem">
-      <div class="secao-titulo">💑 Relacionamentos</div>
+      <div class="secao-titulo">Relacionamentos</div>
       <button class="btn btn-sm btn-prim" onclick="window.abrirConhecerPessoas()">+ Conhecer pessoas</button>
     </div>
     ${relacionamentos.length === 0
@@ -155,7 +155,7 @@ window.renderVidaPessoal = async function(j, el) {
     <!-- Ex-cônjuge separado/a -->
     ${exConjuges.length > 0 ? `
       <div class="secao-header" style="margin-top:1.2rem">
-        <div class="secao-titulo">💔 Ex-cônjuge</div>
+        <div class="secao-titulo">Ex-cônjuge</div>
         <span class="secao-badge" style="background:var(--verm3)20;color:var(--verm2)">Separado/a</span>
       </div>
       ${exConjuges.map(r => _cardExConjuge(r, j)).join('')}
@@ -164,7 +164,7 @@ window.renderVidaPessoal = async function(j, el) {
     <!-- Filhos -->
     ${filhos.length > 0 ? `
       <div class="secao-header" style="margin-top:1.2rem">
-        <div class="secao-titulo">👶 Filhos</div>
+        <div class="secao-titulo">Filhos</div>
         <span class="secao-badge">${filhos.length}</span>
       </div>
       ${filhos.map(f => _cardFilho(f)).join('')}` : ''}

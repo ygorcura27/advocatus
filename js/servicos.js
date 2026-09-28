@@ -116,7 +116,7 @@ window.renderClientes = async function(j, el) {
   const escId = j.escritorio_proprio_id;
   if (!escId) {
     el.innerHTML = `
-      <div class="secao-header"><div class="secao-titulo">📁 Clientes</div></div>
+      <div class="secao-header"><div class="secao-titulo">Clientes</div></div>
       <div class="card" style="text-align:center;padding:2rem;color:var(--txt3)">
         Oportunidades de serviços e carteira de clientes só estão disponíveis para
         quem possui <b>escritório próprio</b>.<br>
@@ -163,7 +163,7 @@ window.renderClientes = async function(j, el) {
  
     <!-- Oportunidades do mês -->
     <div class="secao-header" style="margin-top:1rem">
-      <div class="secao-titulo">✨ Oportunidades do Mês</div>
+      <div class="secao-titulo">Oportunidades do Mês</div>
       <span class="secao-badge">${oportunidades.length} disponível(is)</span>
     </div>
     ${oportunidades.length === 0
@@ -174,7 +174,7 @@ window.renderClientes = async function(j, el) {
  
     <!-- Carteira de clientes -->
     <div class="secao-header" style="margin-top:1.2rem">
-      <div class="secao-titulo">📒 Carteira de Clientes</div>
+      <div class="secao-titulo">Carteira de Clientes</div>
     </div>
     <div id="carteira-clientes-container"></div>
   `;

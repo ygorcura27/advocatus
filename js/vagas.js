@@ -140,7 +140,7 @@ window.renderVagas = async function(j, el) {
 
     ${convites.length > 0 ? `
     <div class="secao-header">
-      <div class="secao-titulo">📬 Convites Recebidos</div>
+      <div class="secao-titulo">Convites Recebidos</div>
       <span class="secao-badge" style="background:var(--ouro-bg);color:var(--ouro2)">${convites.length} pendente(s)</span>
     </div>
     <div style="display:flex;flex-direction:column;gap:.5rem;margin-bottom:1.4rem">
@@ -148,7 +148,7 @@ window.renderVagas = async function(j, el) {
     </div>` : ''}
 
     <div class="secao-header">
-      <div class="secao-titulo">🏢 Vagas Disponíveis</div>
+      <div class="secao-titulo">Vagas Disponíveis</div>
       <span class="secao-badge">${comVaga.length} vaga(s) abertas</span>
     </div>
     <div style="font-size:.75rem;color:var(--txt3);margin-bottom:1rem;padding:.6rem;background:var(--surface2);border:var(--borda);border-radius:var(--r)">
@@ -227,7 +227,7 @@ function _cardEscritorioAtual(j) {
 
   return `
     <div class="secao-header" style="margin-top:1.2rem">
-      <div class="secao-titulo">🏢 Seu Escritório Atual</div>
+      <div class="secao-titulo">Seu Escritório Atual</div>
     </div>
     <div class="card" style="border-left:3px solid ${_corTier(escNPC.tier)};background:var(--navy-light)">
       <div style="font-weight:700;color:var(--txt);margin-bottom:.3rem">${escNPC.nome}</div>

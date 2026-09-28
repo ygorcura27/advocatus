@@ -56,7 +56,7 @@ function _reqLinha(label, atual, min) {
 }
 
 window.renderPosGraduacao = async function(j, el) {
-  el.innerHTML = `<div class="secao-header"><div class="secao-titulo">🎓 Pós-Graduação</div></div><div class="card">Carregando...</div>`;
+  el.innerHTML = `<div class="secao-header"><div class="secao-titulo">Pós-Graduação</div></div><div class="card">Carregando...</div>`;
   const skJur = j.skills_jur || {};
   const status = j.posgrad_status;
 

@@ -42,11 +42,11 @@ function _statusBadge(status) {
 }
 
 window.renderAssembleiaSocios = async function(j, el) {
-  el.innerHTML = `<div class="secao-header"><div class="secao-titulo">🏛️ Assembleia de Sócios</div></div><div class="card">Carregando...</div>`;
+  el.innerHTML = `<div class="secao-header"><div class="secao-titulo">Assembleia de Sócios</div></div><div class="card">Carregando...</div>`;
 
   const escId = j.escritorio_id;
   if (!escId || escId === 'solo') {
-    el.innerHTML = `<div class="secao-header"><div class="secao-titulo">🏛️ Assembleia de Sócios</div></div>
+    el.innerHTML = `<div class="secao-header"><div class="secao-titulo">Assembleia de Sócios</div></div>
       <div class="card" style="color:var(--txt3)">Você precisa estar em um escritório para participar de uma assembleia.</div>`;
     return;
   }
@@ -62,7 +62,7 @@ window.renderAssembleiaSocios = async function(j, el) {
   const votacoes = votSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
   if (socios.length < 2) {
-    el.innerHTML = `<div class="secao-header"><div class="secao-titulo">🏛️ Assembleia de Sócios</div></div>
+    el.innerHTML = `<div class="secao-header"><div class="secao-titulo">Assembleia de Sócios</div></div>
       <div class="card" style="color:var(--txt3)">Assembleia exige pelo menos 2 sócios. Convide um sócio na tela Escritório pra habilitar votações.</div>`;
     return;
   }
