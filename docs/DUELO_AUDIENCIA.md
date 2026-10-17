@@ -167,6 +167,56 @@ O personagem escolhe **1 traço ao virar Advogado Pleno** e **1 segundo ao virar
 
 O balanceamento do desafio: traços dão vantagem, nunca vitória garantida, e cada um tem uma fraqueza (o Blefe pode sair caro, o Técnico irrita juiz humanista).
 
+### 8.1 Traços adicionais
+
+Mesma regra: 3 níveis, ligado a um skill/atributo, sempre com uma fraqueza. Ficam em quatro famílias para o jogador montar um "estilo" (o 1º traço sai da família que quiser; o 2º pode ser de outra, para combos).
+
+**Tribunal — dentro do duelo**
+
+| Traço | Inspiração | Ligado a | Efeito | Fraqueza |
+|---|---|---|---|---|
+| **Contra-interrogatório Letal** | Mickey Haller (*O Poder e a Lei*) | Oratória | Ativa: numa rodada de testemunha, força uma contradição: a jogada adversária vira **sua** carta (força 50%) | Se a testemunha não tem contradição, −3 compostura |
+| **Objeção!** | Phoenix Wright | Direito processual | Passiva: vícios do adversário aparecem sempre (telegrafia de vício nível máximo). Ativa: anula uma jogada sem vício, uma vez | Juiz pragmático −1 paciência a cada objeção |
+| **Voz da Razão** | Atticus Finch | Retórica + Charm | Juízes humanistas e garantistas começam +8 convencimento; recupera paciência ao argumentar | Contra juiz tributarista/formalista, −10% de ganho |
+| **Teatro Total** | Alan Shore / Denny Crane | Charm + Oratória | Alegações finais ×2,2 e chance de "virada" se você estiver até 10 pontos atrás | Juiz formalista: −3 paciência no ato; se falhar, vira piada na imprensa |
+| **Leitura de Precedentes** | Diane Lockhart | Pesquisa + Raciocínio Jurídico | Toda carta de precedente/jurisprudência ganha +1 uso (pode ser jogada 2×) | Cartas de prova pericial −15% |
+| **Silêncio Estratégico** | — | Constituição | Ativa: "passa" a rodada sem perder nada; o adversário gasta a jogada no vazio | Usável só depois da rodada 2; −1 paciência do juiz |
+| **Advogado do Diabo** | Annalise Keating | Argumentação | Antes do duelo, simula a audiência e revela 2 jogadas do baralho adversário | Custa 1 turno de investigação e +5 estresse |
+
+**Investigação e bastidores**
+
+| Traço | Inspiração | Ligado a | Efeito | Fraqueza |
+|---|---|---|---|---|
+| **Rede de Informantes** | Kalinda Sharma (*The Good Wife*) | Networking | Segredos chegam sozinhos (1 por trimestre) e a investigação revela nós escondidos | Cada informante cobra um favor por ano; não pagar vira inimigo |
+| **Olho de Perito** | — | Pesquisa | Detecta prova suja/forjada do adversário (anula e −paciência *dele*) | Sua própria carta suja tem +15% de risco (você "sabe demais") |
+| **Saul Goodman** | *Better Call Saul* | Charm + Negociação | Corrupção custa −40% e gera −25% de Exposição; acesso a contatos do submundo desde o início | Clientes corporativos grandes desconfiam (−confiança inicial); a imprensa vigia você (+chance de bomba-relógio estourar em escândalo) |
+| **Ficha Limpa** | — | Discrição | Exposição nunca passa de 50; boatos contra você perdem força | Não pode usar corrupção (bloqueada) |
+
+**Escritório e negócios**
+
+| Traço | Inspiração | Ligado a | Efeito | Fraqueza |
+|---|---|---|---|---|
+| **Fazedor de Chuva** | Harvey (lado comercial) / Jessica | Networking + Charm | +30% oportunidades de cliente; clientes grandes aparecem mais cedo | Clientes grandes exigem você pessoalmente: 1 audiência obrigatória por mês |
+| **Mentor** | — | Gestão | Funcionários NPC ganham skill 2× mais rápido e são mais leais | Seus próprios estudos −20% (o tempo vai para a equipe) |
+| **Mão de Ferro** | Louis Litt (gestão) | Gestão | Equipe produz +20% | Moral/lealdade cai mais rápido; risco maior de ser roubado por banca rival |
+| **Cobrador Implacável** | — | Negociação | Honorários atrasados chegam em dia; calote −70% | Clientes PF −confiança (ganha fama de duro) |
+| **Faro para Dinheiro** | — | Inteligência | Investimentos +15% de rendimento e aviso antecipado de crise econômica | Tentação: +5 estresse quando o mercado cai |
+
+**Vida pessoal**
+
+| Traço | Inspiração | Ligado a | Efeito | Fraqueza |
+|---|---|---|---|---|
+| **Pé no Chão** | — | Constituição | Família e relacionamentos decaem 50% mais devagar; estresse −20% | Disponibilidade para audiências extras −1 por mês |
+| **Workaholic** | Harvey Specter | Constituição | +20% de energia por mês | Relacionamentos decaem 2× mais rápido; burnout chega mais cedo |
+| **Carisma Natural** | — | Aparência + Charm | +popularidade e imprensa favorável; relacionamentos começam com mais afinidade | Escândalos rendem 2× mais estrago |
+
+### 8.2 Regras de combinação
+
+- No máximo **2 traços ativos** (Pleno e Sócio). Um **3º** destrava em Sócio Nominal *ou* via herança: o herdeiro pode herdar um traço do pai/mãe em nível 1 (incentivo de dinastia).
+- Alguns traços se **excluem**: *Ficha Limpa* ✕ *Saul Goodman*; *Pé no Chão* ✕ *Workaholic*.
+- Combos pensados: *Memória Eidética* + *O Fechador* (a dupla de Suits: sabe o que vem e fecha forte); *Rede de Informantes* + *Saul Goodman* (submundo); *Fazedor de Chuva* + *Mentor* (construtor de escritório).
+- Traço pode ser **trocado** uma vez por "crise de carreira" (evento raro ou custo alto em dinheiro + 3 meses), para quem se arrepender.
+
 ## 9. Ligação com o que já existe (skills e atributos)
 
 | Fonte | Efeito no duelo |
@@ -252,7 +302,8 @@ Tudo em **transaction**, todo número calculado no servidor (mesmo padrão anti-
 ## 14. Entregas em fases
 
 1. **MVP do duelo:** 6 rodadas, cartas da montagem, juiz com afinidade escondida, adversário com telegrafia, os três medidores, acordo no meio, favores existentes, 2 traços (*Memória Eidética*, *O Fechador*), tela de cena. Simulação de balanceamento.
-2. **Traços restantes + Segredos** + hooks dos atributos (Retórica, Charm, Inteligência).
+2. **Traços de tribunal restantes + Segredos** + hooks dos atributos (Retórica, Charm, Inteligência).
+2b. **Traços de bastidores, escritório e vida pessoal** (§8.1) — mexem em sistemas fora do duelo (oportunidades, equipe, cobrança, relacionamentos).
 3. **Corrupção + Exposição + bomba-relógio** + consequências (imprensa, OAB, suspensão).
 4. **Duelo entre jogadores** (Confronto Direto — já existe documento de design), com os dois lados jogando a mesma audiência.
 
