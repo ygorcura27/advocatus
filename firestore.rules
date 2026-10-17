@@ -149,6 +149,8 @@ service cloud.firestore {
         && inalterado('mes_global_pessoal')
         && inalterado('idade')
         && inalterado('avanco_lock')
+        && inalterado('tracos_assinatura')
+        && inalterado('juizes_vistos')
         && request.resource.data.get('reputacao', 0) >= 0
         && request.resource.data.get('reputacao', 0) <= 100;
     }
@@ -478,10 +480,18 @@ service cloud.firestore {
         // Honorários/resultado/XP do caso só o servidor grava.
         && !request.resource.data.diff(resource.data).affectedKeys()
              .hasAny(['hon_pendente', 'hon_antecipado', 'hon_total_acumulado',
-                      'resultado_setlist', 'repDelta', 'xpGanho', 'xp_parcial_creditado']);
+                      'resultado_setlist', 'repDelta', 'xpGanho', 'xp_parcial_creditado',
+                      // investigação/duelo: só functions/investigacao.js e duelo.js
+                      'investigacao']);
 
       // Deleção não permitida
       allow delete: if false;
+
+      // Estado completo da Audiência como Duelo (baralho do adversário,
+      // perfil do juiz, vícios) — só o servidor lê (functions/duelo.js).
+      match /privado/{doc} {
+        allow read, write: if false;
+      }
     }
 
     // ══════════════════════════════════════════════════════

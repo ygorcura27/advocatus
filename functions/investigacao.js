@@ -658,6 +658,8 @@ exports.executarRodadaJulgamento = onCall({ region: 'southamerica-east1' }, asyn
   if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
   const uid = request.auth.uid;
   const { processo_id, reacao, favor_id } = request.data || {}; // reacao: 'defender'|'favor'|'deixar_cair'
+  // (Casos novos usam a Audiência como Duelo — functions/duelo.js. Esta
+  // rodada antiga só termina julgamentos que já começaram no formato antigo.)
   if (!processo_id || !reacao) throw new HttpsError('invalid-argument', 'processo_id e reacao obrigatórios.');
 
   const db = getFirestore();
@@ -672,6 +674,7 @@ exports.executarRodadaJulgamento = onCall({ region: 'southamerica-east1' }, asyn
   if (!investigacao?.julgamento) throw new HttpsError('failed-precondition', 'Julgamento não foi iniciado.');
   const julg = investigacao.julgamento;
   if (julg.veredito) throw new HttpsError('failed-precondition', 'Julgamento já foi concluído.');
+  if (julg.modo === 'duelo') throw new HttpsError('failed-precondition', 'Este caso está na audiência (duelo).');
   if (julg.pecas_restantes.length === 0) throw new HttpsError('failed-precondition', 'Não há mais peças — chame finalizarJulgamento.');
 
   const skJur = normalizarSkillsJur(j.skills_jur);
@@ -736,7 +739,11 @@ async function _finalizarJulgamentoCore(db, uid, processoRef, jogadorRef, p, j) 
   if (!investigacao?.julgamento) throw new HttpsError('failed-precondition', 'Julgamento não foi iniciado.');
   const julg = investigacao.julgamento;
   if (julg.veredito) return { jaResolvido: true, veredito: julg.veredito }; // idempotente
-  if (julg.pecas_restantes.length > 0) throw new HttpsError('failed-precondition', 'Ainda há peças a resolver.');
+  // Audiência como Duelo (functions/duelo.js): o veredito vem do
+  // convencimento final do juiz, não da soma de forças × limiar.
+  const duelo = julg.modo === 'duelo' ? julg.duelo_final : null;
+  if (julg.modo === 'duelo' && !duelo) throw new HttpsError('failed-precondition', 'A audiência ainda não terminou.');
+  if (!duelo && julg.pecas_restantes.length > 0) throw new HttpsError('failed-precondition', 'Ainda há peças a resolver.');
 
   const skJur = normalizarSkillsJur(j.skills_jur);
   const bonusTese = investigacao.tese_vademecum?.bonus_limiar || 0;
@@ -748,12 +755,13 @@ async function _finalizarJulgamentoCore(db, uid, processoRef, jogadorRef, p, j) 
   const forcaEfetiva = julg.forca_total * multiplicadorNota(j.estresse);
 
   let resultado;
-  if (forcaEfetiva >= limiar) resultado = 'procedente';
+  if (duelo) resultado = duelo.resultado === 'acordo' ? 'parcial' : duelo.resultado;
+  else if (forcaEfetiva >= limiar) resultado = 'procedente';
   else if (forcaEfetiva >= limiar - 6) resultado = 'parcial';
   else resultado = 'improcedente';
 
   const favoravelAoJogador = resultado !== 'improcedente';
-  const pecasExpostas = julg.log.filter(l => l.exposta).length;
+  const pecasExpostas = duelo ? (duelo.expostas || 0) : julg.log.filter(l => l.exposta).length;
 
   const cap = repCapDoCargo(j.cargo_id);
   const rep = j.reputacao || 30;
@@ -764,7 +772,9 @@ async function _finalizarJulgamentoCore(db, uid, processoRef, jogadorRef, p, j) 
 
   const valorBase = p.valor || p.valor_causa || 0;
   let honPotencial = 0;
-  if (favoravelAoJogador) {
+  if (duelo?.resultado === 'acordo') {
+    honPotencial = Math.round(duelo.honorario || 0);
+  } else if (favoravelAoJogador) {
     const pct = resultado === 'procedente' ? 1 : 0.5;
     honPotencial = Math.round(valorBase * 0.30 * pct);
   }
@@ -840,6 +850,7 @@ exports.finalizarJulgamento = onCall({ region: 'southamerica-east1' }, async (re
 });
 
 exports._finalizarJulgamentoCore = _finalizarJulgamentoCore;
+exports.autorizadoParaProcessar = autorizadoParaProcessar;
 
 // ─── Apodrecimento de favores (Parte IV.2) — chamado por tick_mensal.js ────
 

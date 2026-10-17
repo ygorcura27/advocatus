@@ -203,3 +203,21 @@ test('jogar o processo passa; mexer em honorário pendente falha', async () => {
   await assertFails(updateDoc(ref, { hon_antecipado: 0, hon_pendente: 5 }));
   await assertFails(updateDoc(ref, { xp_parcial_creditado: true }));
 });
+
+// ══════════════════════════════════════════════════════════════
+// AUDIÊNCIA COMO DUELO
+// ══════════════════════════════════════════════════════════════
+test('duelo: estado privado ilegível; resultado e investigação não se forjam', async () => {
+  await semRegras(async (db) => {
+    await setDoc(doc(db, 'processos', 'p2'), { ...procBase(), investigacao: { fase: 'julgamento', julgamento: { modo: 'duelo' } } });
+    await setDoc(doc(db, 'processos', 'p2', 'privado', 'duelo'), { baralho: [] });
+  });
+  await assertFails(getDoc(doc(eu(), 'processos', 'p2', 'privado', 'duelo')));
+  await assertFails(setDoc(doc(eu(), 'processos', 'p2', 'privado', 'duelo'), { baralho: [] }));
+  await assertFails(updateDoc(doc(eu(), 'processos', 'p2'), { 'investigacao.julgamento.duelo_final': { resultado: 'procedente' } }));
+});
+test('duelo: traços de assinatura e juízes vistos não se editam pelo navegador', async () => {
+  await semRegras((db) => setDoc(jogadorRef(db), fichaBase()));
+  await assertFails(updateDoc(jogadorRef(eu()), { tracos_assinatura: [{ id: 'o_fechador' }] }));
+  await assertFails(updateDoc(jogadorRef(eu()), { juizes_vistos: { 'Dr. X': 9 } }));
+});

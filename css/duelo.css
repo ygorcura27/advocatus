@@ -1,0 +1,182 @@
+/* ═══════════════════════════════════════════════════════════
+   AUDIÊNCIA COMO DUELO — cena (js/duelo.js)
+   Usa os tokens de css/style.css + css/visual-v3.css.
+   ═══════════════════════════════════════════════════════════ */
+
+.duelo-carregando { display: flex; align-items: center; gap: .8rem; justify-content: center; padding: 3rem 1rem; color: var(--txt3); }
+
+.duelo {
+  position: relative;
+  display: flex; flex-direction: column; gap: 1rem;
+  padding: 1.4rem 1.5rem 1.6rem;
+  border-radius: var(--r3, 20px);
+  border: var(--borda2);
+  background:
+    radial-gradient(700px 320px at 50% -10%, rgba(226,189,116,.10), transparent 65%),
+    radial-gradient(500px 300px at 0% 100%, rgba(25,211,162,.07), transparent 60%),
+    linear-gradient(180deg, #121A2B 0%, #0B111D 100%);
+  box-shadow: var(--sombra2);
+  transition: opacity .2s;
+}
+:root[data-theme="light"] .duelo {
+  background:
+    radial-gradient(700px 320px at 50% -10%, rgba(140,106,46,.10), transparent 65%),
+    #FFFFFF;
+}
+.duelo.ocupado { opacity: .75; pointer-events: none; }
+
+/* Topo */
+.duelo-topo { display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; }
+.duelo-kicker { font-size: .62rem; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--navy3); }
+.duelo-fase { font-family: var(--font-serif); font-size: clamp(1.3rem, 2.4vw, 1.75rem); font-weight: 600; color: var(--txt); letter-spacing: -.02em; }
+.duelo-rodada { font-family: var(--font-serif); font-size: 1.6rem; font-weight: 600; color: var(--ouro); font-variant-numeric: tabular-nums; }
+.duelo-rodada span { font-size: .95rem; color: var(--txt4); }
+
+/* Medidor de convencimento */
+.duelo-medidor-rotulo { display: flex; justify-content: space-between; align-items: baseline; font-size: .7rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--txt3); margin-bottom: .4rem; }
+.duelo-medidor-rotulo strong { font-family: var(--font-sans); font-size: 1.5rem; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.duelo-medidor-trilho { position: relative; height: 12px; border-radius: 999px; background: rgba(255,255,255,.06); border: var(--borda); overflow: visible; }
+:root[data-theme="light"] .duelo-medidor-trilho { background: var(--bg2); }
+.duelo-medidor-fill { height: 100%; border-radius: 999px; transition: width .6s cubic-bezier(.2,.8,.2,1), background .3s; box-shadow: 0 0 14px currentColor; }
+.duelo-marca { position: absolute; top: -4px; bottom: -4px; width: 2px; background: rgba(255,255,255,.35); border-radius: 2px; }
+.duelo-marca.forte { background: var(--ouro); box-shadow: 0 0 8px rgba(226,189,116,.6); }
+.duelo-medidor-legenda { position: relative; height: 1rem; font-size: .6rem; color: var(--txt4); margin-top: .3rem; }
+.duelo-medidor-legenda span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.duelo-medidor-legenda span:first-child { left: 0; transform: none; }
+
+/* Palco: você · juiz · adversário */
+.duelo-palco { display: grid; grid-template-columns: 1fr 1.2fr 1fr; align-items: end; gap: .8rem; padding-top: .4rem; }
+.duelo-ator { display: flex; flex-direction: column; align-items: center; text-align: center; gap: .45rem; margin: 0; }
+.duelo-ator figcaption { font-size: .8rem; font-weight: 600; color: var(--txt); display: flex; flex-direction: column; align-items: center; gap: .2rem; }
+.duelo-ator figcaption small { font-size: .66rem; font-weight: 500; color: var(--txt3); max-width: 220px; line-height: 1.35; }
+.duelo-ator figcaption em { font-style: normal; font-size: .6rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--verm3); }
+.duelo-retrato {
+  width: 72px; height: 72px; border-radius: 50%; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid rgba(25,211,162,.5); background: var(--surface2);
+  box-shadow: 0 10px 30px -12px rgba(0,0,0,.8);
+}
+.duelo-retrato svg { width: 100%; height: 100%; }
+.duelo-retrato.mono { font-family: var(--font-serif); font-size: 1.5rem; font-weight: 600; color: var(--txt); background: linear-gradient(160deg, #1D2840, #121A2B); }
+:root[data-theme="light"] .duelo-retrato.mono { background: linear-gradient(160deg, #EDF1F6, #DDE3EC); }
+.duelo-ator.juiz .duelo-retrato { width: 92px; height: 92px; font-size: 1.9rem; border-color: rgba(226,189,116,.7); box-shadow: 0 0 0 6px rgba(226,189,116,.08), 0 14px 36px -12px rgba(0,0,0,.8); }
+.duelo-ator.juiz.irritado .duelo-retrato { border-color: var(--verm3); box-shadow: 0 0 0 6px rgba(193,64,46,.15), 0 14px 36px -12px rgba(0,0,0,.8); }
+.duelo-retrato.mono.adv { border-color: rgba(193,64,46,.55); }
+
+.duelo-pips { display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 3px; max-width: 190px; }
+.duelo-pip { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.12); }
+:root[data-theme="light"] .duelo-pip { background: var(--bg3); }
+.duelo-pip.comp.on { background: var(--navy3); }
+.duelo-pip.pac.on { background: var(--ouro); }
+
+/* Diálogo */
+.duelo-dialogo {
+  display: flex; flex-direction: column; gap: .45rem;
+  max-height: 260px; overflow-y: auto;
+  padding: .9rem 1rem; border-radius: 14px;
+  background: rgba(0,0,0,.22); border: var(--borda);
+}
+:root[data-theme="light"] .duelo-dialogo { background: var(--bg); }
+.duelo-fala { display: flex; gap: .55rem; align-items: baseline; font-size: .84rem; line-height: 1.5; color: var(--txt2); opacity: .7; }
+.duelo-fala.nova { opacity: 1; color: var(--txt); animation: duelo-entra .35s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes duelo-entra { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.duelo-fala-quem { flex-shrink: 0; min-width: 7.5rem; font-size: .66rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--txt4); }
+.duelo-fala.quem-juiz .duelo-fala-quem { color: var(--ouro); }
+.duelo-fala.quem-adversario .duelo-fala-quem { color: var(--verm3); }
+.duelo-fala.quem-jogador .duelo-fala-quem { color: var(--navy3); }
+.duelo-fala.quem-sistema { font-style: italic; color: var(--txt3); }
+.duelo-fala.quem-juiz .duelo-fala-texto { font-family: var(--font-serif); }
+.duelo-delta { margin-left: auto; flex-shrink: 0; font-size: .72rem; font-weight: 700; padding: .05rem .45rem; border-radius: 999px; font-variant-numeric: tabular-nums; }
+.duelo-delta.pos { color: var(--navy3); background: rgba(25,211,162,.12); }
+.duelo-delta.neg { color: var(--verm3); background: rgba(193,64,46,.14); }
+
+/* Leitura do ataque */
+.duelo-leitura { display: flex; flex-wrap: wrap; gap: .4rem; }
+.duelo-chip { font-size: .68rem; font-weight: 600; padding: .25rem .65rem; border-radius: 999px; border: var(--borda2); color: var(--txt2); background: rgba(255,255,255,.03); }
+.duelo-chip.neutro { color: var(--txt4); }
+.duelo-chip.alerta { color: var(--amber-ink, var(--amber)); border-color: var(--amber); background: var(--amber-bg); }
+
+/* Sentença */
+.duelo-sentenca { display: flex; flex-direction: column; align-items: center; gap: .2rem; padding: 1.1rem; border-radius: 14px; border: var(--borda2); text-align: center; animation: duelo-entra .5s cubic-bezier(.2,.8,.2,1) both; }
+.duelo-sentenca span { font-size: .62rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--txt3); }
+.duelo-sentenca strong { font-family: var(--font-serif); font-size: 1.6rem; font-weight: 600; letter-spacing: -.02em; }
+.duelo-sentenca small { font-size: .78rem; color: var(--txt3); }
+.duelo-sentenca.res-procedente strong { color: var(--navy3); }
+.duelo-sentenca.res-parcial strong, .duelo-sentenca.res-acordo strong { color: var(--ouro); }
+.duelo-sentenca.res-improcedente strong { color: var(--verm3); }
+
+/* Ações */
+.duelo-acoes { display: flex; flex-direction: column; gap: .55rem; }
+.duelo-dica { font-size: .78rem; color: var(--txt3); }
+.duelo-acoes-linha { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.duelo-acoes-linha small { font-weight: 500; opacity: .75; margin-left: .2rem; }
+.duelo-traco { border-color: rgba(226,189,116,.45) !important; color: var(--ouro) !important; }
+.duelo-blefe { display: inline-flex; align-items: center; gap: .45rem; font-size: .74rem; font-weight: 600; color: var(--ouro); padding: .45rem .75rem; border-radius: 10px; border: 1px solid rgba(226,189,116,.4); background: rgba(226,189,116,.06); cursor: pointer; }
+.duelo-blefe.off { opacity: .45; cursor: not-allowed; }
+.duelo-acordo { display: flex; flex-direction: column; gap: .6rem; padding: .9rem 1rem; border-radius: 14px; border: 1px solid rgba(226,189,116,.4); background: rgba(226,189,116,.06); font-size: .84rem; color: var(--txt); }
+
+/* Mão de cartas */
+.duelo-mao { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: .6rem; }
+.duelo-carta {
+  position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: .2rem;
+  min-height: 132px; padding: .75rem .8rem; text-align: left; cursor: pointer;
+  border-radius: 14px; border: var(--borda2);
+  background: linear-gradient(170deg, #1A2438, #111827);
+  color: var(--txt); font-family: var(--font-sans);
+  box-shadow: 0 8px 22px -14px rgba(0,0,0,.9);
+  transition: transform .2s cubic-bezier(.2,.8,.2,1), border-color .2s, box-shadow .2s;
+}
+:root[data-theme="light"] .duelo-carta { background: linear-gradient(170deg, #FFFFFF, #F3F5F9); }
+.duelo-carta:hover:not(:disabled) { transform: translateY(-4px); border-color: rgba(25,211,162,.6); box-shadow: 0 14px 28px -14px rgba(25,211,162,.55); }
+.duelo-carta:disabled { cursor: default; }
+.duelo-carta.usada { opacity: .32; filter: grayscale(.7); }
+.duelo-carta.contra { border-color: var(--ouro); box-shadow: 0 0 0 2px rgba(226,189,116,.35), 0 14px 28px -14px rgba(226,189,116,.6); }
+.duelo-carta-tipo { font-size: .58rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--txt3); }
+.duelo-carta-nome { font-family: var(--font-serif); font-size: .95rem; font-weight: 600; }
+.duelo-carta-forca { margin-top: auto; font-size: 1.7rem; font-weight: 700; letter-spacing: -.03em; color: var(--ouro); font-variant-numeric: tabular-nums; }
+.duelo-carta-tags { display: flex; gap: .25rem; flex-wrap: wrap; }
+.duelo-carta-tags i { font-style: normal; font-size: .56rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: .1rem .4rem; border-radius: 999px; }
+.duelo-carta-tags .suja { color: var(--verm3); background: var(--verm-bg); }
+.duelo-carta-tags .pilar { color: var(--txt2); background: rgba(255,255,255,.07); }
+.duelo-carta-tags .contra { color: #1B1406; background: var(--ouro); }
+.duelo-carta::before { content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 3px; border-radius: 0 3px 3px 0; background: var(--txt4); }
+.duelo-carta.tipo-testemunho::before, .duelo-chip.tipo-testemunho { --c: #E8836F; }
+.duelo-carta.tipo-prova_documental::before, .duelo-chip.tipo-prova_documental { --c: #6AE6C3; }
+.duelo-carta.tipo-prova_pericial::before, .duelo-chip.tipo-prova_pericial { --c: #8DB4FF; }
+.duelo-carta.tipo-jurisprudencia::before, .duelo-carta.tipo-precedente::before { --c: #E2BD74; }
+.duelo-carta[class*="tipo-"]::before { background: var(--c, var(--txt4)); }
+.duelo-chip[class*="tipo-"] { border-color: var(--c, rgba(255,255,255,.2)); color: var(--c, var(--txt2)); }
+
+/* Traços na Progressão */
+.tracos-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: .7rem; }
+.traco-card { padding: .9rem 1rem; border-radius: 14px; border: var(--borda2); background: rgba(255,255,255,.02); display: flex; flex-direction: column; gap: .4rem; }
+.traco-card.ativo { border-color: rgba(226,189,116,.55); background: rgba(226,189,116,.06); }
+.traco-nome { font-family: var(--font-serif); font-size: 1.05rem; font-weight: 600; color: var(--txt); display: flex; flex-direction: column; }
+.traco-nome small { font-family: var(--font-sans); font-size: .64rem; font-weight: 500; color: var(--txt3); }
+.traco-card p { font-size: .76rem; line-height: 1.5; color: var(--txt2); margin: 0; }
+.traco-rodape { margin-top: auto; display: flex; justify-content: space-between; align-items: center; font-size: .66rem; color: var(--txt4); }
+.traco-tag { font-size: .62rem; font-weight: 700; color: var(--ouro); text-transform: uppercase; letter-spacing: .08em; }
+
+/* Mobile */
+@media (max-width: 640px) {
+  .duelo { padding: 1rem .9rem 1.2rem; }
+  .duelo-palco { grid-template-columns: 1fr 1fr 1fr; gap: .3rem; }
+  .duelo-retrato { width: 52px; height: 52px; }
+  .duelo-ator.juiz .duelo-retrato { width: 64px; height: 64px; font-size: 1.4rem; }
+  .duelo-ator figcaption small { display: none; }
+  .duelo-fala { flex-direction: column; gap: .1rem; }
+  .duelo-fala-quem { min-width: 0; }
+  .duelo-topo { align-items: flex-start; }
+  .duelo-rodada { font-size: 1.2rem; white-space: nowrap; }
+  /* 50 e 65 ficam a ~50px um do outro: ancora um à esquerda e outro à direita da marca */
+  .duelo-medidor-legenda span:nth-child(2) { transform: translateX(-100%); padding-right: 4px; }
+  .duelo-medidor-legenda span:nth-child(3) { transform: none; padding-left: 4px; }
+  .duelo-mao { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .duelo-fala.nova, .duelo-sentenca { animation: none; }
+  .duelo-carta:hover:not(:disabled) { transform: none; }
+  .duelo-medidor-fill { transition: none; }
+}
+.duelo-concluir { justify-content: center; text-align: center; }
