@@ -1234,7 +1234,14 @@ window._confirmarApoio = async function(escId, procId, funcId, nomeFunc) {
 
 // ─── Processar sentença ───────────────────────────────────────────────────────
 
+let _sentencaEmCurso = false;
 window._processarSentenca = async function(escId, procId, uid) {
+  if (_sentencaEmCurso) return; // clique duplo
+  _sentencaEmCurso = true;
+  try { await _processarSentencaPool(escId, procId, uid); } finally { _sentencaEmCurso = false; }
+};
+
+async function _processarSentencaPool(escId, procId, uid) {
   const j = window.JOGADOR;
 
   let proc;
@@ -1266,6 +1273,13 @@ window._processarSentenca = async function(escId, procId, uid) {
       window.JOGADOR = j;
     }
   } catch (e) {
+    // Lista desatualizada (o caso já foi resolvido, p.ex. na virada do mês):
+    // só recarrega a tela em vez de mostrar erro.
+    if (e.code === 'functions/failed-precondition') {
+      toast('Esse processo já foi resolvido. Atualizando a lista…', 'ok');
+      _refreshProcessosPool(window.JOGADOR, escId);
+      return;
+    }
     console.error('[SENTENÇA POOL]', e);
     toast(e.message || 'Erro ao processar sentença.', 'ko');
     return;
@@ -1323,7 +1337,7 @@ window._processarSentenca = async function(escId, procId, uid) {
      </div>
      ${botoesHtml}`
   );
-};
+}
 
 // Aplica a decisão (aceitar/recorrer) sobre o resultado JÁ sorteado no servidor.
 async function _decidirSentencaPool(etapa) {
