@@ -25,7 +25,8 @@
       "tests/**",
       "*.md",
       "MECANICAS_DO_JOGO.txt",
-      "skills-lock.json"
+      "skills-lock.json",
+      "*.bat"
     ],
     "rewrites": [
       {
