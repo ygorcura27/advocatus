@@ -75,14 +75,13 @@ const XP_PARCIAL_INSTRUCAO = { est: 3, ass: 6 };
 
 window._creditarXpParcialInstrucao = async function(procId, p, j) {
   if (p.xp_parcial_creditado) return; // já creditado — evita XP duplicado
-  const uid = j.uid || window.JOGADOR_UID;
-  const xpGanho = XP_PARCIAL_INSTRUCAO[j.cargo_id] || 0;
-  if (xpGanho === 0) return;
+  if (!(XP_PARCIAL_INSTRUCAO[j.cargo_id] || 0)) return;
 
   try {
-    await updateDoc(doc(db, 'processos', procId), { xp_parcial_creditado: true });
-    await updateDoc(doc(db, 'jogadores', uid), { xp: (j.xp||0) + xpGanho });
-    toast(`📋 Instrução concluída! +${xpGanho} XP por trabalhar neste caso.`, 'ok', 4000);
+    // Crédito (e a trava de 1x por caso) no servidor — functions/xp_instrucao.js.
+    const { httpsCallable } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js');
+    const r = await httpsCallable(window.FB_FUNCTIONS, 'creditarXpParcialInstrucao')({ procId });
+    if (r.data.xp > 0) toast(`📋 Instrução concluída! +${r.data.xp} XP por trabalhar neste caso.`, 'ok', 4000);
   } catch (err) {
     console.error('[XP PARCIAL]', err);
   }
@@ -2401,32 +2400,6 @@ window.decidirRecursoSentencaProducao = async function(procId, recorrer) {
 };
 
 
-// Honorários só são creditados aqui — no trânsito em julgado de fato.
-// Continua existindo no frontend porque é usada por tentarAcordo() (uma
-// ação cujo resultado de aceite/rejeição já é um sorteio simples, de baixo
-// risco de exploração) — mas a sentença de 1ª instância e o acórdão do
-// recurso agora SEMPRE creditam honorários através das Cloud Functions,
-// nunca chamando esta função diretamente a partir desses dois fluxos.
-async function _creditarHonorariosTransito(j, uid, hon) {
-  if (j.escritorio_proprio_id) {
-    const escSnap = await getDoc(doc(db, 'escritorios', j.escritorio_proprio_id));
-    if (escSnap.exists()) {
-      const esc = escSnap.data();
-      await updateDoc(doc(db, 'escritorios', j.escritorio_proprio_id), {
-        caixa: (esc.caixa||0) + hon,
-        faturamento_mes_atual: (esc.faturamento_mes_atual||0) + hon,
-        faturamento_honorarios_mes: (esc.faturamento_honorarios_mes||0) + hon,
-      });
-      return { foiParaCaixa: true };
-    }
-  }
-  await updateDoc(doc(db, 'jogadores', uid), {
-    dinheiro: (j.dinheiro||0) + hon,
-    honorarios_mes: (j.honorarios_mes||0) + hon,
-  });
-  return { foiParaCaixa: false };
-}
-
 async function _penalizarPrestigioEscritorio(escritorioId, repDelta) {
   try {
     const escSnap = await getDoc(doc(db, 'escritorios', escritorioId));
@@ -3061,33 +3034,6 @@ window.recorrerProximaInstanciaProducao = async function(recorrer) {
   } catch (err) {
     console.error('[RECURSO] Erro ao decidir próxima instância:', err);
     toast('Erro ao processar sua decisão. Tente novamente.', 'ko');
-  }
-};
-
-// ════════════════════════════════════════════════════════
-// ACORDO
-// ════════════════════════════════════════════════════════
-window.tentarAcordo = async function(procId) {
-  const ok = await _gastarEnergia(5, 'Tentativa de acordo');
-  if (!ok) return;
-  const j = window.JOGADOR;
-  const uid = j?.uid || window.JOGADOR_UID;
-  const snap = await getDoc(doc(db, 'processos', procId));
-  if (!snap.exists()) return;
-  const p = snap.data();
-  const cv = p.convencimento || 38;
-  const aceito = Math.random() < (cv/120 + 0.25);
-  const isSolo = !j.escritorio_empregado_id || j.escritorio_id === 'solo';
-  if (aceito) {
-    const suc = Math.floor(p.valor * 0.10);
-    const hon = isSolo ? Math.floor((p.valor*0.30 + suc) / 2) : Math.floor(suc*0.10/2);
-    await updateDoc(doc(db, 'processos', procId), { status:'ganho', encerrado_mes: mesTotalPessoalProc(j), hon_total_acumulado: hon });
-    await updateDoc(doc(db, 'jogadores', uid), { wins:(j.wins||0)+1, wins_ano:(j.wins_ano||0)+1, derrotas_consecutivas:0 });
-    const { foiParaCaixa } = await _creditarHonorariosTransito(j, uid, hon);
-    fecharModal();
-    toast(`🤝 Acordo! +${fmt(hon)} honorários${foiParaCaixa?' (no caixa do escritório)':''}`, 'ok');
-  } else {
-    toast('❌ Proposta de acordo rejeitada.', 'ko');
   }
 };
 

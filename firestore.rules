@@ -73,6 +73,89 @@ service cloud.firestore {
     }
 
     // ══════════════════════════════════════════════════════
+    // ANTI-TRAPAÇA (F12) — fichas de personagem
+    // O navegador pode GASTAR (dinheiro/XP só descem), mas tudo que faz o
+    // jogador ganhar dinheiro, XP, vitória, cargo, OAB, imóvel/carro/item,
+    // investimento ou crédito passa por Cloud Function (Admin SDK, que não
+    // passa por estas regras). Vale pro personagem ativo (jogadores/{uid})
+    // e pros arquivados (jogadores/{uid}/personagens/{id}).
+    // ══════════════════════════════════════════════════════
+    function naoSobe(campo) {
+      return request.resource.data.get(campo, 0) <= resource.data.get(campo, 0);
+    }
+    function naoDesce(campo) {
+      return request.resource.data.get(campo, 0) >= resource.data.get(campo, 0);
+    }
+    function inalterado(campo) {
+      return request.resource.data.get(campo, null) == resource.data.get(campo, null);
+    }
+
+    // Troca de cargo pelo navegador (promoção em js/carreira.js, vaga/
+    // convite em js/vagas.js) só vale se a ficha já cumpre os requisitos
+    // de XP/OAB/tempo do cargo novo (mesma tabela de js/carreira.js:CARGOS).
+    // Cargo público (juiz/promotor/defensor) nunca vem do navegador.
+    function cargoPermitido() {
+      let XP_MIN   = {'est':0, 'ass':120, 'jnr':260, 'pln':580, 'snr':1100, 'asc':1800, 'soc':2800, 'snm':4500};
+      let ANOS_MIN = {'est':0, 'ass':0,   'jnr':0,   'pln':2,   'snr':4,    'asc':6,    'soc':8,    'snm':12};
+      let novo = request.resource.data.get('cargo_id', 'est');
+      let d = request.resource.data;
+      return novo == resource.data.get('cargo_id', 'est')
+        || (novo in XP_MIN
+            && d.get('xp', 0) >= XP_MIN[novo]
+            && (novo in ['est', 'ass'] || d.get('oab', false) == true)
+            && (d.get('anos_carreira', 0) >= ANOS_MIN[novo]
+                || d.get('recursos_vencidos_superiores', 0) >= ANOS_MIN[novo]));
+    }
+
+    // Salário de escritório só muda junto com troca de emprego/cargo e
+    // nunca acima do teto do cargo (maior salário real que vagas NPC e
+    // convites pagam hoje, com folga).
+    function salarioPermitido() {
+      let TETO = {'est':5000, 'ass':7000, 'jnr':20000, 'pln':40000, 'snr':90000, 'asc':100000, 'soc':180000, 'snm':300000};
+      let novo = request.resource.data.get('sal_base_escritorio', 0);
+      return novo == resource.data.get('sal_base_escritorio', 0)
+        || novo == 0 || novo == null
+        || ((!inalterado('escritorio_empregado_id') || !inalterado('cargo_id'))
+            && novo <= TETO.get(request.resource.data.get('cargo_id', 'est'), 5000));
+    }
+
+    function fichaAtualizacaoValida() {
+      return naoSobe('dinheiro')
+        && naoSobe('xp')
+        && naoSobe('wins')
+        && naoSobe('wins_ano')
+        && naoSobe('anos_carreira')
+        && naoSobe('recursos_vencidos_superiores')
+        && naoSobe('honorarios_mes')
+        && naoDesce('losses')
+        && naoDesce('losses_ano')
+        && (inalterado('oab') || request.resource.data.get('oab', false) == false)
+        && cargoPermitido()
+        && salarioPermitido()
+        && request.resource.data.get('sal_mult', 1) <= 1.35
+        && inalterado('linha_credito')
+        && inalterado('investimentos')
+        && inalterado('moradias_compradas')
+        && inalterado('carros_comprados')
+        && inalterado('financiamentos')
+        && inalterado('compras')
+        && inalterado('congressos_usados')
+        && inalterado('personagem_ativo_id')
+        && inalterado('concurso_aprovado')
+        && inalterado('cargo_publico_id')
+        && inalterado('carreira')
+        && inalterado('mes_pessoal')
+        && inalterado('ano_pessoal')
+        && inalterado('mes_global_pessoal')
+        && inalterado('idade')
+        && inalterado('avanco_lock')
+        && inalterado('tracos_assinatura')
+        && inalterado('juizes_vistos')
+        && request.resource.data.get('reputacao', 0) >= 0
+        && request.resource.data.get('reputacao', 0) <= 100;
+    }
+
+    // ══════════════════════════════════════════════════════
     // CONFIG DO SERVIDOR (somente leitura para jogadores)
     // ══════════════════════════════════════════════════════
     match /config/{doc} {
@@ -127,13 +210,21 @@ service cloud.firestore {
       allow create: if isOwner(uid)
         && request.resource.data.uid == uid
         && request.resource.data.reputacao <= 30
-        && request.resource.data.dinheiro <= 15000;
+        && request.resource.data.dinheiro <= 15000
+        && request.resource.data.get('xp', 0) == 0
+        && request.resource.data.get('cargo_id', 'est') == 'est'
+        && request.resource.data.get('oab', false) == false
+        && request.resource.data.get('wins', 0) == 0
+        && !('linha_credito' in request.resource.data)
+        && !('investimentos' in request.resource.data)
+        && !('personagem_ativo_id' in request.resource.data);
 
       // Update: apenas o próprio usuário, com restrições
       allow update: if isOwner(uid)
         // Campos que NUNCA podem ser alterados pelo cliente diretamente
         && notChanging('uid')
         && notChanging('criado_em')
+        && fichaAtualizacaoValida()
         // geracao MUDA de propósito ao trocar de personagem ativo (cada
         // personagem tem a sua, ver js/personagens.js:trocarPersonagem) —
         // não é mais um invariante da conta desde a feature de
@@ -196,9 +287,13 @@ service cloud.firestore {
       // principal, só que aninhada — mesmo dono, mesmas regras.
       match /personagens/{personagemId} {
         allow read:   if isOwner(uid);
-        allow create: if isOwner(uid);
-        allow update: if isOwner(uid);
-        allow delete: if isOwner(uid);
+        // Criar/arquivar ficha (troca de personagem, herdeiro) só pelo
+        // servidor — functions/personagens.js. O navegador ainda atualiza
+        // uma ficha arquivada (ex.: aceitar convite de emprego pra ela,
+        // js/vagas.js), com as mesmas travas da ficha ativa.
+        allow create: if false;
+        allow update: if isOwner(uid) && fichaAtualizacaoValida();
+        allow delete: if false;
 
         match /relacionamentos/{relId} {
           allow read:   if isOwner(uid);
@@ -348,6 +443,13 @@ service cloud.firestore {
       // _criarProcessoRecursalPool cria direto com status 'recurso_pendente'
       // (já existe sentença, fase recursal começa do zero sem 'andamento').
       allow create: if isAuth()
+        // Anti-trapaça F12: maior causa que o jogo gera é R$ 800 mil
+        // (js/processos.js, dificuldade alta); honorário pendente nasce 0.
+        && request.resource.data.get('valor', 0) is number
+        && request.resource.data.get('valor', 0) <= 1000000
+        && request.resource.data.get('hon_pendente', 0) == 0
+        && request.resource.data.get('hon_antecipado', 0) == 0
+        && request.resource.data.get('hon_total_acumulado', 0) == 0
         && (
           // Processo novo (provas → teses → audiência)
           (request.resource.data.status == 'andamento'
@@ -374,10 +476,22 @@ service cloud.firestore {
         )
         && notChanging('advogado_uid')
         && notChanging('valor')
-        && request.resource.data.instancia >= resource.data.instancia;
+        && request.resource.data.instancia >= resource.data.instancia
+        // Honorários/resultado/XP do caso só o servidor grava.
+        && !request.resource.data.diff(resource.data).affectedKeys()
+             .hasAny(['hon_pendente', 'hon_antecipado', 'hon_total_acumulado',
+                      'resultado_setlist', 'repDelta', 'xpGanho', 'xp_parcial_creditado',
+                      // investigação/duelo: só functions/investigacao.js e duelo.js
+                      'investigacao']);
 
       // Deleção não permitida
       allow delete: if false;
+
+      // Estado completo da Audiência como Duelo (baralho do adversário,
+      // perfil do juiz, vícios) — só o servidor lê (functions/duelo.js).
+      match /privado/{doc} {
+        allow read, write: if false;
+      }
     }
 
     // ══════════════════════════════════════════════════════
@@ -389,7 +503,10 @@ service cloud.firestore {
 
       // Criação: advogado autenticado pode criar seu próprio escritório
       allow create: if isAuth()
-        && isDono(request.resource.data);
+        && isDono(request.resource.data)
+        // Escritório nasce de caixa zerado — dinheiro entra por aporte
+        // (functions/criar_escritorio.js:aportarCapital) ou pelo jogo.
+        && request.resource.data.get('caixa', 0) == 0;
 
       // Update: dono, sócio, OU o próprio jogador entrando/saindo de
       // funcionarios_uids — cobre os dois lados do ciclo de vida de
@@ -400,6 +517,10 @@ service cloud.firestore {
       // estar dentro, ou vice-versa) — ninguém entra/sai em nome de
       // outro jogador, nem reenvia o mesmo estado sem necessidade.
       allow update: if isAuth()
+        // Caixa só desce pelo navegador (pagamentos). Toda entrada de
+        // dinheiro no caixa vem de Cloud Function (sentença, oportunidade,
+        // aporte, pool) — anti-trapaça F12.
+        && request.resource.data.get('caixa', 0) <= resource.data.get('caixa', 0)
         && (isDono(resource.data)
             || isSocio(resource.data)
             || (
@@ -448,14 +569,17 @@ service cloud.firestore {
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
               || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
               || isFuncionario(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
-        allow create: if isAuth()
-          && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
-              || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
-              || isGestor(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+        // Oportunidades são geradas pelo servidor no avanço de mês, e
+        // aceitar/delegar (que paga) é functions/oportunidades.js — o
+        // navegador só pode recusar uma oportunidade ainda disponível.
+        allow create: if false;
         allow update: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
               || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
-              || isGestor(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+              || isGestor(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data))
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+          && resource.data.status == 'disponivel'
+          && request.resource.data.status == 'recusado';
         allow delete: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
               || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
@@ -502,14 +626,25 @@ service cloud.firestore {
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
               || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
               || isFuncionario(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+        // Honorários: no máximo o teto do tier S (js/processos_escritorio.js:
+        // _tierHonorarios) e imutáveis depois de criado. Resultado da
+        // sentença e valor recebido só o servidor grava
+        // (functions/pool_sentenca.js).
         allow create: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
               || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
-              || isGestor(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+              || isGestor(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data))
+          && request.resource.data.get('honorarios', 0) is number
+          && request.resource.data.get('honorarios', 0) <= 240000
+          && !('sentenca_pendente' in request.resource.data)
+          && request.resource.data.get('valor_recebido', 0) == 0;
         allow update: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
               || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
-              || isGestor(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));
+              || isGestor(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data))
+          && !request.resource.data.diff(resource.data).affectedKeys()
+               .hasAny(['honorarios', 'sentenca_pendente', 'valor_recebido', 'resultado'])
+          && request.resource.data.get('status', '') != 'concluido';
         allow delete: if isAuth()
           && (isDono(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data)
               || isSocio(get(/databases/$(database)/documents/escritorios/$(escritorioId)).data));

@@ -110,7 +110,9 @@ exports.distribuirLucros = onCall({ region: 'southamerica-east1' }, async (reque
   const { escritorio_id, valor } = request.data;
 
   if (!escritorio_id) throw new HttpsError('invalid-argument', 'escritorio_id obrigatório.');
-  if (!valor || valor <= 0) throw new HttpsError('invalid-argument', 'Valor deve ser positivo.');
+  // typeof: um valor em texto ("1000") passava no <= 0 e depois virava
+  // concatenação de string no caixa (ex.: 5000 + "1000" = "50001000").
+  if (typeof valor !== 'number' || !Number.isFinite(valor) || valor <= 0) throw new HttpsError('invalid-argument', 'Valor deve ser positivo.');
 
   const db     = getFirestore();
   const escRef = db.collection('escritorios').doc(escritorio_id);
@@ -194,7 +196,9 @@ exports.aportarCapital = onCall({ region: 'southamerica-east1' }, async (request
   const { escritorio_id, valor } = request.data;
 
   if (!escritorio_id) throw new HttpsError('invalid-argument', 'escritorio_id obrigatório.');
-  if (!valor || valor <= 0) throw new HttpsError('invalid-argument', 'Valor deve ser positivo.');
+  // typeof: um valor em texto ("1000") passava no <= 0 e depois virava
+  // concatenação de string no caixa (ex.: 5000 + "1000" = "50001000").
+  if (typeof valor !== 'number' || !Number.isFinite(valor) || valor <= 0) throw new HttpsError('invalid-argument', 'Valor deve ser positivo.');
 
   const db = getFirestore();
   const jogadorRef  = db.collection('jogadores').doc(uid);

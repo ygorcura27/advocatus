@@ -4,7 +4,8 @@
 
 import { collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-import { db } from './firebase-init.js';
+import { httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
+import { db, functions } from './firebase-init.js';
 import {
   TIPOS_SERVICO, OPORTUNIDADES_POR_TIER, modificadorNetworking, multiplicadorPrestigio,
   CONFIANCA_INICIAL, CONFIANCA_EVENTOS, CONFIANCA_RECORRENTE_MIN, PRODUTIVIDADE_CARGO,
@@ -270,10 +271,10 @@ window.aceitarOportunidade = async function(opId) {
   const rServico = window.checarEnergiaCategoria(j, 'processos', o.energia, 'aceitar o serviço');
   if (!rServico.ok) { toast(`⚡ ${rServico.mensagemErro}`, 'ko'); return; }
 
-  await updateDoc(doc(db,'jogadores',uid), rServico.patch);
-
   // 100% da receita (jogador executou pessoalmente)
-  await _processarServicoConcluido(uid, escId, o, opId, 1.0);
+  if (await _processarServicoConcluido(escId, opId, 'servico_pessoal')) {
+    await updateDoc(doc(db,'jogadores',uid), rServico.patch);
+  }
 };
 
 // ════════════════════════════════════════════════════════
@@ -344,32 +345,31 @@ window.delegarServico = async function(opId, funcId, escId) {
   if (!opSnap.exists()) return;
   const o = opSnap.data();
 
-  await updateDoc(doc(db,'jogadores',uid), rCoordServ.patch);
-
-  const produtividade = PRODUTIVIDADE_CARGO[f.cargo_id] || 0.5;
   fecharModal();
-  await _processarServicoConcluido(uid, escId, o, opId, produtividade, f.nome);
+  if (await _processarServicoConcluido(escId, opId, 'servico_delegar', funcId)) {
+    await updateDoc(doc(db,'jogadores',uid), rCoordServ.patch);
+  }
 };
 
 // ════════════════════════════════════════════════════════
 // PROCESSAR SERVIÇO CONCLUÍDO (núcleo comum)
 // ════════════════════════════════════════════════════════
-async function _processarServicoConcluido(uid, escId, oportunidade, opId, fracaoReceita, executorNome) {
-  const valorRecebido = Math.floor(oportunidade.valor * fracaoReceita);
-
-  const jSnap = await getDoc(doc(db,'jogadores',uid));
-  const j = jSnap.data();
-
-  // Creditar ao jogador (vai para honorarios_mes como renda do escritório)
-  await updateDoc(doc(db,'jogadores',uid), {
-    dinheiro:       (j.dinheiro||0) + valorRecebido,
-    honorarios_mes: (j.honorarios_mes||0) + valorRecebido,
-  });
-
-  // Marcar oportunidade como concluída
-  await updateDoc(doc(db,'escritorios',escId,'oportunidades',opId), {
-    status: 'concluido', valor_recebido: valorRecebido, executor: executorNome || 'Você',
-  });
+async function _processarServicoConcluido(escId, opId, modo, funcId) {
+  // Crédito no saldo + marcar a oportunidade como usada: servidor
+  // (functions/oportunidades.js:concluirOportunidade), com o valor do
+  // próprio documento da oportunidade — nunca um valor vindo daqui.
+  let r;
+  try {
+    r = (await httpsCallable(functions, 'concluirOportunidade')({ escId, opId, modo, funcId })).data;
+  } catch (e) {
+    console.error('[SERVIÇO]', e);
+    toast(e.message || 'Erro ao concluir o serviço.', 'ko');
+    return false;
+  }
+  const oportunidade  = r.oportunidade;
+  const valorRecebido = r.recebe;
+  const executorNome  = r.executor;
+  const j = window.JOGADOR;
 
   // Adicionar/atualizar cliente na carteira
   await _registrarCliente(escId, oportunidade);
@@ -383,6 +383,7 @@ async function _processarServicoConcluido(uid, escId, oportunidade, opId, fracao
 
   toast(`✅ Serviço concluído! +${_fmtK(valorRecebido)}${executorNome?` (via ${executorNome})`:''}.${msgExtra}`, 'ok', 6000);
   setTimeout(()=>window.navTo&&window.navTo('clientes',null), 700);
+  return true;
 }
 
 // GDD Seção 28-30 — perfis de cliente e rede de indicações

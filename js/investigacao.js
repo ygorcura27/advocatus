@@ -17,6 +17,7 @@
 import { doc, getDoc, collection, getDocs }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { db } from './firebase-init.js';
+import { renderDuelo } from './duelo.js';
 import { sortearCandidatosVademecum } from './banco_vademecum.js';
 
 let _procId = null;
@@ -551,8 +552,20 @@ function _prioridadeAtaqueClient(peca) {
   return (10 - peca.forca / 10) + (peca.suja ? 3 : 0) + (peca.pilar ? 2 : 0) + (peca.exposta ? 50 : 0);
 }
 
+// Audiência como Duelo (js/duelo.js) — todo julgamento novo passa por ela.
+// Só cai no formato antigo abaixo quem já tinha começado as rodadas antigas.
+async function _recarregarCaso() {
+  const snap = await getDoc(doc(db, 'processos', _procId));
+  _procCache = snap.data();
+  _renderFase(window.JOGADOR, document.getElementById('main-content'), _procCache);
+}
+
 function _renderJulgamento(j, main, p) {
   const julg = p.investigacao.julgamento;
+  if (julg.modo === 'duelo' || (!julg.veredito && !(julg.rodada_atual > 0))) {
+    renderDuelo(j, main, p, _procId, _recarregarCaso);
+    return;
+  }
   const pecas = julg.pecas_restantes;
   const restantes = pecas.length;
 
@@ -651,6 +664,16 @@ window._invFinalizarJulgamento = async function() {
 // então a decisão de aceitar/recorrer funciona sem duplicar lógica.
 
 function _renderVeredito(j, main, p) {
+  const final = p.investigacao?.julgamento?.duelo_final;
+  if (final?.resultado === 'acordo') {
+    main.innerHTML = `
+      <div class="card">
+        <div class="card-titulo">Acordo homologado</div>
+        <p style="color:var(--txt3);margin:.6rem 0">O caso foi encerrado por acordo em audiência. Honorários: <strong style="color:var(--verde2)">R$ ${Math.round(final.honorario || 0).toLocaleString('pt-BR')}</strong>.</p>
+        <button class="btn btn-prim" onclick="window._invVoltarProcessos()">Voltar aos processos</button>
+      </div>`;
+    return;
+  }
   const veredito = p.resultado_setlist || p.investigacao?.julgamento?.veredito;
   const cor = veredito === 'procedente' ? 'var(--verde)' : veredito === 'parcial' ? 'var(--amber)' : 'var(--verm2)';
   main.innerHTML = `
@@ -668,6 +691,12 @@ function _renderVeredito(j, main, p) {
 function _labelVeredito(v) {
   return { procedente: '✅ Vitória', parcial: '🤝 Acordo parcial', improcedente: '❌ Derrota' }[v] || v || '—';
 }
+
+window._invVoltarProcessos = function() {
+  _procId = null;
+  window.dispatchEvent(new CustomEvent('gamestate:reload'));
+  if (window.navTo) window.navTo('processos', null);
+};
 
 window._invDecidirRecurso = async function(recorrer) {
   window.toast && window.toast('⏳ Processando decisão...', 'neutro', 1500);

@@ -1302,95 +1302,14 @@ window.assumirHerdeiro = async function(filhoId, opts) {
     `Dar controle de ${f.nome} agora?\n\nITCMD (${Math.round(aliquotaEfetiva*10000)/100}% efetivo${reducao>0 ? `, ${Math.round(reducao*100)}% de redução por planejamento` : ''}): R$ ${itcmd.toLocaleString('pt-BR')}\n${f.nome} recebe R$ ${dinheiroLiquido.toLocaleString('pt-BR')} em dinheiro líquido${itcmdDoBolso>0 ? ` (+ R$ ${itcmdDoBolso.toLocaleString('pt-BR')} de imposto saindo do seu próprio saldo)` : ''}.\n\nEle vira um personagem separado, selecionável no trocador do topbar a qualquer momento.`
   )) return;
 
-  const novoId       = doc(collection(db, 'jogadores', uid, 'personagens')).id;
-  const jogadorRef   = doc(db, 'jogadores', uid);
-  const novoPersRef  = doc(db, 'jogadores', uid, 'personagens', novoId);
-  const mesGlobalAtual = j.mes_global_pessoal ?? j.mes_global_inicio ?? 0;
-
-  // Skills novato — MESMA base de index.html (sem isso, um herdeiro sem
-  // bônus alocado em "pesquisa" nascia com skills.pesquisa ausente/0 e
-  // nunca batia o mínimo de nenhuma vaga, mesmo meses depois). Bônus
-  // escolhido pelo doador soma por cima.
-  const skills = {
-    oratoria:10, argumentacao:10, escrita:10,
-    pesquisa:10, negociacao:10, persuasao:10,
-    gestao:5,   networking:5,
-  };
-  for (const [sk, v] of Object.entries(bonusSkills || {})) {
-    if (v > 0) skills[sk] = (skills[sk]||0) + v;
-  }
-
-  if (moradiaId) delete moradiasDoador[moradiaId];
-  if (carroId)   delete carrosDoador[carroId];
-
-  const patDoador = { ...(j.pat || {}) };
-  if (moradiaId && j.pat?.moradia === moradiaId) {
-    patDoador.moradia = Object.keys(moradiasDoador)[0] || 'pais';
-  }
-  if (carroId && j.pat?.transporte === carroId) {
-    patDoador.transporte = Object.keys(carrosDoador).find(k => k !== 'onibus') || 'onibus';
-  }
-
+  // Criação da ficha do herdeiro + débito do doador + ITCMD: servidor
+  // (functions/personagens.js:assumirHerdeiro) — os números acima são só
+  // pra mostrar a confirmação; o servidor recalcula tudo.
   try {
-    await runTransaction(db, async (tx) => {
-      const jogadorSnap = await tx.get(jogadorRef);
-      if (!jogadorSnap.exists()) throw new Error('Personagem não encontrado.');
-      const jd = jogadorSnap.data();
-      if ((jd.dinheiro||0) < dinheiro + itcmdDoBolso) throw new Error('Saldo mudou — não cobre mais dinheiro cedido + ITCMD.');
-
-      // Ficha nova — mesma base de um personagem recém-criado, só com os
-      // recursos escolhidos pelo doador por cima.
-      tx.set(novoPersRef, {
-        nome_personagem: f.nome, sexo: f.sexo || null,
-        especialidade: jd.especialidade || 'civil', faculdade: 'Direito',
-        cargo_id: 'est', cargo_publico_id: null, oab: false, concurso_aprovado: false,
-        anos_carreira: 0, mes_global_inicio: mesGlobalAtual, idade: f.idade, idade_inicial: f.idade, idade_meses: f.idade_meses ?? (f.idade||0)*12,
-        reputacao: Math.round((jd.reputacao||0) * REPUTACAO_HERANCA_PCT),
-        networking: 5, saude_mental: 80, disposicao: 80,
-        prestigio_academico: 0, energia: 100, energia_usada_mes: 0,
-        skills,
-        dinheiro: dinheiroLiquido, itcmd_pago: itcmd, recebido_com_usufruto: usarUsufruto,
-        meses_negativo: 0, meses_positivo_streak: 0, no_serasa: false,
-        renda_calculada: 0, despesas_calculadas: 0,
-        pat: {
-          moradia: moradiaId || 'pais',
-          transporte: carroId || 'onibus',
-          escritorio: 'home',
-        },
-        moradias_compradas: moradiaId ? { [moradiaId]: true } : {},
-        carros_comprados: carroId ? { [carroId]: true } : {},
-        prazo_sair_pais: 0, mora_com_pais: !moradiaId,
-        financiamentos: {},
-        escritorio_id: 'solo', escritorio_empregado_id: null, escritorio_proprio_id: null,
-        escritorio_nome: null, vaga_tipo: 'contencioso', sal_mult: 1.0,
-        xp: 0, xp_next: 120, wins: 0, losses: 0, wins_ano: 0, losses_ano: 0, derrotas_consecutivas: 0,
-        estado_civil: 'solteiro', conjuge_uid: null, filhos: 0, geracao: (jd.geracao||1) + 1,
-        study_queue: [], cursos_feitos: [], compras: [], estagiarios: [],
-        em_burnout: false, burnout_ate_mes: 0, recesso_pendente: false,
-        aposentado: false, aposentado_forcado_pendente: false,
-        ultimo_mes_processado: 0, bonus_pendente: 0,
-        criado_em: new Date().toISOString(),
-      });
-
-      // Doador perde o que foi explicitamente transferido + a parte do
-      // ITCMD que não coube no dinheiro cedido (imposto sai do próprio bolso).
-      tx.update(jogadorRef, {
-        dinheiro: dinheiroDoador - dinheiro - itcmdDoBolso,
-        moradias_compradas: moradiasDoador,
-        carros_comprados: carrosDoador,
-        pat: patDoador,
-      });
-
-      tx.delete(filhoRef);
+    const { httpsCallable } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js');
+    await httpsCallable(window.FB_FUNCTIONS, 'assumirHerdeiro')({
+      filhoId, dinheiroTransferido: dinheiro, moradiaId, carroId, bonusSkills, usarUsufruto,
     });
-
-    await addDoc(collection(db,'jogadores',uid,'inbox'), {
-      de:'sistema', para_uid:uid,
-      assunto: '🎓 Novo herdeiro jogável',
-      corpo: `${f.nome} assumiu o controle e agora tem sua própria carreira — acesse pelo trocador de personagem no topo da tela.${dinheiroLiquido>0?` Recebeu R$ ${dinheiroLiquido.toLocaleString('pt-BR')} em dinheiro líquido.`:''}${itcmd>0?` ITCMD pago: R$ ${itcmd.toLocaleString('pt-BR')}.`:''}`,
-      tipo:'sistema', tipo_noticia:'positivo', lida:false, criado_em:new Date().toISOString(),
-    });
-
     toast(`🎓 ${f.nome} agora é jogável! Troque pra ele no topo da tela quando quiser.`, 'ok', 6000);
     setTimeout(()=>window.navTo&&window.navTo('vida_pessoal',null), 800);
   } catch (e) {

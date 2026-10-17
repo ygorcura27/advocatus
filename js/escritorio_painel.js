@@ -426,28 +426,26 @@ window._aceitarOpPessoalmente = async function(escId, opId, valor) {
   }
 
   try {
-    const { doc: fDoc, updateDoc: fUpd, increment: fInc } = await import(
+    const { doc: fDoc, updateDoc: fUpd } = await import(
       'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js'
     );
-    const { db: fDb } = await import('./firebase-init.js');
+    const { httpsCallable } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js');
+    const { db: fDb, functions: fFns } = await import('./firebase-init.js');
 
-    await Promise.all([
-      fUpd(fDoc(fDb, 'jogadores', uid), rAceitar.patch),
-      fUpd(fDoc(fDb, 'escritorios', escId),
-        { caixa: fInc(valor), faturamento_mes_atual: fInc(valor), faturamento_honorarios_mes: fInc(valor) }),
-      fUpd(fDoc(fDb, 'escritorios', escId, 'oportunidades', opId),
-        { status: 'aceita', aceito_por: 'dono', valor_recebido: valor, aceito_em: new Date().toISOString() }),
-    ]);
+    // O crédito no caixa vem do servidor, com o valor do próprio documento
+    // da oportunidade (functions/oportunidades.js:concluirOportunidade).
+    const r = (await httpsCallable(fFns, 'concluirOportunidade')({ escId, opId, modo: 'painel_pessoal' })).data;
+    await fUpd(fDoc(fDb, 'jogadores', uid), rAceitar.patch);
 
     Object.assign(j, rAceitar.patch);
     window.JOGADOR = j;
-    toast(`✅ +${_fmt(valor)} no caixa do escritório!`, 'ok');
+    toast(`✅ +${_fmt(r.recebe)} no caixa do escritório!`, 'ok');
 
     const elOp = document.getElementById('esc-oportunidades-bloco');
     if (elOp) window.renderOportunidadesPainel(j, escId, elOp);
   } catch (e) {
     console.error('[ACEITAR OP]', e);
-    toast('Erro ao aceitar oportunidade.', 'ko');
+    toast(e.message || 'Erro ao aceitar oportunidade.', 'ko');
   }
 };
 
@@ -542,45 +540,28 @@ window._confirmarDelegacao = async function(escId, opId, valor, funcId, cargoId,
   }
 
   try {
-    const { doc: fDoc, updateDoc: fUpd, increment: fInc, getDoc: fGet } = await import(
+    const { doc: fDoc, updateDoc: fUpd } = await import(
       'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js'
     );
-    const { db: fDb } = await import('./firebase-init.js');
+    const { httpsCallable } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js');
+    const { db: fDb, functions: fFns } = await import('./firebase-init.js');
 
-    // Atualizar energia NPC ao delegar
-    const CUSTO_OP_NPC = window.NPC_CUSTO_OP || 25;
-    const NPC_TOT      = window.NPC_ENERGIA_MES || 100;
-    const NPC_OVL      = window.NPC_OVERLOAD_TH || 20;
-
-    const fSnap = await fGet(fDoc(fDb, 'escritorios', escId, 'funcionarios', funcId));
-    const fData = fSnap.exists() ? fSnap.data() : {};
-    const npcNova = (fData.energia_npc_usada_mes || 0) + CUSTO_OP_NPC;
-    const novosMeses = npcNova >= NPC_TOT - NPC_OVL
-      ? (fData.meses_sobrecarregado || 0) + 1
-      : 0;
-
-    await Promise.all([
-      fUpd(fDoc(fDb, 'jogadores', uid), rDelegar.patch),
-      fUpd(fDoc(fDb, 'escritorios', escId),
-        { caixa: fInc(recebe), faturamento_mes_atual: fInc(recebe), faturamento_honorarios_mes: fInc(recebe) }),
-      fUpd(fDoc(fDb, 'escritorios', escId, 'oportunidades', opId),
-        { status: 'delegada', delegado_func_id: funcId, delegado_cargo: cargoId,
-          valor_recebido: recebe, valor_total: valor, aceito_em: new Date().toISOString() }),
-      fUpd(fDoc(fDb, 'escritorios', escId, 'funcionarios', funcId),
-        { energia_npc_usada_mes: npcNova, meses_sobrecarregado: novosMeses }),
-    ]);
+    // Crédito no caixa + energia NPC do funcionário: servidor
+    // (functions/oportunidades.js:concluirOportunidade).
+    const r = (await httpsCallable(fFns, 'concluirOportunidade')({ escId, opId, modo: 'painel_delegar', funcId })).data;
+    await fUpd(fDoc(fDb, 'jogadores', uid), rDelegar.patch);
 
     Object.assign(j, rDelegar.patch);
     window.JOGADOR = j;
 
     const pctLabel = Math.round((DELEGAR_PCT[cargoId] || .20) * 100);
-    toast(`✅ Delegado! +${_fmt(recebe)} no caixa (${pctLabel}% de ${_fmt(valor)}).`, 'ok');
+    toast(`✅ Delegado! +${_fmt(r.recebe)} no caixa (${pctLabel}% de ${_fmt(r.valor)}).`, 'ok');
 
     const elOp = document.getElementById('esc-oportunidades-bloco');
     if (elOp) window.renderOportunidadesPainel(j, escId, elOp);
   } catch (e) {
     console.error('[DELEGAR OP]', e);
-    toast('Erro ao delegar oportunidade.', 'ko');
+    toast(e.message || 'Erro ao delegar oportunidade.', 'ko');
   }
 };
 

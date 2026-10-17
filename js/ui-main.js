@@ -14,6 +14,7 @@ import { icon } from './icons.js';
 import { renderAvatarJogador } from './avatar_svg.js';
 import { ehDoPersonagemAtivo } from './personagens.js';
 import { COMARCAS } from './escritorios_npc.js';
+import { htmlTracosAssinatura } from './duelo.js';
 
 // ── Painel ativo ──
 let _painelAtivo = 'perfil';
@@ -2238,6 +2239,8 @@ window._mktRenderTab = async function(tab, escCached) {
 function renderProgressao(j, el) {
   if (window.renderCarreiraProgressao) {
     window.renderCarreiraProgressao(j, el);
+    // Traços de assinatura da Audiência como Duelo (js/duelo.js).
+    el.insertAdjacentHTML('afterbegin', htmlTracosAssinatura(j));
   } else {
     el.innerHTML = `<div class="card" style="color:var(--ardosia2)">Carregando progressão...</div>`;
   }

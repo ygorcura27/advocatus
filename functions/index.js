@@ -169,3 +169,16 @@ exports.deletarPost              = deletarPost;
 // Banco de Teses do Escritório
 exports.criarTese_banco          = criarTese;
 exports.manterTese_banco         = manterTese;
+// Ações que antes gravavam dinheiro/XP direto do navegador (anti-trapaça F12)
+exports.acaoPatrimonio             = require('./patrimonio').acaoPatrimonio;
+exports.sentencaPool               = require('./pool_sentenca').sentencaPool;
+exports.concluirOportunidade       = require('./oportunidades').concluirOportunidade;
+exports.creditarXpParcialInstrucao = require('./xp_instrucao').creditarXpParcialInstrucao;
+// Audiência como Duelo (docs/DUELO_AUDIENCIA.md)
+exports.iniciarDuelo            = require('./duelo').iniciarDuelo;
+exports.jogarRodadaDuelo        = require('./duelo').jogarRodadaDuelo;
+exports.escolherTracoAssinatura = require('./duelo').escolherTracoAssinatura;
+// Troca/transferência/herança de personagem (antes direto do navegador)
+exports.trocarPersonagem         = require('./personagens').trocarPersonagem;
+exports.transferirParaPersonagem = require('./personagens').transferirParaPersonagem;
+exports.assumirHerdeiro          = require('./personagens').assumirHerdeiro;
