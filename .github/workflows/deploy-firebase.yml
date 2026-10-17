@@ -1,0 +1,38 @@
+# Publica servidor (Cloud Functions), regras do Firestore e hosting do
+# Firebase a cada mudança na main. O site do Netlify já se atualiza sozinho.
+# Precisa do segredo FIREBASE_TOKEN (gerado com `firebase login:ci`).
+name: Publicar no Firebase
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-firebase
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+
+      - name: Instalar dependências do servidor
+        run: npm ci
+        working-directory: functions
+
+      - name: Testes do servidor
+        run: npm test
+        working-directory: functions
+
+      - name: Publicar
+        run: npx --yes firebase-tools@13 deploy --only hosting,functions,firestore:rules --project advocatus-simultor --non-interactive
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
