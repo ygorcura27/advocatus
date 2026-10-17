@@ -146,7 +146,7 @@ Custam **dinheiro** (de verdade, no servidor) e geram **Exposição**, um medido
 2. Anulação do julgamento → o caso volta, sem honorários.
 3. Processo no Tribunal de Ética da OAB → multa e **suspensão** (X meses sem poder atuar em processos; só consultoria).
 4. Escândalo grande → perda do cargo no escritório, ou dissolução do próprio escritório.
-5. (Extremo, decisão em aberto) prisão → o personagem sai de cena e o **herdeiro** assume (o sistema de herança já existe).
+5. Prisão → o personagem sai de cena e o **herdeiro** assume (o sistema de herança já existe).
 
 **Exposição cai devagar** com o tempo e com atos "limpos" (pro bono, que já existe). O ponto não é proibir: é tornar a tentação real e o risco crível.
 
@@ -307,9 +307,9 @@ Tudo em **transaction**, todo número calculado no servidor (mesmo padrão anti-
 3. **Corrupção + Exposição + bomba-relógio** + consequências (imprensa, OAB, suspensão).
 4. **Duelo entre jogadores** (Confronto Direto — já existe documento de design), com os dois lados jogando a mesma audiência.
 
-## 15. Decisões em aberto
+## 15. Decisões tomadas
 
-- Corrupção pode chegar a **prisão** (personagem sai de cena e passa para o herdeiro), ou o teto é suspensão da OAB?
-- Traços: escolhidos em **Pleno e Sócio** (proposta), ou um já na criação do personagem?
-- 6 rodadas é o tamanho certo (≈3–5 min por audiência) ou mais curto?
-- O duelo vale também para os casos do pool do escritório ou só para casos assumidos pessoalmente (proposta: só pessoais; o pool continua automático)?
+- **Corrupção pode levar à prisão.** O degrau 5 da escada de consequências (§7) vale: o personagem sai de cena e o herdeiro assume. Se não houver herdeiro jogável, a conta recomeça com um personagem novo que herda parte do patrimônio (regra a detalhar na fase 3).
+- **Traços são escolhidos ao virar Advogado Pleno e ao virar Sócio** (3º em Sócio Nominal ou por herança, §8.2).
+- **6 rodadas** por audiência.
+- **O duelo vale só para casos assumidos pessoalmente**; o pool do escritório continua automático.
