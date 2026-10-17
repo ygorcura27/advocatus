@@ -169,3 +169,8 @@ exports.deletarPost              = deletarPost;
 // Banco de Teses do Escritório
 exports.criarTese_banco          = criarTese;
 exports.manterTese_banco         = manterTese;
+// Ações que antes gravavam dinheiro/XP direto do navegador (anti-trapaça F12)
+exports.acaoPatrimonio             = require('./patrimonio').acaoPatrimonio;
+exports.sentencaPool               = require('./pool_sentenca').sentencaPool;
+exports.concluirOportunidade       = require('./oportunidades').concluirOportunidade;
+exports.creditarXpParcialInstrucao = require('./xp_instrucao').creditarXpParcialInstrucao;

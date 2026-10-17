@@ -5,8 +5,8 @@
 
 import { collection, query, where, orderBy, limit, getDocs, addDoc, doc, updateDoc, getDoc, increment }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-import { db } from './firebase-init.js';
-import { personagemIdAtual } from './personagens.js';
+import { httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
+import { db, functions } from './firebase-init.js';
 import { COMARCAS, CORRESPONDENTE_NPC_POR_COMARCA, comarcaDoEscritorio } from './escritorios_npc.js';
 
 // ─── Constantes do pool de processos ─────────────────────────────────────────
@@ -129,21 +129,7 @@ function _calcEficiencia(func) {
   return Math.min(mult, (media / cap) * mult);
 }
 
-function _sentencaOutcome(efic) {
-  if (efic >= .85) return _roll([.38,.45,.17]);
-  if (efic >= .70) return _roll([.25,.50,.25]);
-  if (efic >= .55) return _roll([.14,.48,.38]);
-  if (efic >= .40) return _roll([.07,.38,.55]);
-  if (efic >= .25) return _roll([.03,.25,.72]);
-  return                    _roll([.01,.12,.87]);
-}
 
-function _roll([a, b]) {
-  const r = Math.random();
-  if (r < a) return 'procedente';
-  if (r < a + b) return 'parcial';
-  return 'improcedente';
-}
 
 function _podeManejar(cargoId, tierProc) {
   return TIER_ORDER[tierProc] <= TIER_ORDER[CARGO_TIER_MAX[cargoId] || 'D'];
@@ -160,10 +146,6 @@ function _barraProgresso(pct) {
   </div>`;
 }
 
-function _poolSomarMeses(m, a, delta) {
-  const total = (a * 12 + m) + delta;
-  return { mes: total % 12, ano: Math.floor(total / 12) };
-}
 function _poolMesTotal(m, a) { return (a || 1) * 12 + (m || 0); }
 
 // Contexto preservado entre _processarSentenca e os handlers do modal
@@ -1273,72 +1255,44 @@ window._processarSentenca = async function(escId, procId, uid) {
     return;
   }
 
-  const skills = j.skills || {};
-  const vals   = SKILLS_REL.map(s => skills[s] || 0);
-  const media  = vals.reduce((a, b) => a + b, 0) / vals.length;
-  const capDono = window.HABILIDADE_CAP || 50;
-  const efic   = Math.min(1, media / capDono);
-  const resultado = _sentencaOutcome(efic);
-
-  const hon = proc.honorarios || 0;
-  const valorRecebido = resultado === 'procedente' ? hon
-    : resultado === 'parcial' ? Math.round(hon * 0.55)
-    : Math.round(hon * 0.1);
-
-  if (resultado === 'procedente') {
-    const quemAtuou = proc.func_nome || 'A equipe';
-    try {
-      await Promise.all([
-        updateDoc(doc(db, 'jogadores', uid), rSent.patch),
-        updateDoc(doc(db, 'escritorios', escId), {
-          caixa: increment(valorRecebido),
-          faturamento_mes_atual: increment(valorRecebido),
-          faturamento_honorarios_mes: increment(valorRecebido),
-        }),
-        updateDoc(doc(db, 'escritorios', escId, 'processos_pool', procId), {
-          status: 'concluido', resultado, valor_recebido: valorRecebido,
-          concluido_em: new Date().toISOString(),
-        }),
-        proc.func_id
-          ? updateDoc(doc(db, 'escritorios', escId, 'funcionarios', proc.func_id), { processo_id: null })
-          : Promise.resolve(),
-        addDoc(collection(db, 'escritorios', escId, 'log_gestao'), {
-          texto: `✅ ${quemAtuou} obteve sentença favorável em "${proc.titulo}". +${_fmtP(valorRecebido)}.`,
-          criado_em: new Date().toISOString(),
-        }),
-      ]);
+  // O sorteio e o crédito no caixa rodam no servidor (functions/
+  // pool_sentenca.js:sentencaPool) — o navegador não decide mais o resultado.
+  let r;
+  try {
+    r = (await httpsCallable(functions, 'sentencaPool')({ escId, procId, etapa: 'sortear' })).data;
+    if (!r.jaSorteado) {
+      await updateDoc(doc(db, 'jogadores', uid), rSent.patch);
       Object.assign(j, rSent.patch);
       window.JOGADOR = j;
-      toast(`✅ Procedente! +${_fmtP(valorRecebido)} no caixa.`, 'ok');
-      _refreshProcessosPool(j, escId);
-    } catch (e) {
-      console.error('[SENTENÇA PROCEDENTE]', e);
-      toast('Erro ao processar sentença.', 'ko');
     }
+  } catch (e) {
+    console.error('[SENTENÇA POOL]', e);
+    toast(e.message || 'Erro ao processar sentença.', 'ko');
+    return;
+  }
+  const { resultado, valorRecebido, opponentAppealed } = r;
+
+  if (resultado === 'procedente') {
+    toast(`✅ Procedente! +${_fmtP(valorRecebido)} no caixa.`, 'ok');
+    _refreshProcessosPool(j, escId);
     return;
   }
 
   // Resultado desfavorável (parcial ou improcedente) — mostrar convencimento final
   const isParcial = resultado === 'parcial';
-
-  // Para parcial: chance do adversário recorrer (~65% — equivalente ao manual para score ~65)
-  const opponentAppealed = isParcial && (Math.random() < 0.65);
-
-  _sentencaPoolCtx = { escId, procId, uid, proc, resultado, valorRecebido, energiaPatch: rSent.patch, j };
+  _sentencaPoolCtx = { escId, procId, uid, proc, resultado, valorRecebido, j };
 
   const resultadoLabel = isParcial ? '🟡 Parcialmente Procedente' : '❌ Improcedente';
   const resultadoCor   = isParcial ? 'var(--amber)' : 'var(--verm2)';
 
   let botoesHtml;
   if (isParcial && opponentAppealed) {
-    _sentencaPoolCtx.opponentAppealed = true;
     botoesHtml = `
       <div style="background:rgba(239,159,39,.1);border:1px solid rgba(239,159,39,.3);border-radius:6px;padding:.6rem;margin-bottom:.8rem;font-size:.75rem;color:var(--amber)">
         ⚠️ A parte contrária decidiu recorrer desta sentença. O processo vai ao Tribunal de Justiça.
       </div>
       <button class="btn btn-prim btn-block" onclick="window._poolModalRecorrerContrario()">OK — Ver na Fase Recursal</button>`;
   } else if (isParcial) {
-    _sentencaPoolCtx.opponentAppealed = false;
     botoesHtml = `
       <div style="font-size:.73rem;color:var(--txt4);margin-bottom:.9rem">
         A parte contrária aceitou o resultado. Deseja recorrer buscando decisão mais favorável?
@@ -1371,148 +1325,38 @@ window._processarSentenca = async function(escId, procId, uid) {
   );
 };
 
-window._poolModalAceitar = async function() {
+// Aplica a decisão (aceitar/recorrer) sobre o resultado JÁ sorteado no servidor.
+async function _decidirSentencaPool(etapa) {
   const ctx = _sentencaPoolCtx;
-  if (!ctx) return;
+  if (!ctx) return null;
   _sentencaPoolCtx = null;
-  const quemAtuou = ctx.proc.func_nome || 'A equipe';
-  const ico = ctx.resultado === 'parcial' ? '🟡' : '❌';
   try {
-    await Promise.all([
-      updateDoc(doc(db, 'jogadores', ctx.uid), ctx.energiaPatch),
-      updateDoc(doc(db, 'escritorios', ctx.escId), {
-        caixa: increment(ctx.valorRecebido),
-        faturamento_mes_atual: increment(ctx.valorRecebido),
-        faturamento_honorarios_mes: increment(ctx.valorRecebido),
-      }),
-      updateDoc(doc(db, 'escritorios', ctx.escId, 'processos_pool', ctx.procId), {
-        status: 'concluido', resultado: ctx.resultado,
-        valor_recebido: ctx.valorRecebido, concluido_em: new Date().toISOString(),
-      }),
-      ctx.proc.func_id
-        ? updateDoc(doc(db, 'escritorios', ctx.escId, 'funcionarios', ctx.proc.func_id), { processo_id: null })
-        : Promise.resolve(),
-      addDoc(collection(db, 'escritorios', ctx.escId, 'log_gestao'), {
-        texto: `${ico} ${quemAtuou} — sentença ${ctx.resultado} em "${ctx.proc.titulo}". +${_fmtP(ctx.valorRecebido)}. Encerrado sem recurso.`,
-        criado_em: new Date().toISOString(),
-      }),
-    ]);
-    Object.assign(ctx.j, ctx.energiaPatch);
-    window.JOGADOR = ctx.j;
+    const r = (await httpsCallable(functions, 'sentencaPool')({ escId: ctx.escId, procId: ctx.procId, etapa })).data;
     fecharModal();
-    toast(`${ico} Sentença aceita. +${_fmtP(ctx.valorRecebido)} no caixa.`, ctx.resultado === 'parcial' ? 'neutro' : 'ko');
     _refreshProcessosPool(ctx.j, ctx.escId);
+    return r;
   } catch (e) {
-    console.error('[ACEITAR POOL]', e);
-    toast('Erro ao encerrar processo.', 'ko');
+    console.error('[DECISÃO POOL]', etapa, e);
+    toast(e.message || 'Erro ao registrar a decisão.', 'ko');
+    return null;
   }
-};
-
-async function _criarProcessoRecursalPool(ctx, quemRecorre) {
-  const j = ctx.j;
-  const bloq = 2 + Math.floor(Math.random() * 2);
-  const dataDisponivel = _poolSomarMeses(j.mes_pessoal || 0, j.ano_pessoal || 1, bloq);
-  const jan  = 2 + Math.floor(Math.random() * 2);
-  const prazoFinal = _poolSomarMeses(dataDisponivel.mes, dataDisponivel.ano, jan);
-  const scoreAnterior = ctx.resultado === 'parcial' ? 65 : 38;
-
-  const newProcRef = await addDoc(collection(db, 'processos'), {
-    titulo: ctx.proc.titulo || 'Processo',
-    autor:  ctx.proc.cliente_nome || 'Cliente',
-    reu:    'Parte contrária',
-    tipo:   ctx.proc.area || 'Cível',
-    numero: ctx.procId,
-    tribunal: 'TJRJ',
-    valor: ctx.proc.honorarios || 0,
-    fatos_narrativa: [], teses_selecionadas: [],
-    status: 'recurso_pendente',
-    pool_escritorio_id:  ctx.escId,
-    pool_proc_subcol_id: ctx.procId,
-    pool_proc_esc_id:    ctx.escId,
-    advogado_uid: ctx.uid,
-    personagem_id: personagemIdAtual(j),
-    instancia_atual:    '1grau',
-    instancia_seguinte: 'TJ',
-    quem_recorre: quemRecorre,
-    score_anterior: scoreAnterior,
-    hon_pendente: ctx.valorRecebido,
-    data_disponivel_recurso: dataDisponivel,
-    prazo_final_recurso:     prazoFinal,
-    criado_em: new Date().toISOString(),
-  });
-  return newProcRef.id;
 }
 
+window._poolModalAceitar = async function() {
+  const r = await _decidirSentencaPool('aceitar');
+  if (!r) return;
+  const ico = r.resultado === 'parcial' ? '🟡' : '❌';
+  toast(`${ico} Sentença aceita. +${_fmtP(r.valorRecebido)} no caixa.`, r.resultado === 'parcial' ? 'neutro' : 'ko');
+};
+
 window._poolModalRecorrer = async function() {
-  const ctx = _sentencaPoolCtx;
-  if (!ctx) return;
-  _sentencaPoolCtx = null;
-  try {
-    const newProcId = await _criarProcessoRecursalPool(ctx, 'jogador');
-    await Promise.all([
-      updateDoc(doc(db, 'jogadores', ctx.uid), ctx.energiaPatch),
-      updateDoc(doc(db, 'escritorios', ctx.escId), {
-        caixa: increment(ctx.valorRecebido),
-        faturamento_mes_atual: increment(ctx.valorRecebido),
-        faturamento_honorarios_mes: increment(ctx.valorRecebido),
-      }),
-      updateDoc(doc(db, 'escritorios', ctx.escId, 'processos_pool', ctx.procId), {
-        status: 'recurso_pendente', resultado: ctx.resultado,
-        valor_recebido: ctx.valorRecebido, processo_ref: newProcId,
-      }),
-      ctx.proc.func_id
-        ? updateDoc(doc(db, 'escritorios', ctx.escId, 'funcionarios', ctx.proc.func_id), { processo_id: null })
-        : Promise.resolve(),
-      addDoc(collection(db, 'escritorios', ctx.escId, 'log_gestao'), {
-        texto: `⚖️ Recurso protocolado em "${ctx.proc.titulo}" (sentença ${ctx.resultado}). Aguardando julgamento no TJ.`,
-        criado_em: new Date().toISOString(),
-      }),
-    ]);
-    Object.assign(ctx.j, ctx.energiaPatch);
-    window.JOGADOR = ctx.j;
-    fecharModal();
-    toast('⚖️ Recurso protocolado. Acompanhe na aba Fase Recursal.', 'ok', 4000);
-    _refreshProcessosPool(ctx.j, ctx.escId);
-  } catch (e) {
-    console.error('[RECORRER POOL]', e);
-    toast('Erro ao protocolar recurso.', 'ko');
-  }
+  const r = await _decidirSentencaPool('recorrer');
+  if (r) toast('⚖️ Recurso protocolado. Acompanhe na aba Fase Recursal.', 'ok', 4000);
 };
 
 window._poolModalRecorrerContrario = async function() {
-  const ctx = _sentencaPoolCtx;
-  if (!ctx) return;
-  _sentencaPoolCtx = null;
-  try {
-    const newProcId = await _criarProcessoRecursalPool(ctx, 'parte_contraria');
-    await Promise.all([
-      updateDoc(doc(db, 'jogadores', ctx.uid), ctx.energiaPatch),
-      updateDoc(doc(db, 'escritorios', ctx.escId), {
-        caixa: increment(ctx.valorRecebido),
-        faturamento_mes_atual: increment(ctx.valorRecebido),
-        faturamento_honorarios_mes: increment(ctx.valorRecebido),
-      }),
-      updateDoc(doc(db, 'escritorios', ctx.escId, 'processos_pool', ctx.procId), {
-        status: 'recurso_pendente', resultado: ctx.resultado,
-        valor_recebido: ctx.valorRecebido, processo_ref: newProcId,
-      }),
-      ctx.proc.func_id
-        ? updateDoc(doc(db, 'escritorios', ctx.escId, 'funcionarios', ctx.proc.func_id), { processo_id: null })
-        : Promise.resolve(),
-      addDoc(collection(db, 'escritorios', ctx.escId, 'log_gestao'), {
-        texto: `⚠️ Parte contrária recorreu da sentença parcial em "${ctx.proc.titulo}". Você deverá defender no TJ.`,
-        criado_em: new Date().toISOString(),
-      }),
-    ]);
-    Object.assign(ctx.j, ctx.energiaPatch);
-    window.JOGADOR = ctx.j;
-    fecharModal();
-    toast('⚠️ Parte contrária recorreu. Processo na Fase Recursal.', 'neutro', 4000);
-    _refreshProcessosPool(ctx.j, ctx.escId);
-  } catch (e) {
-    console.error('[RECURSO CONTRÁRIO POOL]', e);
-    toast('Erro ao registrar recurso adversarial.', 'ko');
-  }
+  const r = await _decidirSentencaPool('recorrer_contrario');
+  if (r) toast('⚠️ Parte contrária recorreu. Processo na Fase Recursal.', 'neutro', 4000);
 };
 
 // ─── Reunião com Clientes (geração manual de processos) ───────────────────────

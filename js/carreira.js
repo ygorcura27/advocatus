@@ -326,26 +326,13 @@ window._abrirModalTransferirDinheiro = function(personagemId, nome) {
 window._confirmarTransferirDinheiro = async function(personagemId) {
   const valor = Math.round(Number(document.getElementById('transf-valor')?.value) || 0);
   const j     = window.JOGADOR;
-  const uid   = j.uid || window.JOGADOR_UID;
   if (valor <= 0) { toast('Digite um valor válido.', 'ko'); return; }
   if (valor > (j.dinheiro||0)) { toast('Saldo insuficiente.', 'ko'); return; }
 
   try {
-    const { runTransaction } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-    const jogadorRef = doc(db, 'jogadores', uid);
-    const destRef     = doc(db, 'jogadores', uid, 'personagens', personagemId);
-
-    await runTransaction(db, async (tx) => {
-      const jogadorSnap = await tx.get(jogadorRef);
-      const destSnap     = await tx.get(destRef);
-      if (!jogadorSnap.exists() || !destSnap.exists()) throw new Error('Personagem não encontrado.');
-      const jd   = jogadorSnap.data();
-      const dest = destSnap.data();
-      if (valor > (jd.dinheiro||0)) throw new Error('Saldo insuficiente.');
-
-      tx.update(jogadorRef, { dinheiro: (jd.dinheiro||0) - valor });
-      tx.update(destRef,     { dinheiro: (dest.dinheiro||0) + valor });
-    });
+    // Débito + crédito entre personagens: functions/personagens.js:transferirParaPersonagem.
+    const { httpsCallable } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js');
+    await httpsCallable(window.FB_FUNCTIONS, 'transferirParaPersonagem')({ personagemId, valor });
 
     j.dinheiro = (j.dinheiro||0) - valor;
     window.JOGADOR = j;

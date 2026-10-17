@@ -2,3 +2,6 @@
 functions/node_modules/ 
 .firebase/ 
 functions/node_modules/ 
+tests/regras/node_modules/
+tests/regras/firebase-debug.log
+tests/regras/firestore-debug.log

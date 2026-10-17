@@ -5,7 +5,24 @@
 
 import { doc, updateDoc }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-import { db } from './firebase-init.js';
+import { httpsCallable }
+  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
+import { db, functions } from './firebase-init.js';
+
+// Compra/venda (dinheiro, posse e financiamento) roda no servidor —
+// functions/patrimonio.js:acaoPatrimonio. As regras do Firestore não
+// deixam mais o navegador aumentar o próprio saldo nem marcar posse.
+async function _acaoServidor(acao, id, modo) {
+  try {
+    const r = await httpsCallable(functions, 'acaoPatrimonio')({ acao, id, modo });
+    toast(r.data.msg, 'ok', 5000);
+    return true;
+  } catch (err) {
+    toast(err.message || 'Erro ao salvar.', 'ko');
+    console.error('[PAT]', err);
+    return false;
+  }
+}
 
 // ════════════════════════════════════════════════════════
 // ZONAS
@@ -285,11 +302,8 @@ window.escolherMoradia = async function(id, tipo) {
     toast('👨‍👩‍👦 Voltou para a casa dos pais. -3 rep.','');
   } else if (tipo === 'compra') {
     if ((j.dinheiro||0) < m.v) { toast(`Saldo insuficiente. Necessário: ${fmt(m.v)}`,'ko'); return; }
-    updates.dinheiro = (j.dinheiro||0) - m.v;
-    updates[`moradias_compradas.${id}`] = true;
-    updates['pat.moradia'] = id;
-    updates.reputacao = Math.min(100,(j.reputacao||30)+m.rep_cp);
-    toast(`🏠 ${m.l} comprada! +${m.rep_cp} rep`,'ok');
+    await _acaoServidor('comprar_imovel', id);
+    return;
   } else {
     updates['pat.moradia'] = id;
     if (m.rep_al > 0) updates.reputacao = Math.min(100,(j.reputacao||30)+m.rep_al);
@@ -313,15 +327,7 @@ window.venderImovel = async function(id) {
   if (!m || m.pais || !j.moradias_compradas?.[id]) { toast('Imóvel não encontrado.','ko'); return; }
   const vVenda = Math.floor(m.v * 0.6);
   if (!confirm(`Vender ${m.l}?\n\nValor de venda (60%): ${fmt(vVenda)}${j.pat?.moradia===id?'\nVocê voltará para outra propriedade ou casa dos pais.':''}`)) return;
-  const novasComp = {...(j.moradias_compradas||{})}; delete novasComp[id];
-  const updates = { moradias_compradas: novasComp, dinheiro: (j.dinheiro||0)+vVenda };
-  if (j.pat?.moradia === id) {
-    const outras = Object.keys(novasComp).filter(k=>novasComp[k]);
-    updates['pat.moradia'] = outras.length > 0 ? outras[0] : 'pais';
-    if ((m.rep_cp||0) > 0) updates.reputacao = Math.max(0,(j.reputacao||30)-(m.rep_cp||0));
-  }
-  await _salvar(uid, updates);
-  toast(`🏠 ${m.l} vendida por ${fmt(vVenda)}.`,'ok');
+  await _acaoServidor('vender_imovel', id);
 };
 
 // ════════════════════════════════════════════════════════
@@ -332,23 +338,13 @@ window.escolherCarro = async function(id, mod) {
   const uid = j.uid || window.JOGADOR_UID;
   if (j.no_serasa && mod !== 'vista' && id !== 'onibus') { toast('Financiamento bloqueado — nome no Serasa.','ko'); return; }
   const cr = CARROS.find(x=>x.id===id);
-  const updates = {};
-  if (id === 'onibus' || mod === 'vista') {
-    if (cr?.v && (j.dinheiro||0) < cr.v) { toast('Saldo insuficiente.','ko'); return; }
-    if (cr?.v) { updates.dinheiro = (j.dinheiro||0)-cr.v; updates[`carros_comprados.${id}`] = true; }
-    updates['pat.transporte'] = id;
-    updates.reputacao = Math.min(100,(j.reputacao||30)+(cr?.rep||0));
+  if (id === 'onibus') {
+    await _salvar(uid, { 'pat.transporte': id, reputacao: Math.max(0, Math.min(100,(j.reputacao||30)+(cr?.rep||0))) });
     toast(`${cr?.l||'Transporte'} selecionado!`,'ok');
-  } else {
-    const parcelas = mod === 'fin36' ? 36 : 48;
-    const parcela  = Math.ceil((cr?.v||0)/parcelas*1.35);
-    updates[`financiamentos.${id}`] = { nome:cr?.l, parcela_mensal:parcela, parcelas_restantes:parcelas, valor_total:parcela*parcelas };
-    updates[`carros_comprados.${id}`] = true;
-    updates['pat.transporte'] = id;
-    updates.reputacao = Math.min(100,(j.reputacao||30)+Math.floor((cr?.rep||0)*0.6));
-    toast(`${cr?.l} financiado! ${parcelas}× ${fmt(parcela)}/mês`,'ok');
+    return;
   }
-  await _salvar(uid, updates);
+  if (mod === 'vista' && cr?.v && (j.dinheiro||0) < cr.v) { toast('Saldo insuficiente.','ko'); return; }
+  await _acaoServidor('comprar_carro', id, mod === 'vista' ? 'vista' : (mod === 'fin36' ? 'fin36' : 'fin48'));
 };
 
 window.alternarCarro = async function(id) {
@@ -366,16 +362,7 @@ window.venderCarro = async function(id) {
   if (!cr || id === 'onibus') { toast('Operação inválida.','ko'); return; }
   const vVenda = Math.floor(cr.v * 0.5);
   if (!confirm(`Vender ${cr.l}?\n\nValor de venda (50%): ${fmt(vVenda)}${j.pat?.transporte===id?'\nVocê passará a usar outro veículo ou transporte público.':''}`)) return;
-  const novosCom = {...(j.carros_comprados||{})}; delete novosCom[id];
-  const updates  = { carros_comprados: novosCom, dinheiro: (j.dinheiro||0)+vVenda };
-  if (j.pat?.transporte === id) {
-    const outros = Object.keys(novosCom).filter(k=>novosCom[k] && k!=='onibus');
-    updates['pat.transporte'] = outros.length > 0 ? outros[0] : 'onibus';
-    if ((cr.rep||0) > 0) updates.reputacao = Math.max(0,(j.reputacao||30)-(cr.rep||0));
-  }
-  if (j.financiamentos?.[id]) { const f={...j.financiamentos}; delete f[id]; updates.financiamentos=f; }
-  await _salvar(uid, updates);
-  toast(`🚗 ${cr.l} vendido por ${fmt(vVenda)}!`,'ok',5000);
+  await _acaoServidor('vender_carro', id);
 };
 
 window.devolverCarro = async function(carroId) {
@@ -387,10 +374,7 @@ window.devolverCarro = async function(carroId) {
   const pagas         = totalParcelas - fin.parcelas_restantes;
   const reembolso     = Math.floor(pagas*fin.parcela_mensal*0.5);
   if (!confirm(`Devolver ${fin.nome}?\n\nParcelas pagas: ${pagas}/${totalParcelas}\nReembolso (50%): ${fmt(reembolso)}\n\nVocê voltará para o ônibus.`)) return;
-  const novosFins = {...(j.financiamentos||{})}; delete novosFins[carroId];
-  const novosCom  = {...(j.carros_comprados||{})}; delete novosCom[carroId];
-  await _salvar(uid, { financiamentos:novosFins, carros_comprados:novosCom, 'pat.transporte':'onibus', dinheiro:(j.dinheiro||0)+reembolso });
-  toast(`🚗 Carro devolvido. +${fmt(reembolso)} de reembolso.`,'ok',5000);
+  await _acaoServidor('devolver_carro', carroId);
 };
 
 // ════════════════════════════════════════════════════════
@@ -519,33 +503,12 @@ window.comprarItem = async function(id) {
   if (it.cat === 'cong') {
     if (_mesAtual(j) !== it.mes) { toast(`Congresso disponível apenas em ${MESES_NOME[it.mes-1]}.`,'ko'); return; }
     if ((j.congressos_usados||{})[it.id] === _anoAtual(j)) { toast('Você já participou deste congresso este ano.','ko'); return; }
-    const netBonus = {cong_par:8,cong_ber:7,cong_lis:6,cong_sp:5,cong_rio:5}[it.id]||5;
-    const updates  = { dinheiro:(j.dinheiro||0)-it.p, [`congressos_usados.${it.id}`]:_anoAtual(j) };
-    if (it.rep>0) updates.reputacao = Math.min(window.REP_CAP?.[j.cargo_id]||55,(j.reputacao||30)+it.rep);
-    updates['skills.networking'] = Math.min(window.HABILIDADE_CAP||50, ((j.skills||{}).networking||10)+netBonus);
-    await _salvar(uid, updates);
-    toast(`✈️ ${it.n} — participação confirmada!${it.rep>0?` +${it.rep} rep`:''}`, 'ok');
+    await _acaoServidor('comprar_item', id);
     return;
   }
 
   if ((j.compras||[]).some(c=>c.id===id)) { toast('Você já possui este item.',''); return; }
-  const novasCompras = [...(j.compras||[]), {id:it.id,n:it.n,rep:it.rep||0,p:it.p,img:it.img}];
-  const updates = { dinheiro:(j.dinheiro||0)-it.p, compras:novasCompras };
-  if (it.rep>0) updates.reputacao = Math.min(100,(j.reputacao||30)+it.rep);
-  if (it.id==='bj') updates['skills.pesquisa'] = Math.min(window.HABILIDADE_CAP||50,((j.skills||{}).pesquisa||18)+8);
-  if (it.id==='nb') {
-    updates['skills.escrita']  = Math.min(window.HABILIDADE_CAP||50,((j.skills||{}).escrita||15)+6);
-    updates['skills.pesquisa'] = Math.min(window.HABILIDADE_CAP||50,((j.skills||{}).pesquisa||18)+6);
-  }
-  if (it.id==='ai') Object.keys(j.skills||{}).forEach(k=>{
-    updates[`skills.${k}`]=Math.min(window.HABILIDADE_CAP||50,((j.skills||{})[k]||15)+8);
-  });
-  if (it.id==='ac') {
-    updates['skills.persuasao']=Math.min(window.HABILIDADE_CAP||50,((j.skills||{}).persuasao||12)+6);
-    updates['skills.oratoria'] =Math.min(window.HABILIDADE_CAP||50,((j.skills||{}).oratoria||15)+4);
-  }
-  await _salvar(uid, updates);
-  toast(`${it.n} adquirido!${it.rep>0?` +${it.rep} rep`:''}`, 'ok');
+  await _acaoServidor('comprar_item', id);
 };
 
 // ════════════════════════════════════════════════════════
@@ -558,10 +521,7 @@ window.venderItem = async function(id) {
   if (!it || !(j.compras||[]).some(c=>c.id===id)) { toast('Item não encontrado.','ko'); return; }
   const vVenda = Math.floor(it.p*.5);
   if (!confirm(`Vender ${it.n}?\n\nValor de venda (50%): ${fmt(vVenda)}${it.rep>0?`\nPerda de reputação: -${it.rep} rep`:''}`)) return;
-  const updates = { dinheiro:(j.dinheiro||0)+vVenda, compras:(j.compras||[]).filter(c=>c.id!==id) };
-  if ((it.rep||0)>0) updates.reputacao = Math.max(0,(j.reputacao||30)-(it.rep||0));
-  await _salvar(uid, updates);
-  toast(`${it.n} vendido por ${fmt(vVenda)}.${it.rep>0?` -${it.rep} rep`:''}`, 'ok');
+  await _acaoServidor('vender_item', id);
 };
 
 // ════════════════════════════════════════════════════════

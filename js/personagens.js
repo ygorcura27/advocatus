@@ -10,9 +10,9 @@
  * sem nenhuma migração necessária pros personagens criados antes desta
  * feature existir).
  */
-import { doc, getDoc, setDoc, updateDoc, collection, getDocs }
+import { doc, collection, getDocs }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-import { db } from './firebase-init.js';
+import { db, functions } from './firebase-init.js';
 
 // Campos de identidade da CONTA — nunca trocam junto com o personagem.
 const _EXCLUIR_TROCA = new Set([
@@ -105,77 +105,15 @@ window.trocarPersonagem = async function(targetId) {
   const j   = window.JOGADOR;
   const uid = j?.uid || window.JOGADOR_UID;
   if (!uid || !j || !targetId) return;
+  if (targetId === (j.personagem_ativo_id || 'principal')) return;
 
-  const idAtual = j.personagem_ativo_id || 'principal';
-  if (targetId === idAtual) return;
-
-  const jogadorRef  = doc(db, 'jogadores', uid);
-  const outgoingRef = doc(db, 'jogadores', uid, 'personagens', idAtual);
-
+  // A troca (arquivar quem sai + ativar quem entra) roda no servidor —
+  // functions/personagens.js:trocarPersonagem. As regras não deixam mais o
+  // navegador escrever fichas de personagem inteiras.
   try {
-    // Leitura fresca do doc ativo ANTES de escrever qualquer coisa — não
-    // confia em window.JOGADOR (pode estar um passo atrás do que o
-    // Firestore tem gravado). As Rules exigem notChanging('uid')/
-    // notChanging('criado_em') batendo com o valor real armazenado.
-    const jogadorAtualSnap = await getDoc(jogadorRef);
-    const jd = jogadorAtualSnap.exists() ? jogadorAtualSnap.data() : j;
-
-    // 1. Guarda o personagem que está saindo — cria jogadores/{uid}/
-    // personagens/principal na primeira troca de saída dele, de forma
-    // preguiçosa (nunca precisou existir antes disso). Sem bounds check
-    // nas Rules pra essa subcoleção — sempre passa.
-    try {
-      await setDoc(outgoingRef, _somenteFichaPersonagem(jd));
-    } catch (e) {
-      console.error('[TROCAR PERSONAGEM] falhou salvando quem sai', e);
-      throw e;
-    }
-
-    // 2. Busca a ficha de quem vai entrar.
-    const targetRef  = doc(db, 'jogadores', uid, 'personagens', targetId);
-    const targetSnap = await getDoc(targetRef);
-    if (!targetSnap.exists()) { toast('Personagem não encontrado.', 'ko'); return; }
-    const fichaAlvo = targetSnap.data();
-
-    if ((fichaAlvo.idade || 0) >= 75) {
-      toast(`${fichaAlvo.nome_personagem} já se aposentou — não dá mais pra jogar com ele, só usar pra passar herança.`, 'ko', 6000);
-      return;
-    }
-
-    // 3. Sobrescreve o doc ativo com a ficha de quem entrou — setDoc SEM
-    // merge de propósito: updateDoc deixaria campos que só existiam no
-    // personagem que saiu (e não existem na ficha de quem entrou)
-    // vazarem/sobrarem no personagem novo. Reconstrói a identidade da
-    // CONTA (nunca troca) + a ficha inteira do alvo.
-    const identidade = {};
-    for (const k of _EXCLUIR_TROCA) {
-      if (k === 'personagem_ativo_id') continue;
-      if (jd[k] !== undefined) identidade[k] = jd[k];
-    }
-    // Clamp defensivo de reputacao: as Rules de jogadores/{uid} exigem
-    // 0-100 no documento inteiro pós-escrita. Uma ficha arquivada pode ter
-    // saído de faixa por algum caminho que grava via Admin SDK (Cloud
-    // Functions não passam pelas Rules) — sem isso, a troca pra esse
-    // personagem específico falhava com permission-denied pra sempre.
-    const reputacaoClamped = Math.max(0, Math.min(100, fichaAlvo.reputacao ?? 30));
-    // fichaAlvo pode ter seu PRÓPRIO criado_em (ex.: personagem gerado via
-    // assumirHerdeiro, que grava a data de criação do personagem, não da
-    // conta) — sem passar por _somenteFichaPersonagem aqui, esse campo
-    // sobrescrevia o criado_em da conta e violava notChanging('criado_em')
-    // nas Rules, derrubando a troca com permission-denied.
-    try {
-      await setDoc(jogadorRef, {
-        ...identidade,
-        ..._somenteFichaPersonagem(fichaAlvo),
-        reputacao: reputacaoClamped,
-        personagem_ativo_id: targetId === 'principal' ? null : targetId,
-      });
-    } catch (e) {
-      console.error('[TROCAR PERSONAGEM] falhou ativando quem entra', e, { fichaAlvo, identidade });
-      throw e;
-    }
-
-    toast(`🔀 Trocou para ${fichaAlvo.nome_personagem}.`, 'ok', 4000);
+    const { httpsCallable } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js');
+    const r = await httpsCallable(functions, 'trocarPersonagem')({ targetId });
+    toast(`🔀 Trocou para ${r.data.nome}.`, 'ok', 4000);
   } catch (e) {
     console.error('[TROCAR PERSONAGEM]', e);
     toast('Erro ao trocar de personagem: ' + (e.message||''), 'ko');

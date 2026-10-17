@@ -1,0 +1,14 @@
+{
+  "name": "advocatus-testes-regras",
+  "private": true,
+  "description": "Testes das regras do Firestore (anti-trapaça) — rodar com: npm test (precisa do Java instalado)",
+  "type": "module",
+  "scripts": {
+    "test": "firebase emulators:exec --only firestore --project demo-advocatus \"node --test regras.test.mjs\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^3.0.4",
+    "firebase": "^10.12.2",
+    "firebase-tools": "^13.0.0"
+  }
+}
