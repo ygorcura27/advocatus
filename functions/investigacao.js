@@ -882,5 +882,6 @@ module.exports = {
   executarRodadaJulgamento: exports.executarRodadaJulgamento,
   finalizarJulgamento: exports.finalizarJulgamento,
   _finalizarJulgamentoCore: exports._finalizarJulgamentoCore,
+  autorizadoParaProcessar,
   processarApodrecimentoFavores,
 };

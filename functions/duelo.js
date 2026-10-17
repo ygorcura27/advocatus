@@ -10,7 +10,7 @@
  */
 
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
-const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue, FieldPath } = require('firebase-admin/firestore');
 const motor = require('./duelo_motor');
 const { autorizadoParaProcessar, _finalizarJulgamentoCore } = require('./investigacao');
 const { _aceitarDecisaoSentenca } = require('./processar_sentenca');
@@ -119,7 +119,8 @@ exports.jogarRodadaDuelo = onCall({ region: 'southamerica-east1' }, async (reque
   if (resultado.publico.final?.resultado === 'acordo' && !r.jaResolvido) {
     await _aceitarDecisaoSentenca(db, processoRef, jogadorRef, r.pAtualizado, r.jAtualizado, true);
   }
-  await jogadorRef.update({ [`juizes_vistos.${resultado.juiz}`]: FieldValue.increment(1) });
+  // FieldPath: o nome do juiz tem ponto ("Dr."), que viraria subcampo.
+  await jogadorRef.update(new FieldPath('juizes_vistos', resultado.juiz), FieldValue.increment(1));
   return { duelo: resultado.publico, veredito: r.veredito, hon_pendente: r.hon_pendente, repDelta: r.repDelta, xpGanho: r.xpGanho };
 });
 
