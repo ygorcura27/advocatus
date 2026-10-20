@@ -190,14 +190,19 @@ window.renderGestaoProcessos = async function(j, el) {
   el.innerHTML = `
     <div style="margin-bottom:.8rem"><button class="btn btn-ghost btn-sm" onclick="window.navTo('escritorio',null)">← Escritório</button></div>
     ${window._capaHeader(`GESTÃO · ${(esc.nome||'—').toUpperCase()}`, '⚖️ Gestão de Processos', '')}
-    ${podeGerenciar ? `<div class="card" style="margin-bottom:1rem;font-size:.74rem;color:var(--txt3);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
-      <span>Delegação de gestão foi pra Gestão de Pessoas — junto com contratação e equipe.</span>
-      <button class="btn btn-ghost btn-sm" onclick="window.navTo('equipe',null)">👤 Gestão de Pessoas →</button>
-    </div>` : ''}
-    ${podeGerenciar ? _renderRegrasCaptacao(esc, escId) : ''}
-    ${_renderEstrategiaPadrao(j)}
-    ${podeGerenciar ? `<div id="gestao-correspondentes"></div>` : ''}
-    <div id="gestao-processos-pool"></div>`;
+    <div id="gestao-processos-pool"></div>
+    <details class="card" style="margin-top:1rem;padding:.7rem .9rem">
+      <summary style="cursor:pointer;font-weight:600;font-size:.82rem;color:var(--txt)">⚙️ Configurações avançadas <span style="font-weight:400;color:var(--txt4);font-size:.72rem">— captação automática, estratégia padrão${podeGerenciar ? ', correspondentes e delegação' : ''}</span></summary>
+      <div style="margin-top:.8rem">
+        ${podeGerenciar ? `<div style="margin-bottom:1rem;font-size:.74rem;color:var(--txt3);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
+          <span>Delegar a gestão dos casos a um funcionário fica em Gestão de Pessoas.</span>
+          <button class="btn btn-ghost btn-sm" onclick="window.navTo('equipe',null)">👤 Gestão de Pessoas →</button>
+        </div>` : ''}
+        ${podeGerenciar ? _renderRegrasCaptacao(esc, escId) : ''}
+        ${_renderEstrategiaPadrao(j)}
+        ${podeGerenciar ? `<div id="gestao-correspondentes"></div>` : ''}
+      </div>
+    </details>`;
 
   if (podeGerenciar) {
     const elCorr = document.getElementById('gestao-correspondentes');

@@ -830,7 +830,6 @@ async function _carregarEscritorioProprio(escId, j) {
         ${_escBeneficiosPreviewCard(esc.id)}
         ${_escTesesCard()}
         ${_escClientesCard()}
-        <div id="esc-oportunidades-bloco"></div>
         ${_escSocietarioCard(esc, j)}
         <div id="esc-financas-upgrade">
           ${window.renderBlocoFinancas ? window.renderBlocoFinancas(esc, j) : ''}
@@ -858,8 +857,6 @@ async function _carregarEscritorioProprio(escId, j) {
       if (elClientes && window.renderClientesPainel) window.renderClientesPainel(j, escId, elClientes);
       const elTeses = document.getElementById('esc-teses-embed');
       if (elTeses && window.renderBancoTesesPainel) window.renderBancoTesesPainel(j, escId, elTeses);
-      const elOportunidades = document.getElementById('esc-oportunidades-bloco');
-      if (elOportunidades && window.renderOportunidadesPainel) window.renderOportunidadesPainel(j, escId, elOportunidades);
       const elWorkspace = document.getElementById('esc-workspace-bloco');
       if (elWorkspace) _renderWorkspacePainel(j, elWorkspace);
       const elEspec = document.getElementById('esc-especializacoes-bloco');
@@ -1654,8 +1651,8 @@ function _escClientesCard() {
   return `
   <div class="esc-card-bloco" style="margin-bottom:1.1rem">
     <div class="secao-header" style="margin-bottom:.8rem">
-      <div class="secao-titulo">Carteira de Clientes</div>
-      <button class="painel-btn" onclick="window.navTo('clientes',null)">ver todos →</button>
+      <div class="secao-titulo">Clientes e Oportunidades</div>
+      <button class="painel-btn" onclick="window.navTo('clientes',null)">oportunidades e clientes →</button>
     </div>
     <div id="esc-clientes-embed">
       <div style="font-size:.78rem;color:var(--txt3);padding:.5rem 0">Carregando clientes...</div>
