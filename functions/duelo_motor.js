@@ -157,7 +157,9 @@ function criarDuelo(p, j, rng, seedId = '') {
   const vezes = (j.juizes_vistos || {})[juiz.nome] || 0;
   const estilo = sortearPeso({ agressivo: 3, tecnico: 3, teatral: 2, burocrata: 2 }, rng);
   const valor = p.valor || p.valor_causa || 20000;
-  const instancia = p.instancia_atual && p.instancia_atual !== '1grau' ? 3 : 0;
+  // Recurso vira audiência no tribunal: cada degrau da cadeia endurece o adversário.
+  const NIVEL_INSTANCIA = { TJ: 3, TRF: 3, TRT: 3, STJ: 6, TST: 6, STF: 9 };
+  const instancia = NIVEL_INSTANCIA[p.instancia_atual] ?? (p.instancia_atual && p.instancia_atual !== '1grau' ? 3 : 0);
   const escalaValor = clamp(Math.log10(Math.max(5000, valor)) - 3.7, 0, 2.3) * 6; // 5k → 0, 800k ≈ +8
   const forcaAdvBase = 12 + escalaValor + (inv.investigacao_adversaria || 0) / 5 + instancia;
 

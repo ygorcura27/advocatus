@@ -720,12 +720,12 @@ function _renderVeredito(j, main, p) {
   }
   main.innerHTML = `
     <div class="card">
-      <div class="card-titulo">Veredito</div>
+      <div class="card-titulo">Veredito${p.instancia_atual && p.instancia_atual !== '1grau' ? ' — ' + p.instancia_atual : ''}</div>
       <div class="card-sub" style="color:${cor};font-weight:600;font-size:1.1rem">${_labelVeredito(veredito)}</div>
       <p style="color:var(--txt3);margin:.75rem 0">Honorários pendentes: R$ ${(p.hon_pendente || 0).toLocaleString('pt-BR')}</p>
       <div style="display:flex;gap:.5rem">
         ${p.status !== 'aguardando_decisao_sentenca' ? `<button class="btn btn-prim" onclick="window._invVoltarProcessos()">Voltar aos processos</button>` : `
-        <button class="btn btn-prim" onclick="window._invDecidirRecurso(true)">Recorrer</button>
+        ${p.instancia_atual === 'STF' ? '' : `<button class="btn btn-prim" onclick="window._invDecidirRecurso(true)">Recorrer${p.instancia_atual && p.instancia_atual !== '1grau' ? '' : ' ao 2º grau'}</button>`}
         <button class="btn btn-sec" onclick="window._invDecidirRecurso(false)">Aceitar a derrota</button>`}
       </div>
     </div>`;

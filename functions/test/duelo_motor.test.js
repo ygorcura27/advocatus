@@ -150,3 +150,13 @@ test('juiz que valoriza o tipo da carta dá mais convencimento', () => {
   const baixo = m.ganhoCarta(e, carta);
   assert.ok(alto > baixo * 2);
 });
+
+test('recurso: adversário fica mais forte a cada instância (1º grau < TJ < STJ < STF)', () => {
+  const base = { valor: 50000, investigacao: { nos: [{ id: 'n0', tipo: 'consulta' }], julgamento: { pecas_restantes: [{ no_id: 'n0', forca: 20 }] } } };
+  const soma = (inst) => {
+    const e = m.criarDuelo({ ...base, instancia_atual: inst }, {}, rngSeed(42), 'x');
+    return e.baralho.reduce((s, c) => s + c.forca, 0);
+  };
+  const [g1, tj, stj, stf] = ['1grau', 'TJ', 'STJ', 'STF'].map(soma);
+  assert.ok(g1 < tj && tj < stj && stj < stf, `${g1} ${tj} ${stj} ${stf}`);
+});

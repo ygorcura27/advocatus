@@ -490,7 +490,10 @@ window.renderProcessosPool = async function(j, escId, el) {
       const jaIncluidos = new Set(recursais.map(r => r.id));
       const snaps = await Promise.all(poolAssumidosAbertos.map(p => getDoc(doc(db, 'processos', p.processo_ref))));
       for (const snap of snaps) {
-        if (snap.exists() && STATUSES_RECURSAL.includes(snap.data().status) && !jaIncluidos.has(snap.id)) {
+        const dd = snap.exists() ? snap.data() : null;
+        // Recurso em audiência no tribunal (status 'investigacao' fora do 1º grau) também é fase recursal.
+        const emAudienciaRecursal = dd && dd.status === 'investigacao' && dd.instancia_atual && dd.instancia_atual !== '1grau';
+        if (dd && (STATUSES_RECURSAL.includes(dd.status) || emAudienciaRecursal) && !jaIncluidos.has(snap.id)) {
           jaIncluidos.add(snap.id);
           recursais.push({ id: snap.id, ...snap.data() });
         }
@@ -777,6 +780,20 @@ function _renderColRecursal(recursais, mesAtualTotal) {
   }
 
   return recursais.map(p => {
+    // Loop de investigação: audiência no tribunal em andamento ou veredito a ver.
+    if (p.investigacao && (p.status === 'investigacao' || p.status === 'aguardando_decisao_sentenca')) {
+      const emAudiencia = p.status === 'investigacao';
+      return `
+      <div class="proc-recursal-row">
+        <div style="font-size:.6rem;color:var(--txt4);font-family:monospace">${p.numero||'—'}</div>
+        <div style="font-size:.75rem;font-weight:600;color:var(--txt);margin:.1rem 0">${p.autor||'—'} vs ${p.reu||'—'}</div>
+        <div style="font-size:.63rem;color:var(--txt4)">${p.tipo||'—'} · ${p.instancia_atual && p.instancia_atual !== '1grau' ? p.instancia_atual : '1º grau'}</div>
+        <button class="btn btn-sm btn-prim btn-block" style="margin-top:.4rem;font-size:.62rem"
+          onclick="window.jogarRecursoProducao && window.jogarRecursoProducao('${p.id}')">
+          ${emAudiencia ? '⚖️ Continuar audiência' : '📜 Ver veredito'}
+        </button>
+      </div>`;
+    }
     if (p.status === 'aguardando_decisao_recurso' || p.status === 'aguardando_decisao_sentenca') {
       return `
       <div class="proc-recursal-row">

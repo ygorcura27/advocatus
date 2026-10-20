@@ -178,6 +178,7 @@ exports.creditarXpParcialInstrucao = require('./xp_instrucao').creditarXpParcial
 // Audiência como Duelo (docs/DUELO_AUDIENCIA.md)
 exports.iniciarDuelo            = require('./duelo').iniciarDuelo;
 exports.jogarRodadaDuelo        = require('./duelo').jogarRodadaDuelo;
+exports.iniciarRecursoDuelo     = require('./duelo').iniciarRecursoDuelo;
 exports.escolherTracoAssinatura = require('./duelo').escolherTracoAssinatura;
 // Troca/transferência/herança de personagem (antes direto do navegador)
 exports.trocarPersonagem         = require('./personagens').trocarPersonagem;
