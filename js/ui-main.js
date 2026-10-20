@@ -925,24 +925,7 @@ async function renderBalancete(j, el) {
     <div class="card blcte-card" style="margin-bottom:.7rem">
       <div class="blcte-secao-titulo despesa">DESPESAS</div>
 
-      <div class="blcte-grupo">Salários</div>
-      ${data.funcionarios.length
-        ? data.funcionarios.map(f => `
-          <div class="blcte-linha sub">
-            <span>${f.nome || f.name || 'Funcionário'} <span style="color:var(--txt4);font-size:.85em">(${CARGO_L[f.cargo_id]||f.cargo_id})</span></span>
-            <span class="blcte-val despesa">−${fmt(f.sal)}</span>
-          </div>`).join('')
-        : `<div class="blcte-linha sub"><span style="color:var(--txt3)">Sem funcionários ativos</span><span style="color:var(--txt3)">—</span></div>`}
-      <div class="blcte-linha blcte-subtotal">
-        <span>Subtotal Salários</span>
-        <span class="blcte-val despesa">−${fmt(data.salariosTotais)}</span>
-      </div>
-
       <div class="blcte-grupo">Infraestrutura</div>
-      <div class="blcte-linha sub">
-        <span>Custo fixo ${TIER_L[data.tier]||''}</span>
-        <span class="blcte-val despesa">−${fmt(data.custoFixo)}</span>
-      </div>
       ${data.workspaceCm > 0
         ? `<div class="blcte-linha sub">
             <span>${data.workspaceLabel}</span>
@@ -1600,7 +1583,9 @@ async function _escKpis(esc, j) {
   // cada tick igual faturamento_mes_atual).
   const despesaMarketing = (esc && esc.despesa_marketing_mes_atual) || 0;
 
-  const despMes   = custoFixo + salariosTotais + workspaceCm + beneficiosCustoTotal + despesaMarketing;
+  // Salários e custo fixo do tier não saem do caixa (o servidor não cobra
+  // folha) — ficam fora da conta para o balancete mostrar só o que é real.
+  const despMes   = workspaceCm + beneficiosCustoTotal + despesaMarketing;
   const lucroMes  = rendaMes - despMes;
   const socios    = esc ? _normalizarSociosUI(esc) : [{ participacao_pct: 100 }];
   const minhaUid  = j.uid || window.JOGADOR_UID;

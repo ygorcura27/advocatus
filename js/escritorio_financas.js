@@ -1,7 +1,7 @@
 /**
  * FINANÇAS DO ESCRITÓRIO — Advocatus Online
  * Caixa separado do dinheiro pessoal. Aporte de capital, distribuição de lucros,
- * pagamento de salários com queda de produtividade e demissão por inadimplência.
+ * upgrade de tier. Não há folha de pagamento mensal: a equipe não consome o caixa.
  *
  * Aportar capital e distribuir lucros passam por Cloud Functions para suportar
  * sociedades com outros jogadores reais (regras do Firestore não permitem um
@@ -13,8 +13,6 @@ import { collection, doc, getDoc, getDocs, updateDoc }
 import { httpsCallable }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
 import { db } from './firebase-init.js';
-import { rolarEventosDoMes } from './eventos_escritorio.js';
-import { calcSalarioMercado } from './equipe.js';
 import './upgrade_escritorio.js';
 
 export const MESES_TOLERANCIA_SALARIO = 3;
@@ -55,16 +53,10 @@ function _normalizarSocios(esc) {
 // RENDERIZAR BLOCO DE FINANÇAS (usado no painel Escritório)
 // Caixa/participação/aportar/distribuir já aparecem nos KPIs e nas
 // Ações Rápidas do novo dashboard — aqui ficam só alertas operacionais
-// (salário atrasado) e o progresso de upgrade de tier.
+// o progresso de upgrade de tier.
 // ════════════════════════════════════════════════════════
 export function renderBlocoFinancas(esc, j) {
-  const alertaSalario = (esc.meses_sem_pagar_salario||0) > 0 ? `
-    <div style="background:var(--verm-bg);border:1px solid var(--verm3);border-radius:var(--r);padding:.6rem .8rem;margin-bottom:.8rem;font-size:.74rem;color:var(--verm2)">
-      ⚠️ ${esc.meses_sem_pagar_salario} mês(es) sem pagar salário. Produtividade reduzida em ${Math.round(esc.meses_sem_pagar_salario*PERDA_PRODUTIVIDADE_SEM_SALARIO*100)}%.
-      ${esc.meses_sem_pagar_salario >= MESES_TOLERANCIA_SALARIO ? ' Funcionários podem pedir demissão!' : ''}
-    </div>` : '';
-
-  return `${alertaSalario}${renderBlocoUpgradeTier(esc, j)}`;
+  return renderBlocoUpgradeTier(esc, j);
 }
 
 // ════════════════════════════════════════════════════════
@@ -127,7 +119,7 @@ window.abrirModalAportarCapital = function(escId) {
   abrirModal('💵 Aportar Capital',
     `<div style="font-size:.78rem;color:var(--txt3);margin-bottom:1rem">
       Transfira dinheiro do seu bolso pessoal para o caixa do escritório.
-      Útil para cobrir salários ou despesas em meses difíceis.
+      Útil para cobrir despesas em meses difíceis.
     </div>
     <div class="campo">
       <label>Valor a aportar</label>
@@ -222,83 +214,3 @@ window.confirmarDistribuicao = async function(escId) {
     console.error('[DISTRIBUIR LUCROS]', err);
   }
 };
-
-// ════════════════════════════════════════════════════════
-// PROCESSAMENTO MENSAL — pagar salários do caixa, queda de
-// produtividade, demissão por inadimplência (chamado pelo avancar_mes.js)
-// ════════════════════════════════════════════════════════
-export async function processarFinancasEscritorioMensal(j) {
-  const escId = j.escritorio_proprio_id;
-  if (!escId) return {};
-
-  const escSnap = await getDoc(doc(db,'escritorios',escId));
-  if (!escSnap.exists()) return {};
-  const esc = escSnap.data();
-  let caixa = esc.caixa || 0;
-
-  // Buscar funcionários e calcular folha
-  const fSnap = await getDocs(collection(db,'escritorios',escId,'funcionarios'));
-  const TIER_CUSTO_FIXO = { 1:3500, 2:8000, 3:18000, 4:35000, 5:70000 };
-  const tier = esc.tier || 1;
-  const custoFixo = TIER_CUSTO_FIXO[tier] || 3500;
-
-  let folha = custoFixo;
-  fSnap.docs.forEach(d => {
-    const fd = d.data();
-    folha += fd.salario ?? calcSalarioMercado(fd.cargo_id, tier);
-  });
-
-  const escUpdates = {};
-  let mesesSemPagar = esc.meses_sem_pagar_salario || 0;
-  let demissoesPorFalta = [];
-
-  if (caixa >= folha) {
-    // Caixa suficiente — paga normalmente
-    caixa -= folha;
-    escUpdates.meses_sem_pagar_salario = 0;
-    // Restaurar produtividade se estava reduzida
-    for (const fDoc of fSnap.docs) {
-      if (fDoc.data().produtividade_penalidade) {
-        await updateDoc(doc(db,'escritorios',escId,'funcionarios',fDoc.id), { produtividade_penalidade: 0 });
-      }
-    }
-  } else {
-    // Caixa insuficiente — não paga, penaliza produtividade
-    mesesSemPagar += 1;
-    escUpdates.meses_sem_pagar_salario = mesesSemPagar;
-
-    for (const fDoc of fSnap.docs) {
-      const penalidadeAtual = fDoc.data().produtividade_penalidade || 0;
-      const novaPenalidade = Math.min(0.9, penalidadeAtual + PERDA_PRODUTIVIDADE_SEM_SALARIO);
-      await updateDoc(doc(db,'escritorios',escId,'funcionarios',fDoc.id), { produtividade_penalidade: novaPenalidade });
-
-      // Após 3 meses sem pagar, funcionário pede demissão
-      if (mesesSemPagar >= MESES_TOLERANCIA_SALARIO) {
-        await updateDoc(doc(db,'escritorios',escId,'funcionarios',fDoc.id), { ativo: false, demitido_motivo: 'salario_atrasado' });
-        demissoesPorFalta.push(fDoc.data().nome);
-      }
-    }
-  }
-
-  escUpdates.caixa = caixa;
-
-  // ── EVENTOS EXTRAS DO MÊS — multa, inadimplência, indenização,
-  // fiscalização. Escalam com o Tier, exclusivos de dono de escritório.
-  const { custoTotal: custoEventos, eventos } = rolarEventosDoMes(esc.tier || 1);
-  if (custoEventos > 0) {
-    escUpdates.caixa = (escUpdates.caixa || caixa) - custoEventos;
-  }
-
-  await updateDoc(doc(db,'escritorios',escId), escUpdates);
-
-  return {
-    folha_paga: caixa >= 0 && mesesSemPagar === 0,
-    caixa_final: escUpdates.caixa,
-    meses_sem_pagar: mesesSemPagar,
-    demissoes: demissoesPorFalta,
-    eventos_extras: eventos,
-    custo_eventos: custoEventos,
-  };
-}
-
-window._processarFinancasEscritorioMensal = processarFinancasEscritorioMensal;
