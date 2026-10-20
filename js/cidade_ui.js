@@ -66,16 +66,17 @@ function cardAqui(){
     <button type="button" class="cid-entrar" data-painel="${L.painel}">Entrar</button></div>`;
 }
 function desenharLado(el){
-  const lado = el.querySelector('.cid-lado'); if(!lado) return;
-  lado.innerHTML = cardAqui() + `<div class="cid-lista" role="list">${Object.entries(LUGARES).map(([id,L])=>
-    `<button type="button" role="listitem" data-ir="${id}" ${id===_aqui?'aria-current="true"':''}><span class="cid-sigla">${L.g}</span>${L.name}${_pend[id] ? '<span class="cid-ponto" title="Algo esperando"></span>' : ''}</button>`).join('')}</div>`;
-  lado.querySelector('.cid-entrar')?.addEventListener('click', e => window.navTo?.(e.currentTarget.dataset.painel));
+  const card = el.querySelector('.cid-card'), lado = el.querySelector('.cid-lado'); if(!lado || !card) return;
+  card.innerHTML = cardAqui();
+  card.querySelector('.cid-entrar')?.addEventListener('click', e => window.navTo?.(e.currentTarget.dataset.painel));
+  lado.innerHTML = `<div class="cid-lista" role="list">${Object.entries(LUGARES).map(([id,L])=>
+    `<button type="button" class="cid-item" role="listitem" data-ir="${id}" ${id===_aqui?'aria-current="true"':''}><span class="cid-sigla">${L.g}</span>${L.name}${_pend[id] ? '<span class="cid-ponto" title="Algo esperando"></span>' : ''}</button>`).join('')}</div>`;
   lado.querySelectorAll('[data-ir]').forEach(b => b.addEventListener('click', () => window.cidade3d?.ir(b.dataset.ir)));
 }
 
 window.renderCidade = function(j, main){
   carregarCss();
-  main.innerHTML = `<div class="cid-wrap"><div class="cid-mapa" id="cid-mapa"><div class="cid-carregando">Carregando o Rio de Janeiro…</div></div><div class="cid-lado"></div></div>`;
+  main.innerHTML = `<div class="cid-wrap"><div class="cid-palco"><div class="cid-mapa" id="cid-mapa"><div class="cid-carregando">Carregando o Rio de Janeiro…</div></div><div class="cid-card"></div></div><div class="cid-lado"></div></div>`;
   _pend = pendencias(j);
   try{ _aqui = localStorage.getItem('advocatus_cidade_loc') || 'escritorio'; }catch(e){ _aqui='escritorio'; }
   desenharLado(main);
