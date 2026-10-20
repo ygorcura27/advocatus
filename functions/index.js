@@ -184,3 +184,9 @@ exports.escolherTracoAssinatura = require('./duelo').escolherTracoAssinatura;
 exports.trocarPersonagem         = require('./personagens').trocarPersonagem;
 exports.transferirParaPersonagem = require('./personagens').transferirParaPersonagem;
 exports.assumirHerdeiro          = require('./personagens').assumirHerdeiro;
+// Império — modo Tycoon (idle)
+exports.tycoonSincronizar = require('./tycoon').tycoonSincronizar;
+exports.tycoonAtender     = require('./tycoon').tycoonAtender;
+exports.tycoonComprar     = require('./tycoon').tycoonComprar;
+exports.tycoonGerente     = require('./tycoon').tycoonGerente;
+exports.tycoonMelhoria    = require('./tycoon').tycoonMelhoria;
