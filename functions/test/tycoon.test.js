@@ -6,90 +6,91 @@ const { _motor: m, catalogoTycoon: cat } = require('../tycoon');
 
 const T0 = 1_000_000_000_000;
 
-test('começa com o Juizado no nível 1 e caixa zerado', () => {
+test('começa com a divisão Cível aberta e 1 advogado', () => {
   const e = m.estadoInicial(T0);
-  assert.equal(e.frentes.forum.nivel, 1);
-  assert.equal(e.caixa, 0);
+  assert.equal(e.divisoes.civel.aberta, true);
+  assert.equal(e.divisoes.civel.equipe, 1);
+  assert.equal(m.rendaTotal(e), 2);
 });
 
-test('sem gerente: atender inicia um ciclo que paga uma vez ao terminar', () => {
+test('renda entra por segundo e respeita o teto offline de 12h', () => {
   const e = m.estadoInicial(T0);
-  m.atender(e, 'forum', T0);
-  m.calcular(e, T0 + 2000);
-  assert.equal(e.caixa, 0);
-  m.calcular(e, T0 + 60000);
-  assert.equal(e.caixa, 10);              // um ciclo só, mesmo depois de muito tempo
-  assert.equal(e.frentes.forum.ciclo_inicio, null);
-  assert.throws(() => m.atender(e, 'delegacia', T0), /ainda não atua/);
+  m.calcular(e, T0 + 10_000);
+  assert.equal(e.caixa, 20);
+  m.calcular(e, T0 + 10_000 + 3 * 24 * 3600 * 1000);
+  assert.equal(e.caixa, 20 + 2 * 12 * 3600);
 });
 
-test('não dá para atender de novo com o ciclo em andamento', () => {
+test('contratar respeita as vagas da sala; ampliar a sala abre mais 2', () => {
   const e = m.estadoInicial(T0);
-  m.atender(e, 'forum', T0);
-  assert.throws(() => m.atender(e, 'forum', T0 + 1000), /em andamento/);
+  e.caixa = 1e9;
+  m.melhorar(e, 'civel', 'equipe', 'max');
+  assert.equal(e.divisoes.civel.equipe, 3);
+  assert.throws(() => m.melhorar(e, 'civel', 'equipe', 1), /sala está cheia/);
+  m.melhorar(e, 'civel', 'sala', 1);
+  m.melhorar(e, 'civel', 'equipe', 'max');
+  assert.equal(e.divisoes.civel.equipe, 5);
 });
 
-test('com gerente: ciclos contínuos, inclusive offline, com teto de 24h', () => {
+test('treino e tecnologia multiplicam a renda da divisão', () => {
   const e = m.estadoInicial(T0);
-  e.caixa = 1000;
-  m.contratarGerente(e, 'forum', T0);
-  assert.equal(e.caixa, 0);
-  m.calcular(e, T0 + 30_000);            // 10 ciclos de 3s
-  assert.equal(e.caixa, 100);
+  e.caixa = 1e9;
+  const base = m.rendaDivisao(e, 'civel');
+  m.melhorar(e, 'civel', 'treino', 10);          // +10% por nível
+  assert.ok(Math.abs(m.rendaDivisao(e, 'civel') - base * 2) < 1e-9);
+  m.melhorar(e, 'civel', 'tecnologia', 1);       // ×1,05
+  assert.ok(Math.abs(m.rendaDivisao(e, 'civel') - base * 2 * 1.05) < 1e-9);
+});
+
+test('comprar sem dinheiro falha e não muda nada', () => {
+  const e = m.estadoInicial(T0);
+  assert.throws(() => m.melhorar(e, 'civel', 'treino', 1), /insuficiente/);
+  assert.equal(e.divisoes.civel.treino, 0);
+});
+
+test('abrir divisão exige estrelas e dinheiro', () => {
+  const e = m.estadoInicial(T0);
+  e.caixa = 1e6;
+  assert.throws(() => m.abrir(e, 'trabalhista'), /estrelas/);
+  m.abrir(e, 'familia');
+  assert.equal(e.divisoes.familia.aberta, true);
+  assert.equal(e.divisoes.familia.equipe, 1);
+  assert.throws(() => m.melhorar(e, 'consumidor', 'treino', 1), /Abra a divisão/);
+});
+
+test('missões: 3 ativas, só resgata concluída, dá estrela e dinheiro', () => {
+  const e = m.estadoInicial(T0);
+  const ativas = m.missoesAtivas(e);
+  assert.equal(ativas.length, 3);
+  assert.equal(ativas[0].id, 'equipe3_civel');
+  assert.throws(() => m.resgatar(e, 'equipe3_civel'), /não concluída/);
+  e.caixa = 1e6;
+  m.melhorar(e, 'civel', 'equipe', 2);
   const antes = e.caixa;
-  m.calcular(e, T0 + 30_000 + 10 * 24 * 3600 * 1000);   // 10 dias fora
-  const ciclos24h = (24 * 3600) / 3;
-  assert.equal(e.caixa - antes, ciclos24h * 10);
+  const r = m.resgatar(e, 'equipe3_civel');
+  assert.equal(e.estrelas, 1);
+  assert.equal(e.caixa, antes + r.dinheiro);
+  assert.throws(() => m.resgatar(e, 'equipe3_civel'), /não está ativa/);
+  assert.throws(() => m.resgatar(e, 'equipe7_superiores'), /não está ativa/);
 });
 
-test('custo de níveis segue a progressão geométrica e o "max" cabe no caixa', () => {
-  const c1 = m.custoNiveis('forum', 1, 1);
-  assert.ok(Math.abs(c1 - 40 * 1.07) < 1e-9);
+test('estrelas somam +2% de receita cada', () => {
   const e = m.estadoInicial(T0);
-  e.caixa = 5000;
-  const n = m.maxComprável('forum', 1, e.caixa);
-  assert.ok(m.custoNiveis('forum', 1, n) <= 5000);
-  assert.ok(m.custoNiveis('forum', 1, n + 1) > 5000);
-  const r = m.comprar(e, 'forum', 'max');
-  assert.equal(r.comprados, n);
-  assert.equal(e.frentes.forum.nivel, 1 + n);
+  e.estrelas = 10;
+  assert.ok(Math.abs(m.rendaTotal(e) - 2 * 1.2) < 1e-9);
 });
 
-test('comprar sem dinheiro falha e não mexe no estado', () => {
-  const e = m.estadoInicial(T0);
-  assert.throws(() => m.comprar(e, 'delegacia', 1), /insuficiente/);
-  assert.equal(e.frentes.delegacia.nivel, 0);
+test('conta da 1ª versão do Império migra mantendo só o caixa', () => {
+  const e = m.normalizar({ caixa: 500, frentes: {} }, T0);
+  assert.equal(e.versao, 2);
+  assert.equal(e.caixa, 500);
+  assert.equal(e.divisoes.civel.aberta, true);
 });
 
-test('marcos de nível dobram a velocidade', () => {
-  assert.equal(m.tempoCiclo('forum', 24), 3);
-  assert.equal(m.tempoCiclo('forum', 25), 1.5);
-  assert.equal(m.tempoCiclo('forum', 50), 0.75);
-});
-
-test('melhorias multiplicam a receita da frente certa', () => {
-  const e = m.estadoInicial(T0);
-  e.caixa = 1e12;
-  e.frentes.forum.nivel = 10;
-  const antes = m.receitaCiclo(e, 'forum');
-  m.comprarMelhoria(e, 'esp_forum');
-  assert.equal(m.receitaCiclo(e, 'forum'), antes * 3);
-  assert.throws(() => m.comprarMelhoria(e, 'esp_forum'), /já tem/);
-});
-
-test('catálogo: cada frente custa mais e paga mais que a anterior', () => {
-  for (let i = 1; i < cat.FRENTES.length; i++) {
-    assert.ok(cat.FRENTES[i].custo > cat.FRENTES[i - 1].custo);
-    assert.ok(cat.FRENTES[i].receita > cat.FRENTES[i - 1].receita);
-  }
-});
-
-test('publico calcula renda por segundo só das frentes com gerente', () => {
-  const e = m.estadoInicial(T0);
-  let p = m.publico(e, T0);
-  assert.equal(p.por_segundo, 0);
-  e.caixa = 1000;
-  m.contratarGerente(e, 'forum', T0);
-  p = m.publico(e, T0);
-  assert.ok(Math.abs(p.por_segundo - 10 / 3) < 1e-9);
+test('catálogo: estrelas das missões bastam para abrir todas as divisões', () => {
+  const maxReq = Math.max(...cat.DIVISOES.map((d) => d.estrelas));
+  // missões das divisões anteriores à última precisam render estrelas suficientes
+  const ultima = cat.DIVISOES[cat.DIVISOES.length - 1].id;
+  const antes = cat.MISSOES.filter((x) => x.div !== ultima).length;
+  assert.ok(antes >= maxReq);
 });

@@ -1,194 +1,213 @@
 'use strict';
 
 /**
- * IMPÉRIO — modo Tycoon (idle) do Advocatus.
+ * IMPÉRIO — modo Tycoon (idle), estilo "Police Chief", do Advocatus.
  *
- * O jogador compra e melhora frentes de atuação espalhadas pelo mapa da
- * cidade. Cada frente fecha um "ciclo" de casos e paga honorários; com um
- * gerente contratado, os ciclos se repetem sozinhos, inclusive offline.
+ * O escritório é um prédio: cada andar é uma divisão (Cível, Família,
+ * Trabalhista... M&A, Tribunais Superiores). Em cada divisão o jogador
+ * contrata advogados (até a capacidade da sala), investe em treinamento e
+ * tecnologia e amplia a sala. Os honorários entram sozinhos, por segundo,
+ * inclusive offline (até 12h). Missões dão estrelas ⭐, e as estrelas
+ * liberam as divisões seguintes (e somam +2% de receita cada).
  *
- * Tudo é calculado aqui a partir de timestamps do servidor (nada de valor
- * vem do cliente). O estado mora em tycoon/{uid}, que as regras do
- * Firestore não deixam o cliente ler nem escrever — só estes callables.
- *
- * O motor (funções puras) é exportado para os testes em test/tycoon.test.js.
+ * Tudo é calculado aqui pelo relógio do servidor; o estado mora em
+ * tycoon/{uid}, que o cliente não lê nem escreve (só estes callables).
+ * O motor puro é exportado para test/tycoon.test.js.
  */
 
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getFirestore } = require('firebase-admin/firestore');
 
 // ─── Catálogo ───────────────────────────────────────────────────────────────
-// custo: preço do 1º nível; coef: quanto cada nível encarece; tempo: segundos
-// por ciclo; receita: honorários por ciclo por nível; gerente: preço do gerente.
-const FRENTES = [
-  { id: 'forum',     nome: 'Juizado Cível',          custo: 40,          coef: 1.07, tempo: 3,     receita: 10,         gerente: 1000 },
-  { id: 'delegacia', nome: 'Defesa Criminal',        custo: 600,         coef: 1.15, tempo: 15,    receita: 600,        gerente: 15000 },
-  { id: 'trt',       nome: 'Trabalhista',            custo: 7200,        coef: 1.14, tempo: 30,    receita: 5400,       gerente: 100000 },
-  { id: 'tj',        nome: 'Recursos no TJ',         custo: 86400,       coef: 1.13, tempo: 60,    receita: 43200,      gerente: 500000 },
-  { id: 'trf',       nome: 'Tributário Federal',     custo: 1036800,     coef: 1.12, tempo: 120,   receita: 518400,     gerente: 1200000 },
-  { id: 'empresas',  nome: 'Corporativo',            custo: 12441600,    coef: 1.11, tempo: 480,   receita: 6220800,    gerente: 10000000 },
-  { id: 'banco',     nome: 'Bancário e M&A',         custo: 149299200,   coef: 1.10, tempo: 1920,  receita: 74649600,   gerente: 111111111 },
-  { id: 'aeroporto', nome: 'Tribunais Superiores',   custo: 1791590400,  coef: 1.09, tempo: 7680,  receita: 895795200,  gerente: 555555555 },
+// base: R$/s de um advogado sem melhorias; abrir: preço da divisão;
+// estrelas: ⭐ necessárias para abrir.
+const DIVISOES = [
+  { id: 'civel',          nome: 'Cível',                 base: 2,          abrir: 0,                  estrelas: 0 },
+  { id: 'familia',        nome: 'Família e Sucessões',   base: 10,         abrir: 150,                estrelas: 0 },
+  { id: 'trabalhista',    nome: 'Trabalhista',           base: 50,         abrir: 3000,               estrelas: 3 },
+  { id: 'consumidor',     nome: 'Consumidor',            base: 250,        abrir: 60000,              estrelas: 6 },
+  { id: 'criminal',       nome: 'Criminal',              base: 1250,       abrir: 1200000,            estrelas: 9 },
+  { id: 'previdenciario', nome: 'Previdenciário',        base: 6250,       abrir: 24000000,           estrelas: 12 },
+  { id: 'tributario',     nome: 'Tributário',            base: 31250,      abrir: 480000000,          estrelas: 15 },
+  { id: 'empresarial',    nome: 'Empresarial',           base: 156250,     abrir: 9600000000,         estrelas: 18 },
+  { id: 'ma',             nome: 'M&A',                   base: 781250,     abrir: 192000000000,       estrelas: 21 },
+  { id: 'digital',        nome: 'Digital e LGPD',        base: 3906250,    abrir: 3840000000000,      estrelas: 24 },
+  { id: 'ambiental',      nome: 'Ambiental',             base: 19531250,   abrir: 76800000000000,     estrelas: 27 },
+  { id: 'superiores',     nome: 'Tribunais Superiores',  base: 97656250,   abrir: 1536000000000000,   estrelas: 30 },
 ];
-const FRENTE = Object.fromEntries(FRENTES.map((f) => [f.id, f]));
+const DIV = Object.fromEntries(DIVISOES.map((d) => [d.id, d]));
 
-// A cada marco de nível, a frente fica 2x mais rápida.
-const MARCOS = [25, 50, 100, 200, 300, 400];
+// Melhorias de cada divisão. preco(d, nivel) = d.base * fator * cresc^nivel.
+const ITENS = {
+  equipe:     { fator: 15,  cresc: 1.5,  max: null }, // contratar advogado (limitado pela sala)
+  treino:     { fator: 40,  cresc: 1.25, max: 50 },   // +10% por nível
+  tecnologia: { fator: 150, cresc: 1.45, max: 25 },   // ×1,05 por nível
+  sala:       { fator: 300, cresc: 4,    max: 6 },    // +2 vagas por nível
+};
+const VAGAS_BASE = 3;
+const BONUS_ESTRELA = 0.02;
+const BONUS_TREINO = 0.10;
+const MULT_TECNOLOGIA = 1.05;
+const OFFLINE_MAX_S = 12 * 3600;
+const SEGUNDOS_POR_MES = 600;
 
-// Melhorias (Universidade e Emissora): multiplicam a receita de uma frente ou de todas.
-const MELHORIAS = [
-  { id: 'esp_forum',     alvo: 'forum',     mult: 3, custo: 250000,        nome: 'Especialização em Juizados' },
-  { id: 'esp_delegacia', alvo: 'delegacia', mult: 3, custo: 500000,        nome: 'Pós em Direito Penal' },
-  { id: 'esp_trt',       alvo: 'trt',       mult: 3, custo: 1000000,       nome: 'Pós em Direito do Trabalho' },
-  { id: 'esp_tj',        alvo: 'tj',        mult: 3, custo: 5000000,       nome: 'Curso de Recursos' },
-  { id: 'esp_trf',       alvo: 'trf',       mult: 3, custo: 10000000,      nome: 'MBA Tributário' },
-  { id: 'esp_empresas',  alvo: 'empresas',  mult: 3, custo: 25000000,      nome: 'LL.M. Corporativo' },
-  { id: 'esp_banco',     alvo: 'banco',     mult: 3, custo: 500000000,     nome: 'Mestrado em Mercado de Capitais' },
-  { id: 'esp_aeroporto', alvo: 'aeroporto', mult: 3, custo: 10000000000,   nome: 'Doutorado em Direito Constitucional' },
-  { id: 'tv_1',          alvo: 'todas',     mult: 3, custo: 50000000000,   nome: 'Campanha na TV' },
-  { id: 'tv_2',          alvo: 'todas',     mult: 3, custo: 2000000000000, nome: 'Colunista fixo no jornal' },
-];
-const MELHORIA = Object.fromEntries(MELHORIAS.map((m) => [m.id, m]));
-
-const OFFLINE_MAX_S = 24 * 3600;   // gerentes rendem no máximo 24h sem o jogador aparecer
-const SEGUNDOS_POR_MES = 600;      // calendário do império: 1 mês a cada 10 minutos reais
+// Missões: sequência fixa; as 3 primeiras não resgatadas ficam ativas.
+function _gerarMissoes() {
+  const m = [];
+  DIVISOES.forEach((d, i) => {
+    if (i > 0) m.push({ id: `abrir_${d.id}`, tipo: 'abrir', div: d.id, valor: 1, texto: `Abra a divisão ${d.nome}` });
+    m.push({ id: `equipe3_${d.id}`, tipo: 'equipe', div: d.id, valor: 3, texto: `Tenha 3 advogados em ${d.nome}` });
+    m.push({ id: `treino5_${d.id}`, tipo: 'treino', div: d.id, valor: 5, texto: `Treinamento nível 5 em ${d.nome}` });
+    m.push({ id: `sala1_${d.id}`, tipo: 'sala', div: d.id, valor: 1, texto: `Amplie a sala de ${d.nome}` });
+    m.push({ id: `tec3_${d.id}`, tipo: 'tecnologia', div: d.id, valor: 3, texto: `Tecnologia nível 3 em ${d.nome}` });
+    m.push({ id: `equipe7_${d.id}`, tipo: 'equipe', div: d.id, valor: 7, texto: `Tenha 7 advogados em ${d.nome}` });
+  });
+  return m;
+}
+const MISSOES = _gerarMissoes();
+const MISSAO = Object.fromEntries(MISSOES.map((x) => [x.id, x]));
+const MISSOES_ATIVAS = 3;
 
 // ─── Motor puro ─────────────────────────────────────────────────────────────
 
-function estadoInicial(agora) {
-  const frentes = {};
-  for (const f of FRENTES) frentes[f.id] = { nivel: 0, gerente: false, ciclo_inicio: null };
-  frentes.forum.nivel = 1;
-  return { caixa: 0, total_ganho: 0, frentes, melhorias: [], criado_em: agora, ultimo_calc: agora };
+function _divVazia() { return { aberta: false, equipe: 0, treino: 0, tecnologia: 0, sala: 0 }; }
+
+function estadoInicial(agora, caixa = 0) {
+  const divisoes = {};
+  for (const d of DIVISOES) divisoes[d.id] = _divVazia();
+  divisoes.civel = { aberta: true, equipe: 1, treino: 0, tecnologia: 0, sala: 0 };
+  return { versao: 2, caixa, total_ganho: 0, estrelas: 0, missoes_feitas: [], divisoes, criado_em: agora, ultimo_calc: agora };
 }
 
-function multiplicador(estado, id) {
-  let m = 1;
-  for (const mid of estado.melhorias || []) {
-    const mel = MELHORIA[mid];
-    if (mel && (mel.alvo === id || mel.alvo === 'todas')) m *= mel.mult;
-  }
-  return m;
+/** Garante o formato atual (contas da 1ª versão do Império mantêm só o caixa). */
+function normalizar(estado, agora) {
+  if (!estado || estado.versao !== 2) return estadoInicial(agora, Math.max(0, (estado && estado.caixa) || 0));
+  for (const d of DIVISOES) if (!estado.divisoes[d.id]) estado.divisoes[d.id] = _divVazia();
+  return estado;
 }
 
-function tempoCiclo(id, nivel) {
-  const marcos = MARCOS.filter((n) => nivel >= n).length;
-  return FRENTE[id].tempo / Math.pow(2, marcos);
+function vagas(dv) { return VAGAS_BASE + 2 * (dv.sala || 0); }
+
+function _multDivisao(estado, dv) {
+  return (1 + BONUS_TREINO * dv.treino) * Math.pow(MULT_TECNOLOGIA, dv.tecnologia) * (1 + BONUS_ESTRELA * (estado.estrelas || 0));
 }
 
-function receitaCiclo(estado, id) {
-  const nivel = estado.frentes[id].nivel;
-  return FRENTE[id].receita * nivel * multiplicador(estado, id);
+function rendaDivisao(estado, id) {
+  const dv = estado.divisoes[id];
+  if (!dv || !dv.aberta || !dv.equipe) return 0;
+  return DIV[id].base * dv.equipe * _multDivisao(estado, dv);
 }
 
-function custoNiveis(id, nivelAtual, qtd) {
-  const f = FRENTE[id];
-  return f.custo * Math.pow(f.coef, nivelAtual) * (Math.pow(f.coef, qtd) - 1) / (f.coef - 1);
+function rendaTotal(estado) {
+  return DIVISOES.reduce((s, d) => s + rendaDivisao(estado, d.id), 0);
 }
 
-function maxComprável(id, nivelAtual, caixa) {
-  const f = FRENTE[id];
-  const base = f.custo * Math.pow(f.coef, nivelAtual);
-  if (caixa < base) return 0;
-  return Math.floor(Math.log(caixa * (f.coef - 1) / base + 1) / Math.log(f.coef));
+function preco(id, item, nivel) {
+  const it = ITENS[item];
+  return DIV[id].base * it.fator * Math.pow(it.cresc, nivel);
+}
+function limiteItem(dv, item) {
+  if (item === 'equipe') return vagas(dv);
+  return ITENS[item].max;
 }
 
-/** Credita tudo o que rendeu até `agora`. Muta e devolve o estado. */
+/** Credita a renda acumulada desde o último cálculo (teto offline de 12h). */
 function calcular(estado, agora) {
-  for (const f of FRENTES) {
-    const fr = estado.frentes[f.id];
-    if (!fr || fr.nivel <= 0 || fr.ciclo_inicio == null) continue;
-    const t = tempoCiclo(f.id, fr.nivel) * 1000;
-    const rec = receitaCiclo(estado, f.id);
-    if (fr.gerente) {
-      // Ciclos contínuos, com teto de rendimento offline.
-      const inicio = Math.max(fr.ciclo_inicio, agora - OFFLINE_MAX_S * 1000);
-      const ciclos = Math.floor((agora - inicio) / t);
-      if (ciclos > 0) {
-        estado.caixa += ciclos * rec;
-        estado.total_ganho += ciclos * rec;
-        fr.ciclo_inicio = inicio + ciclos * t;
-      }
-    } else if (agora - fr.ciclo_inicio >= t) {
-      // Sem gerente: o ciclo terminou e espera o próximo "Atender" — paga uma vez.
-      estado.caixa += rec;
-      estado.total_ganho += rec;
-      fr.ciclo_inicio = null;
-    }
-  }
+  const dt = Math.max(0, Math.min(agora - (estado.ultimo_calc || agora), OFFLINE_MAX_S * 1000)) / 1000;
+  const ganho = rendaTotal(estado) * dt;
+  estado.caixa += ganho;
+  estado.total_ganho += ganho;
   estado.ultimo_calc = agora;
   return estado;
 }
 
 function _erro(msg) { const e = new Error(msg); e.tycoon = true; return e; }
 
-function atender(estado, id, agora) {
-  const fr = estado.frentes[id];
-  if (!FRENTE[id] || !fr || fr.nivel <= 0) throw _erro('Você ainda não atua nessa frente.');
-  if (fr.gerente) throw _erro('O gerente já cuida dessa frente.');
-  if (fr.ciclo_inicio != null) throw _erro('Os casos ainda estão em andamento.');
-  fr.ciclo_inicio = agora;
+function abrir(estado, id) {
+  const d = DIV[id], dv = estado.divisoes[id];
+  if (!d) throw _erro('Divisão inválida.');
+  if (dv.aberta) throw _erro('Essa divisão já está aberta.');
+  if ((estado.estrelas || 0) < d.estrelas) throw _erro(`Faltam estrelas: precisa de ${d.estrelas} ⭐.`);
+  if (estado.caixa < d.abrir) throw _erro('Dinheiro insuficiente.');
+  estado.caixa -= d.abrir;
+  Object.assign(dv, { aberta: true, equipe: 1 });
   return estado;
 }
 
-function comprar(estado, id, qtd) {
-  const fr = estado.frentes[id];
-  if (!FRENTE[id] || !fr) throw _erro('Frente inválida.');
-  const n = qtd === 'max' ? maxComprável(id, fr.nivel, estado.caixa) : Math.max(1, Math.min(1000, Math.floor(Number(qtd) || 1)));
-  if (n <= 0) throw _erro('Dinheiro insuficiente.');
-  const custo = custoNiveis(id, fr.nivel, n);
-  if (custo > estado.caixa + 1e-6) throw _erro('Dinheiro insuficiente.');
-  estado.caixa -= custo;
-  fr.nivel += n;
-  return { estado, comprados: n, custo };
-}
-
-function contratarGerente(estado, id, agora) {
-  const fr = estado.frentes[id];
-  if (!FRENTE[id] || !fr || fr.nivel <= 0) throw _erro('Abra essa frente antes de contratar um gerente.');
-  if (fr.gerente) throw _erro('Essa frente já tem gerente.');
-  const preco = FRENTE[id].gerente;
-  if (estado.caixa < preco) throw _erro('Dinheiro insuficiente.');
-  estado.caixa -= preco;
-  fr.gerente = true;
-  if (fr.ciclo_inicio == null) fr.ciclo_inicio = agora;
-  return estado;
-}
-
-function comprarMelhoria(estado, mid) {
-  const mel = MELHORIA[mid];
-  if (!mel) throw _erro('Melhoria inválida.');
-  if ((estado.melhorias || []).includes(mid)) throw _erro('Você já tem essa melhoria.');
-  if (estado.caixa < mel.custo) throw _erro('Dinheiro insuficiente.');
-  estado.caixa -= mel.custo;
-  estado.melhorias = [...(estado.melhorias || []), mid];
-  return estado;
-}
-
-/** Visão para o cliente: estado + números derivados para animar a tela. */
-function publico(estado, agora) {
-  const frentes = {};
-  let porSegundo = 0;
-  for (const f of FRENTES) {
-    const fr = estado.frentes[f.id];
-    const t = fr.nivel > 0 ? tempoCiclo(f.id, fr.nivel) : f.tempo;
-    const rec = fr.nivel > 0 ? receitaCiclo(estado, f.id) : 0;
-    if (fr.gerente && fr.nivel > 0) porSegundo += rec / t;
-    const proxMarco = MARCOS.find((n) => n > fr.nivel) || null;
-    frentes[f.id] = {
-      ...fr, tempo: t, receita: rec,
-      custo_1: custoNiveis(f.id, fr.nivel, 1),
-      custo_10: custoNiveis(f.id, fr.nivel, 10),
-      custo_100: custoNiveis(f.id, fr.nivel, 100),
-      max: maxComprável(f.id, fr.nivel, estado.caixa),
-      prox_marco: proxMarco,
-    };
+/** Compra `qtd` níveis (ou 'max') de um item de uma divisão. */
+function melhorar(estado, id, item, qtd) {
+  const dv = estado.divisoes[id];
+  if (!DIV[id] || !dv) throw _erro('Divisão inválida.');
+  if (!ITENS[item]) throw _erro('Melhoria inválida.');
+  if (!dv.aberta) throw _erro('Abra a divisão primeiro.');
+  let n = qtd === 'max' ? Infinity : Math.max(1, Math.min(100, Math.floor(Number(qtd) || 1)));
+  let comprados = 0, gasto = 0;
+  while (n > 0) {
+    const nivel = dv[item] || 0, lim = limiteItem(dv, item);
+    if (lim != null && nivel >= lim) {
+      if (!comprados) throw _erro(item === 'equipe' ? 'A sala está cheia: amplie a sala para contratar mais.' : 'Nível máximo.');
+      break;
+    }
+    const p = preco(id, item, nivel);
+    if (p > estado.caixa + 1e-6) { if (!comprados) throw _erro('Dinheiro insuficiente.'); break; }
+    estado.caixa -= p; gasto += p; dv[item] = nivel + 1; comprados++; n--;
   }
+  return { estado, comprados, gasto };
+}
+
+function progressoMissao(estado, m) {
+  if (m.tipo === 'abrir') return estado.divisoes[m.div].aberta ? 1 : 0;
+  return Math.min(1, (estado.divisoes[m.div][m.tipo] || 0) / m.valor);
+}
+
+function missoesAtivas(estado) {
+  const feitas = new Set(estado.missoes_feitas || []);
+  return MISSOES.filter((m) => !feitas.has(m.id)).slice(0, MISSOES_ATIVAS);
+}
+
+function recompensaDinheiro(estado, m) {
+  // 30 segundos da renda atual, com piso pelo porte da divisão.
+  return Math.max(DIV[m.div].base * 30, rendaTotal(estado) * 30);
+}
+
+function resgatar(estado, mid) {
+  const m = MISSAO[mid];
+  if (!m) throw _erro('Missão inválida.');
+  if (!missoesAtivas(estado).some((x) => x.id === mid)) throw _erro('Essa missão não está ativa.');
+  if (progressoMissao(estado, m) < 1) throw _erro('Missão ainda não concluída.');
+  const dinheiro = recompensaDinheiro(estado, m);
+  estado.caixa += dinheiro;
+  estado.estrelas = (estado.estrelas || 0) + 1;
+  estado.missoes_feitas = [...(estado.missoes_feitas || []), mid];
+  return { estado, dinheiro };
+}
+
+/** Visão para o cliente, com preços e números já calculados. */
+function publico(estado, agora) {
+  const divisoes = DIVISOES.map((d) => {
+    const dv = estado.divisoes[d.id];
+    const itens = {};
+    for (const item of Object.keys(ITENS)) {
+      const nivel = dv[item] || 0, lim = limiteItem(dv, item);
+      itens[item] = { nivel, max: lim, preco: lim != null && nivel >= lim ? null : preco(d.id, item, nivel) };
+    }
+    return {
+      id: d.id, nome: d.nome, aberta: dv.aberta, preco_abrir: d.abrir, estrelas_req: d.estrelas,
+      equipe: dv.equipe, vagas: vagas(dv), renda: rendaDivisao(estado, d.id),
+      renda_por_adv: d.base * _multDivisao(estado, dv),
+      nivel: dv.equipe + dv.treino + dv.tecnologia + dv.sala, itens,
+    };
+  });
+  const missoes = missoesAtivas(estado).map((m) => ({
+    id: m.id, texto: m.texto, progresso: progressoMissao(estado, m), recompensa: recompensaDinheiro(estado, m),
+  }));
   const meses = Math.floor((agora - (estado.criado_em || agora)) / 1000 / SEGUNDOS_POR_MES);
   return {
-    caixa: estado.caixa, total_ganho: estado.total_ganho, melhorias: estado.melhorias || [],
-    frentes, por_segundo: porSegundo, agora, mes: (meses % 12) + 1, ano: Math.floor(meses / 12) + 1,
-    catalogo: { gerentes: Object.fromEntries(FRENTES.map((f) => [f.id, f.gerente])), melhorias: MELHORIAS },
+    caixa: estado.caixa, total_ganho: estado.total_ganho, estrelas: estado.estrelas || 0,
+    bonus_estrelas: BONUS_ESTRELA * (estado.estrelas || 0),
+    por_segundo: rendaTotal(estado), divisoes, missoes,
+    missoes_total: MISSOES.length, missoes_feitas: (estado.missoes_feitas || []).length,
+    agora, mes: (meses % 12) + 1, ano: Math.floor(meses / 12) + 1,
   };
 }
 
@@ -201,7 +220,7 @@ async function _transacao(request, mutar) {
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const agora = Date.now();
-    const estado = snap.exists ? snap.data() : estadoInicial(agora);
+    const estado = normalizar(snap.exists ? snap.data() : null, agora);
     calcular(estado, agora);
     let extra = {};
     try { extra = mutar(estado, agora) || {}; }
@@ -212,27 +231,33 @@ async function _transacao(request, mutar) {
 }
 
 const OPTS = { region: 'southamerica-east1' };
+const _str = (v) => String(v || '');
 
 exports.tycoonSincronizar = onCall(OPTS, (req) => _transacao(req, () => ({})));
 
-exports.tycoonAtender = onCall(OPTS, (req) =>
-  _transacao(req, (estado, agora) => { atender(estado, String(req.data?.frente || ''), agora); }));
+exports.tycoonAbrir = onCall(OPTS, (req) =>
+  _transacao(req, (estado) => { abrir(estado, _str(req.data?.divisao)); }));
 
-exports.tycoonComprar = onCall(OPTS, (req) =>
+exports.tycoonMelhorar = onCall(OPTS, (req) =>
   _transacao(req, (estado) => {
     const qtd = req.data?.qtd === 'max' ? 'max' : Number(req.data?.qtd) || 1;
-    const r = comprar(estado, String(req.data?.frente || ''), qtd);
+    const r = melhorar(estado, _str(req.data?.divisao), _str(req.data?.item), qtd);
     return { comprados: r.comprados };
   }));
 
-exports.tycoonGerente = onCall(OPTS, (req) =>
-  _transacao(req, (estado, agora) => { contratarGerente(estado, String(req.data?.frente || ''), agora); }));
+exports.tycoonResgatar = onCall(OPTS, (req) =>
+  _transacao(req, (estado) => ({ dinheiro: resgatar(estado, _str(req.data?.missao)).dinheiro })));
 
-exports.tycoonMelhoria = onCall(OPTS, (req) =>
-  _transacao(req, (estado) => { comprarMelhoria(estado, String(req.data?.melhoria || '')); }));
+// Callables da 1ª versão do Império: continuam exportados (assim o deploy
+// não precisa apagar functions), só avisam que a tela mudou.
+const _antigo = () => { throw new HttpsError('failed-precondition', 'O Império foi atualizado — recarregue a página.'); };
+exports.tycoonAtender = onCall(OPTS, _antigo);
+exports.tycoonComprar = onCall(OPTS, _antigo);
+exports.tycoonGerente = onCall(OPTS, _antigo);
+exports.tycoonMelhoria = onCall(OPTS, _antigo);
 
-exports.catalogoTycoon = { FRENTES, MELHORIAS, MARCOS, OFFLINE_MAX_S };
+exports.catalogoTycoon = { DIVISOES, ITENS, MISSOES, OFFLINE_MAX_S };
 exports._motor = {
-  estadoInicial, calcular, atender, comprar, contratarGerente, comprarMelhoria,
-  publico, custoNiveis, maxComprável, tempoCiclo, receitaCiclo,
+  estadoInicial, normalizar, calcular, abrir, melhorar, resgatar, publico,
+  rendaDivisao, rendaTotal, preco, vagas, missoesAtivas, progressoMissao,
 };
