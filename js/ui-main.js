@@ -81,6 +81,7 @@ function _navLateralPadrao(painel) {
       <div class="nav-item${ativo('perfil')}" onclick="navTo('perfil',this)"><span class="ni-icon">${icon('perfil')}</span> Meu Perfil</div>
       <div class="nav-item${ativo('energia')}" onclick="navTo('energia',this)"><span class="ni-icon">${icon('energia')}</span> Energia</div>
       <div class="nav-item${ativo('foco')}" onclick="navTo('foco',this)"><span class="ni-icon">${icon('oportunidades')}</span> Foco</div>
+      <div class="nav-item${ativo('cidade')}" onclick="navTo('cidade',this)" title="O Rio de Janeiro em 3D: vá até o fórum, o tribunal, a OAB..."><span class="ni-icon">${icon('escritorio')}</span> Cidade</div>
       <div class="nav-item${ativo('escritorio')}" onclick="navTo('escritorio',this)"><span class="ni-icon">${icon('escritorio')}</span> Escritório</div>
       <div class="nav-item${ativo('processos')}" onclick="navTo('processos',this)" title="Seus casos: clique num processo para investigar e ir à audiência"><span class="ni-icon">${icon('investigacao')}</span> Processos</div>
       <div class="nav-item${ativo('progressao')}" onclick="navTo('progressao',this)"><span class="ni-icon">${icon('progressao')}</span> Progressão</div>
@@ -205,6 +206,10 @@ function _renderizar() {
     case 'investigacao':
       if (window.renderInvestigacao) window.renderInvestigacao(j, main);
       else main.innerHTML = '<div class="card" style="color:var(--txt3)">Carregando investigação...</div>';
+      break;
+    case 'cidade':
+      if (window.renderCidade) window.renderCidade(j, main);
+      else main.innerHTML = '<div class="card" style="color:var(--txt3)">Carregando a cidade...</div>';
       break;
     case 'foco':          renderFoco(j, main);          break;
     case 'redes':         renderRedes(j, main);         break;
