@@ -30,6 +30,7 @@ const { processarRoyaltiesLivros, processarCitacoesNPCMensal } = require('./arti
 const { determinarSentencaSetlist, AREA_PT_PARA_EN } = require('./processar_sentenca');
 const { processarDecaimentoMensal: processarDecaimentoTesesMensal } = require('./banco_teses');
 const { resetEnergiaMensal, calcularModSupervisaoSocio } = require('./energia_categorias');
+const _energiaCat = require('./energia_categorias');
 const _estresse = require('./estresse');
 const { filtrarOportunidadesElegiveis } = require('./regras_captacao');
 const _assedio = require('./assedio_banca_rival');
@@ -1591,9 +1592,7 @@ async function _avancarMesCore(request) {
   // energia_usada_mes — o gasto real está somado em energia_usada. Ler só o
   // campo legado fazia essas contas parecerem sempre "descansadas" (+3 de
   // saúde mental/disposição todo mês e burnout por energia impossível).
-  const energiaGasta = j.energia_alocada
-    ? Object.values(j.energia_usada || {}).reduce((soma, v) => soma + (Number(v) || 0), 0)
-    : (j.energia_usada_mes || 0);
+  const energiaGasta = _energiaCat.energiaGastaMes(j);
   let saudeMental    = j.saude_mental ?? 80;
   let disposicao     = j.disposicao   ?? 80;
 
@@ -1604,10 +1603,12 @@ async function _avancarMesCore(request) {
   // quantas horas foram gastas em cada categoria, então não desconta nada
   // aqui (incentivo indireto a configurar os sliders na tela de Energia).
   {
-    const usoCategorias = j.energia_alocada ? (j.energia_usada || {}) : {};
+    // Pote único de energia: o que sobra no fim do mês vira descanso.
+    const usoCategorias = j.energia_usada || {};
+    const sobra = Math.max(0, _energiaCat.calcularEnergiaTotal(j) - energiaGasta);
     const deltaEstresse = _estresse.calcularDeltaEstresseMensal({
       derrotasNoMes:  j.derrotas_mes || 0,
-      horasDescanso:  usoCategorias.descanso || 0,
+      horasDescanso:  (usoCategorias.descanso || 0) + sobra,
       horasPessoal:   usoCategorias.pessoal || 0,
       teveRecesso:    isJaneiro,
     });

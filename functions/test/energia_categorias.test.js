@@ -47,7 +47,9 @@ test('academia só conta bônus se academia_ativa=true', () => {
 test('conta antiga sem energia_alocada: debita do pool único legado, mantendo os 2 espelhos (energia_usada_mes e energia) em sincronia', () => {
   const j = { energia_usada_mes: 40, disposicao: 60 };
   const patch = debitarEnergiaCategoria(j, 'estudo', 30, 'teste');
-  assert.deepEqual(patch, { energia_usada_mes: 70, energia: 30 });
+  assert.equal(patch.energia_usada_mes, 70);
+  assert.equal(patch.energia, 30);
+  assert.equal(patch.energia_usada.estudo, 30);
 });
 
 test('conta antiga sem energia_alocada: estoura o pool único -> resource-exhausted', () => {
@@ -55,31 +57,35 @@ test('conta antiga sem energia_alocada: estoura o pool único -> resource-exhaus
   assert.throws(() => debitarEnergiaCategoria(j, 'estudo', 30, 'teste'), /resource-exhausted|Energia insuficiente/);
 });
 
-test('conta configurada: debita só do balde da categoria, ignora outros baldes', () => {
+test('pote único: conta com baldes antigos debita do total e registra a categoria', () => {
   const j = {
     disposicao: 60,
     energia_alocada: { processos: 40, supervisao: 10, estudo: 20, captacao: 10, pessoal: 15, descanso: 5 },
     energia_usada: { processos: 0, supervisao: 0, estudo: 5, captacao: 0, pessoal: 0, descanso: 0 },
   };
   const patch = debitarEnergiaCategoria(j, 'estudo', 8, 'aula');
-  assert.deepEqual(patch, { energia_usada: { processos: 0, supervisao: 0, estudo: 13, captacao: 0, pessoal: 0, descanso: 0 } });
+  assert.deepEqual(patch.energia_usada, { processos: 0, supervisao: 0, estudo: 13, captacao: 0, pessoal: 0, descanso: 0 });
+  assert.equal(patch.energia_usada_mes, 13);
+  assert.equal(patch.energia, 87);
 });
 
-test('conta configurada: estoura o balde específico -> resource-exhausted, mesmo com espaço sobrando em outro balde', () => {
+test('pote único: o antigo teto do balde não bloqueia mais, só o total', () => {
   const j = {
     disposicao: 60,
     energia_alocada: { processos: 40, supervisao: 10, estudo: 20, captacao: 10, pessoal: 15, descanso: 5 },
     energia_usada: { processos: 0, supervisao: 0, estudo: 18, captacao: 0, pessoal: 0, descanso: 0 },
   };
-  assert.throws(() => debitarEnergiaCategoria(j, 'estudo', 5, 'aula'), /resource-exhausted|insuficiente/);
+  assert.equal(debitarEnergiaCategoria(j, 'estudo', 5, 'aula').energia_usada.estudo, 23);
+  const cheio = { disposicao: 60, energia_usada: { processos: 90, supervisao: 0, estudo: 0, captacao: 0, pessoal: 0, descanso: 0 } };
+  assert.throws(() => debitarEnergiaCategoria(cheio, 'estudo', 15, 'aula'), /resource-exhausted|insuficiente/);
 });
 
-test('resetEnergiaMensal: conta legado só zera o pool único', () => {
+test('resetEnergiaMensal: zera o pote e as categorias', () => {
   const j = { energia_usada_mes: 80, disposicao: 60 };
   const patch = resetEnergiaMensal(j);
   assert.equal(patch.energia, 100);
   assert.equal(patch.energia_usada_mes, 0);
-  assert.equal(patch.energia_usada, undefined);
+  assert.deepEqual(patch.energia_usada, categoriasVazias());
 });
 
 test('creditarEnergiaCategoria: conta legado devolve nos 2 espelhos, floor em 0', () => {
@@ -104,24 +110,6 @@ test('calcularModSupervisaoSocio: conta legado (sem energia_alocada) fica neutra
   assert.equal(calcularModSupervisaoSocio(null), 1.0);
 });
 
-test('calcularModSupervisaoSocio: 0 alocado em supervisao = piso 0.85x', () => {
-  const j = { disposicao: 60, energia_alocada: { processos: 100, supervisao: 0, estudo: 0, captacao: 0, pessoal: 0, descanso: 0 } };
-  assert.equal(calcularModSupervisaoSocio(j), 0.85);
-});
-
-test('calcularModSupervisaoSocio: 20% do teto alocado (ou mais) = teto 1.15x', () => {
-  // total = 100 (disposicao 60 -> bônus 0), 20% = 20
-  const j20 = { disposicao: 60, energia_alocada: { processos: 0, supervisao: 20, estudo: 0, captacao: 0, pessoal: 0, descanso: 0 } };
-  assert.equal(calcularModSupervisaoSocio(j20), 1.15);
-  const jAcima = { disposicao: 60, energia_alocada: { processos: 0, supervisao: 80, estudo: 0, captacao: 0, pessoal: 0, descanso: 0 } };
-  assert.equal(calcularModSupervisaoSocio(jAcima), 1.15); // não passa do teto
-});
-
-test('calcularModSupervisaoSocio: interpola linear entre 0.85 e 1.15', () => {
-  // metade do teto de referência (10 de 20) -> metade do caminho (0.85 + 0.15 = 1.0)
-  const j = { disposicao: 60, energia_alocada: { processos: 0, supervisao: 10, estudo: 0, captacao: 0, pessoal: 0, descanso: 0 } };
-  assert.equal(calcularModSupervisaoSocio(j), 1.0);
-});
 
 test('resetEnergiaMensal: conta configurada zera os 6 baldes de uso, mantém a alocação intocada (não faz parte do patch)', () => {
   const j = {

@@ -372,9 +372,7 @@ function renderPerfil(j, el) {
   // GDD v6.0 §3.1 — teto real (com bônus de academia/disposição), não mais
   // fixo em 100 (bug antigo: card sempre mostrava "/100" mesmo com bônus ativo).
   const energiaTotalReal = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
-  const energiaDisp  = j.energia_alocada
-    ? window.CATEGORIAS_ENERGIA.reduce((s,c) => s + window.energiaDisponivelCategoria(j, c), 0)
-    : Math.max(0, energiaTotalReal - (j.energia_usada_mes||0));
+  const energiaDisp  = window.energiaDisponivelCategoria(j, 'processos');
   const repPct = Math.min(100, Math.round((j.reputacao||0)/cap*100));
 
   el.innerHTML = `

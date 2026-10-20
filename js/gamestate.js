@@ -233,8 +233,8 @@ function _atualizarCronologia(mesIdx, ano, j) {
 
   // Countdown = energia restante até poder avançar o mês
   if (j) {
-    const usado = j.energia_usada_mes || 0;
-    const disp  = Math.max(0, (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - usado);
+    const disp  = window.energiaDisponivelCategoria ? window.energiaDisponivelCategoria(j, 'processos')
+      : Math.max(0, (window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100) - (j.energia_usada_mes || 0));
     _set('cron-countdown', disp <= 5 ? 'Pronto ▶' : `${disp} ⚡ energia`);
   }
 
