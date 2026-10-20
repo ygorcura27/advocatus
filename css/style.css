@@ -1271,7 +1271,8 @@ a:hover { color: var(--txt); }
   .server-clock .data-jogo { font-size: .78rem; }
 
   /* Mostrar elementos mobile */
-  .bloco-energia-mobile { display: flex; }
+  /* Tempo real (Império): sem barra de energia/Avançar mês no celular */
+  .bloco-energia-mobile { display: none; }
   .bottom-nav           { display: flex; }
   .hamburger            { display: flex; }
 
@@ -1380,7 +1381,7 @@ a:hover { color: var(--txt); }
   /* Bottom nav mobile */
   .bottom-nav {
     position: fixed;
-    bottom: 52px; /* acima da barra de energia */
+    bottom: 0;
     left: 0; right: 0;
     background: var(--surface);
     border-top: var(--borda);
@@ -1409,7 +1410,7 @@ a:hover { color: var(--txt); }
   .bnav-label { font-size: .55rem; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
 
   /* Espaço para bottom nav + barra energia */
-  .main-content { padding-bottom: 120px; }
+  .main-content { padding-bottom: 76px; }
 }
 
 /* display:none para elementos mobile-only já definido acima (regra padrão) */
@@ -2963,3 +2964,6 @@ a:hover { color: var(--txt); }
   .equipe-grid { grid-template-columns: 1fr; }
   .equipe-hero-stats { flex-direction: column; }
 }
+
+/* O tempo do jogo passa sozinho (Império em tempo real): sem botão de Avançar mês. */
+#btn-avancar-topo, #btn-avancar-mobile, #btn-avancar { display: none !important; }
