@@ -28,12 +28,8 @@ let _painelAtivo = 'cidade';   // o Império (modo Tycoon) é a tela inicial
     const el = document.querySelector(`#${id} .bnav-icon`);
     if (el) el.innerHTML = icon(nome);
   };
-  injetarNav('bn-perfil',       'perfil');
-  injetarNav('bn-cidade',       'cidade');
-  injetarNav('bn-escritorio',   'escritorio');
-  injetarNav('bn-vagas',        'vagas');
-  injetarNav('bn-habilidades',  'habilidades');
-  injetarNav('bn-mais',         'menu');
+  injetarNav('bn-cidade',       'escritorio');
+  injetarNav('bn-mapa',         'cidade');
 
   const bemLabel = document.getElementById('bem-mobile-label');
   if (bemLabel) bemLabel.innerHTML = `<span class="ni-icon">${icon('habilidades')}</span>Energia`;
@@ -60,6 +56,21 @@ window.addEventListener('gamestate:ready', () => {
 // 'processos' fica de fora: ele já tem item próprio (Investigação), e
 // incluí-lo aqui acendia dois itens do menu ao mesmo tempo.
 const ESC_SUBPAINEIS = new Set(['balancete','equipe','clientes','repertorio','midia_convites','marketing','assembleia','contratacao','treinamento','beneficios']);
+
+// O jogo agora é só o Império (modo Tycoon): os painéis da carreira antiga
+// saem do menu e qualquer navegação para eles volta ao escritório. O código
+// antigo fica no repositório, fora de alcance, até ser removido de vez.
+const PAINEIS_IMPERIO = new Set(['cidade', 'mapa']);
+
+function _navImperio(painel) {
+  const ativo = (id) => id === painel ? ' ativo' : '';
+  return `
+    <div class="nav-grupo">
+      <div class="nav-grupo-titulo">Império</div>
+      <div class="nav-item${ativo('cidade')}" onclick="navTo('cidade',this)"><span class="ni-icon">${icon('escritorio')}</span> Escritório</div>
+      <div class="nav-item${ativo('mapa')}" onclick="navTo('mapa',this)"><span class="ni-icon">${icon('cidade')}</span> Cidade</div>
+    </div>`;
+}
 
 function _navLateralPadrao(painel) {
   const ativo = (id) => (id === painel || (id === 'escritorio' && ESC_SUBPAINEIS.has(painel))) ? ' ativo' : '';
@@ -129,7 +140,7 @@ function _renderSidebarLateral(painel) {
   // Patrimônio etc. são navegados por dentro da própria tela, via âncora/
   // botão, não por um sub-menu lateral próprio).
   {
-    nav.innerHTML = _navLateralPadrao(painel);
+    nav.innerHTML = _navImperio(painel);
   }
   _tornarFocavel(nav.querySelectorAll('.nav-item'));
 }
@@ -166,6 +177,7 @@ function _renderizar() {
   const main = document.getElementById('main-content');
   if (!main) return;
 
+  if (!PAINEIS_IMPERIO.has(_painelAtivo)) _painelAtivo = 'cidade';
   _renderSidebarLateral(_painelAtivo);
 
   switch (_painelAtivo) {
@@ -261,8 +273,8 @@ function _renderizar() {
     default:             renderPerfil(j, main);
   }
 
-  // Verificar recesso pendente
-  if (j.recesso_pendente) _mostrarModalRecesso(j);
+  // Recesso é da carreira antiga — não aparece no modo Império.
+  if (j.recesso_pendente && !PAINEIS_IMPERIO.has(_painelAtivo)) _mostrarModalRecesso(j);
 }
 
 // ════════════════════════════════════════════════════════

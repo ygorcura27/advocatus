@@ -62,8 +62,8 @@ let _aqui = null, _pend = {};
 function cardAqui(){
   const L = LUGARES[_aqui];
   if(!L) return `<div class="cid-aqui"><span class="cid-rot">Rio de Janeiro</span><h3>Para onde?</h3><p>Toque num medalhão do mapa ou escolha um lugar abaixo. O advogado vai até lá a pé ou de táxi.</p></div>`;
-  return `<div class="cid-aqui"><span class="cid-rot">Você está em</span><h3>${L.name}</h3><p>${L.txt}</p>${_pend[_aqui] ? `<p class="cid-pend">${_pend[_aqui]}</p>` : ''}
-    <button type="button" class="cid-entrar" data-painel="${L.painel}">Entrar</button></div>`;
+  return `<div class="cid-aqui"><span class="cid-rot">Você está em</span><h3>${L.name}</h3><p>${L.txt}</p>
+    <button type="button" class="cid-entrar" data-painel="cidade">🏢 Voltar ao escritório</button></div>`;
 }
 function desenharLado(el){
   const card = el.querySelector('.cid-card'), lado = el.querySelector('.cid-lado'); if(!lado || !card) return;
@@ -91,7 +91,7 @@ window.renderCidade = function(j, main){
     };
     const lugares = {}; for(const id in LUGARES) lugares[id] = { name:LUGARES[id].name, g:LUGARES[id].g, zone:'centro' };
     window.cidade3d.montar(slot, {
-      lugares, posicoes, destaques:Object.keys(_pend),
+      lugares, posicoes, destaques:[],
       aoChegar: id => { _aqui = id; desenharLado(main); }
     });
   }).catch(() => {

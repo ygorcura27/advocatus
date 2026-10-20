@@ -2967,3 +2967,15 @@ a:hover { color: var(--txt); }
 
 /* O tempo do jogo passa sozinho (Império em tempo real): sem botão de Avançar mês. */
 #btn-avancar-topo, #btn-avancar-mobile, #btn-avancar { display: none !important; }
+
+/* Modo Império: só o escritório e a cidade ficam visíveis. */
+body.modo-imperio .sidebar-right,
+body.modo-imperio .server-clock,
+body.modo-imperio #tb-personagens-wrap,
+body.modo-imperio #tb-serasa,
+body.modo-imperio #brasao-container,
+body.modo-imperio #sl-cargo,
+body.modo-imperio .perfil-rep-bar,
+body.modo-imperio .perfil-rep-txt { display: none !important; }
+body.modo-imperio .layout { grid-template-columns: var(--sidebar-l) 1fr; }
+@media (max-width: 640px) { body.modo-imperio .layout { grid-template-columns: 1fr; } }
