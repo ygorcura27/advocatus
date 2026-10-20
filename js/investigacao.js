@@ -184,8 +184,9 @@ async function _renderMapaInvestigacao(j, main, p) {
           </div>`).join('')}
       </div>
       <div style="display:flex;gap:.5rem;margin-top:1rem;flex-wrap:wrap">
+        <button class="btn btn-prim" id="inv-btn-rapida" onclick="window._invRapida()" title="Investiga sozinho os nós disponíveis com base nas suas habilidades — um pouco pior, em média, que resolver cada um">⚡ Investigação rápida</button>
         <button class="btn btn-sec" onclick="window._invAbrirVademecum()">📖 Vade Mecum</button>
-        <button class="btn btn-prim" ${revelados === 0 ? 'disabled' : ''} onclick="window._invIrParaMontagem()">Ir para Montagem de Estratégia</button>
+        <button class="btn btn-sec" ${revelados === 0 ? 'disabled' : ''} onclick="window._invIrParaMontagem()">Ir para Montagem de Estratégia</button>
       </div>
     </div>`;
 }
@@ -197,6 +198,20 @@ function _labelTipoNo(tipo) {
     favor_relacionamento: 'Favor / Relacionamento',
   }[tipo] || tipo;
 }
+
+window._invRapida = async function() {
+  const btn = document.getElementById('inv-btn-rapida');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Investigando...'; }
+  try {
+    const r = await callFn('investigacaoRapida', { processo_id: _procId });
+    _procCache.investigacao = r.investigacao;
+    window.toast && window.toast(`🔎 ${r.reveladas} pista(s) investigada(s).`, 'ok', 2500);
+    _renderFase(window.JOGADOR, document.getElementById('main-content'), _procCache);
+  } catch (err) {
+    window.toast && window.toast('Erro: ' + erroAmigavel(err), 'ko');
+    if (btn) { btn.disabled = false; btn.textContent = '⚡ Investigação rápida'; }
+  }
+};
 
 window._invIrParaMontagem = function() {
   // Força fase de montagem no cliente apenas para navegar; o servidor
