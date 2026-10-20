@@ -29,6 +29,7 @@ let _painelAtivo = 'perfil';
     if (el) el.innerHTML = icon(nome);
   };
   injetarNav('bn-perfil',       'perfil');
+  injetarNav('bn-cidade',       'cidade');
   injetarNav('bn-escritorio',   'escritorio');
   injetarNav('bn-vagas',        'vagas');
   injetarNav('bn-habilidades',  'habilidades');
@@ -78,10 +79,10 @@ function _navLateralPadrao(painel) {
     ${grupoNestaPagina}
     <div class="nav-grupo">
       <div class="nav-grupo-titulo">Carreira</div>
+      <div class="nav-item${ativo('cidade')}" onclick="navTo('cidade',this)" title="O Rio de Janeiro em 3D: vá até o fórum, o tribunal, a OAB..."><span class="ni-icon">${icon('cidade')}</span> Cidade</div>
       <div class="nav-item${ativo('perfil')}" onclick="navTo('perfil',this)"><span class="ni-icon">${icon('perfil')}</span> Meu Perfil</div>
       <div class="nav-item${ativo('energia')}" onclick="navTo('energia',this)"><span class="ni-icon">${icon('energia')}</span> Energia</div>
       <div class="nav-item${ativo('foco')}" onclick="navTo('foco',this)"><span class="ni-icon">${icon('oportunidades')}</span> Foco</div>
-      <div class="nav-item${ativo('cidade')}" onclick="navTo('cidade',this)" title="O Rio de Janeiro em 3D: vá até o fórum, o tribunal, a OAB..."><span class="ni-icon">${icon('escritorio')}</span> Cidade</div>
       <div class="nav-item${ativo('escritorio')}" onclick="navTo('escritorio',this)"><span class="ni-icon">${icon('escritorio')}</span> Escritório</div>
       <div class="nav-item${ativo('processos')}" onclick="navTo('processos',this)" title="Seus casos: clique num processo para investigar e ir à audiência"><span class="ni-icon">${icon('investigacao')}</span> Processos</div>
       <div class="nav-item${ativo('progressao')}" onclick="navTo('progressao',this)"><span class="ni-icon">${icon('progressao')}</span> Progressão</div>

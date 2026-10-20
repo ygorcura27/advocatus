@@ -25,3 +25,5 @@
 .cid-sigla{flex:0 0 30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font:700 .6rem 'DM Sans',sans-serif;border:1px solid var(--ouro3);color:var(--ouro);background:var(--ouro-light)}
 .cid-semgl{padding:1.2rem;color:var(--txt2);font-size:.85rem}
 @media (max-width:900px){ .cid-wrap{grid-template-columns:1fr} .cid-mapa{aspect-ratio:4/5} }
+.cid-pend{margin:.1rem 0 .8rem;padding:.45rem .6rem;border-left:2px solid var(--ouro);background:var(--ouro-light);color:var(--txt);font-size:.76rem;border-radius:0 4px 4px 0}
+.cid-ponto{margin-left:auto;width:8px;height:8px;border-radius:50%;background:var(--ouro);box-shadow:0 0 0 3px var(--ouro-light)}
