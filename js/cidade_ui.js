@@ -47,24 +47,37 @@ function carregarMotor(){
 }
 function carregarCss(){ if(document.getElementById('css-cidade')) return; const l=document.createElement('link'); l.id='css-cidade'; l.rel='stylesheet'; l.href='css/cidade.css'; document.head.appendChild(l); }
 
-let _aqui = null;
+// lugares com algo esperando o jogador (halo dourado no mapa). Só lê o que já
+// está em JOGADOR — nenhuma consulta extra ao Firestore.
+function pendencias(j){
+  const p = {};
+  if(!j.oab) p.oab = 'O Exame da Ordem espera por você.';
+  if(!j.escritorio_id && !j.escritorio_proprio_id && !j.escritorio_empregado_id) p.vagas = 'Você ainda não trabalha em nenhum escritório.';
+  if((j.estresse||0) >= 70 || (j.saude_mental ?? 80) <= 35) p.casa = 'Estresse alto: hora de descansar.';
+  if(j.no_serasa) p.banco = 'Seu nome está no Serasa.';
+  return p;
+}
+
+let _aqui = null, _pend = {};
 function cardAqui(){
   const L = LUGARES[_aqui];
   if(!L) return `<div class="cid-aqui"><span class="cid-rot">Rio de Janeiro</span><h3>Para onde?</h3><p>Toque num medalhão do mapa ou escolha um lugar abaixo. O advogado vai até lá a pé ou de táxi.</p></div>`;
-  return `<div class="cid-aqui"><span class="cid-rot">Você está em</span><h3>${L.name}</h3><p>${L.txt}</p>
+  return `<div class="cid-aqui"><span class="cid-rot">Você está em</span><h3>${L.name}</h3><p>${L.txt}</p>${_pend[_aqui] ? `<p class="cid-pend">${_pend[_aqui]}</p>` : ''}
     <button type="button" class="cid-entrar" data-painel="${L.painel}">Entrar</button></div>`;
 }
 function desenharLado(el){
-  const lado = el.querySelector('.cid-lado'); if(!lado) return;
-  lado.innerHTML = cardAqui() + `<div class="cid-lista" role="list">${Object.entries(LUGARES).map(([id,L])=>
-    `<button type="button" role="listitem" data-ir="${id}" ${id===_aqui?'aria-current="true"':''}><span class="cid-sigla">${L.g}</span>${L.name}</button>`).join('')}</div>`;
-  lado.querySelector('.cid-entrar')?.addEventListener('click', e => window.navTo?.(e.currentTarget.dataset.painel));
+  const card = el.querySelector('.cid-card'), lado = el.querySelector('.cid-lado'); if(!lado || !card) return;
+  card.innerHTML = cardAqui();
+  card.querySelector('.cid-entrar')?.addEventListener('click', e => window.navTo?.(e.currentTarget.dataset.painel));
+  lado.innerHTML = `<div class="cid-lista" role="list">${Object.entries(LUGARES).map(([id,L])=>
+    `<button type="button" class="cid-item" role="listitem" data-ir="${id}" ${id===_aqui?'aria-current="true"':''}><span class="cid-sigla">${L.g}</span>${L.name}${_pend[id] ? '<span class="cid-ponto" title="Algo esperando"></span>' : ''}</button>`).join('')}</div>`;
   lado.querySelectorAll('[data-ir]').forEach(b => b.addEventListener('click', () => window.cidade3d?.ir(b.dataset.ir)));
 }
 
 window.renderCidade = function(j, main){
   carregarCss();
-  main.innerHTML = `<div class="cid-wrap"><div class="cid-mapa" id="cid-mapa"><div class="cid-carregando">Carregando o Rio de Janeiro…</div></div><div class="cid-lado"></div></div>`;
+  main.innerHTML = `<div class="cid-wrap"><div class="cid-palco"><div class="cid-mapa" id="cid-mapa"><div class="cid-carregando">Carregando o Rio de Janeiro…</div></div><div class="cid-card"></div></div><div class="cid-lado"></div></div>`;
+  _pend = pendencias(j);
   try{ _aqui = localStorage.getItem('advocatus_cidade_loc') || 'escritorio'; }catch(e){ _aqui='escritorio'; }
   desenharLado(main);
   carregarMotor().then(() => {
@@ -78,7 +91,7 @@ window.renderCidade = function(j, main){
     };
     const lugares = {}; for(const id in LUGARES) lugares[id] = { name:LUGARES[id].name, g:LUGARES[id].g, zone:'centro' };
     window.cidade3d.montar(slot, {
-      lugares, posicoes, destaques:[],
+      lugares, posicoes, destaques:Object.keys(_pend),
       aoChegar: id => { _aqui = id; desenharLado(main); }
     });
   }).catch(() => {

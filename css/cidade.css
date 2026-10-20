@@ -1,6 +1,7 @@
 /* ════════ CIDADE 3D ════════ */
-.cid-wrap{display:grid;grid-template-columns:1fr 300px;gap:1rem;align-items:start}
-.cid-mapa{position:relative;aspect-ratio:16/10;border-radius:8px;overflow:hidden;background:var(--navy);border:1px solid var(--ouro3);box-shadow:0 12px 32px rgba(0,0,0,.35)}
+.cid-wrap{display:flex;flex-direction:column;gap:1rem}
+.cid-palco{position:relative}
+.cid-mapa{position:relative;height:calc(100vh - 150px);min-height:460px;border-radius:8px;overflow:hidden;background:var(--navy);border:1px solid var(--ouro3);box-shadow:0 12px 32px rgba(0,0,0,.35)}
 .cid-mapa .m3d{position:absolute;inset:0;overflow:hidden}
 .cid-mapa .m3d-tela{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
 .cid-mapa .m3d-tela.arrastando{cursor:grabbing}
@@ -11,17 +12,20 @@
 .cid-mapa .m3d-tz,.cid-mapa .m3d-conf{display:none!important}
 .cid-mapa .m3d-vinheta{position:absolute;inset:0;pointer-events:none;opacity:0}
 .cid-carregando{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--txt3);font-size:.8rem}
-.cid-lado{display:flex;flex-direction:column;gap:.8rem}
+.cid-card{position:absolute;left:12px;bottom:12px;width:min(300px,calc(100% - 24px));z-index:3}
+.cid-card .cid-aqui{background:rgba(20,28,48,.92);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 10px 28px rgba(0,0,0,.4)}
 .cid-aqui{background:var(--navy2);border:1px solid var(--ouro3);border-radius:8px;padding:1rem}
 .cid-aqui .cid-rot{font:600 .62rem 'DM Sans',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--ouro2)}
 .cid-aqui h3{font-family:'Playfair Display',Georgia,serif;font-size:1.15rem;color:var(--txt);margin:.25rem 0 .35rem}
 .cid-aqui p{font-size:.8rem;color:var(--txt2);margin:0 0 .8rem;line-height:1.5}
 .cid-aqui .cid-entrar{width:100%;background:var(--ouro);color:#14100c;border:0;border-radius:4px;padding:.6rem;font:700 .82rem 'DM Sans',sans-serif;cursor:pointer}
 .cid-aqui .cid-entrar:hover{filter:brightness(1.08)}
-.cid-lista{background:var(--navy2);border:1px solid var(--navy-light);border-radius:8px;padding:.5rem}
-.cid-lista button{display:flex;align-items:center;gap:.6rem;width:100%;background:none;border:0;border-radius:4px;padding:.45rem .5rem;color:var(--txt2);font:500 .78rem 'DM Sans',sans-serif;text-align:left;cursor:pointer}
-.cid-lista button:hover,.cid-lista button:focus-visible{background:var(--navy-light);color:var(--txt)}
-.cid-lista button[aria-current="true"]{color:var(--ouro)}
+.cid-lista{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:.25rem;background:var(--navy2);border:1px solid var(--navy-light);border-radius:8px;padding:.5rem}
+.cid-lista .cid-item{display:flex;align-items:center;gap:.6rem;width:100%;background:none;border:0;border-radius:4px;padding:.45rem .5rem;color:var(--txt2);font:500 .78rem 'DM Sans',sans-serif;text-align:left;cursor:pointer}
+.cid-lista .cid-item:hover,.cid-lista .cid-item:focus-visible{background:var(--navy-light);color:var(--txt)}
+.cid-lista .cid-item[aria-current="true"]{color:var(--ouro)}
 .cid-sigla{flex:0 0 30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font:700 .6rem 'DM Sans',sans-serif;border:1px solid var(--ouro3);color:var(--ouro);background:var(--ouro-light)}
 .cid-semgl{padding:1.2rem;color:var(--txt2);font-size:.85rem}
-@media (max-width:900px){ .cid-wrap{grid-template-columns:1fr} .cid-mapa{aspect-ratio:4/5} }
+@media (max-width:900px){ .cid-mapa{height:62vh;min-height:340px} .cid-card{position:static;width:auto;margin-top:.8rem} .cid-card .cid-aqui{background:var(--navy2);box-shadow:none} }
+.cid-pend{margin:.1rem 0 .8rem;padding:.45rem .6rem;border-left:2px solid var(--ouro);background:var(--ouro-light);color:var(--txt);font-size:.76rem;border-radius:0 4px 4px 0}
+.cid-ponto{margin-left:auto;width:8px;height:8px;border-radius:50%;background:var(--ouro);box-shadow:0 0 0 3px var(--ouro-light)}

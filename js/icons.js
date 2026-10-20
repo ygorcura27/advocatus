@@ -15,6 +15,7 @@ const PATHS = {
   // Carreira
   perfil:       `<path ${S} d="M12 3l2.6 2.7 3.7.5.6 3.7 2.6 2.6-1.9 3.3.6 3.7-3.6 1.4-1.9 3.3-3.7-1-3.7 1-1.9-3.3-3.6-1.4.6-3.7L2 12.5l2.6-2.6.6-3.7 3.7-.5z"/><circle ${S} cx="12" cy="12" r="3.1"/>`,
   escritorio:   `<path ${S} d="M4 21V9l8-5 8 5v12"/><path ${S} d="M9 21v-6h6v6"/><path ${S} d="M9 12h.01M15 12h.01M9 8h.01M15 8h.01"/>`,
+  cidade:       `<path ${S} d="M9 4 3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5z"/><path ${S} d="M9 4v13.5M15 6.5V20"/>`,
   investigacao: `<circle ${S} cx="10.5" cy="10.5" r="6.5"/><path ${S} d="M20 20l-4.6-4.6"/>`,
   progressao:   `<path ${S} d="M3 19h18"/><path ${S} d="M6 19V11M11 19V6M16 19v-9M21 19V4"/>`,
 
