@@ -175,13 +175,13 @@
 
 <!-- ════════ BOTTOM NAV (mobile) ════════ -->
 <nav class="bottom-nav" id="bottom-nav">
-  <div class="bnav-item ativo" id="bn-perfil" onclick="navTo('perfil',this);closeSidebar()">
+  <div class="bnav-item" id="bn-perfil" onclick="navTo('perfil',this);closeSidebar()">
     <span class="bnav-icon ni-icon"></span>
     <span class="bnav-label">Perfil</span>
   </div>
-  <div class="bnav-item" id="bn-cidade" onclick="navTo('cidade',this);closeSidebar()">
+  <div class="bnav-item ativo" id="bn-cidade" onclick="navTo('cidade',this);closeSidebar()">
     <span class="bnav-icon ni-icon"></span>
-    <span class="bnav-label">Cidade</span>
+    <span class="bnav-label">Império</span>
   </div>
   <div class="bnav-item" id="bn-escritorio" onclick="navTo('escritorio',this);closeSidebar()">
     <span class="bnav-icon ni-icon"></span>
@@ -270,6 +270,7 @@
   import './js/podcasts_ui.js';
   import './js/wiki.js';
   import './js/cidade_ui.js';
+  import './js/imperio_ui.js';
 </script>
 
 <script>
@@ -499,7 +500,7 @@ window.navTo = function(painel, el) {
   _navToOrig(painel, el);
   // Atualizar bottom nav
   document.querySelectorAll('.bnav-item').forEach(b => b.classList.remove('ativo'));
-  const bnMap = { perfil:'bn-perfil', processos:'bn-processos', escritorio:'bn-escritorio', vagas:'bn-vagas', habilidades:'bn-habilidades' };
+  const bnMap = { cidade:'bn-cidade', perfil:'bn-perfil', processos:'bn-processos', escritorio:'bn-escritorio', vagas:'bn-vagas', habilidades:'bn-habilidades' };
   if (bnMap[painel]) document.getElementById(bnMap[painel])?.classList.add('ativo');
   closeSidebar();
 };

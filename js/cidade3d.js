@@ -1285,6 +1285,12 @@ window.cidade3d={
     slot.id='mapa3d-slot'; mapa3d.aposRender();
   },
   ir(id){ mapa3d.viajar(id,true); },
+  /* atualiza halos (ids com algo esperando) e, opcionalmente, nomes/siglas dos medalhões */
+  atualizar(destaques, lugares){
+    OPTS.destaques=new Set(destaques||[]);
+    if(lugares) for(const k in lugares) if(OPTS.lugares[k]) Object.assign(OPTS.lugares[k], lugares[k]);
+    if(M && M.cont && M.cont.isConnected) sincronizar();
+  },
   parar(){ st.ativo=false; },
   _tile(x,z){ return M && M.G ? M.G.T(x,z) : null; }   // para testes
 };

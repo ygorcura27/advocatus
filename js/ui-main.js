@@ -17,7 +17,7 @@ import { COMARCAS } from './escritorios_npc.js';
 import { htmlTracosAssinatura } from './duelo.js';
 
 // ── Painel ativo ──
-let _painelAtivo = 'perfil';
+let _painelAtivo = 'cidade';   // o Império (modo Tycoon) é a tela inicial
 
 // ════════════════════════════════════════════════════════
 // ÍCONES ESTÁTICOS DO CHROME (bottom nav + barra de energia mobile)
@@ -79,12 +79,11 @@ function _navLateralPadrao(painel) {
     ${grupoNestaPagina}
     <div class="nav-grupo">
       <div class="nav-grupo-titulo">Carreira</div>
-      <div class="nav-item${ativo('cidade')}" onclick="navTo('cidade',this)" title="O Rio de Janeiro em 3D: vá até o fórum, o tribunal, a OAB..."><span class="ni-icon">${icon('cidade')}</span> Cidade</div>
+      <div class="nav-item${ativo('cidade')}" onclick="navTo('cidade',this)" title="Seu império: compre e melhore as frentes do escritório no mapa do Rio"><span class="ni-icon">${icon('cidade')}</span> Império</div>
       <div class="nav-item${ativo('perfil')}" onclick="navTo('perfil',this)"><span class="ni-icon">${icon('perfil')}</span> Meu Perfil</div>
       <div class="nav-item${ativo('energia')}" onclick="navTo('energia',this)"><span class="ni-icon">${icon('energia')}</span> Energia</div>
       <div class="nav-item${ativo('foco')}" onclick="navTo('foco',this)"><span class="ni-icon">${icon('oportunidades')}</span> Foco</div>
       <div class="nav-item${ativo('escritorio')}" onclick="navTo('escritorio',this)"><span class="ni-icon">${icon('escritorio')}</span> Escritório</div>
-      <div class="nav-item${ativo('processos')}" onclick="navTo('processos',this)" title="Seus casos: clique num processo para investigar e ir à audiência"><span class="ni-icon">${icon('investigacao')}</span> Processos</div>
       <div class="nav-item${ativo('progressao')}" onclick="navTo('progressao',this)"><span class="ni-icon">${icon('progressao')}</span> Progressão</div>
     </div>
     <div class="nav-grupo">
@@ -209,8 +208,9 @@ function _renderizar() {
       else main.innerHTML = '<div class="card" style="color:var(--txt3)">Carregando investigação...</div>';
       break;
     case 'cidade':
-      if (window.renderCidade) window.renderCidade(j, main);
-      else main.innerHTML = '<div class="card" style="color:var(--txt3)">Carregando a cidade...</div>';
+      if (window.renderImperio) window.renderImperio(j, main);
+      else if (window.renderCidade) window.renderCidade(j, main);
+      else main.innerHTML = '<div class="card" style="color:var(--txt3)">Carregando o império...</div>';
       break;
     case 'foco':          renderFoco(j, main);          break;
     case 'redes':         renderRedes(j, main);         break;
