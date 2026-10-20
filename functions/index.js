@@ -190,3 +190,6 @@ exports.tycoonAtender     = require('./tycoon').tycoonAtender;
 exports.tycoonComprar     = require('./tycoon').tycoonComprar;
 exports.tycoonGerente     = require('./tycoon').tycoonGerente;
 exports.tycoonMelhoria    = require('./tycoon').tycoonMelhoria;
+exports.tycoonAbrir       = require('./tycoon').tycoonAbrir;
+exports.tycoonMelhorar    = require('./tycoon').tycoonMelhorar;
+exports.tycoonResgatar    = require('./tycoon').tycoonResgatar;

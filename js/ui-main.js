@@ -207,6 +207,10 @@ function _renderizar() {
       if (window.renderInvestigacao) window.renderInvestigacao(j, main);
       else main.innerHTML = '<div class="card" style="color:var(--txt3)">Carregando investigação...</div>';
       break;
+    case 'mapa':
+      if (window.renderCidade) window.renderCidade(j, main);
+      else main.innerHTML = '<div class="card" style="color:var(--txt3)">Carregando a cidade...</div>';
+      break;
     case 'cidade':
       if (window.renderImperio) window.renderImperio(j, main);
       else if (window.renderCidade) window.renderCidade(j, main);
