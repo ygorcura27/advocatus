@@ -2183,6 +2183,10 @@ function _renderModalProcesso(id, p) {
     window._creditarXpParcialInstrucao(id, p, j);
   }
 
+  // Sem trava de cargo, o modal só repetia os dados do caso e um botão
+  // "Iniciar/Continuar investigação": vai direto para a investigação.
+  if (!travadoPorCargo && window.abrirInvestigacao && ['andamento','investigacao'].includes(p.status)) { window.abrirInvestigacao(id); return; }
+
   const ladoLabel = p.meu_lado === 'reu' ? '🛡️ Você está na DEFESA' : '⚖️ Você é o AUTOR da ação';
 
   // Novo loop (GDD addendum v1.0 — Investigação, Favores e Julgamento):

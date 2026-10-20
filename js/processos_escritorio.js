@@ -916,8 +916,9 @@ window._assumirCasoPool = async function(escId, procId, containerId) {
       try {
         const novoProcId = await window.criarProcessoDoPool(escId, procId, poolProc);
         await updateDoc(poolRef, { processo_ref: novoProcId });
-        toast(`⚖️ Caso assumido! Siga o fluxo: provas → teses → audiência. -${CUSTO}⚡`, 'ok', 4000);
-        window.abrirProcesso(novoProcId);
+        toast(`⚖️ Caso assumido! -${CUSTO}⚡`, 'ok', 3000);
+        // Direto para a investigação — o modal intermediário só tinha o botão "Iniciar investigação".
+        (window.abrirInvestigacao || window.abrirProcesso)(novoProcId);
       } catch (eCriar) {
         // Sem isso, um erro aqui deixava o pool marcado como "assumido" pra
         // sempre sem processo_ref — caso zumbi, sem investigação vinculada

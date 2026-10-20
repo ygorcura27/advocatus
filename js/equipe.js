@@ -1239,7 +1239,7 @@ window.abrirModalDesignar = async function(funcId, escId) {
         <button
           class="btn btn-ghost btn-block"
           style="text-align:left;padding:.65rem .85rem"
-          onclick="window._confirmarDesignar('${funcId}','${p.id}','${escId}')">
+          onclick="window._confirmarDesignarEquipe('${funcId}','${p.id}','${escId}')">
 
           <div style="font-weight:600;font-size:.82rem;color:var(--txt)">
             ${p.autor || '—'} vs ${p.reu || '—'}
@@ -1329,7 +1329,7 @@ function _autoSelecionarProvasTeses(p, funcionario) {
 }
 
 
-window._confirmarDesignar = async function(funcId, procId, escId) {
+window._confirmarDesignarEquipe = async function(funcId, procId, escId) {
   const j   = window.JOGADOR;
   const uid = j?.uid || window.JOGADOR_UID;
 

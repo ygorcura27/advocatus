@@ -1751,10 +1751,8 @@ function _escAcoesRapidas(j, esc) {
   const acoes = [
     { icone:'📈', label:'Investir no Escritório', fn:'', habilitado: temEscritorio },
     { icone:'🏛️', label:'Distribuir Pró-Labore',  fn:'', habilitado: temEscritorio },
-    { icone:'📊', label:'Expandir Operação',       fn:'', habilitado: temEscritorio },
     { icone:'➕', label:'Contratar Advogado',      fn:"window.navTo('equipe',null)", habilitado: true },
-    { icone:'🏢', label:'Abrir Filial',            fn:'', habilitado: false },
-    { icone:'🎓', label:'Treinar Equipe',          fn:"window.navTo('habilidades',null)", habilitado: true },
+    { icone:'🎓', label:'Treinar Equipe',          fn:"window.navTo('treinamento',null)", habilitado: temEscritorio },
     { icone:'📣', label:'Marketing',                fn:"window.navTo('marketing',null)",  habilitado: temEscritorio },
     { icone:'📖', label:'Repertório do Escritório', fn:"window.navTo('repertorio',null)", habilitado: temEscritorio },
   ];
@@ -1762,7 +1760,6 @@ function _escAcoesRapidas(j, esc) {
   if (esc) {
     acoes[0].fn = `window.abrirModalAportarCapital('${esc.id}')`;
     acoes[1].fn = `window.abrirModalDistribuirLucros('${esc.id}')`;
-    acoes[2].fn = `window.navTo('escritorio',null)`;
   } else {
     acoes[0].fn = "window.criarEscritorio && window.criarEscritorio()";
     acoes[0].label = 'Criar Escritório';

@@ -454,6 +454,7 @@ window._invAplicarTese = async function(precedenteId, tags) {
 // ─── Tela: Montagem de Estratégia ──────────────────────────────────────────
 
 let _maoSelecionada = new Set();
+let _montagemSugeridaPara = null;
 let _teseSelecionadaId = null;
 let _teseCacheEscId = null;
 let _teseCacheLista = null;
@@ -475,11 +476,17 @@ async function _teseCarregarBanco(j) {
 function _renderMontagem(j, main, p) {
   const inv = p.investigacao;
   const revelados = inv.nos.filter(n => n.status === 'revelado' && n.peca);
+  // Mão sugerida: todas as peças limpas já vêm marcadas (as sujas podem ser
+  // expostas no julgamento, então ficam a critério do jogador).
+  if (_montagemSugeridaPara !== _procId) {
+    _montagemSugeridaPara = _procId;
+    _maoSelecionada = new Set(revelados.filter(n => !n.peca.suja).map(n => n.id));
+  }
 
   main.innerHTML = `
     <div class="inv-scenario">
       <div class="inv-titulo-caso">Montagem de Estratégia</div>
-      <div class="inv-sub-caso">Selecione as evidências que vão compor sua mão para o julgamento.</div>
+      <div class="inv-sub-caso">As peças limpas já estão na sua mão. Toque para tirar ou incluir; as marcadas como suja podem ser expostas pela outra parte.</div>
       <div class="inv-nos-grid" style="margin-top:.75rem">
         ${revelados.map(no => `
           <div class="inv-no inv-no-revelado ${_maoSelecionada.has(no.id) ? 'sel' : ''}" data-mat="${no.peca.pilar ? '' : (MATERIAL_NO[no.tipo] || 'clip')}" onclick="window._invToggleMao('${no.id}')">
@@ -676,14 +683,35 @@ function _renderVeredito(j, main, p) {
   }
   const veredito = p.resultado_setlist || p.investigacao?.julgamento?.veredito;
   const cor = veredito === 'procedente' ? 'var(--verde)' : veredito === 'parcial' ? 'var(--amber)' : 'var(--verm2)';
+  // Vitória (total ou parcial) não tem decisão a tomar — o servidor recusa
+  // recurso de quem ganhou. Os honorários entram direto, sem o clique "Aceitar".
+  if (veredito !== 'improcedente' && p.status === 'aguardando_decisao_sentenca') {
+    main.innerHTML = `
+      <div class="card">
+        <div class="card-titulo">Veredito</div>
+        <div class="card-sub" style="color:${cor};font-weight:600;font-size:1.1rem">${_labelVeredito(veredito)}</div>
+        <p id="inv-hon-msg" style="color:var(--txt3);margin:.75rem 0">Recebendo honorários de R$ ${(p.hon_pendente || 0).toLocaleString('pt-BR')}…</p>
+        <button class="btn btn-prim" onclick="window._invVoltarProcessos()">Voltar aos processos</button>
+      </div>`;
+    callFn('decidirRecursoSentenca', { processo_id: _procId, recorrer: false }).then(r => {
+      const el = document.getElementById('inv-hon-msg');
+      if (el) el.textContent = r.msg || `Honorários recebidos: R$ ${(p.hon_pendente || 0).toLocaleString('pt-BR')}.`;
+      window.dispatchEvent(new CustomEvent('gamestate:reload'));
+    }).catch(err => {
+      const el = document.getElementById('inv-hon-msg');
+      if (el) el.textContent = 'Não foi possível receber os honorários agora: ' + erroAmigavel(err);
+    });
+    return;
+  }
   main.innerHTML = `
     <div class="card">
       <div class="card-titulo">Veredito</div>
       <div class="card-sub" style="color:${cor};font-weight:600;font-size:1.1rem">${_labelVeredito(veredito)}</div>
       <p style="color:var(--txt3);margin:.75rem 0">Honorários pendentes: R$ ${(p.hon_pendente || 0).toLocaleString('pt-BR')}</p>
       <div style="display:flex;gap:.5rem">
-        <button class="btn btn-prim" onclick="window._invDecidirRecurso(false)">Aceitar</button>
-        ${veredito !== 'procedente' ? `<button class="btn btn-sec" onclick="window._invDecidirRecurso(true)">Recorrer</button>` : ''}
+        ${p.status !== 'aguardando_decisao_sentenca' ? `<button class="btn btn-prim" onclick="window._invVoltarProcessos()">Voltar aos processos</button>` : `
+        <button class="btn btn-prim" onclick="window._invDecidirRecurso(true)">Recorrer</button>
+        <button class="btn btn-sec" onclick="window._invDecidirRecurso(false)">Aceitar a derrota</button>`}
       </div>
     </div>`;
 }
