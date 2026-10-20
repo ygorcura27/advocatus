@@ -2088,6 +2088,12 @@ window.abrirProcesso = async function(processoId) {
 function _renderModalProcesso(id, p) {
   const j = window.JOGADOR;
 
+  // Loop de investigação: audiência (1º grau ou tribunal) e veredito ficam na tela do caso.
+  if (p.investigacao && ['investigacao', 'aguardando_decisao_sentenca'].includes(p.status) && window.abrirInvestigacao) {
+    window.abrirInvestigacao(id);
+    return;
+  }
+
   // GDD v4.1 — fluxo setlist
   if (p.status === 'aguardando_evento' && p.evento_julgamento) {
     abrirModal(`⚖️ ${p.tipo || 'Processo'} — Evento`, '<div id="modal-evento-content"><div style="padding:1rem;color:var(--ardosia2)">Carregando evento…</div></div>');
@@ -2182,6 +2188,10 @@ function _renderModalProcesso(id, p) {
   if (travadoPorCargo && !p.xp_parcial_creditado) {
     window._creditarXpParcialInstrucao(id, p, j);
   }
+
+  // Sem trava de cargo, o modal só repetia os dados do caso e um botão
+  // "Iniciar/Continuar investigação": vai direto para a investigação.
+  if (!travadoPorCargo && window.abrirInvestigacao && ['andamento','investigacao'].includes(p.status)) { window.abrirInvestigacao(id); return; }
 
   const ladoLabel = p.meu_lado === 'reu' ? '🛡️ Você está na DEFESA' : '⚖️ Você é o AUTOR da ação';
 
@@ -2571,6 +2581,24 @@ window.jogarRecursoProducao = async function(procId) {
   if (!snap.exists()) { toast('Processo não encontrado.', 'ko'); return; }
   const p = snap.data();
   RECURSO_ATIVO = { id: procId, ...p };
+
+  // Casos do loop de investigação: o recurso é uma nova audiência no
+  // tribunal, com a mesma mão do 1º grau (functions/duelo.js:iniciarRecursoDuelo).
+  if (p.investigacao && p.status === 'recurso_pendente') {
+    try {
+      toast('⏳ Pautando a audiência no tribunal...', 'neutro', 1500);
+      const r = await httpsCallable(window.FB_FUNCTIONS, 'iniciarRecursoDuelo')({ processo_id: procId });
+      toast(`⚖️ Audiência no ${r.data?.tribunal || 'tribunal'}.`, 'ok', 2500);
+      window.abrirInvestigacao ? window.abrirInvestigacao(procId) : window.abrirProcesso(procId);
+    } catch (e) {
+      toast((e.message || 'Erro ao iniciar o recurso.').replace('Firebase: ', ''), 'ko', 5000);
+    }
+    return;
+  }
+  if (p.investigacao && ['investigacao', 'aguardando_decisao_sentenca'].includes(p.status)) {
+    window.abrirInvestigacao ? window.abrirInvestigacao(procId) : window.abrirProcesso(procId);
+    return;
+  }
 
   // GDD v4.1 — OAB (ou caso originado do novo loop de Investigação/
   // Favores/Julgamento, que marca `setlist:[]` em finalizarJulgamento para

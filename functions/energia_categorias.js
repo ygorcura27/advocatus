@@ -66,60 +66,41 @@ function debitarEnergiaCategoria(j, categoria, valor, rotuloAcao) {
     throw new Error(`categoria de energia inválida: ${categoria}`);
   }
 
-  // Conta antiga (ou jogador que nunca abriu a tela de alocação): legado.
-  // Mantém os DOIS espelhos que o código legado já usava em paralelo —
-  // `energia_usada_mes` (o que a UI real mostra, js/ui-main.js:264) e
-  // `energia` (o que defesa_tcc.js/sistemas_sociais.js/posgraduacao.js/
-  // podcasts_social.js checam antes de agir) — senão os dois saem de
-  // sincronia e a checagem de cada arquivo passa a mentir pro outro.
-  if (!j.energia_alocada) {
-    const usoAtual = j.energia_usada_mes || 0;
-    const total = calcularEnergiaTotal(j);
-    if (usoAtual + valor > total) {
-      throw new HttpsError('resource-exhausted', `Energia insuficiente para ${rotuloAcao || 'esta ação'}.`);
-    }
-    return {
-      energia_usada_mes: usoAtual + valor,
-      energia: Math.max(0, total - (usoAtual + valor)),
-    };
+  // Pote único: toda ação gasta da mesma energia mensal. A categoria só
+  // fica registrada em `energia_usada` (estatística e descanso/vida pessoal
+  // no cálculo de estresse) — não existe mais teto por categoria.
+  const gasto = energiaGastaMes(j);
+  const total = calcularEnergiaTotal(j);
+  if (gasto + valor > total) {
+    throw new HttpsError('resource-exhausted', `Energia insuficiente para ${rotuloAcao || 'esta ação'} (${Math.max(0, total - gasto)}/${valor}).`);
   }
+  return patchUso(j, categoria, valor, total);
+}
 
-  // Jogador já configurou os 6 baldes: checa só o balde da categoria.
-  const alocado = j.energia_alocada[categoria] || 0;
-  const usado = (j.energia_usada || categoriasVazias())[categoria] || 0;
-  if (usado + valor > alocado) {
-    throw new HttpsError('resource-exhausted', `Energia de ${categoria} insuficiente para ${rotuloAcao || 'esta ação'} (${usado}/${alocado}).`);
-  }
-  const novoUsado = { ...(j.energia_usada || categoriasVazias()) };
-  novoUsado[categoria] = usado + valor;
-  return { energia_usada: novoUsado };
+/** Energia já gasta no mês. Lê os dois registros (pool legado e baldes) e fica com o maior, para contas de qualquer época. */
+function energiaGastaMes(j) {
+  if (!j) return 0;
+  const somaCategorias = Object.values(j.energia_usada || {}).reduce((s, v) => s + (Number(v) || 0), 0);
+  return Math.max(Number(j.energia_usada_mes) || 0, somaCategorias);
+}
+
+function patchUso(j, categoria, delta, total) {
+  const usado = { ...categoriasVazias(), ...(j.energia_usada || {}) };
+  usado[categoria] = Math.max(0, (usado[categoria] || 0) + delta);
+  const gasto = Math.max(0, energiaGastaMes(j) + delta);
+  return { energia_usada: usado, energia_usada_mes: gasto, energia: Math.max(0, total - gasto) };
 }
 
 /**
  * Devolve `valor` de energia gasta na categoria (ex: darAula devolvendo o
- * custo de comparecer_aula — "docência energiza", GDD). Sempre floor em 0
- * de uso — nunca deixa a categoria com uso negativo mesmo se o crédito for
- * maior que o que tinha sido gasto nela. Antes do refactor, o código legado
- * (functions/posgraduacao.js::darAula) só devolvia no campo espelho
- * `energia`, sem tocar `energia_usada_mes` — os dois já saíam de sincronia
- * antes dessa mudança; aqui os dois voltam a andar junto.
+ * custo de comparecer_aula — "docência energiza", GDD). Floor em 0.
  */
 function creditarEnergiaCategoria(j, categoria, valor) {
   if (!CATEGORIAS.includes(categoria)) {
     throw new Error(`categoria de energia inválida: ${categoria}`);
   }
-
-  if (!j.energia_alocada) {
-    const usoAtual = j.energia_usada_mes || 0;
-    const novoUso = Math.max(0, usoAtual - valor);
-    const total = calcularEnergiaTotal(j);
-    return { energia_usada_mes: novoUso, energia: Math.max(0, total - novoUso) };
-  }
-
-  const usado = (j.energia_usada || categoriasVazias())[categoria] || 0;
-  const novoUsado = { ...(j.energia_usada || categoriasVazias()) };
-  novoUsado[categoria] = Math.max(0, usado - valor);
-  return { energia_usada: novoUsado };
+  const atual = (j.energia_usada || {})[categoria] || 0;
+  return patchUso(j, categoria, -Math.min(valor, Math.max(atual, energiaGastaMes(j))), calcularEnergiaTotal(j));
 }
 
 /**
@@ -141,21 +122,13 @@ function creditarEnergiaCategoria(j, categoria, valor) {
  * pontos 0-100+bônus (decisão de não migrar unidade pro literal do GDD).
  */
 function calcularModSupervisaoSocio(j) {
-  if (!j || !j.energia_alocada) return 1.0;
-  const alocado = j.energia_alocada.supervisao || 0;
-  const total = calcularEnergiaTotal(j);
-  const tetoReferencia = total * 0.2;
-  const pct = tetoReferencia > 0 ? Math.min(1, alocado / tetoReferencia) : 0;
-  return Math.min(1.15, 0.85 + pct * 0.30);
+  // Com o pote único de energia não há mais alocação em Supervisão: neutro.
+  return 1.0;
 }
 
 /** Reset mensal — chamado por avancar_mes.js e tick_mensal.js. Zera uso, mantém a alocação (sliders) que o jogador já tinha configurado. */
 function resetEnergiaMensal(j) {
-  const patch = { energia: calcularEnergiaTotal(j), energia_usada_mes: 0 };
-  if (j.energia_alocada) {
-    patch.energia_usada = categoriasVazias();
-  }
-  return patch;
+  return { energia: calcularEnergiaTotal(j), energia_usada_mes: 0, energia_usada: categoriasVazias() };
 }
 
 module.exports = {
@@ -166,5 +139,6 @@ module.exports = {
   debitarEnergiaCategoria,
   creditarEnergiaCategoria,
   resetEnergiaMensal,
+  energiaGastaMes,
   calcularModSupervisaoSocio,
 };

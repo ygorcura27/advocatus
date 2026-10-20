@@ -801,8 +801,19 @@ exports.decidirRecursoSentenca = onCall({ region: 'southamerica-east1' }, async 
   // Recorrer: abre a fase de recurso, com o JOGADOR como quem recorre.
   // Avança instancia_seguinte para a próxima instância na cadeia recursal,
   // para que chamadas subsequentes a montarSetlist usem o tribunal correto.
-  const instAtualRecurso = p.setlist_instancia || p.instancia_atual || p.instancia;
-  const proxTribunal     = banco.tribunalRecursal(p, p.instancia_seguinte);
+  // Casos do loop de investigação recorrem a partir da instância em que
+  // perderam (1º grau → TJ/TRF/TRT → STJ/TST → STF). O cálculo antigo partia
+  // de instancia_seguinte e pulava o 2º grau.
+  const ehInvestigacao = !!p.investigacao;
+  const instAtualRecurso = ehInvestigacao
+    ? (p.instancia_atual || '1grau')
+    : (p.setlist_instancia || p.instancia_atual || p.instancia);
+  if (ehInvestigacao && instAtualRecurso === 'STF') {
+    throw new HttpsError('failed-precondition', 'Não cabe mais recurso: o STF é a última instância.');
+  }
+  const proxTribunal     = ehInvestigacao
+    ? banco.tribunalRecursal(p, instAtualRecurso)
+    : banco.tribunalRecursal(p, p.instancia_seguinte);
   const { dataDisponivel, prazoFinal } = banco.calcularPrazosRecurso(j.mes_pessoal || 0, j.ano_pessoal || 1);
   await processoRef.update({
     status: 'recurso_pendente',
@@ -821,5 +832,7 @@ exports.decidirRecursoSentenca = onCall({ region: 'southamerica-east1' }, async 
         .update({ status: 'recurso_pendente' });
     } catch (e) { logger.warn('Pool subcol recurso update (decidir):', e); }
   }
-  return { msg: `Recurso protocolado. Acesse a carteira processual para sustentar no ${proxTribunal}.` };
+  return { msg: ehInvestigacao
+    ? `Recurso protocolado no ${proxTribunal}. Quando o tribunal pautar, a audiência aparece em Processos.`
+    : `Recurso protocolado. Acesse a carteira processual para sustentar no ${proxTribunal}.` };
 });

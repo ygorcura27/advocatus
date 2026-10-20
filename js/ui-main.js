@@ -372,9 +372,7 @@ function renderPerfil(j, el) {
   // GDD v6.0 §3.1 — teto real (com bônus de academia/disposição), não mais
   // fixo em 100 (bug antigo: card sempre mostrava "/100" mesmo com bônus ativo).
   const energiaTotalReal = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
-  const energiaDisp  = j.energia_alocada
-    ? window.CATEGORIAS_ENERGIA.reduce((s,c) => s + window.energiaDisponivelCategoria(j, c), 0)
-    : Math.max(0, energiaTotalReal - (j.energia_usada_mes||0));
+  const energiaDisp  = window.energiaDisponivelCategoria(j, 'processos');
   const repPct = Math.min(100, Math.round((j.reputacao||0)/cap*100));
 
   el.innerHTML = `
@@ -832,7 +830,6 @@ async function _carregarEscritorioProprio(escId, j) {
         ${_escBeneficiosPreviewCard(esc.id)}
         ${_escTesesCard()}
         ${_escClientesCard()}
-        <div id="esc-oportunidades-bloco"></div>
         ${_escSocietarioCard(esc, j)}
         <div id="esc-financas-upgrade">
           ${window.renderBlocoFinancas ? window.renderBlocoFinancas(esc, j) : ''}
@@ -860,8 +857,6 @@ async function _carregarEscritorioProprio(escId, j) {
       if (elClientes && window.renderClientesPainel) window.renderClientesPainel(j, escId, elClientes);
       const elTeses = document.getElementById('esc-teses-embed');
       if (elTeses && window.renderBancoTesesPainel) window.renderBancoTesesPainel(j, escId, elTeses);
-      const elOportunidades = document.getElementById('esc-oportunidades-bloco');
-      if (elOportunidades && window.renderOportunidadesPainel) window.renderOportunidadesPainel(j, escId, elOportunidades);
       const elWorkspace = document.getElementById('esc-workspace-bloco');
       if (elWorkspace) _renderWorkspacePainel(j, elWorkspace);
       const elEspec = document.getElementById('esc-especializacoes-bloco');
@@ -927,24 +922,7 @@ async function renderBalancete(j, el) {
     <div class="card blcte-card" style="margin-bottom:.7rem">
       <div class="blcte-secao-titulo despesa">DESPESAS</div>
 
-      <div class="blcte-grupo">Salários</div>
-      ${data.funcionarios.length
-        ? data.funcionarios.map(f => `
-          <div class="blcte-linha sub">
-            <span>${f.nome || f.name || 'Funcionário'} <span style="color:var(--txt4);font-size:.85em">(${CARGO_L[f.cargo_id]||f.cargo_id})</span></span>
-            <span class="blcte-val despesa">−${fmt(f.sal)}</span>
-          </div>`).join('')
-        : `<div class="blcte-linha sub"><span style="color:var(--txt3)">Sem funcionários ativos</span><span style="color:var(--txt3)">—</span></div>`}
-      <div class="blcte-linha blcte-subtotal">
-        <span>Subtotal Salários</span>
-        <span class="blcte-val despesa">−${fmt(data.salariosTotais)}</span>
-      </div>
-
       <div class="blcte-grupo">Infraestrutura</div>
-      <div class="blcte-linha sub">
-        <span>Custo fixo ${TIER_L[data.tier]||''}</span>
-        <span class="blcte-val despesa">−${fmt(data.custoFixo)}</span>
-      </div>
       ${data.workspaceCm > 0
         ? `<div class="blcte-linha sub">
             <span>${data.workspaceLabel}</span>
@@ -1602,7 +1580,9 @@ async function _escKpis(esc, j) {
   // cada tick igual faturamento_mes_atual).
   const despesaMarketing = (esc && esc.despesa_marketing_mes_atual) || 0;
 
-  const despMes   = custoFixo + salariosTotais + workspaceCm + beneficiosCustoTotal + despesaMarketing;
+  // Salários e custo fixo do tier não saem do caixa (o servidor não cobra
+  // folha) — ficam fora da conta para o balancete mostrar só o que é real.
+  const despMes   = workspaceCm + beneficiosCustoTotal + despesaMarketing;
   const lucroMes  = rendaMes - despMes;
   const socios    = esc ? _normalizarSociosUI(esc) : [{ participacao_pct: 100 }];
   const minhaUid  = j.uid || window.JOGADOR_UID;
@@ -1671,8 +1651,8 @@ function _escClientesCard() {
   return `
   <div class="esc-card-bloco" style="margin-bottom:1.1rem">
     <div class="secao-header" style="margin-bottom:.8rem">
-      <div class="secao-titulo">Carteira de Clientes</div>
-      <button class="painel-btn" onclick="window.navTo('clientes',null)">ver todos →</button>
+      <div class="secao-titulo">Clientes e Oportunidades</div>
+      <button class="painel-btn" onclick="window.navTo('clientes',null)">oportunidades e clientes →</button>
     </div>
     <div id="esc-clientes-embed">
       <div style="font-size:.78rem;color:var(--txt3);padding:.5rem 0">Carregando clientes...</div>
@@ -1751,10 +1731,8 @@ function _escAcoesRapidas(j, esc) {
   const acoes = [
     { icone:'📈', label:'Investir no Escritório', fn:'', habilitado: temEscritorio },
     { icone:'🏛️', label:'Distribuir Pró-Labore',  fn:'', habilitado: temEscritorio },
-    { icone:'📊', label:'Expandir Operação',       fn:'', habilitado: temEscritorio },
     { icone:'➕', label:'Contratar Advogado',      fn:"window.navTo('equipe',null)", habilitado: true },
-    { icone:'🏢', label:'Abrir Filial',            fn:'', habilitado: false },
-    { icone:'🎓', label:'Treinar Equipe',          fn:"window.navTo('habilidades',null)", habilitado: true },
+    { icone:'🎓', label:'Treinar Equipe',          fn:"window.navTo('treinamento',null)", habilitado: temEscritorio },
     { icone:'📣', label:'Marketing',                fn:"window.navTo('marketing',null)",  habilitado: temEscritorio },
     { icone:'📖', label:'Repertório do Escritório', fn:"window.navTo('repertorio',null)", habilitado: temEscritorio },
   ];
@@ -1762,7 +1740,6 @@ function _escAcoesRapidas(j, esc) {
   if (esc) {
     acoes[0].fn = `window.abrirModalAportarCapital('${esc.id}')`;
     acoes[1].fn = `window.abrirModalDistribuirLucros('${esc.id}')`;
-    acoes[2].fn = `window.navTo('escritorio',null)`;
   } else {
     acoes[0].fn = "window.criarEscritorio && window.criarEscritorio()";
     acoes[0].label = 'Criar Escritório';

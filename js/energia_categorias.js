@@ -22,52 +22,39 @@ window.categoriaEnergiaVazia = function() {
   return { processos: 0, supervisao: 0, estudo: 0, captacao: 0, pessoal: 0, descanso: 0 };
 };
 
-/** Checa e monta o patch de débito. Não lança — retorna {ok:false, mensagemErro} se não couber. */
+/** Energia já gasta no mês (pote único) — maior entre o registro legado e a soma por categoria. */
+window.energiaGastaMes = function(j) {
+  if (!j) return 0;
+  const soma = Object.values(j.energia_usada || {}).reduce((s, v) => s + (Number(v) || 0), 0);
+  return Math.max(Number(j.energia_usada_mes) || 0, soma);
+};
+
+function _patchUso(j, categoria, delta) {
+  const total = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
+  const usado = { ...window.categoriaEnergiaVazia(), ...(j.energia_usada || {}) };
+  usado[categoria] = Math.max(0, (usado[categoria] || 0) + delta);
+  const gasto = Math.max(0, window.energiaGastaMes(j) + delta);
+  return { energia_usada: usado, energia_usada_mes: gasto, energia: Math.max(0, total - gasto) };
+}
+
+/** Checa e monta o patch de débito (pote único). Não lança — retorna {ok:false, mensagemErro} se não couber. */
 window.checarEnergiaCategoria = function(j, categoria, valor, rotuloAcao) {
   if (!window.CATEGORIAS_ENERGIA.includes(categoria)) {
     throw new Error(`categoria de energia inválida: ${categoria}`);
   }
-
-  // Conta antiga (ou jogador que nunca abriu a tela de alocação): legado —
-  // mesmos 2 espelhos que o código legado já mantinha (energia_usada_mes,
-  // que a UI mostra, e energia, que outras telas checam).
-  if (!j.energia_alocada) {
-    const usoAtual = j.energia_usada_mes || 0;
-    const total = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
-    if (usoAtual + valor > total) {
-      return { ok: false, mensagemErro: `Energia insuficiente para ${rotuloAcao || 'esta ação'}.` };
-    }
-    return {
-      ok: true,
-      patch: { energia_usada_mes: usoAtual + valor, energia: Math.max(0, total - (usoAtual + valor)) },
-    };
+  const total = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
+  const gasto = window.energiaGastaMes(j);
+  if (gasto + valor > total) {
+    return { ok: false, mensagemErro: `Energia insuficiente para ${rotuloAcao || 'esta ação'} (${Math.max(0, total - gasto)}/${valor}). Avance o mês para recuperar.` };
   }
-
-  // Jogador já configurou os 6 baldes: checa só o balde da categoria.
-  const alocado = j.energia_alocada[categoria] || 0;
-  const usado = (j.energia_usada || window.categoriaEnergiaVazia())[categoria] || 0;
-  if (usado + valor > alocado) {
-    return {
-      ok: false,
-      mensagemErro: `Energia de ${categoria} insuficiente para ${rotuloAcao || 'esta ação'} (${usado}/${alocado}).`,
-    };
-  }
-  const novoUsado = { ...(j.energia_usada || window.categoriaEnergiaVazia()) };
-  novoUsado[categoria] = usado + valor;
-  return { ok: true, patch: { energia_usada: novoUsado } };
+  return { ok: true, patch: _patchUso(j, categoria, valor) };
 };
 
-/** Energia disponível numa categoria, pra exibir na UI (habilitar/desabilitar botão, mostrar barra). Cai pro pool único legado se a conta não tiver configurado os baldes. */
+/** Energia disponível (pote único — a categoria é ignorada, mantida por compatibilidade). */
 window.energiaDisponivelCategoria = function(j, categoria) {
   if (!j) return 0;
-  if (!j.energia_alocada) {
-    const usoAtual = j.energia_usada_mes || 0;
-    const total = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
-    return Math.max(0, total - usoAtual);
-  }
-  const alocado = j.energia_alocada[categoria] || 0;
-  const usado = (j.energia_usada || window.categoriaEnergiaVazia())[categoria] || 0;
-  return Math.max(0, alocado - usado);
+  const total = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
+  return Math.max(0, total - window.energiaGastaMes(j));
 };
 
 /**
@@ -76,25 +63,10 @@ window.energiaDisponivelCategoria = function(j, categoria) {
  * mostrar o multiplicador atual na tela de Energia (o cálculo que vale de
  * verdade roda no backend, em avancar_mes.js).
  */
-window.calcularModSupervisaoSocio = function(j) {
-  if (!j || !j.energia_alocada) return 1.0;
-  const alocado = j.energia_alocada.supervisao || 0;
-  const total = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
-  const tetoReferencia = total * 0.2;
-  const pct = tetoReferencia > 0 ? Math.min(1, alocado / tetoReferencia) : 0;
-  return Math.min(1.15, 0.85 + pct * 0.30);
-};
+window.calcularModSupervisaoSocio = function(j) { return 1.0; };
 
 /** Devolve energia gasta (ex: docência energiza). Sempre floor em 0. */
 window.creditarEnergiaCategoriaPatch = function(j, categoria, valor) {
-  if (!j.energia_alocada) {
-    const usoAtual = j.energia_usada_mes || 0;
-    const novoUso = Math.max(0, usoAtual - valor);
-    const total = window.getEnergiaTotal ? window.getEnergiaTotal(j) : 100;
-    return { energia_usada_mes: novoUso, energia: Math.max(0, total - novoUso) };
-  }
-  const usado = (j.energia_usada || window.categoriaEnergiaVazia())[categoria] || 0;
-  const novoUsado = { ...(j.energia_usada || window.categoriaEnergiaVazia()) };
-  novoUsado[categoria] = Math.max(0, usado - valor);
-  return { energia_usada: novoUsado };
+  const atual = (j.energia_usada || {})[categoria] || 0;
+  return _patchUso(j, categoria, -Math.min(valor, Math.max(atual, window.energiaGastaMes(j))));
 };

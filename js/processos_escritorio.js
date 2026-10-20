@@ -190,14 +190,19 @@ window.renderGestaoProcessos = async function(j, el) {
   el.innerHTML = `
     <div style="margin-bottom:.8rem"><button class="btn btn-ghost btn-sm" onclick="window.navTo('escritorio',null)">← Escritório</button></div>
     ${window._capaHeader(`GESTÃO · ${(esc.nome||'—').toUpperCase()}`, '⚖️ Gestão de Processos', '')}
-    ${podeGerenciar ? `<div class="card" style="margin-bottom:1rem;font-size:.74rem;color:var(--txt3);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
-      <span>Delegação de gestão foi pra Gestão de Pessoas — junto com contratação e equipe.</span>
-      <button class="btn btn-ghost btn-sm" onclick="window.navTo('equipe',null)">👤 Gestão de Pessoas →</button>
-    </div>` : ''}
-    ${podeGerenciar ? _renderRegrasCaptacao(esc, escId) : ''}
-    ${_renderEstrategiaPadrao(j)}
-    ${podeGerenciar ? `<div id="gestao-correspondentes"></div>` : ''}
-    <div id="gestao-processos-pool"></div>`;
+    <div id="gestao-processos-pool"></div>
+    <details class="card" style="margin-top:1rem;padding:.7rem .9rem">
+      <summary style="cursor:pointer;font-weight:600;font-size:.82rem;color:var(--txt)">⚙️ Configurações avançadas <span style="font-weight:400;color:var(--txt4);font-size:.72rem">— captação automática, estratégia padrão${podeGerenciar ? ', correspondentes e delegação' : ''}</span></summary>
+      <div style="margin-top:.8rem">
+        ${podeGerenciar ? `<div style="margin-bottom:1rem;font-size:.74rem;color:var(--txt3);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
+          <span>Delegar a gestão dos casos a um funcionário fica em Gestão de Pessoas.</span>
+          <button class="btn btn-ghost btn-sm" onclick="window.navTo('equipe',null)">👤 Gestão de Pessoas →</button>
+        </div>` : ''}
+        ${podeGerenciar ? _renderRegrasCaptacao(esc, escId) : ''}
+        ${_renderEstrategiaPadrao(j)}
+        ${podeGerenciar ? `<div id="gestao-correspondentes"></div>` : ''}
+      </div>
+    </details>`;
 
   if (podeGerenciar) {
     const elCorr = document.getElementById('gestao-correspondentes');
@@ -490,7 +495,10 @@ window.renderProcessosPool = async function(j, escId, el) {
       const jaIncluidos = new Set(recursais.map(r => r.id));
       const snaps = await Promise.all(poolAssumidosAbertos.map(p => getDoc(doc(db, 'processos', p.processo_ref))));
       for (const snap of snaps) {
-        if (snap.exists() && STATUSES_RECURSAL.includes(snap.data().status) && !jaIncluidos.has(snap.id)) {
+        const dd = snap.exists() ? snap.data() : null;
+        // Recurso em audiência no tribunal (status 'investigacao' fora do 1º grau) também é fase recursal.
+        const emAudienciaRecursal = dd && dd.status === 'investigacao' && dd.instancia_atual && dd.instancia_atual !== '1grau';
+        if (dd && (STATUSES_RECURSAL.includes(dd.status) || emAudienciaRecursal) && !jaIncluidos.has(snap.id)) {
           jaIncluidos.add(snap.id);
           recursais.push({ id: snap.id, ...snap.data() });
         }
@@ -777,6 +785,20 @@ function _renderColRecursal(recursais, mesAtualTotal) {
   }
 
   return recursais.map(p => {
+    // Loop de investigação: audiência no tribunal em andamento ou veredito a ver.
+    if (p.investigacao && (p.status === 'investigacao' || p.status === 'aguardando_decisao_sentenca')) {
+      const emAudiencia = p.status === 'investigacao';
+      return `
+      <div class="proc-recursal-row">
+        <div style="font-size:.6rem;color:var(--txt4);font-family:monospace">${p.numero||'—'}</div>
+        <div style="font-size:.75rem;font-weight:600;color:var(--txt);margin:.1rem 0">${p.autor||'—'} vs ${p.reu||'—'}</div>
+        <div style="font-size:.63rem;color:var(--txt4)">${p.tipo||'—'} · ${p.instancia_atual && p.instancia_atual !== '1grau' ? p.instancia_atual : '1º grau'}</div>
+        <button class="btn btn-sm btn-prim btn-block" style="margin-top:.4rem;font-size:.62rem"
+          onclick="window.jogarRecursoProducao && window.jogarRecursoProducao('${p.id}')">
+          ${emAudiencia ? '⚖️ Continuar audiência' : '📜 Ver veredito'}
+        </button>
+      </div>`;
+    }
     if (p.status === 'aguardando_decisao_recurso' || p.status === 'aguardando_decisao_sentenca') {
       return `
       <div class="proc-recursal-row">
@@ -916,8 +938,9 @@ window._assumirCasoPool = async function(escId, procId, containerId) {
       try {
         const novoProcId = await window.criarProcessoDoPool(escId, procId, poolProc);
         await updateDoc(poolRef, { processo_ref: novoProcId });
-        toast(`⚖️ Caso assumido! Siga o fluxo: provas → teses → audiência. -${CUSTO}⚡`, 'ok', 4000);
-        window.abrirProcesso(novoProcId);
+        toast(`⚖️ Caso assumido! -${CUSTO}⚡`, 'ok', 3000);
+        // Direto para a investigação — o modal intermediário só tinha o botão "Iniciar investigação".
+        (window.abrirInvestigacao || window.abrirProcesso)(novoProcId);
       } catch (eCriar) {
         // Sem isso, um erro aqui deixava o pool marcado como "assumido" pra
         // sempre sem processo_ref — caso zumbi, sem investigação vinculada

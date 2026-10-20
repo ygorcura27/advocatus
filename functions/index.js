@@ -72,7 +72,7 @@ const { comprarAtivo, venderAtivo } = require('./investimentos_mercado');
 const { responderConviteMidia } = require('./podcasts_social');
 // GDD addendum v1.0 — Investigação, Favores e Julgamento
 const {
-  iniciarCasoInvestigativo, executarAcaoInvestigacao,
+  iniciarCasoInvestigativo, executarAcaoInvestigacao, investigacaoRapida,
   pedirFavor, consumirFavorNode, confirmarMontagem,
   abrirVadeMecum, aplicarTeseVademecum,
   executarRodadaJulgamento, finalizarJulgamento,
@@ -151,6 +151,7 @@ exports.venderAtivo              = venderAtivo;
 // GDD addendum v1.0 — Investigação, Favores e Julgamento
 exports.iniciarCasoInvestigativo = iniciarCasoInvestigativo;
 exports.executarAcaoInvestigacao = executarAcaoInvestigacao;
+exports.investigacaoRapida = investigacaoRapida;
 exports.pedirFavor               = pedirFavor;
 exports.consumirFavorNode        = consumirFavorNode;
 exports.confirmarMontagem        = confirmarMontagem;
@@ -177,6 +178,7 @@ exports.creditarXpParcialInstrucao = require('./xp_instrucao').creditarXpParcial
 // Audiência como Duelo (docs/DUELO_AUDIENCIA.md)
 exports.iniciarDuelo            = require('./duelo').iniciarDuelo;
 exports.jogarRodadaDuelo        = require('./duelo').jogarRodadaDuelo;
+exports.iniciarRecursoDuelo     = require('./duelo').iniciarRecursoDuelo;
 exports.escolherTracoAssinatura = require('./duelo').escolherTracoAssinatura;
 // Troca/transferência/herança de personagem (antes direto do navegador)
 exports.trocarPersonagem         = require('./personagens').trocarPersonagem;

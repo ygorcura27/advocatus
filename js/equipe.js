@@ -226,10 +226,7 @@ window.renderEquipe = async function(j, el) {
                 <span class="l">Equipe</span><span class="v">${funcs.length}<small>/${totalVagas}</small></span>
               </div>
               <div class="equipe-hero-badge">
-                <span class="l">Folha de pagamento</span><span class="v verm">-${_fmtK(totalSalarios + cap.custo_fixo)}<small>/mês</small></span>
-              </div>
-              <div class="equipe-hero-badge" style="cursor:pointer" onclick="window.navTo('energia',null)" title="Horas alocadas em Supervisão (tela Energia) multiplicam a carteira automática">
-                <span class="l">🎯 Supervisão do Sócio</span><span class="v" style="color:var(--verde2)">${(window.calcularModSupervisaoSocio ? window.calcularModSupervisaoSocio(j) : 1.0).toFixed(2)}x</span>
+                <span class="l">Vagas livres</span><span class="v">${Math.max(0, totalVagas - funcs.length)}</span>
               </div>
             </div>
           </div>
@@ -1239,7 +1236,7 @@ window.abrirModalDesignar = async function(funcId, escId) {
         <button
           class="btn btn-ghost btn-block"
           style="text-align:left;padding:.65rem .85rem"
-          onclick="window._confirmarDesignar('${funcId}','${p.id}','${escId}')">
+          onclick="window._confirmarDesignarEquipe('${funcId}','${p.id}','${escId}')">
 
           <div style="font-weight:600;font-size:.82rem;color:var(--txt)">
             ${p.autor || '—'} vs ${p.reu || '—'}
@@ -1329,7 +1326,7 @@ function _autoSelecionarProvasTeses(p, funcionario) {
 }
 
 
-window._confirmarDesignar = async function(funcId, procId, escId) {
+window._confirmarDesignarEquipe = async function(funcId, procId, escId) {
   const j   = window.JOGADOR;
   const uid = j?.uid || window.JOGADOR_UID;
 

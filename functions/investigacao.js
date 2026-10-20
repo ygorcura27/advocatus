@@ -296,30 +296,7 @@ function avancarTurno(investigacao, custo) {
 
 // ─── 2. Executar ação de investigação (revelar nó) ─────────────────────────
 
-exports.executarAcaoInvestigacao = onCall({ region: 'southamerica-east1' }, async (request) => {
-  if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
-  const uid = request.auth.uid;
-  const { processo_id, no_id, escolha } = request.data || {};
-  if (!processo_id || !no_id) throw new HttpsError('invalid-argument', 'processo_id e no_id obrigatórios.');
-
-  const db = getFirestore();
-  const processoRef = db.collection('processos').doc(processo_id);
-  const jogadorRef   = db.collection('jogadores').doc(uid);
-  const [pSnap, jSnap] = await Promise.all([processoRef.get(), jogadorRef.get()]);
-  if (!pSnap.exists || !jSnap.exists) throw new HttpsError('not-found', 'Processo ou jogador não encontrado.');
-  const p = pSnap.data(), j = jSnap.data();
-  if (!(await autorizadoParaProcessar(db, p, uid, j))) throw new HttpsError('permission-denied', 'Este processo não é seu.');
-
-  const investigacao = p.investigacao;
-  if (!investigacao) throw new HttpsError('failed-precondition', 'Investigação ainda não iniciada.');
-  if (investigacao.fase !== 'investigacao') throw new HttpsError('failed-precondition', 'Fase de investigação já encerrada.');
-
-  const no = investigacao.nos.find(n => n.id === no_id);
-  if (!no) throw new HttpsError('not-found', 'Nó não encontrado.');
-  if (no.status === 'revelado') throw new HttpsError('failed-precondition', 'Nó já revelado.');
-  if (no.status === 'bloqueado') throw new HttpsError('failed-precondition', 'Nó bloqueado — use pedirFavor ou consumirFavorNode.');
-  if (investigacao.turnos_usados >= investigacao.turnos_totais) throw new HttpsError('resource-exhausted', 'Turnos esgotados.');
-
+function _executarNo(investigacao, no, escolha, j) {
   const skJur = normalizarSkillsJur(j.skills_jur);
   let custo = CUSTO_TURNO[no.tipo] || 1;
   if (ACOES_DIRETAS.has(no.tipo)) custo = sk.descontoGestaoTempo(custo, (j.skills||{}).gestao);
@@ -379,8 +356,86 @@ exports.executarAcaoInvestigacao = onCall({ region: 'southamerica-east1' }, asyn
   if (no.peca && no.peca.suja) incAdv += 3;
   investigacao.investigacao_adversaria = Math.round((investigacao.investigacao_adversaria || 0) + incAdv * (1 - reducaoVel));
 
+  return resultado;
+}
+
+
+exports.executarAcaoInvestigacao = onCall({ region: 'southamerica-east1' }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
+  const uid = request.auth.uid;
+  const { processo_id, no_id, escolha } = request.data || {};
+  if (!processo_id || !no_id) throw new HttpsError('invalid-argument', 'processo_id e no_id obrigatórios.');
+
+  const db = getFirestore();
+  const processoRef = db.collection('processos').doc(processo_id);
+  const jogadorRef   = db.collection('jogadores').doc(uid);
+  const [pSnap, jSnap] = await Promise.all([processoRef.get(), jogadorRef.get()]);
+  if (!pSnap.exists || !jSnap.exists) throw new HttpsError('not-found', 'Processo ou jogador não encontrado.');
+  const p = pSnap.data(), j = jSnap.data();
+  if (!(await autorizadoParaProcessar(db, p, uid, j))) throw new HttpsError('permission-denied', 'Este processo não é seu.');
+
+  const investigacao = p.investigacao;
+  if (!investigacao) throw new HttpsError('failed-precondition', 'Investigação ainda não iniciada.');
+  if (investigacao.fase !== 'investigacao') throw new HttpsError('failed-precondition', 'Fase de investigação já encerrada.');
+
+  const no = investigacao.nos.find(n => n.id === no_id);
+  if (!no) throw new HttpsError('not-found', 'Nó não encontrado.');
+  if (no.status === 'revelado') throw new HttpsError('failed-precondition', 'Nó já revelado.');
+  if (no.status === 'bloqueado') throw new HttpsError('failed-precondition', 'Nó bloqueado — use pedirFavor ou consumirFavorNode.');
+  if (investigacao.turnos_usados >= investigacao.turnos_totais) throw new HttpsError('resource-exhausted', 'Turnos esgotados.');
+
+  const resultado = _executarNo(investigacao, no, escolha, j);
+
   await processoRef.update({ investigacao });
   return { ...resultado, investigacao: publicoDoNos(investigacao) };
+});
+
+// ─── 2b. Investigação rápida ───────────────────────────────────────────────
+// Resolve sozinha os nós visíveis até acabarem os turnos, com chance de
+// acerto pelos skills do jogador (50% a 85%) — em média um pouco pior que
+// jogar os puzzles com atenção. Para na Montagem (que já vem com as peças
+// limpas selecionadas no cliente).
+function _chanceAcertoRapida(skill) {
+  return 0.5 + Math.max(0, Math.min(50, Number(skill) || 0)) / 50 * 0.35;
+}
+
+exports.investigacaoRapida = onCall({ region: 'southamerica-east1' }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
+  const uid = request.auth.uid;
+  const { processo_id } = request.data || {};
+  if (!processo_id) throw new HttpsError('invalid-argument', 'processo_id obrigatório.');
+
+  const db = getFirestore();
+  const processoRef = db.collection('processos').doc(processo_id);
+  const jogadorRef   = db.collection('jogadores').doc(uid);
+  const [pSnap, jSnap] = await Promise.all([processoRef.get(), jogadorRef.get()]);
+  if (!pSnap.exists || !jSnap.exists) throw new HttpsError('not-found', 'Processo ou jogador não encontrado.');
+  const p = pSnap.data(), j = jSnap.data();
+  if (!(await autorizadoParaProcessar(db, p, uid, j))) throw new HttpsError('permission-denied', 'Este processo não é seu.');
+
+  const investigacao = p.investigacao;
+  if (!investigacao) throw new HttpsError('failed-precondition', 'Investigação ainda não iniciada.');
+  if (investigacao.fase !== 'investigacao') throw new HttpsError('failed-precondition', 'Fase de investigação já encerrada.');
+
+  const skJur = normalizarSkillsJur(j.skills_jur);
+  const acerta = (skill) => Math.random() < _chanceAcertoRapida(skill);
+  let reveladas = 0;
+  for (let guarda = 0; guarda < 20 && investigacao.fase === 'investigacao'; guarda++) {
+    const no = investigacao.nos.find(n => n.status === 'visivel' && ACOES_DIRETAS.has(n.tipo));
+    if (!no) break;
+    const dp = no.dados_puzzle || {};
+    let escolha = null;
+    if (no.tipo === 'analise_documental') escolha = acerta(skJur.analise_forense) ? dp.campo_suspeito : -1;
+    else if (no.tipo === 'pericia') escolha = acerta(skJur.analise_forense) ? dp.certa : -1;
+    else if (no.tipo === 'entrevista') escolha = { declaracao_escolhida: acerta(skJur.perfil_comportamental) ? dp.evasiva : -1, tom: 'empatia' };
+    _executarNo(investigacao, no, escolha, j);
+    reveladas++;
+  }
+  // Sem nó direto sobrando (só bloqueados por favor): encerra a investigação.
+  if (investigacao.fase === 'investigacao') investigacao.fase = 'montagem';
+
+  await processoRef.update({ investigacao });
+  return { reveladas, investigacao: publicoDoNos(investigacao) };
 });
 
 // ─── 3. Pedir favor a um NPC ────────────────────────────────────────────────
@@ -874,6 +929,8 @@ async function processarApodrecimentoFavores(db) {
 module.exports = {
   iniciarCasoInvestigativo: exports.iniciarCasoInvestigativo,
   executarAcaoInvestigacao: exports.executarAcaoInvestigacao,
+  investigacaoRapida: exports.investigacaoRapida,
+  _executarNo,
   pedirFavor: exports.pedirFavor,
   consumirFavorNode: exports.consumirFavorNode,
   confirmarMontagem: exports.confirmarMontagem,

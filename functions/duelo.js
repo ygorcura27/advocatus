@@ -124,6 +124,59 @@ exports.jogarRodadaDuelo = onCall({ region: 'southamerica-east1' }, async (reque
   return { duelo: resultado.publico, veredito: r.veredito, hon_pendente: r.hon_pendente, repDelta: r.repDelta, xpGanho: r.xpGanho };
 });
 
+// ─── Recurso como audiência no tribunal ─────────────────────────────────────
+// Casos do loop de investigação: o recurso reaproveita a mão montada no 1º
+// grau e vira uma nova audiência (duelo) na instância seguinte, mais difícil
+// a cada degrau (duelo_motor.js: NIVEL_INSTANCIA). O fim da audiência passa
+// pelo mesmo _finalizarJulgamentoCore → aceitar / recorrer de novo.
+function _mesTotal(j) { return (j.ano_pessoal || 1) * 12 + (j.mes_pessoal || 0); }
+
+exports.iniciarRecursoDuelo = onCall({ region: 'southamerica-east1' }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
+  const uid = request.auth.uid;
+  const { processo_id } = request.data || {};
+  if (typeof processo_id !== 'string') throw new HttpsError('invalid-argument', 'processo_id obrigatório.');
+
+  const db = getFirestore();
+  const { processoRef, jogadorRef } = _refs(db, processo_id, uid);
+  const [pSnap, jSnap] = await Promise.all([processoRef.get(), jogadorRef.get()]);
+  if (!pSnap.exists || !jSnap.exists) throw new HttpsError('not-found', 'Processo não encontrado.');
+  const p = pSnap.data();
+  const j = jSnap.data();
+  if (!(await autorizadoParaProcessar(db, p, uid, j))) throw new HttpsError('permission-denied', 'Este processo não é seu.');
+  if (p.status !== 'recurso_pendente') throw new HttpsError('failed-precondition', 'Este processo não tem recurso pendente.');
+
+  const inv = p.investigacao;
+  if (!inv || !Array.isArray(inv.nos)) throw new HttpsError('failed-precondition', 'Este recurso segue o formato antigo.');
+  const disp = p.data_disponivel_recurso;
+  if (disp && (disp.ano || 1) * 12 + (disp.mes || 0) > _mesTotal(j)) {
+    throw new HttpsError('failed-precondition', 'O tribunal ainda não pautou o recurso. Avance o mês.');
+  }
+
+  const pecas = (inv.mao_evidencias || []).map((id) => {
+    const no = inv.nos.find((n) => n.id === id);
+    return no && no.peca ? { no_id: id, forca: no.peca.forca, suja: no.peca.suja, pilar: no.peca.pilar, exposta: false } : null;
+  }).filter(Boolean);
+  if (pecas.length === 0) {
+    // Sem mão registrada: usa o que foi revelado na investigação.
+    inv.nos.filter((n) => n.status === 'revelado' && n.peca && !n.peca.suja)
+      .forEach((n) => pecas.push({ no_id: n.id, forca: n.peca.forca, suja: false, pilar: n.peca.pilar, exposta: false }));
+  }
+  if (pecas.length === 0) throw new HttpsError('failed-precondition', 'Não há provas para levar ao tribunal.');
+
+  const tribunal = p.instancia_seguinte;
+  inv.fase = 'julgamento';
+  inv.julgamento = { rodada_atual: 0, pecas_restantes: pecas, forca_total: 0, log: [], veredito: null, recurso: tribunal };
+  await processoRef.update({
+    investigacao: inv,
+    status: 'investigacao',
+    instancia_atual: tribunal,
+    resultado_setlist: null,
+    hon_pendente: 0,
+  });
+  return { ok: true, tribunal };
+});
+
 // ─── Traço de assinatura ────────────────────────────────────────────────────
 exports.escolherTracoAssinatura = onCall({ region: 'southamerica-east1' }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
